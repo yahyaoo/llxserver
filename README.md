@@ -27,6 +27,7 @@ fnos/
     app/server/              自动生成的应用载荷，不提交 Git
   scripts/                   构建、归档校验、发布工具及测试
   releases/                  按标签命名的发布说明
+  md/                        原飞牛截图、图标原稿和制作说明
   dist/                      自动生成的 FPK 和 SHA256，不提交 Git
 README_UPSTREAM.md           原官方说明
 ```
