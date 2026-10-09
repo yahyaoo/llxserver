@@ -16,3 +16,6 @@
 *.gif binary
 *.ico binary
 *.svg text eol=lf
+
+fnos/**/cmd/* text eol=lf
+fnos/**/*.PNG binary

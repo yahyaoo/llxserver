@@ -1,12 +1,14 @@
 {
   "name": "lx-music-sync-server",
-  "version": "v_jyh_2.1.2",
+  "version": "2.1.3",
   "private": true,
   "scripts": {
     "prebuild": "node scripts/download-binary.js && node scripts/update-build-hash.js",
     "build": "rimraf server && tsc --project tsconfig.json && tsc-alias -p tsconfig.json",
     "test": "node --test test/*.test.cjs",
-    "test:unit": "tsx --test test/*.test.ts",
+    "test:unit": "node --test test/appUpdates.test.cjs test/downloadAuth.test.cjs test/serverDownloads.test.cjs test/settingsFrontend.test.cjs",
+    "test:system": "node --test test/serverDownloads.system.test.cjs",
+    "test:fpk:system": "node --test fnos/test/fpk.system.test.cjs",
     "prestart": "node scripts/download-binary.js && node scripts/update-build-hash.js",
     "start": "node ./index.js",
     "predev": "node scripts/update-build-hash.js",
@@ -19,7 +21,11 @@
     "publish": "node publish",
     "electron:build": "npm run build",
     "electron:dist": "npm run electron:build && electron-builder",
-    "prepare": "husky || true"
+    "prepare": "husky || true",
+    "build:fpk": "node fnos/scripts/build.js && node fnos/scripts/package.js",
+    "prepare:fpk": "node fnos/scripts/build.js",
+    "package:fpk": "node fnos/scripts/package.js",
+    "test:fpk": "node --test fnos/scripts/*.test.cjs"
   },
   "engines": {
     "node": ">= 20",
@@ -27,7 +33,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+http://frp.yahyaoo.top:4012/yahyaoo/lxserver-source.git"
+    "url": "git+https://github.com/yahyaoo/fn-lxserver.git"
   },
   "author": {
     "name": "XCQ",
@@ -35,9 +41,9 @@
   },
   "license": "Apache-2.0",
   "bugs": {
-    "url": "https://github.com/XCQ0607/lxserver/issues"
+    "url": "https://github.com/yahyaoo/fn-lxserver/issues"
   },
-  "homepage": "https://github.com/XCQ0607/lxserver#readme",
+  "homepage": "https://github.com/yahyaoo/fn-lxserver#readme",
   "dependencies": {
     "@foobar404/wave": "^2.0.5",
     "@types/formidable": "^3.5.1",

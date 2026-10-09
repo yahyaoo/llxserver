@@ -1,5 +1,5 @@
 /** 自定义发布仓库的更新检查；默认关闭，不依赖统计服务。 @author jingyh */
-export const DEFAULT_UPDATE_SERVER = 'http://frp.yahyaoo.top:4012/api/v1/repos/yahyaoo/lxserver-source/releases/latest'
+export const DEFAULT_UPDATE_SERVER = 'https://api.github.com/repos/yahyaoo/fn-lxserver/releases/latest'
 
 /** 检查完整的发布 API 地址，只允许 HTTP 和 HTTPS。 */
 export const validateUpdateServer = (value: unknown): string => {

@@ -1,0 +1,14 @@
+appname         = levis.lxserver
+version         = 2.1.3
+desc            = LX Music Web 播放器 - 聚合多平台音乐搜索与在线播放
+arch            = x86_64
+platform        = x86
+display_name    = LX Music Player
+maintainer      = levis
+distributor     = levis
+desktop_uidir   = ui
+desktop_applaunchname = levis.lxserver.Application
+source          = thirdparty
+install_type    =
+install_dep_apps = nodejs_v24
+service_port    = 17000

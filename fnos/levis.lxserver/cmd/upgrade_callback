@@ -1,0 +1,12 @@
+#!/bin/bash
+
+export PATH=/var/apps/nodejs_v24/target/bin:$PATH
+export HOME="${TRIM_PKGVAR}"
+APP_DIR="${TRIM_APPDEST}/server"
+LOG_FILE="${TRIM_PKGVAR}/info.log"
+
+echo "$(date '+%Y-%m-%d %H:%M:%S') - Upgrading dependencies..." >> ${LOG_FILE}
+set -o pipefail
+cd "${APP_DIR}" && npm ci --omit=dev --no-audit --no-fund 2>&1 | tee -a "${LOG_FILE}" || exit 1
+
+exit 0

@@ -2,9 +2,6 @@ name: Build and Release
 
 on:
   workflow_dispatch:
-  push:
-    tags:
-      - 'v*'
 
 jobs:
   # ── 1. 初始化阶段：获取版本号和更新日志 ──────────────────────────────────────
@@ -232,13 +229,6 @@ jobs:
         with:
           path: release_assets
           merge-multiple: true
-
-      - name: Delete existing release (Cleanup)
-        run: |
-          gh release delete ${{ needs.init.outputs.VERSION }} --yes --cleanup-tag || echo "Release not found"
-          sleep 5
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
