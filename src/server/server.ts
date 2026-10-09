@@ -29,6 +29,8 @@ import * as customSourceHandlers from './customSourceHandlers'
 import * as fileCache from './fileCache'
 import * as customMusicManager from './customMusicManager'
 import * as serverDownloadQueue from './serverDownloadQueue'
+import * as serverDownloads from './serverDownloads'
+import * as appUpdates from './appUpdates'
 import * as remasterQueue from './remasterQueue'
 import * as scheduler from './scheduler'
 import { getUpdatedListIds, removeUpdatedListId } from './task/networkListTask'
@@ -678,6 +680,26 @@ const saveUsers = () => {
   }
 }
 
+/** 统一保存目录前完成全部校验，仅允许修改现有用户的目录字段。 @author jingyh */
+const validateCustomDirectoryUpdates = (value: unknown) => {
+  if (value === undefined) return []
+  if (!Array.isArray(value) || value.length > global.lx.config.users.length) throw new Error('用户歌曲目录配置格式错误')
+  const names = new Set<string>()
+  return value.map(entry => {
+    if (!entry || typeof entry.name !== 'string' || typeof entry.customMusicDir !== 'string' || typeof entry.enableCustomMusicDir !== 'boolean' || names.has(entry.name)) throw new Error('用户歌曲目录配置格式错误')
+    const user = global.lx.config.users.find(user => user.name === entry.name)
+    if (!user) throw new Error('目录所属用户不存在')
+    names.add(entry.name)
+    const directory = entry.customMusicDir.trim()
+    if (entry.enableCustomMusicDir && !directory) throw new Error(`用户 ${entry.name} 启用歌曲目录时必须填写绝对路径`)
+    if (directory) {
+      if (!path.isAbsolute(directory) || /[<>"|?*\x00-\x1f]/.test(directory)) throw new Error(`用户 ${entry.name} 的歌曲目录必须是有效绝对路径`)
+      try { fs.mkdirSync(directory, { recursive: true }); fs.accessSync(directory, fs.constants.R_OK) } catch { throw new Error(`用户 ${entry.name} 的歌曲目录无法访问，请检查路径与应用目录权限`) }
+    }
+    return { user, directory, enabled: entry.enableCustomMusicDir, oldDirectory: user.customMusicDir || '', oldEnabled: !!user.enableCustomMusicDir }
+  })
+}
+
 /** [新增] 服务器内部热重载数据 */
 const reloadServerData = async () => {
   startupLog.info('Hot-reloading server data (users and config)...')
@@ -1246,6 +1268,8 @@ const handleStartServer = async (port = 9527, ip = '0.0.0.0') => await new Promi
       const frontendConfig = {
         version,
         buildHash,
+        updateEnabled: global.lx.config['update.enabled'] === true,
+        updateServer: global.lx.config['update.server'] || appUpdates.DEFAULT_UPDATE_SERVER,
         serverName: global.lx.config.serverName,
         disableTelemetry: global.lx.config.disableTelemetry || false,
         'proxy.enabled': global.lx.config['proxy.enabled'],
@@ -1412,6 +1436,19 @@ const handleStartServer = async (port = 9527, ip = '0.0.0.0') => await new Promi
         return
       }
 
+      if (pathname === '/api/app/update/check' && req.method === 'GET') {
+        try {
+          const content = fs.readFileSync(path.join(global.lx.staticPath, 'js/config.js'), 'utf8')
+          const version = content.match(/version:\s*['"]([^'"]+)['"]/)?.[1] || ''
+          const result = await appUpdates.checkAppUpdate(version)
+          res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' })
+          res.end(JSON.stringify(result))
+        } catch {
+          res.writeHead(502, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ success: false, message: '检查更新失败，请检查更新服务器地址、网络连接或私有仓库访问令牌' }))
+        }
+        return
+      }
       if (pathname === '/api/users') {
         const auth = req.headers['x-frontend-auth']
         if (auth !== global.lx.config['frontend.password']) {
@@ -1498,11 +1535,15 @@ const handleStartServer = async (port = 9527, ip = '0.0.0.0') => await new Promi
                 const oldEnabled = !!user.enableCustomMusicDir
                 const oldCustomDir = (user.customMusicDir || '').trim()
 
-                if (password) user.password = password
-                if (enableCustomMusicDir !== undefined) user.enableCustomMusicDir = !!enableCustomMusicDir
+                // 先验证目录，再修改用户状态，避免失败请求留下部分配置。 @author jingyh
                 if (customMusicDir !== undefined) {
                   const trimmedMusicDir = String(customMusicDir).trim()
                   if (trimmedMusicDir) {
+                    if (!path.isAbsolute(trimmedMusicDir)) {
+                      res.writeHead(422, { 'Content-Type': 'application/json' })
+                      res.end(JSON.stringify({ success: false, error: '自定义音乐目录请填写服务器绝对路径' }))
+                      return
+                    }
                     if (/[<>"|?*]/.test(trimmedMusicDir)) {
                       res.writeHead(422, { 'Content-Type': 'application/json' })
                       res.end(JSON.stringify({ success: false, error: '自定义音乐目录包含非法字符 (< > " | ? *)' }))
@@ -1517,8 +1558,16 @@ const handleStartServer = async (port = 9527, ip = '0.0.0.0') => await new Promi
                       return
                     }
                   }
-                  user.customMusicDir = trimmedMusicDir
                 }
+                const finalMusicDir = customMusicDir === undefined ? oldCustomDir : String(customMusicDir).trim()
+                if ((enableCustomMusicDir === undefined ? oldEnabled : !!enableCustomMusicDir) && !finalMusicDir) {
+                  res.writeHead(422, { 'Content-Type': 'application/json' })
+                  res.end(JSON.stringify({ success: false, error: '启用自定义音乐目录时必须填写目录路径' }))
+                  return
+                }
+                if (password) user.password = password
+                if (enableCustomMusicDir !== undefined) user.enableCustomMusicDir = !!enableCustomMusicDir
+                if (customMusicDir !== undefined) user.customMusicDir = finalMusicDir
                 if (allowOperateCustomMusicDir !== undefined) user.allowOperateCustomMusicDir = !!allowOperateCustomMusicDir
                 if (allowWriteCustomMusicDir !== undefined) user.allowWriteCustomMusicDir = !!allowWriteCustomMusicDir
                 if (enableAutoDownload !== undefined) user.enableAutoDownload = !!enableAutoDownload
@@ -3598,7 +3647,10 @@ const handleStartServer = async (port = 9527, ip = '0.0.0.0') => await new Promi
                     return
                   }
                 }
+                if (!['data', 'root'].includes(location)) serverDownloads.validateDirectory(location)
                 fileCache.setCacheLocation(location)
+                global.lx.config.serverCacheLocation = location
+                global.lx.saveConfig?.()
                 updated = true
               }
             }
@@ -3616,9 +3668,9 @@ const handleStartServer = async (port = 9527, ip = '0.0.0.0') => await new Promi
               res.writeHead(200, { 'Content-Type': 'application/json' })
               res.end(JSON.stringify({ success: true, message: 'No changes' }))
             }
-          } catch (e) {
-            res.writeHead(500)
-            res.end('Error')
+          } catch (e: any) {
+            res.writeHead(400, { 'Content-Type': 'application/json' })
+            res.end(JSON.stringify({ success: false, error: e.message || '缓存目录保存失败' }))
           }
         })
         return
@@ -3659,7 +3711,7 @@ const handleStartServer = async (port = 9527, ip = '0.0.0.0') => await new Promi
             cacheDirectory: cacheDir,
             downloadDirectory: onlyDownloadQuery ? downloadDir : cacheDir,
             rawDownloadDirectory: downloadDir,
-            rootType: effectiveLocation === 'data' ? 'DATA_PATH (WebDAV同步)' : '运行目录 (仅本地)',
+            rootType: path.isAbsolute(effectiveLocation) ? '自定义目录' : (effectiveLocation === 'data' ? 'DATA_PATH (WebDAV同步)' : '运行目录 (仅本地)'),
             isWebDAVSynced: effectiveLocation === 'data'
           }
         }))
@@ -3934,6 +3986,36 @@ const handleStartServer = async (port = 9527, ip = '0.0.0.0') => await new Promi
         return
       }
 
+      // 指定目录下载只按已登记索引提供文件，禁止客户端传入任意服务器路径。
+      if (pathname === '/api/music/server-download/check' && req.method === 'GET') {
+        const username = getCacheRequestUsername(req)
+        if (!username) { res.writeHead(401); res.end('Unauthorized'); return }
+        try {
+          const song = Object.fromEntries(urlObj.searchParams)
+          const result = serverDownloads.check(song, username, song.quality, song.exactQuality === '1', song.currentDirectory === '1')
+          if ('url' in result && result.url && username !== '_open' && req.headers['x-user-token']) {
+            result.url += `&token=${encodeURIComponent(String(req.headers['x-user-token']))}`
+          }
+          res.writeHead(200, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify(result))
+        } catch (err: any) {
+          res.writeHead(400, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ exists: false, message: err.message }))
+        }
+        return
+      }
+      if (pathname.startsWith('/api/music/server-download/file/')) {
+        const requestedUsername = urlObj.searchParams.get('username') || '_open'
+        if (requestedUsername !== '_open') {
+          if (!req.headers['x-user-name']) req.headers['x-user-name'] = requestedUsername
+          if (!req.headers['x-user-token']) req.headers['x-user-token'] = urlObj.searchParams.get('token') || ''
+        }
+        const username = getCacheRequestUsername(req)
+        if (!username || username !== requestedUsername) { res.writeHead(401); res.end('Unauthorized'); return }
+        serverDownloads.serve(req, res, pathname.split('/').pop() || '', username)
+        return
+      }
+
       // 2. Check Cache
       if (pathname === '/api/music/cache/check' && req.method === 'GET') {
         const name = urlObj.searchParams.get('name')
@@ -4012,6 +4094,15 @@ const handleStartServer = async (port = 9527, ip = '0.0.0.0') => await new Promi
           try {
             const { tasks, namingPattern, concurrency } = JSON.parse(body)
             if (!Array.isArray(tasks) || tasks.length === 0) throw new Error('Missing tasks')
+            for (const task of tasks) {
+              if (task.serverDownload === true) {
+                serverDownloads.songIdentity(task.songInfo)
+                serverDownloads.validateDirectory(serverDownloads.getDirectory())
+                if (task.lyricMode !== 'external' && task.lyricMode !== 'embedded') {
+                  task.lyricMode = global.lx.config['download.lyricMode'] || 'embedded'
+                }
+              }
+            }
             if (concurrency !== undefined) serverDownloadQueue.setConcurrency(username, concurrency)
             if (namingPattern) {
               const auth = req.headers['x-frontend-auth']
@@ -5199,6 +5290,12 @@ const handleStartServer = async (port = 9527, ip = '0.0.0.0') => await new Promi
         if (!isPublic) {
           const verified = verifyUserAuth(req)
           if (verified) lyricUsername = verified
+        }
+        const downloadedLyric = serverDownloads.getLyric({ source, songmid }, lyricUsername)
+        if (downloadedLyric) {
+          res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'private, no-store' })
+          res.end(JSON.stringify({ lyric: downloadedLyric, _fromLocalCache: true }))
+          return
         }
         const localLyricResult = fileCache.checkLyricCache({
           source,
@@ -6919,6 +7016,12 @@ const handleStartServer = async (port = 9527, ip = '0.0.0.0') => await new Promi
         if (req.method === 'GET') {
           const config = {
             serverName: global.lx.config.serverName,
+            'download.directory': global.lx.config['download.directory'] || '',
+            'download.lyricMode': global.lx.config['download.lyricMode'] || 'embedded',
+            'download.nameTemplate': global.lx.config['download.nameTemplate'] || serverDownloads.DEFAULT_NAME_TEMPLATE,
+            'update.enabled': global.lx.config['update.enabled'] === true,
+            'update.server': global.lx.config['update.server'] || appUpdates.DEFAULT_UPDATE_SERVER,
+            'update.hasToken': !!global.lx.config['update.token'],
             'debug.enabled': global.lx.config['debug.enabled'] || false,
             maxSnapshotNum: global.lx.config.maxSnapshotNum,
             'list.addMusicLocationType': global.lx.config['list.addMusicLocationType'],
@@ -7011,6 +7114,28 @@ const handleStartServer = async (port = 9527, ip = '0.0.0.0') => await new Promi
           void readBody(req).then(body => {
             try {
               const newConfig = JSON.parse(body)
+              const customDirectoryUpdates = validateCustomDirectoryUpdates(newConfig['user.customMusicDirectories'])
+              const nameTemplate = newConfig['download.nameTemplate'] === undefined ? undefined : serverDownloads.validateNameTemplate(newConfig['download.nameTemplate'])
+              const updateServer = newConfig['update.server'] === undefined ? undefined : appUpdates.validateUpdateServer(newConfig['update.server'])
+              if (newConfig['update.enabled'] !== undefined && typeof newConfig['update.enabled'] !== 'boolean') throw new Error('检查更新开关格式错误')
+              if (newConfig['update.token'] !== undefined && (typeof newConfig['update.token'] !== 'string' || /[\r\n]/.test(newConfig['update.token']))) throw new Error('更新访问令牌格式错误')
+              // 先校验目录，失败时不修改已有配置；保存沿用原 config.js 持久化流程。
+              let downloadDirectory: string | undefined
+              if (newConfig['download.directory'] !== undefined) {
+                const value = newConfig['download.directory']
+                if (value === '') downloadDirectory = ''
+                else downloadDirectory = serverDownloads.validateDirectory(value)
+              }
+              if (newConfig['download.lyricMode'] !== undefined && !['embedded', 'external'].includes(newConfig['download.lyricMode'])) {
+                throw new Error('无效的歌词写入方式')
+              }
+              if (downloadDirectory !== undefined) global.lx.config['download.directory'] = downloadDirectory
+              if (nameTemplate !== undefined) global.lx.config['download.nameTemplate'] = nameTemplate
+              if (updateServer !== undefined) global.lx.config['update.server'] = updateServer
+              if (newConfig['update.enabled'] !== undefined) global.lx.config['update.enabled'] = newConfig['update.enabled']
+              if (newConfig['update.token']?.trim()) global.lx.config['update.token'] = newConfig['update.token'].trim()
+              if (newConfig['update.clearToken'] === true) global.lx.config['update.token'] = ''
+              if (newConfig['download.lyricMode'] !== undefined) global.lx.config['download.lyricMode'] = newConfig['download.lyricMode']
               if (newConfig.serverName !== undefined) global.lx.config.serverName = newConfig.serverName
               if (newConfig['debug.enabled'] !== undefined) global.lx.config['debug.enabled'] = newConfig['debug.enabled']
               if (newConfig.maxSnapshotNum !== undefined) global.lx.config.maxSnapshotNum = parseInt(newConfig.maxSnapshotNum)
@@ -7244,6 +7369,19 @@ const handleStartServer = async (port = 9527, ip = '0.0.0.0') => await new Promi
                 })
               }
 
+              for (const update of customDirectoryUpdates) {
+                update.user.customMusicDir = update.directory
+                update.user.enableCustomMusicDir = update.enabled
+              }
+              if (customDirectoryUpdates.length && !saveUsers()) throw new Error('用户歌曲目录保存失败，请检查应用数据目录写入权限')
+              // 沿用用户管理页面的目录迁移行为，仅迁移已经选择 custom 存储的同步歌曲。
+              for (const update of customDirectoryUpdates) {
+                try {
+                  if (getSyncDownloadData(update.user.name).storageLocation !== 'custom') continue
+                  if (update.oldEnabled && !update.enabled) migrateSyncStorage(update.user.name, 'root', { overrideOldCustomDir: update.oldDirectory })
+                  else if (update.enabled && update.oldDirectory && update.directory && update.oldDirectory !== update.directory) migrateSyncStorage(update.user.name, 'custom', { overrideOldCustomDir: update.oldDirectory, overrideNewCustomDir: update.directory })
+                } catch (error: any) { console.error('[用户目录] 保存后的目录迁移失败:', error.message) }
+              }
               const configPath = global.lx.configPath || process.env.CONFIG_PATH || path.join(global.lx.dataPath, 'config.js')
               const configContent = `module.exports = ${JSON.stringify({
                 serverName: global.lx.config.serverName,
@@ -7328,6 +7466,12 @@ const handleStartServer = async (port = 9527, ip = '0.0.0.0') => await new Promi
                 'singer.sourcePriority': global.lx.config['singer.sourcePriority'],
                 'artist.maxFetchPages': global.lx.config['artist.maxFetchPages'],
                 'cache.namingPattern': global.lx.config['cache.namingPattern'],
+                'download.directory': global.lx.config['download.directory'],
+                'download.lyricMode': global.lx.config['download.lyricMode'],
+                'download.nameTemplate': global.lx.config['download.nameTemplate'],
+                'update.enabled': global.lx.config['update.enabled'],
+                'update.server': global.lx.config['update.server'],
+                'update.token': global.lx.config['update.token'],
                 'system.allowUnsafeVM': global.lx.config['system.allowUnsafeVM'],
                 users: global.lx.config.users.map(u => ({
                   name: u.name,
@@ -7355,9 +7499,9 @@ const handleStartServer = async (port = 9527, ip = '0.0.0.0') => await new Promi
 
               res.writeHead(200)
               res.end(JSON.stringify({ success: true, warning }))
-            } catch (e) {
-              res.writeHead(500)
-              res.end('Server Error')
+            } catch (e: any) {
+              res.writeHead(400, { 'Content-Type': 'application/json' })
+              res.end(JSON.stringify({ success: false, message: e.message || '配置保存失败' }))
             }
           })
           return
@@ -8743,7 +8887,7 @@ export const startServer = async (port: number, ip: string) => {
     const settingsPath = path.join(openUserSpace.dataManage.userDir, File.userSettingsJSON)
     if (fs.existsSync(settingsPath)) {
       const savedSettings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'))
-      if (savedSettings.serverCacheLocation) {
+      if (savedSettings.serverCacheLocation && !path.isAbsolute(global.lx.config.serverCacheLocation || '')) {
         fileCache.setCacheLocation(savedSettings.serverCacheLocation)
         console.log(`[缓存] 从配置恢复服务器缓存路径: ${savedSettings.serverCacheLocation}`)
       }
@@ -8756,6 +8900,14 @@ export const startServer = async (port: number, ip: string) => {
     console.warn('[缓存] 恢复缓存设置失败:', err.message)
   }
 
+  serverDownloads.initialize({
+    lyric: async (song, username) => {
+      const cached = fileCache.checkLyricCache(song, username)
+      if (cached.exists && cached.content?.lyric) return cached.content.lyric
+      return fileCache.getLyricFetcher()?.(song) || null
+    },
+    embed: fileCache.embedLyricsIntoFile,
+  })
   serverDownloadQueue.initialize(async task => {
     const songInfo = normalizeSongInfo(task.songInfo)
     const apiUsername = task.username === '_open' ? 'open' : task.username

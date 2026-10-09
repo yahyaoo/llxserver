@@ -374,7 +374,7 @@ async function downloadSong(songOrId, forceQuality = null, suppressAlerts = fals
         const checkResult = await window.checkServerCache?.(song, prefQuality);
         const cacheSuffix = (checkResult?.exists && !checkResult?.isCollision) ? ' (已缓存)' : '';
 
-        const options = ['浏览器下载', `${actionLabel}${cacheSuffix}`];
+        const options = ['浏览器下载', `${actionLabel}${cacheSuffix}`, '服务器下载'];
         const modeText = isOnlyDownload ? '仅下载模式' : '缓存模式';
         selected = await showOptions('下载与缓存', `[${modeText}] 选择对 [${song.name}] 的操作：`, options);
     }
@@ -385,7 +385,26 @@ async function downloadSong(songOrId, forceQuality = null, suppressAlerts = fals
     const enablePublicRestriction = window.lx_config?.['user.enablePublicRestriction'];
     const isAdmin = !!localStorage.getItem('lx_admin_password');
 
-    if (selected === '浏览器下载') {
+    if (selected === '服务器下载') {
+        const isAllowed = window.lx_config?.['user.enablePublicNonAdminServerCache'] !== false;
+        if (isPublic && enablePublicRestriction && !isAllowed && !isAdmin) {
+            if (!(await window.handleAdminAuth?.('服务器下载需要验证管理员身份'))) return false;
+        }
+        let quality = forceQuality;
+        if (!quality) {
+            const qualities = getSelectableQualityOrder(song);
+            const labels = await buildQualityOptionLabels(song, qualities);
+            const chosen = await showOptions('选择下载音质', `请选择对 [${song.name}] 的下载音质：`, labels);
+            if (!chosen) return false;
+            quality = qualities[labels.indexOf(chosen)];
+        }
+        const mode = await showOptions('歌词写入', '请选择服务器下载的歌词写入方式：', ['使用后台默认方式', '内嵌到音频（默认）', '外部 .lrc 文件']);
+        if (!mode) return false;
+        if (!window.SystemDownloadManager) { showError('下载管理器未就绪'); return false; }
+        await window.SystemDownloadManager.addTasks([{ ...song, isServer: true, serverDownload: true,
+            quality, lyricMode: mode === '使用后台默认方式' ? undefined : (mode === '外部 .lrc 文件' ? 'external' : 'embedded') }]);
+        return true;
+    } else if (selected === '浏览器下载') {
         const isBrowserDownloadAllowed = window.lx_config?.['user.enablePublicNonAdminBrowserDownload'] !== false;
         if (isPublic && enablePublicRestriction && !isBrowserDownloadAllowed && !isAdmin) {
             showError('权限限制：管理员已关闭非管理员浏览器下载功能，下载歌曲需要验证管理员身份。');

@@ -135,7 +135,7 @@ class DownloadManager {
     async requestServerQueue(path, body) {
         const options = { method: body === undefined ? 'GET' : 'POST', headers: this.getServerQueueHeaders() };
         if (body !== undefined) options.body = JSON.stringify(body);
-        const response = await fetch(path, options);
+        const response = await window.fetchDownloadWithAuth(path, options);
         const result = await response.json().catch(() => ({}));
         if (!response.ok || result.success === false) throw new Error(result.message || `HTTP ${response.status}`);
         return result.data;
@@ -152,6 +152,8 @@ class DownloadManager {
                     id: task.id,
                     songInfo: this.getSongInfoForServer(task.song),
                     quality: task.quality,
+                    serverDownload: task.serverDownload === true,
+                    lyricMode: task.lyricMode,
                     enableOnlyDownloadMode: window.settings?.enableOnlyDownloadMode || false,
                     cacheLyric: window.settings?.enableServerLyricCache !== false,
                     embedLyric: !!(window.settings?.embedLyricToFile ?? true)
@@ -198,6 +200,8 @@ class DownloadManager {
                         id: item.id,
                         song: item.songInfo || {},
                         isServer: true,
+                        serverDownload: item.serverDownload === true,
+                        lyricMode: item.lyricMode,
                         serverManaged: true,
                         serverQueueRegistered: true,
                         serverQueueId: item.id,
@@ -216,6 +220,8 @@ class DownloadManager {
                     this.tasks.push(task);
                 } else {
                     task.song = item.songInfo || task.song;
+                    task.serverDownload = item.serverDownload === true;
+                    task.lyricMode = item.lyricMode;
                     task.serverManaged = true;
                     task.serverQueueRegistered = true;
                     task.serverQueueId = item.id;
@@ -515,7 +521,7 @@ class DownloadManager {
 
     // [New] 检测任务歌词是否存在
     async checkTaskLyric(task) {
-        if (!task || !task.isServer || task.status !== 'finished') return;
+        if (!task || !task.isServer || task.serverDownload || task.status !== 'finished') return;
 
         // [优化] 如果已经有结果，或者重试超过 3 次，则不再请求
         if ((task.hasLyric === true || task.hasLyric === false) || (task.lyricRetryCount || 0) >= 3) return;
@@ -692,7 +698,9 @@ class DownloadManager {
         const results = await this.mapWithConcurrency(songs, 8, async (song) => {
             const targetPref = song.quality || window.settings?.preferredQuality || 'flac';
             const quality = song.quality || (window.QualityManager ? window.QualityManager.getBestQuality(song, targetPref) : targetPref);
-            const cacheResult = await checkServerCache(song, quality, true);
+            const cacheResult = song.serverDownload
+                ? await window.checkServerDownload(song, quality, true, true)
+                : await checkServerCache(song, quality, true);
             return { song, quality, cacheResult };
         });
 
@@ -702,7 +710,7 @@ class DownloadManager {
             const isServerTask = song.isServer || false;
             if (cacheResult.exists && !cacheResult.isCollision) {
                 const onlyDownloadMode = window.settings?.enableOnlyDownloadMode === true;
-                const targetAlreadyExists = !onlyDownloadMode || cacheResult.folder === 'music';
+                const targetAlreadyExists = song.serverDownload ? cacheResult.folder === 'download' : (!onlyDownloadMode || cacheResult.folder === 'music');
                 if (isServerTask && targetAlreadyExists) { // 仅下载模式下 cache 命中仍需交给后端复制到 music 目录
                     skipCount++;
                     continue;
@@ -714,6 +722,7 @@ class DownloadManager {
             const songIdentity = this.getSongIdentity(song);
             const existing = this.tasks.find(t =>
                 this.getSongIdentity(t.song) === songIdentity &&
+                !!t.serverDownload === !!song.serverDownload &&
                 t.quality === quality &&
                 (t.status === 'waiting' || t.status === 'starting' || t.status === 'downloading' || t.status === 'tagging')
             );
@@ -726,6 +735,8 @@ class DownloadManager {
                     id: taskId,
                     song: song,
                     isServer: isServerTask,
+                    serverDownload: song.serverDownload === true,
+                    lyricMode: song.lyricMode,
                     serverManaged: isServerTask,
                     serverQueueRegistered: false,
                     serverQueueId: isServerTask ? taskId : null,
@@ -1589,7 +1600,7 @@ class DownloadManager {
                             ${speedText ? `<span class="text-[10px] font-mono text-emerald-500">${speedText}</span>` : ''}
                             
                             <!-- LRC Status Tag -->
-                            ${isServerTask && task.status === 'finished' ? `
+                            ${isServerTask && !task.serverDownload && task.status === 'finished' ? `
                                 ${task.hasLyric === true ? `
                                     <span class="text-[9px] bg-emerald-500 text-white px-1 rounded h-3.5 flex items-center shadow-sm" title="歌词已同步">LRC</span>
                                 ` : task.hasLyric === false ? `

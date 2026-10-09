@@ -132,7 +132,7 @@
 
         // 版本信息展示逻辑
         const currentVer = CONFIG.getLocalVersion();
-        const isVerRelated = item.type === 'version' || (item.id && item.id.includes('manual_check'));
+        const isVerRelated = item.type === 'version' || !!item.logic?.target_version;
         let versionBadge = '';
         if (isVerRelated) {
             let targetVer = '未知';
@@ -279,7 +279,7 @@
                 }
             } else if (action === 'link') {
                 close();
-                window.open(item.action.url, '_blank');
+                window.open(item.action.url, '_blank', 'noopener,noreferrer');
             } else {
                 close();
             }
@@ -444,94 +444,46 @@
     }
 
     // ================= 5. 初始化入口 =================
+
+    /** 默认关闭时不请求；开启后仅查询本机更新接口。 @author jingyh */
     function init() {
-        if (typeof posthog === 'undefined') {
-            if (!window._ph_retry) window._ph_retry = 0;
-            if (window._ph_retry < 10) {
-                window._ph_retry++;
-                setTimeout(init, 500);
-            }
-            return;
-        }
-
-        posthog.onFeatureFlags(() => {
-            checkUpdates(false);
-        });
+        if (window.CONFIG?.updateEnabled === true) checkUpdates(false);
     }
-
+    const escapeText = value => String(value || '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
+    let checking = false;
     async function checkUpdates(isManual = false) {
-        // 如果是手动检查，增加一个主动探测逻辑来判断 PostHog 是否被拦截
-        let adBlocked = !!window._ph_blocked;
-        if (isManual && !adBlocked) {
-            // 如果 posthog 对象看起来还没完全加载，进行一次 fetch 探测
-            if (typeof posthog === 'undefined' || !posthog.__loaded) {
-                try {
-                    await fetch('https://us.i.posthog.com/static/array.js', { mode: 'no-cors', cache: 'no-store' });
-                } catch (e) {
-                    console.warn('[Notification] Proactive AdBlocker detection triggered.');
-                    adBlocked = true;
-                }
-            }
-        }
-
-        // 如果是手动检查，尝试强制刷新 PostHog 配置以获取最新数据
-        if (isManual && typeof posthog !== 'undefined' && !adBlocked) {
-            try { posthog.reloadFeatureFlags(); } catch (e) { console.error('[Notification] Reload flags failed:', e); }
-        }
-
-        // 如果服务没加载，或者被 AdBlocker 拦截，或者配置里明确禁用了，直接弹窗提示
-        if (typeof posthog === 'undefined' || (window.CONFIG && window.CONFIG.disableTelemetry) || adBlocked) {
-            if (isManual) {
-                const message = adBlocked
-                    ? '由于您的浏览器广告拦截插件（AdBlocker）拦截了更新检查服务，无法在线获取最新版本信息。请暂时关闭插件或将 LX Server 地址加入白名单。'
-                    : '由于在线更新检测服务未加载（可能已禁用统计），请前往 GitHub 检查最新版本。';
-
-                const errorItem = {
-                    id: 'manual_check_disabled',
-                    type: 'warning',
-                    ui: {
-                        title: '检查更新受阻',
-                        message: message,
-                        confirm_text: '确定',
-                        cancel_text: ''
-                    },
-                    action: { type: 'close' },
-                    logic: { interval_hours: 0 }
-                };
-                renderModal(errorItem, 'temp_manual_disabled', null);
-            }
+        if (checking) return;
+        const show = (title, message, type = 'info', version = '', url = '') => {
+            const item = {
+                id: 'manual_check_' + (version || 'status'), type,
+                ui: { title: escapeText(title), message: escapeText(message), confirm_text: url ? '查看发布' : '确定', cancel_text: url ? '稍后' : '', section_title: type === 'version' ? '更新内容与日志' : '检查结果' },
+                logic: { interval_hours: 0, target_version: escapeText(version) },
+                action: url ? { type: 'link', url } : { type: 'close' }
+            };
+            renderModal(item, 'temp_update_check', null);
+        };
+        if (window.CONFIG?.updateEnabled !== true) {
+            if (isManual) show('检查更新已关闭', '请在设置中的“版本更新”开启检查更新。');
             return;
         }
-
-        let checked = false;
-        for (const key of CONFIG.PRIORITY_KEYS) {
-            const isEnabled = posthog.isFeatureEnabled(key);
-            if (isEnabled) {
-                const payload = posthog.getFeatureFlagPayload(key);
-                if (payload) {
-                    handlePayload(payload, key, isManual);
-                    checked = true;
-                    return;
-                }
+        checking = true;
+        try {
+            const response = await fetch('/api/app/update/check', { cache: 'no-store' });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.message || '检查更新失败');
+            if (!data.enabled) {
+                window.CONFIG.updateEnabled = false;
+                if (isManual) show('检查更新已关闭', '服务端已关闭检查更新。');
+            } else if (data.hasUpdate) {
+                let url = '';
+                try { const parsed = new URL(data.releaseUrl); if (['http:', 'https:'].includes(parsed.protocol) && !parsed.username && !parsed.password) url = parsed.href; } catch {}
+                show('发现新版本', data.notes || '请前往发布页面查看详情并下载安装包。', 'version', data.version, url);
+            } else if (isManual) {
+                show('当前已是最新版本', '当前版本：' + data.currentVersion + '\n最新发布：' + data.version, 'info', data.version);
             }
-        }
-
-        if (isManual && !checked) {
-            // 如果 Feature Flags 里没东西，仅显示提示即可
-            const upToDateItem = {
-                id: 'manual_check_uptodate',
-                type: 'info',
-                ui: {
-                    title: '当前已是最新版本',
-                    message: `无法从服务器获取到版本发布详情，您的系统当前版本为 ${CONFIG.getLocalVersion().replace(/^v+/, 'v')}。`,
-                    confirm_text: '确定',
-                    cancel_text: ''
-                },
-                action: { type: 'close' },
-                logic: { interval_hours: 0 }
-            };
-            renderModal(upToDateItem, 'temp_manual_check', null);
-        }
+        } catch (error) {
+            if (isManual) show('检查更新失败', error.message || '请检查服务器地址、网络或访问令牌。', 'warning');
+        } finally { checking = false; }
     }
 
     // 暴露给全局的方法

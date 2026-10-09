@@ -63,7 +63,10 @@ export const getCacheDir = (username?: string, isOnlyDownload?: boolean, locatio
     const folderName = isOnlyDownload ? 'music' : 'cache'
     const loc = location || currentCacheLocation
     let baseDir = ''
-    if (loc === CACHE_ROOTS.DATA) {
+    if (path.isAbsolute(loc)) {
+        // 自定义路径作为存储根目录，继续保留 cache/music 和用户隔离结构。
+        baseDir = path.join(loc, folderName)
+    } else if (loc === CACHE_ROOTS.DATA) {
         baseDir = path.join(global.lx.dataPath, folderName)
     } else {
         baseDir = path.join(process.cwd(), folderName)
@@ -1530,7 +1533,7 @@ export const removeCacheFile = (filename: string, username?: string, requestedFo
 }
 
 export const setCacheLocation = (location: string) => {
-    if (location === CACHE_ROOTS.DATA || location === CACHE_ROOTS.ROOT) {
+    if (location === CACHE_ROOTS.DATA || location === CACHE_ROOTS.ROOT || path.isAbsolute(location)) {
         currentCacheLocation = location
         console.log(`[文件缓存] 基础缓存根路径设置为: ${location}`)
     }
@@ -2923,7 +2926,7 @@ export const switchBaseLocation = async (filenames: string[], username: string |
     // Helper to get dir for a specific location
     const getLocalDir = (folder: string, loc: string) => {
         const folderName = folder === 'music' ? 'music' : 'cache'
-        const base = loc === CACHE_ROOTS.DATA ? global.lx.dataPath : process.cwd()
+        const base = path.isAbsolute(loc) ? loc : (loc === CACHE_ROOTS.DATA ? global.lx.dataPath : process.cwd())
         const userDir = (username && username !== '_open' && username !== 'default') ? username : '_open'
         return path.join(base, folderName, userDir)
     }

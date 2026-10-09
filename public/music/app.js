@@ -22,6 +22,39 @@ function checkForUpdates() {
     }
 }
 
+/** 更新设置保存在服务端，使用既有管理员认证，不写入播放器账户设置。 @author jingyh */
+async function saveAppUpdateSettings() {
+    if (!localStorage.getItem('lx_admin_password') && !await handleAdminAuth('修改更新设置需要管理员身份')) return;
+    const enabled = document.getElementById('setting-app-update-enabled').checked;
+    const server = document.getElementById('setting-app-update-server').value.trim();
+    const tokenInput = document.getElementById('setting-app-update-token');
+    const clearInput = document.getElementById('setting-app-update-clear-token');
+    try {
+        const response = await fetch('/api/config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-frontend-auth': localStorage.getItem('lx_admin_password') },
+            body: JSON.stringify({ 'update.enabled': enabled, 'update.server': server, 'update.token': tokenInput.value.trim(), 'update.clearToken': clearInput.checked })
+        });
+        if (response.status === 401) {
+            if (await handleAdminAuth('管理员登录已失效，请重新验证')) return saveAppUpdateSettings();
+            return;
+        }
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.message || data.error || '更新设置保存失败');
+        tokenInput.value = '';
+        clearInput.checked = false;
+        Object.assign(window.CONFIG, { updateEnabled: enabled, updateServer: server });
+        showSuccess('更新设置已保存');
+    } catch (error) { showError(error.message || '更新设置保存失败'); }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const enabled = document.getElementById('setting-app-update-enabled');
+    const server = document.getElementById('setting-app-update-server');
+    if (enabled) enabled.checked = window.CONFIG?.updateEnabled === true;
+    if (server) server.value = window.CONFIG?.updateServer || '';
+});
+
 const API_BASE = '/api/music';
 let currentPage = 1;
 window.currentPage = 1;
@@ -948,6 +981,26 @@ async function ensureUserAuthToken(options = {}) {
     return userTokenRefreshPromise;
 }
 window.ensureUserAuthToken = ensureUserAuthToken;
+
+/**
+ * 下载相关请求遇到失效会话时续签一次，供队列和本地播放索引共同使用。
+ * 保留请求正文，重试时重新读取认证头，防止沿用服务重启前的 Token。
+ * @author jingyh
+ */
+async function fetchDownloadWithAuth(url, options = {}) {
+    const request = () => fetch(url, {
+        ...options, headers: { ...options.headers, ...getUserAuthHeaders() }
+    });
+    let response = await request();
+    if (response.status === 401) {
+        const restored = await ensureUserAuthToken({ force: true });
+        if (!restored) throw new Error('登录已失效，请在播放器重新登录账号后重试');
+        response = await request();
+        if (response.status === 401) throw new Error('登录已失效，请在播放器重新登录账号后重试');
+    }
+    return response;
+}
+window.fetchDownloadWithAuth = fetchDownloadWithAuth;
 
 /**
  * 更新顶部栏的用户状态显示 (登录按钮/用户名)
@@ -5361,6 +5414,12 @@ async function fetchSongUrl(song, quality, isRetry = false, isSilent = false, op
 
     const shouldBypassServerCache = isRetry === 'local_retry' || isRetry === 'download';
 
+    // 指定目录的已下载歌曲优先于链接缓存及音源解析。
+    if (!shouldBypassServerCache) {
+        const downloaded = await checkServerDownload(cleanedSong, quality, !!isRetry);
+        if (downloaded.exists) return { url: downloaded.url, sourceType: 'server_cache', quality: downloaded.quality || quality };
+    }
+
     const allowServerCache = settings.preferServerCache !== false && !shouldBypassServerCache;
     if (allowServerCache) {
         let cacheResult = await checkServerCache(cleanedSong, quality, !!isRetry);
@@ -5588,6 +5647,21 @@ async function prefetchNextSong(startFromIndex = null, depth = 0) {
 }
 
 // --- Server Cache Helpers ---
+/** 检查指定目录下载索引；未命中时保留原缓存与音源流程。 @author jingyh */
+async function checkServerDownload(song, quality, exactQuality = false, currentDirectory = false) {
+    try {
+        const params = new URLSearchParams({ source: song.source || '',
+            songmid: song.songmid || song.meta?.songmid || '',
+            songId: song.songId || song.meta?.songId || song.id || '', quality: quality || '' });
+        if (exactQuality) params.set('exactQuality', '1');
+        if (currentDirectory) params.set('currentDirectory', '1');
+        const response = await fetchDownloadWithAuth(`/api/music/server-download/check?${params}`);
+        if (response.ok) return await response.json();
+    } catch (error) { console.warn('[服务器下载] 本地检查失败', error); }
+    return { exists: false };
+}
+window.checkServerDownload = checkServerDownload;
+
 async function checkServerCache(song, quality, exactQuality = false) {
     try {
         const username = currentListData?.username || '';
@@ -5898,6 +5972,28 @@ async function triggerServerCache(song, url, quality) {
 let lastNamingPattern = window.settings?.serverCacheNamingPattern || 'simple';
 let serverCacheConfigInitialized = false; // 首次初始化同步完成前不弹命名格式变更弹窗
 
+/** 自定义缓存路径先提交验证，成功后才保存到播放器设置。 @author jingyh */
+async function selectServerCacheLocation(value) {
+    const previous = settings.serverCacheLocation || 'root';
+    let location = value;
+    if (value === 'custom') {
+        const inputPromise = showInput('缓存歌曲位置', '请输入飞牛服务器上的绝对路径，应用需具有写入权限：', {
+            placeholder: '/vol3/1000/音乐/缓存'
+        });
+        // 路径通过 DOM 属性赋值，避免目录名中的引号被当作 HTML。
+        const input = document.getElementById('modal-input');
+        if (input && !['data', 'root'].includes(previous)) { input.value = previous; input.select(); }
+        location = await inputPromise;
+        location = location?.trim();
+        if (!location) { syncSettingsUI('serverCacheLocation', previous); return; }
+    }
+    if (await updateServerCacheConfig(location)) {
+        updateSetting('serverCacheLocation', location);
+        syncSettingsUI('serverCacheLocation', location);
+    } else syncSettingsUI('serverCacheLocation', previous);
+}
+window.selectServerCacheLocation = selectServerCacheLocation;
+
 async function updateServerCacheConfig(location, pattern) {
     const loc = location || window.settings?.serverCacheLocation || 'root';
     const pat = pattern || window.settings?.serverCacheNamingPattern || 'simple';
@@ -5919,12 +6015,15 @@ async function updateServerCacheConfig(location, pattern) {
             })
         });
         if (!response.ok) {
+            const result = await response.json().catch(() => ({}));
+            showError(result.error || result.message || '缓存目录保存失败，请检查路径及写入权限');
             console.warn('[ServerCache] Config update failed:', response.status);
             // 失败时回滚 UI
             if (typeof syncSettingsUI === 'function') {
                 if (location) syncSettingsUI('serverCacheLocation', settings.serverCacheLocation);
                 if (pattern) syncSettingsUI('serverCacheNamingPattern', settings.serverCacheNamingPattern);
             }
+            return false;
         } else {
             console.log('[Cache] 服务器配置已同步:', loc, pat);
 
@@ -5962,9 +6061,11 @@ async function updateServerCacheConfig(location, pattern) {
             }
             lastNamingPattern = pat; // 更新最后同步的模式
             serverCacheConfigInitialized = true; // 首次同步完成，后续变更才允许弹窗
+            return true;
         }
     } catch (e) {
         console.error('[ServerCache] Config update failed:', e);
+        return false;
     }
 }
 window.updateServerCacheConfig = updateServerCacheConfig; // Expose global
@@ -8299,6 +8400,12 @@ function syncSettingsUI(key = null, value = null) {
         }
         const el = document.getElementById(config.id);
         if (el) {
+            if (itemKey === 'serverCacheLocation' && !['data', 'root'].includes(itemValue)) {
+                let option = el.querySelector('option[data-custom-path]');
+                if (!option) { option = document.createElement('option'); option.dataset.customPath = '1'; el.appendChild(option); }
+                option.value = itemValue;
+                option.textContent = `自定义目录：${itemValue}`;
+            }
             if (config.type === 'checkbox') el.checked = !!itemValue;
             else el.value = itemValue;
 
@@ -11269,10 +11376,8 @@ async function handleLocalLogin() {
         if (success) {
             statusEl.innerHTML = '<i class="fas fa-check-circle text-emerald-500"></i> 登录成功，正在同步...';
 
-            // [核心优化] 如果已有有效 Token，则不用再请求 /api/user/login 获取新 Token
-            if (userToken) {
-                console.log('[Auth] 检测到现有的 User Token，跳过登录接口直接尝试数据同步。');
-            } else {
+            // 用户主动登录时重新颁发 Token，避免继续使用服务器重启前的会话。
+            {
                 try {
                     const tokenRes = await fetch('/api/user/login', {
                         method: 'POST',
@@ -15270,7 +15375,7 @@ async function handleDownloadClick(event) {
 
     const isOnlyDownload = window.settings?.enableOnlyDownloadMode === true;
     const actionLabel = isOnlyDownload ? '下载到服务器' : '缓存到服务器';
-    const options = ['浏览器下载', `${actionLabel}${cacheSuffix}`];
+    const options = ['浏览器下载', `${actionLabel}${cacheSuffix}`, '服务器下载'];
     const modeText = isOnlyDownload ? '仅下载模式' : '缓存模式';
     const selected = await showOptions('下载与缓存', `[${modeText}] 选择对 [${song.name}] 的操作：`, options);
     if (!selected) return;
@@ -15280,7 +15385,9 @@ async function handleDownloadClick(event) {
     const enablePublicRestriction = window.lx_config?.['user.enablePublicRestriction'];
     const isAdmin = !!localStorage.getItem('lx_admin_password');
 
-    if (selected === '浏览器下载') {
+    if (selected === '服务器下载') {
+        await window.downloadSong(song, null, false, '服务器下载');
+    } else if (selected === '浏览器下载') {
         const isBrowserDownloadAllowed = window.lx_config?.['user.enablePublicNonAdminBrowserDownload'] !== false;
         if (isPublic && enablePublicRestriction && !isBrowserDownloadAllowed && !isAdmin) {
             showError('权限限制：管理员已关闭非管理员浏览器下载功能，下载歌曲需要验证管理员身份。');

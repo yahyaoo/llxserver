@@ -32,6 +32,7 @@ class App {
         this.password = null;
         this.currentView = 'dashboard';
         this.users = [];
+        this.customDirectoryDrafts = new Map();
         this.configLoaded = false;
         this.systemCpuHistory = [];
         this.processCpuHistory = [];
@@ -145,6 +146,10 @@ class App {
         document.getElementById('data-user-select')?.addEventListener('change', () => this.loadUserData());
 
         // 配置管理
+        document.getElementById('config-custom-dir-user')?.addEventListener('change', () => this.renderCustomDirectoryFields());
+        document.getElementById('config-custom-dir-path')?.addEventListener('input', () => this.updateCustomDirectoryDraft());
+        document.getElementById('config-custom-dir-enabled')?.addEventListener('change', () => this.updateCustomDirectoryDraft());
+        document.querySelector('input[name="download.nameTemplate"]')?.addEventListener('input', () => this.updateDownloadNamePreview());
         document.getElementById('config-form')?.addEventListener('submit', (e) => {
             e.preventDefault();
             this.saveConfig();
@@ -883,10 +888,64 @@ class App {
         try {
             const users = await this.request('/api/users');
             this.users = users.filter(u => u.name !== '_open');
+            for (const name of this.customDirectoryDrafts.keys()) {
+                if (!this.users.some(user => user.name === name)) this.customDirectoryDrafts.delete(name);
+            }
             this.renderUsers();
+            this.renderCustomDirectoryUsers();
         } catch (err) {
             console.error('Failed to load users:', err);
         }
+    }
+
+    /** 更新系统配置中的用户选项，使用文本节点防止用户名被当成 HTML。 @author jingyh */
+    renderCustomDirectoryUsers() {
+        const select = document.getElementById('config-custom-dir-user');
+        if (!select) return;
+        const selected = select.value;
+        select.replaceChildren();
+        for (const user of this.users) select.add(new Option(user.name, user.name));
+        if (this.users.some(user => user.name === selected)) select.value = selected;
+        this.renderCustomDirectoryFields();
+    }
+
+    /** 展示选中用户已有目录及启用状态。 @author jingyh */
+    renderCustomDirectoryFields() {
+        const select = document.getElementById('config-custom-dir-user');
+        const input = document.getElementById('config-custom-dir-path');
+        const enabled = document.getElementById('config-custom-dir-enabled');
+        if (!select || !input || !enabled) return;
+        const user = this.users.find(user => user.name === select.value);
+        const value = this.customDirectoryDrafts.get(select.value) || user;
+        select.disabled = input.disabled = enabled.disabled = !user;
+        input.value = value?.customMusicDir || '';
+        enabled.checked = value?.enableCustomMusicDir === true;
+        document.getElementById('config-custom-dir-status').textContent = user
+            ? (this.customDirectoryDrafts.size ? `有 ${this.customDirectoryDrafts.size} 个用户的目录修改待保存，请点击页面底部“保存配置”。` : '用户目录与总开关统一使用页面底部“保存配置”保存。')
+            : '请先在用户管理中创建用户，再配置歌曲目录。';
+    }
+
+    /** 切换用户前保留目录草稿，统一保存时仅提交目录字段。 @author jingyh */
+    updateCustomDirectoryDraft() {
+        const name = document.getElementById('config-custom-dir-user').value;
+        const customMusicDir = document.getElementById('config-custom-dir-path').value.trim();
+        const enableCustomMusicDir = document.getElementById('config-custom-dir-enabled').checked;
+        const user = this.users.find(user => user.name === name);
+        if (!user) return;
+        if (customMusicDir === (user.customMusicDir || '') && enableCustomMusicDir === !!user.enableCustomMusicDir) this.customDirectoryDrafts.delete(name);
+        else this.customDirectoryDrafts.set(name, { name, customMusicDir, enableCustomMusicDir });
+        document.getElementById('config-custom-dir-status').textContent = this.customDirectoryDrafts.size
+            ? `有 ${this.customDirectoryDrafts.size} 个用户的目录修改待保存，请点击页面底部“保存配置”。`
+            : '用户目录与总开关统一使用页面底部“保存配置”保存。';
+    }
+
+    /** 预览文件名模板，使用文本节点展示用户输入。 @author jingyh */
+    updateDownloadNamePreview() {
+        const template = (document.querySelector('input[name="download.nameTemplate"]')?.value || '').trim();
+        const values = { artist: '周杰伦', title: '晴天', album: '叶惠美', platform: 'wy', quality: 'flac', id: '12345', track: '1' };
+        const preview = template.replace(/\{(artist|title|album|platform|quality|id|track)\}/g, (_, key) => values[key]).replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').trim();
+        const target = document.getElementById('config-download-name-preview');
+        if (target) target.textContent = template ? `预览：${preview || '未知'}.flac` : '留空：沿用播放器设置中的“歌曲命名方式”';
     }
 
     async batchDeleteUsers() {
@@ -2358,6 +2417,16 @@ class App {
             this.configLoaded = true;
             this.loadedConfig = config; // 保存原始配置，供 saveConfig 对比「需重启」字段是否变更
             const form = document.getElementById('config-form');
+            form.elements['download.directory'].value = config['download.directory'] || '';
+            form.elements['download.lyricMode'].value = config['download.lyricMode'] || 'embedded';
+            form.elements['download.nameTemplate'].value = config['download.nameTemplate'] || '';
+            this.updateDownloadNamePreview();
+
+            form.elements['update.enabled'].checked = config['update.enabled'] === true;
+            form.elements['update.server'].value = config['update.server'] || '';
+            form.elements['update.token'].value = '';
+            form.elements['update.token'].placeholder = config['update.hasToken'] ? '已保存令牌，留空保留' : '公开仓库可留空';
+            form.elements['update.clearToken'].checked = false;
 
             form.elements['serverName'].value = config.serverName || '';
             if (form.elements['debug.enabled']) {
@@ -2637,6 +2706,7 @@ class App {
                 form.elements['user.enableCustomMusicDir'].checked = config['user.enableCustomMusicDir'] === true;
             }
             const configJsPathRef = document.getElementById('config-js-path-ref');
+            await this.loadUsers();
             if (configJsPathRef && config.configFilePath) {
                 configJsPathRef.textContent = config.configFilePath;
             }
@@ -3023,6 +3093,13 @@ class App {
         if (pathError) return;
 
         const config = {
+            'download.directory': (formData.get('download.directory') || '').trim(),
+            'download.lyricMode': formData.get('download.lyricMode') || 'embedded',
+            'download.nameTemplate': (formData.get('download.nameTemplate') || '').trim(),
+            'update.enabled': formData.get('update.enabled') === 'on',
+            'update.server': (formData.get('update.server') || '').trim(),
+            'update.token': (formData.get('update.token') || '').trim(),
+            'update.clearToken': formData.get('update.clearToken') === 'on',
             serverName: formData.get('serverName'),
             'debug.enabled': formData.get('debug.enabled') === 'on',
             maxSnapshotNum: parseInt(formData.get('maxSnapshotNum')),
@@ -3115,6 +3192,8 @@ class App {
             return config[k] !== prevConfig[k];
         });
         const needRestart = changedRestartKeys.length > 0;
+        const directoryDrafts = Array.from(this.customDirectoryDrafts.values());
+        if (directoryDrafts.length) config['user.customMusicDirectories'] = directoryDrafts;
 
         try {
             const res = await this.request('/api/config', {
@@ -3133,7 +3212,19 @@ class App {
             if (navPlayerLink) navPlayerLink.href = playerPath === '' ? '/' : (playerPath ?? '/');
 
             // 保存成功后同步「已加载配置」，供下次保存对比
+            // 访问令牌只发往服务端；保存后清空输入及内存快照。
+            delete config['update.token'];
+            form.elements['update.token'].value = '';
+            form.elements['update.clearToken'].checked = false;
             this.loadedConfig = config;
+            if (window.CONFIG) Object.assign(window.CONFIG, { updateEnabled: config['update.enabled'], updateServer: config['update.server'] });
+            for (const submitted of directoryDrafts) {
+                const user = this.users.find(user => user.name === submitted.name);
+                if (user) Object.assign(user, submitted);
+                // 请求期间继续编辑的草稿保留到下一次保存。
+                if (JSON.stringify(this.customDirectoryDrafts.get(submitted.name)) === JSON.stringify(submitted)) this.customDirectoryDrafts.delete(submitted.name);
+            }
+            this.renderCustomDirectoryFields();
 
             if (!silent) {
                 if (res.warning) {

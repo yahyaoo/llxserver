@@ -501,6 +501,18 @@ declare namespace LX {
      * 缓存命名规则
      */
     'cache.namingPattern'?: string
+    /** 服务器下载的绝对目录，留空使用持久化数据目录。 */
+    'download.directory'?: string
+    /** 服务器下载默认歌词写入方式。 */
+    'download.lyricMode'?: 'embedded' | 'external'
+    /** 服务器下载文件名模板，不含扩展名。 */
+    'download.nameTemplate'?: string
+    /** 是否检查应用发布更新，默认关闭。 */
+    'update.enabled'?: boolean
+    /** Gitea、GitHub 或兼容 JSON 的最新发布 API。 */
+    'update.server'?: string
+    /** 私有发布仓库的可选访问令牌。 */
+    'update.token'?: string
     /**
      * 缓存存储位置
      */

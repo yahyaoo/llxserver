@@ -63,6 +63,9 @@ const finalHash = crypto.createHash('md5').update(publicHash + srcHash).digest('
 const configPath = path.join(targetDir, 'public', 'js', 'config.js');
 if (fs.existsSync(configPath)) {
     let configContent = fs.readFileSync(configPath, 'utf8');
+    // 网页版本只从源码包读取，避免发布标签与页面显示不一致。 @author jingyh
+    const releaseVersion = JSON.parse(fs.readFileSync(path.join(targetDir, 'package.json'), 'utf8')).version;
+    configContent = configContent.replace(/version:\s*['"][^'"]+['"]/, `version: '${releaseVersion}'`);
 
     if (configContent.includes('buildHash:')) {
         configContent = configContent.replace(/buildHash:\s*['"][a-f0-9]+['"]/, `buildHash: '${finalHash}'`);

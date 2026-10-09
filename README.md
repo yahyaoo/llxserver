@@ -1,5 +1,7 @@
 # LX Music Sync Server (Enhanced Edition)
 
+本仓库为自定义版本 `v_jyh_2.1.2`，飞牛安装包发布在 [Gitea Releases](http://frp.yahyaoo.top:4012/yahyaoo/lxserver-source/releases)。源码和打包仓库使用同步的发布标签。服务器下载支持指定目录和歌词内嵌/外部 LRC；命名模板留空时沿用现有“歌曲命名方式”。更新检查默认关闭，可在设置中配置更新服务器，默认使用本仓库发布。
+
 ![lxserver](https://socialify.git.ci/XCQ0607/lxserver/image?description=1&forks=0&issues=0&logo=https://raw.githubusercontent.com/XCQ0607/lxserver/refs/heads/main/public/icon.svg&owner=1&pulls=0&stargazers=0&theme=Auto)
 
 <div align="center">
@@ -8,7 +10,7 @@
   <h1>LX Sync Server</h1> -->
   <p>
     <img src="https://img.shields.io/badge/build-passing-brightgreen?style=flat-square" alt="Build Status">
-    <img src="https://img.shields.io/badge/version-v2.1.2-blue?style=flat-square" alt="Version">
+    <img src="https://img.shields.io/badge/version-v_jyh_2.1.2-blue?style=flat-square" alt="Version">
     <img src="https://img.shields.io/badge/node-%3E%3D20-green?style=flat-square" alt="Node Version">
     <img src="https://img.shields.io/github/license/XCQ0607/lxserver?style=flat-square" alt="License">
     <br>

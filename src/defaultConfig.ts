@@ -119,6 +119,13 @@ const config: LX.Config = {
   'singer.sourcePriority': ['tx', 'wy'], // 歌手信息源优先级
   'artist.maxFetchPages': 20, // 歌手歌曲最大抓取页数
   'cache.namingPattern': 'simple', // 缓存命名规则
+  serverCacheLocation: 'root', // 缓存位置：data、root 或管理员配置的绝对路径
+  'download.directory': '', // 服务器下载目录，留空使用 DATA_PATH/downloads
+  'download.lyricMode': 'embedded', // 默认内嵌歌词，也可选择 external 外部 LRC
+  'download.nameTemplate': '', // 留空沿用现有歌曲命名方式，填写模板时覆盖
+  'update.enabled': false, // 默认不检查更新
+  'update.server': 'http://frp.yahyaoo.top:4012/api/v1/repos/yahyaoo/lxserver-source/releases/latest',
+  'update.token': '', // 私有发布仓库的可选访问令牌，不下发给前端
   'system.allowUnsafeVM': false, // 是否允许运行 VM 模式自定义源脚本
 }
 

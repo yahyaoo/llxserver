@@ -191,13 +191,7 @@
                 </a>
             </div>
 
-            <div
-                style="padding: 15px 20px; font-size: 12px; color: rgba(255, 255, 255, 0.4); text-align: center; line-height: 1.5;">
-                Copyright © 2026 <a href="https://github.com/xcq0607" target="_blank"
-                    style="color: inherit; text-decoration: underline;">xcq0607</a>.<br>
-                Licensed under Apache-2.0.
-            </div>
-            <div class="sidebar-footer">
+<div class="sidebar-footer">
                 <button id="logout-btn" class="btn-logout">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
@@ -249,15 +243,6 @@
                         <span class="status-dot"></span>
                         <span id="server-status">服务器运行中</span>
                     </div>
-                    <a href="https://github.com/XCQ0607/lxserver" target="_blank" class="btn-secondary"
-                        title="查看 GitHub 项目"
-                        style="margin-left: 1rem; padding: 0.5rem 1rem; font-size: 0.875rem; text-decoration: none; display: flex; align-items: center; color: inherit;">
-                        <svg viewBox="0 0 24 24" fill="currentColor" style="width: 16px; height: 16px;">
-                            <path
-                                d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
-                        </svg>
-                        <span>GitHub</span>
-                    </a>
                 </div>
             </header>
 
@@ -865,6 +850,26 @@
                                     </label>
                                 </div>
                                 <div class="config-divider"></div>
+                                 <div class="config-field">
+                                     <label class="config-label" for="config-custom-dir-user">目录所属用户</label>
+                                     <select id="config-custom-dir-user" class="form-input config-input"></select>
+                                 </div>
+                                 <div class="config-field">
+                                     <label class="config-label" for="config-custom-dir-path">歌曲目录</label>
+                                     <input id="config-custom-dir-path" type="text" class="form-input config-input" placeholder="例如 /vol3/1000/音乐" />
+                                     <small class="config-hint">填写飞牛绝对路径，应用需具有目录访问权限。每个用户分别保存目录。</small>
+                                 </div>
+                                 <div class="config-toggle-row">
+                                     <div class="config-toggle-info">
+                                         <span class="config-toggle-label">为该用户启用目录</span>
+                                         <span class="config-toggle-desc">上方总开关也需开启，统一点击页面底部保存配置</span>
+                                     </div>
+                                     <label class="toggle-switch">
+                                         <input id="config-custom-dir-enabled" type="checkbox" />
+                                         <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                                     </label>
+                                 </div>
+                                 <small id="config-custom-dir-status" class="config-hint" role="status">用户目录与总开关统一使用页面底部“保存配置”保存。</small>
                                 <div
                                     style="font-size: 0.825rem; color: var(--text-secondary, #94a3b8); line-height: 1.6;">
                                     <div
@@ -1094,6 +1099,53 @@
                                         当前服务器数据目录位置：<br />
                                         <code id="config-backup-js-path-ref" style="color: #38bdf8;">--</code>
                                     </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="config-card glass">
+                            <div class="config-card-header">
+                                <div class="config-card-icon" style="background: linear-gradient(135deg, #10b981, #059669);">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" /></svg>
+                                </div>
+                                <div><h3 class="config-card-title">服务器下载配置</h3><p class="config-card-desc">将歌曲保存到指定目录，已下载歌曲优先本地播放</p></div>
+                            </div>
+                            <div class="config-card-body">
+                                <div class="config-field"><label class="config-label" for="config-download-directory">下载目录</label>
+                                    <input id="config-download-directory" class="form-input config-input" type="text" name="download.directory" placeholder="例如 /vol3/1000/音乐/洛雪" />
+                                    <small class="config-hint">填写服务器绝对路径，留空使用数据目录下的 downloads。飞牛应用需具有该目录的写入权限。保存后立即生效，已有歌曲保持原位置。</small>
+                                </div>
+                                <div class="config-field">
+                                    <label class="config-label" for="config-download-name-template">文件命名模板</label>
+                                    <input id="config-download-name-template" class="form-input config-input" type="text" name="download.nameTemplate" placeholder="留空沿用歌曲命名方式，例如 {artist} - {title}" maxlength="256" />
+                                    <small id="config-download-name-preview" class="config-hint">留空：沿用播放器设置中的“歌曲命名方式”</small>
+                                    <small class="config-hint">{artist} 歌手 · {title} 歌名 · {album} 专辑 · {platform} 平台 · {quality} 音质 · {id} 歌曲 ID · {track} 音轨号</small>
+                                    <small class="config-hint">留空沿用歌曲命名方式，填写模板才覆盖；模板不含扩展名。重名时自动追加 (2)、(3)，已有文件不覆盖。</small>
+                                </div>
+                                <div class="config-field"><label class="config-label" for="config-download-lyric-mode">默认歌词写入方式</label>
+                                    <select id="config-download-lyric-mode" class="form-input config-input" name="download.lyricMode"><option value="embedded">内嵌到音频（默认）</option><option value="external">外部 .lrc 文件</option></select>
+                                    <small class="config-hint">下载时可以单独选择。无歌词的歌曲仍可正常下载。</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="config-card glass">
+                            <div class="config-card-header">
+                                <div><h3 class="config-card-title">版本更新</h3><p class="config-card-desc">当前版本由自有 Gitea 仓库发布</p></div>
+                            </div>
+                            <div class="config-card-body">
+                                <div class="config-toggle-row">
+                                    <div class="config-toggle-info"><span class="config-toggle-label">检查更新</span><span class="config-toggle-desc">默认关闭，开启后从下面的服务器检查发布版本</span></div>
+                                    <label class="toggle-switch"><input type="checkbox" name="update.enabled" /><span class="toggle-track"><span class="toggle-thumb"></span></span></label>
+                                </div>
+                                <div class="config-field"><label class="config-label" for="config-update-server">检查更新服务器地址</label>
+                                    <input id="config-update-server" class="form-input config-input" type="url" name="update.server" />
+                                    <small class="config-hint">填写 Gitea 或 GitHub 的 latest release API 完整地址，默认使用自有仓库发布。</small>
+                                </div>
+                                <div class="config-field"><label class="config-label" for="config-update-token">访问令牌（可选）</label>
+                                    <input id="config-update-token" class="form-input config-input" type="password" name="update.token" autocomplete="new-password" placeholder="公开仓库可留空" />
+                                    <small class="config-hint">私有仓库填写只读访问令牌。留空保留已保存令牌，修改服务器时请按需更新或清除。</small>
+                                    <label><input type="checkbox" name="update.clearToken" /> 清除已保存的访问令牌</label>
                                 </div>
                             </div>
                         </div>

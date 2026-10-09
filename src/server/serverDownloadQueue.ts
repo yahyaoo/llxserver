@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import * as fileCache from './fileCache'
+import * as serverDownloads from './serverDownloads'
 
 export type ServerDownloadStatus = 'waiting' | 'downloading' | 'tagging' | 'paused' | 'finished' | 'exists' | 'error'
 
@@ -21,6 +22,9 @@ export interface ServerDownloadTask {
   enableOnlyDownloadMode: boolean
   cacheLyric: boolean
   embedLyric: boolean
+  serverDownload?: boolean
+  lyricMode?: serverDownloads.LyricMode
+  identitySong?: any
   createdAt: number
   updatedAt: number
 }
@@ -32,6 +36,8 @@ interface QueueInput {
   enableOnlyDownloadMode?: boolean
   cacheLyric?: boolean
   embedLyric?: boolean
+  serverDownload?: boolean
+  lyricMode?: serverDownloads.LyricMode
 }
 
 interface ResolveResult {
@@ -141,6 +147,9 @@ const loadTasks = () => {
         enableOnlyDownloadMode: !!raw.enableOnlyDownloadMode,
         cacheLyric: raw.cacheLyric !== false,
         embedLyric: raw.embedLyric !== false,
+        serverDownload: raw.serverDownload === true,
+        lyricMode: raw.lyricMode === 'external' ? 'external' : 'embedded',
+        identitySong: raw.identitySong || raw.songInfo,
         createdAt: Number(raw.createdAt || now),
         updatedAt: now,
       }
@@ -153,7 +162,7 @@ const loadTasks = () => {
 }
 
 const getPublicTask = (task: ServerDownloadTask) => {
-  const live = task.status === 'downloading' && task.activeSongKey
+  const live = !task.serverDownload && task.status === 'downloading' && task.activeSongKey
     ? fileCache.cacheProgress.get(task.activeSongKey)
     : undefined
   const liveStatus = live?.status as ServerDownloadStatus | undefined
@@ -163,6 +172,8 @@ const getPublicTask = (task: ServerDownloadTask) => {
     songInfo: task.songInfo,
     quality: task.quality,
     requestedQuality: task.requestedQuality,
+    serverDownload: task.serverDownload === true,
+    lyricMode: task.lyricMode,
     status: liveStatus || task.status,
     progress: Number(live?.progress ?? task.progress ?? 0),
     total: Number(live?.total ?? task.total ?? 0),
@@ -189,6 +200,12 @@ const runTask = async (task: ServerDownloadTask) => {
   scheduleSave()
 
   try {
+    // 指定目录任务先查已下载文件，重复任务不触发音源解析。
+    if (task.serverDownload && serverDownloads.check(task.identitySong || task.songInfo, task.username, task.requestedQuality, true, true).exists) {
+      task.status = 'exists'
+      task.progress = 100
+      return
+    }
     const resolved = await resolver(task)
     if (controller.signal.aborted) return
     if (!resolved?.url) throw new Error('无法解析下载地址')
@@ -198,15 +215,27 @@ const runTask = async (task: ServerDownloadTask) => {
     task.updatedAt = Date.now()
     scheduleSave()
 
-    await fileCache.downloadAndCache(task.songInfo, resolved.url, task.quality, task.username, controller.signal,
-      task.enableOnlyDownloadMode, task.cacheLyric, task.embedLyric, {
-      requestedSource: resolved.requestedSource,
-      downloadSource: resolved.downloadSource,
-      sourceName: resolved.sourceName,
-    })
+    if (task.serverDownload) {
+      const started = Date.now()
+      await serverDownloads.download(task.songInfo, task.identitySong || task.songInfo, resolved.url, task.quality, task.username,
+        task.lyricMode || 'embedded', controller.signal, (received, total) => {
+          task.received = received
+          task.total = total
+          task.progress = total ? Math.min(99, received / total * 100) : 0
+          task.speed = received / Math.max(1, (Date.now() - started) / 1000)
+          task.updatedAt = Date.now()
+        })
+    } else {
+      await fileCache.downloadAndCache(task.songInfo, resolved.url, task.quality, task.username, controller.signal,
+        task.enableOnlyDownloadMode, task.cacheLyric, task.embedLyric, {
+        requestedSource: resolved.requestedSource,
+        downloadSource: resolved.downloadSource,
+        sourceName: resolved.sourceName,
+      })
+    }
 
     if (controller.signal.aborted) return
-    const progress = fileCache.cacheProgress.get(task.activeSongKey)
+    const progress = task.serverDownload ? undefined : fileCache.cacheProgress.get(task.activeSongKey)
     task.status = progress?.status === 'exists' ? 'exists' : 'finished'
     task.progress = 100
     task.total = Number(progress?.total || progress?.received || task.total || 0)
@@ -296,6 +325,9 @@ export const enqueue = (username: string, inputs: QueueInput[]) => {
       existing.enableOnlyDownloadMode = !!input.enableOnlyDownloadMode
       existing.cacheLyric = input.cacheLyric !== false
       existing.embedLyric = input.embedLyric !== false
+      existing.serverDownload = input.serverDownload === true
+      existing.lyricMode = input.lyricMode === 'external' ? 'external' : 'embedded'
+      existing.identitySong = input.songInfo
       existing.createdAt = now
       existing.updatedAt = now
       added.push(existing)
@@ -312,6 +344,9 @@ export const enqueue = (username: string, inputs: QueueInput[]) => {
       enableOnlyDownloadMode: !!input.enableOnlyDownloadMode,
       cacheLyric: input.cacheLyric !== false,
       embedLyric: input.embedLyric !== false,
+      serverDownload: input.serverDownload === true,
+      lyricMode: input.lyricMode === 'external' ? 'external' : 'embedded',
+      identitySong: input.songInfo,
       createdAt: now, updatedAt: now,
     }
     tasks.set(key, task)
