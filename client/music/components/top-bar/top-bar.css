@@ -46,7 +46,10 @@ body > .flex.flex-1 { z-index: 1; }
 .library-search { position: relative; width: 100%; }
 .library-search-input, .header-actions {
     background: color-mix(in srgb, var(--bg-panel) calc(var(--surface-opacity) * 100%), transparent);
-    backdrop-filter: blur(22px); border: 1px solid color-mix(in srgb, var(--border-dim) 65%, transparent);
+    /* 两侧浮动胶囊直接读取账号模糊配置，初始化阶段也不保留固定强度。作者：jingyh */
+    backdrop-filter: blur(var(--surface-blur, 24px));
+    -webkit-backdrop-filter: blur(var(--surface-blur, 24px));
+    border: 1px solid color-mix(in srgb, var(--border-dim) 65%, transparent);
     border-radius: 30px; box-shadow: 0 4px 24px rgb(0 0 0 / 5%);
 }
 .library-search-input { display: flex; align-items: center; padding: 0 18px; gap: 12px; height: 52px; color: var(--text-muted); }
@@ -58,7 +61,9 @@ body > .flex.flex-1 { z-index: 1; }
 .header-avatar { height: 32px; width: 32px; }
 .top-icon-button, .top-mobile-nav { display: grid; place-items: center; height: 36px; width: 36px; border-radius: 50%; color: var(--text-muted); }
 .top-icon-button:hover, .top-mobile-nav:hover { color: var(--c-500); background: var(--bg-item-hover); }
-.library-search-results { position: absolute; top: 64px; left: 0; width: min(560px, calc(100vw - 40px)); max-height: calc(100dvh - 210px); overflow-y: auto; border-radius: 24px; border: 1px solid var(--border-dim); background: color-mix(in srgb, var(--bg-panel) 90%, transparent); backdrop-filter: blur(28px); box-shadow: 0 20px 65px rgb(0 0 0 / 20%); padding: 14px; color: var(--text-main); }
+.library-search-results { position: absolute; top: 64px; left: 0; width: min(560px, calc(100vw - 40px)); max-height: calc(100dvh - 210px); overflow-y: auto; border-radius: 24px; border: 1px solid var(--border-dim); background: color-mix(in srgb, var(--bg-panel) 90%, transparent); backdrop-filter: blur(var(--surface-blur, 24px)); -webkit-backdrop-filter: blur(var(--surface-blur, 24px)); box-shadow: 0 20px 65px rgb(0 0 0 / 20%); padding: 14px; color: var(--text-main); }
+/* 账号与主题下拉属于浮动顶部，模糊强度与胶囊同步。作者：jingyh */
+#music-top-bar .header-dropdown-panel { backdrop-filter: blur(var(--surface-blur, 24px)); -webkit-backdrop-filter: blur(var(--surface-blur, 24px)); }
 .library-search-heading { font-size: 12px; color: var(--text-muted); font-weight: 600; padding: 12px 12px 8px; }
 .library-search-item { display: flex; align-items: center; width: 100%; gap: 12px; padding: 9px 12px; text-align: left; border-radius: 12px; }
 .library-search-item:hover, .library-search-item[aria-selected="true"], .library-search-online[aria-selected="true"] { background: var(--bg-item-hover); }
@@ -97,7 +102,7 @@ body > .flex.flex-1 { z-index: 1; }
 .theme-image-actions { display: flex; gap: 10px; align-items: center; }
 .theme-image-actions button, .theme-image-actions label { font-size: 12px; padding: 9px 14px; border-radius: 10px; background: var(--bg-item-hover); cursor: pointer; }
 #experience-save-status { font-size: 12px; color: var(--text-muted); margin-top: 16px; }
-#main-sidebar.main-navigation { background: color-mix(in srgb, var(--bg-panel) calc(var(--surface-opacity) * 100%), transparent) !important; backdrop-filter: blur(24px); }
+#main-sidebar.main-navigation { background: color-mix(in srgb, var(--bg-panel) calc(var(--surface-opacity) * 100%), transparent) !important; backdrop-filter: blur(var(--surface-blur, 24px)); -webkit-backdrop-filter: blur(var(--surface-blur, 24px)); }
 .has-music-background :is(.t-bg-panel,.settings-sidebar,.settings-content,.settings-form-card) { background-color: color-mix(in srgb, var(--bg-panel) calc(var(--surface-opacity) * 100%), transparent); backdrop-filter: blur(12px); }
 .has-music-background .t-bg-main { background-color: transparent; }
 .playlist-group-heading { display: flex; align-items: center; justify-content: space-between; padding: 24px 14px 10px; color: var(--text-muted); font-size: 12px; font-weight: 600; }
