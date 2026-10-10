@@ -17,7 +17,7 @@
 | 验证 | 命令或方式 | 结果 |
 | --- | --- | --- |
 | 编译与客户端资源生成 | `npm run build` | 通过 |
-| 单元测试 | `npm run test:unit` | 86 / 86，通过 |
+| 单元测试 | `npm run test:unit` | 91 / 91，通过 |
 | 真实接口与 ZIP 系统测试 | `npm run test:system` | 4 / 4，通过 |
 | fnOS 工具单元测试 | `npm run test:fpk` | 7 / 7，通过 |
 | 实际 FPK 载荷系统测试 | `npm run test:fpk:system` | 3 / 3，通过 |
@@ -58,4 +58,12 @@ ZIP 位于 `output/llxserver-{all,server,client}.zip`；FPK 位于 `deploy/fnos/
 
 真实浏览器验证了顶部切换蓝色后设置同步选中、设置切回粉色后顶部标签同步、图标随主题变化及刷新恢复粉色。浏览器计算样式确认两处粉色渐变一致；在 397px 和 1100px 宽度下检查菜单覆盖区域，所有重叠搜索图标均位于菜单下方。
 
-临时实例使用独立端口与临时数据库。未登录接口返回 401/403；另观察到既有 `batch_pagination.js` 的 `goToPage` 未定义错误，本轮主题修复未修改该模块。
+临时实例使用独立端口与临时数据库。未登录接口返回 401/403。主题验证时发现的 `goToPage` 未定义错误已在后续分页修复中处理，详见下节。
+
+## 分页脚本加载回归验证
+
+`batch_pagination.js` 先于 `app.js` 加载，却在末尾导出了由 `app.js` 定义的 `goToPage`，导致启动抛出 `ReferenceError`。删除这条错误导出，保持 `app.js` 的全局搜索跳页实现及已有列表分页逻辑。
+
+新增五项回归测试，验证先加载批量脚本不抛异常、应用跳页入口不被覆盖、本地上下页及首末页、跳页边界，以及网络续页失败后按钮恢复。完整单元测试 91 / 91 通过。
+
+真实浏览器加载临时实例，确认控制台不再出现 `goToPage` 未定义错误，`goToPage`、`nextPage`、`prevPage`、`jumpToPage` 和 `changeItemsPerPage` 均为可调用函数。完整系统测试继续验证整体与两端独立 ZIP 启动、接口及 SQLite 数据持久化。

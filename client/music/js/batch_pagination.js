@@ -1,5 +1,7 @@
-// Batch Selection and Deletion Functions
-// Batch Selection and Deletion Functions
+/**
+ * 提供歌曲批量操作和已加载结果分页；全局搜索跳页入口由 app.js 在稍后加载时初始化。
+ * @author yahyaoo
+ */
 function handleBatchSelect(songId, isChecked) {
     const id = String(songId); // Force string ID
     if (isChecked) {
@@ -520,7 +522,7 @@ window.exitBatchMode = exitBatchMode;
 window.deselectAll = deselectAll;
 window.batchDeleteFromList = batchDeleteFromList;
 window.handleBatchCollect = handleBatchCollect;
-window.goToPage = goToPage;
+// goToPage 属于 app.js，不能在本脚本加载时引用尚未定义的函数。
 window.nextPage = nextPage;
 window.prevPage = prevPage;
 window.jumpToPage = jumpToPage;
