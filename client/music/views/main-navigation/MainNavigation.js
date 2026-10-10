@@ -12,10 +12,11 @@
 
 <nav id="main-navigation" class="main-navigation-scroll flex-1 py-4 overflow-y-auto custom-scrollbar" aria-label="主导航"><ul>
         <li><a href="#" onclick="switchTab('search'); return false" id="tab-search" title="在线搜索" aria-label="在线搜索" class="flex items-center px-6 py-3 t-text-muted hover:t-bg-main"><i class="fas fa-search w-6 text-center"></i><span class="ml-3 font-medium">在线搜索</span></a></li>
-        <li><div onclick="handleFavoritesClick()" id="tab-favorites" title="收藏" aria-label="收藏" class="flex items-center justify-between px-6 py-3 t-text-muted cursor-pointer"><div class="flex items-center"><i class="far fa-heart w-6 text-center"></i><span class="ml-3 font-medium">收藏</span></div><i id="favorites-arrow" class="fas fa-chevron-down text-xs"></i></div>
-            <ul id="favorites-children" class="overflow-hidden transition-all duration-300"><li><div id="my-lists-container" class="space-y-1 px-1.5"><div class="px-3 py-2 text-sm t-text-muted">请先在设置中登录</div></div></li></ul></li>
-        <li><a href="#" onclick="switchTab('recent'); return false" id="tab-recent" title="最近" aria-label="最近" class="flex items-center px-6 py-3 t-text-muted hover:t-bg-main"><i class="far fa-clock w-6 text-center"></i><span class="ml-3 font-medium">最近</span></a></li>
+        <li><a href="#" onclick="switchTab('songlist'); return false" id="tab-songlist" title="在线歌单" aria-label="在线歌单" class="flex items-center px-6 py-3 t-text-muted hover:t-bg-main"><i class="fas fa-list-ul w-6 text-center"></i><span class="ml-3 font-medium">在线歌单</span></a></li>
         <li><a href="#" onclick="switchTab('leaderboard'); return false" id="tab-leaderboard" title="排行榜" aria-label="排行榜" class="flex items-center px-6 py-3 t-text-muted hover:t-bg-main"><i class="fas fa-chart-bar w-6 text-center"></i><span class="ml-3 font-medium">排行榜</span></a></li>
+        <li><a href="#" onclick="switchTab('recent'); return false" id="tab-recent" title="最近" aria-label="最近" class="flex items-center px-6 py-3 t-text-muted hover:t-bg-main"><i class="far fa-clock w-6 text-center"></i><span class="ml-3 font-medium">最近</span></a></li>
+        <li><div onclick="handleFavoritesClick()" id="tab-favorites" title="收藏" aria-label="收藏" class="flex items-center justify-between px-6 py-3 t-text-muted cursor-pointer"><div class="flex items-center"><i class="far fa-heart w-6 text-center"></i><span class="ml-3 font-medium">收藏</span></div><i id="favorites-arrow" class="fas fa-chevron-down text-xs"></i></div>
+            <ul id="favorites-children" class="overflow-hidden transition-all duration-300"><li><div id="my-lists-container" class="space-y-1 px-1.5"><div class="px-3 py-2 text-sm t-text-muted">正在加载歌单…</div></div></li></ul></li>
         <li><a href="#" onclick="switchTab('localmusic'); return false" id="tab-localmusic" title="音乐库" aria-label="音乐库" class="flex items-center justify-between px-6 py-3 t-text-muted"><div class="flex items-center"><i class="fas fa-compact-disc w-6 text-center"></i><span class="ml-3 font-medium">音乐库</span></div><div id="custom-dir-switch-container" class="hidden items-center ml-2" title="自定义歌曲目录开关"
                                 onclick="event.stopPropagation()">
                                 <label class="relative inline-flex items-center cursor-pointer scale-75 origin-right">
@@ -86,9 +87,8 @@
                                         </div>
                                     </li>
                                 </ul></li>
-        <li><a href="#" onclick="switchTab('settings'); return false" id="tab-settings" title="设置" aria-label="设置" class="flex items-center px-6 py-3 t-text-muted hover:t-bg-main"><i class="fas fa-cog w-6 text-center"></i><span class="ml-3 font-medium">设置</span></a></li>
-        <li><a href="#" onclick="switchTab('songlist'); return false" id="tab-songlist" title="在线歌单" aria-label="在线歌单" class="flex items-center px-6 py-3 t-text-muted hover:t-bg-main"><i class="fas fa-list-ul w-6 text-center"></i><span class="ml-3 font-medium">在线歌单</span></a></li>
-        <li><div class="playlist-group-heading"><span>歌单</span><button onclick="handleCreateList()" title="新建歌单" aria-label="新建歌单"><i class="fas fa-plus"></i></button></div><div id="playlist-lists-container" class="space-y-1 px-1.5"></div></li>
+        <li><a href="#" onclick="switchTab('downloads'); return false" id="tab-downloads" title="下载管理" aria-label="下载管理" class="flex items-center px-6 py-3 t-text-muted hover:t-bg-main"><i class="fas fa-cloud-download-alt w-6 text-center"></i><span class="ml-3 font-medium">下载管理</span></a></li>
+        <li><div class="playlist-group-heading"><span>歌单</span><button type="button" id="playlist-actions-button" onclick="togglePlaylistActions(event)" title="新建或导入歌单" aria-label="新建或导入歌单" aria-haspopup="menu" aria-expanded="false" aria-controls="playlist-actions-menu"><i class="fas fa-plus" aria-hidden="true"></i></button></div><div id="playlist-lists-container" class="space-y-1 px-1.5"></div></li>
         </ul></nav>
 
             <!-- Mini Player Info (Optional, cover art here) -->

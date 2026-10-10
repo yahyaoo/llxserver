@@ -36,6 +36,7 @@
                 const date = document.createElement('time'); date.className = 'recent-time'; date.textContent = recent ? new Date(song.playedAt).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : song.quality || '';
                 row.append(number, img, info, album, date); row.onclick = () => this.play(index); host.append(row);
             });
+            window.SongFileStatus?.update(host, entries.slice(0, count), '.recent-song-info strong');
             if (entries.length > count) { const more = document.createElement('button'); more.className = 'recent-more'; more.textContent = `加载更多（剩余 ${entries.length - count} 首）`; more.onclick = () => { count += 100; this.render(); }; host.append(more); }
         },
         play(index = 0) {

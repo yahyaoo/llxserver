@@ -21,8 +21,11 @@ async (page) => {
     }), name)
   }
   try {
+  await page.route('**/api/music/hotSearch**', route => route.fulfill({ json: { list: ['样式测试热门搜索'] } }))
+  await page.evaluate(() => { localStorage.removeItem('lx_playback_state'); document.getElementById('audio-player').pause() })
   await page.reload()
   await page.setViewportSize({ width: 1440, height: 900 })
+  await page.evaluate(() => updateSetting('playerBackground', 'theme'))
   await page.mouse.move(0, 0)
   await page.locator('#tab-leaderboard').click()
   await page.waitForFunction(() => window.LeaderboardManager.getCurrentList().length === 80)
@@ -47,7 +50,8 @@ async (page) => {
     await lines('#lb-songs-container', `${appearance} 排行榜表格只用浅色上下边界`)
     await lines('#lb-boards-list', `${appearance} 榜单目录只用浅色上下边界`)
     await page.locator('#tab-search').click()
-    await page.evaluate(list => { window.ListSearch.resetState(); window.selectedItems.clear(); renderResults(list) }, songs)
+    await page.getByRole('heading', { name: '热门搜索', exact: true }).waitFor()
+    await page.evaluate(list => { currentSearchScope = 'local_list'; window.ListSearch.resetState(); window.selectedItems.clear(); renderResults(list) }, songs)
     await transparent('#search-results-header', `${appearance} 搜索表头透明`)
     await transparent('#search-results > .grid', `${appearance} 搜索普通行透明`)
     await page.locator('#search-results > .grid').first().hover()
@@ -79,7 +83,7 @@ async (page) => {
     await transparent('#sl-detail-list > .grid', `${appearance} 歌单详情普通行透明`)
     await transparent('#sl-detail-header', `${appearance} 歌单详情信息面板透明`)
     check(await page.locator('#songlist-grid').evaluate(n => getComputedStyle(n).visibility === 'hidden'), `${appearance} 歌单详情不透出后方网格`)
-    await page.locator('#tab-settings').click()
+    await page.locator('.header-actions [aria-label="设置"]').click()
     await transparent('.settings-sidebar,.settings-content', `${appearance} 设置目录及内容区透明`)
     const targets = await page.locator('.settings-nav-item').evaluateAll(nodes => nodes.map(n => n.dataset.settingsTarget))
     for (const target of targets) {
@@ -106,6 +110,7 @@ async (page) => {
     check(await page.locator('.music-shell').evaluate(n => getComputedStyle(n).visibility === 'visible'), `${appearance} 退出播放详情后恢复内容`)
   }
   await page.unroute('**/api/music/songList/**')
+  await page.unroute('**/api/music/hotSearch**')
   await page.reload()
   return { passed: results.length, results }
   } catch (error) { throw new Error(`最后通过：${results.at(-1)}；${error.message}`) }

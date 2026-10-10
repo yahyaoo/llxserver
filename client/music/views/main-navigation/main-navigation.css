@@ -11,6 +11,15 @@
     box-shadow: 0 4px 20px rgb(0 0 0 / 5%);
 }
 .main-navigation-brand { flex-shrink: 0; }
+.playlist-group-heading { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px 8px; color: var(--text-muted); font-size: 13px; }
+#playlist-actions-button { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 7px; }
+#playlist-actions-button:hover, #playlist-actions-button[aria-expanded="true"] { color: var(--c-500); background: color-mix(in srgb, var(--c-500) 12%, transparent); }
+#playlist-actions-button:disabled { opacity: .5; cursor: progress; }
+.playlist-actions-menu { position: fixed; z-index: 10020; min-width: 128px; padding: 5px; border: 1px solid var(--border-main); border-radius: 10px; background: var(--bg-panel); color: var(--text-main); box-shadow: 0 8px 24px rgb(0 0 0 / 16%); }
+.playlist-actions-menu[hidden] { display: none; }
+.playlist-actions-menu button { display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 12px; border-radius: 6px; font-size: 13px; text-align: left; }
+.playlist-actions-menu button:hover, .playlist-actions-menu button:focus-visible { outline: none; color: var(--c-500); background: color-mix(in srgb, var(--c-500) 12%, transparent); }
+#playlist-actions-button:focus-visible { outline: 2px solid var(--c-500); outline-offset: 2px; }
 #main-navigation { min-height: 0; padding: 16px 12px; overscroll-behavior: contain; }
 #main-navigation > ul > li > :is(a, div[onclick]) {
     min-height: 46px; margin: 2px 0; padding: 12px 14px; border-radius: 12px;
@@ -35,6 +44,8 @@
     .navigation-collapsed #main-navigation span,
     .navigation-collapsed #favorites-arrow,
     .navigation-collapsed #favorites-children,
+    .navigation-collapsed #dislike-arrow,
+    .navigation-collapsed #dislike-children,
     .navigation-collapsed #custom-dir-switch-container,
     .navigation-collapsed .sidebar-song-info-wrapper,
     .navigation-collapsed .main-navigation-collapse span { display: none !important; }

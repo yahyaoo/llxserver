@@ -1,0 +1,47 @@
+/** 真实文件状态、共用列表、下载浮层与移动布局验证。 @author jingyh */
+async (page) => {
+  const results=[],check=(condition,label)=>{if(!condition)throw new Error(label);results.push(label);console.log(label)};
+  await page.reload();await page.setViewportSize({width:1440,height:900});
+  await page.waitForFunction(()=>window.SongFileStatus&&window.SongActions&&currentListData);
+  await page.locator('#tab-leaderboard').click();
+  await page.waitForFunction(()=>document.querySelector('#lb-row-0 .song-file-status')?.dataset.fileState==='downloaded');
+  const states=await page.locator('#lb-songs-list .song-file-status').evaluateAll(nodes=>nodes.slice(0,3).map(n=>n.dataset.fileState));
+  check(JSON.stringify(states)===JSON.stringify(['downloaded','cached','cloud']),'排行榜真实接口识别下载、缓存、云端');
+  check(await page.locator('#lb-row-0 .song-file-status').getAttribute('aria-label')==='已下载到服务器','下载状态有中文说明');
+  await page.screenshot({path:'D:/opensource/fn-lxserver/output/playwright/song-file-status-desktop.png'});
+  await page.locator('#lb-row-0 button[title="下载"]').click();
+  await page.locator('.download-options-popover select[name="target"]').waitFor();
+  const targets=await page.locator('.download-options-popover select[name="target"] option').evaluateAll(nodes=>nodes.map(n=>n.value));
+  check(JSON.stringify(targets)===JSON.stringify(['浏览器下载','服务器下载']),'下载位置仅保留浏览器和指定目录服务器下载');
+  await page.locator('.download-options-close').click();
+  const songs=await page.evaluate(()=>window.LeaderboardManager.getCurrentList().slice(0,3));
+  await page.evaluate(async items=>{for(const song of items)if(!window.SongActions.isLoved(song))await window.SongActions.toggleLove(song);handleListClick('love')},songs);
+  await page.waitForFunction(()=>document.querySelector('#search-results .song-file-status[data-file-state="downloaded"]'));
+  check(await page.locator('#search-results .song-file-status').count()===3,'收藏列表复用状态组件');
+  const imported=await page.evaluate(async items=>{const response=await window.fetchDownloadWithAuth('/api/music/playlists/import',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'lxserver-playlist',version:1,playlist:{id:'status-list',name:'文件状态验收歌单',list:items}})});if(!response.ok)return false;await window.applyImportedPlaylists(await response.json());return true},songs);
+  check(imported,'真实导入包含三种文件状态的歌单');
+  await page.evaluate(()=>handleListClick(currentListData.userList.find(list=>list.name==='文件状态验收歌单').id));
+  await page.waitForFunction(()=>document.querySelector('#search-results .song-file-status')?.dataset.fileState==='downloaded');
+  check(await page.locator('#search-results .song-file-status').count()===3,'导入歌单显示三种状态');
+  await page.route('**/api/music/songList/detail?**',route=>route.fulfill({json:{info:{id:'status-online',name:'状态歌单',source:'wy',author:'测试'},list:songs,total:3}}));
+  await page.locator('#tab-songlist').click();await page.evaluate(()=>window.SongListManager.openDetail('status-online','wy'));
+  await page.waitForFunction(()=>document.querySelector('#sl-detail-list .song-file-status')?.dataset.fileState==='downloaded');
+  check(await page.locator('#sl-detail-list .song-file-status').count()===3,'在线歌单复用状态组件');
+  await page.evaluate(()=>window.SongListManager.closeDetail());
+  await page.locator('#tab-leaderboard').click();await page.setViewportSize({width:390,height:844});
+  await page.evaluate(()=>{const sidebar=document.getElementById('main-sidebar');if(sidebar&&!sidebar.classList.contains('-translate-x-full'))toggleSidebar()});
+  await page.waitForFunction(()=>document.getElementById('main-sidebar').getBoundingClientRect().right<=1);
+  await page.waitForFunction(()=>document.querySelector('#lb-row-0 .song-file-status')?.dataset.fileState==='downloaded');
+  check(await page.locator('#lb-row-0 .song-file-status').evaluate(node=>node.getBoundingClientRect().width>=12),'手机宽度状态图标不被压缩');
+  check(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'手机页面无横向溢出');
+  await page.screenshot({path:'D:/opensource/fn-lxserver/output/playwright/song-file-status-mobile.png'});
+  await page.evaluate(()=>window.switchTab('settings'));
+  check(await page.locator('#setting-only-download-mode').count()===0,'设置已删除仅下载模式');
+  await page.route('**/api/music/file-status',route=>route.fulfill({status:503,json:{success:false}}));
+  await page.evaluate(()=>{window.switchTab('leaderboard');window.LeaderboardManager.renderSongs()});
+  await page.waitForFunction(()=>document.querySelector('#lb-row-0 .song-file-status')?.dataset.fileState==='unknown');
+  check(true,'查询故障显示不可用而非未下载');
+  await page.unroute('**/api/music/file-status');
+  console.log(JSON.stringify({passed:results.length,results},null,2));
+  return {passed:results.length,results};
+}

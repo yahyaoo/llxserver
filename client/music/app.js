@@ -122,7 +122,6 @@ const DEFAULT_SETTINGS = {
     enableAutoProxy: true, // 自动代理
     enableCustomProxy: false, // 是否启用自定义代理
     customProxyUrl: '', // 自定义代理URL模板，使用 {url} 作为原始URL占位符
-    enableOnlyDownloadMode: true, // 仅下载模式
     downloadConcurrency: 3, // 缓存并发量 (1-5)
     hotSearchLimit: 20, // 热搜显示数量
     lyricFontSize: 1.25, // 歌词字体大小 (rem)
@@ -150,7 +149,7 @@ const DEFAULT_SETTINGS = {
     showFooterVisualizer: true,
     footerVisualizerStyle: 'bars',
     showDetailVisualizer: false,
-    detailVisualizerStyle: 'pulse',
+    detailVisualizerStyle: 'spectrum',
     visualizerOpacity: 0.5,
     visualizerGlobalStyle: 'blocks',
     // Cache Settings
@@ -164,7 +163,7 @@ const DEFAULT_SETTINGS = {
     enableSongUrlCache: true,
     enableLyricGlow: true, // 歌词荧光效果 (默认开启)
     enablePersistentToken: false, // 启用持久化 Token 验证
-    playerBackground: 'blur', // 播放页背景: 'blur', 'solid', 'dark'
+    playerBackground: 'theme', // 播放页背景：跟随页面、歌手氛围、封面虚化、纯色或黑色。
     saveAccountSettingsToFile: true, // 同步账号设置到文件 (默认开启)
     autoUpdateNetworkList: false, // 自动更新网络歌单 (默认关闭)
     networkListAutoCheckInterval: '6h', // 网络歌单自动检测间隔
@@ -186,6 +185,7 @@ function normalizeDownloadConcurrency(value) {
 function normalizeStoredSettings(nextSettings) {
     if (!nextSettings || typeof nextSettings !== 'object') return nextSettings;
     delete nextSettings.remasterRetryManifest;
+    delete nextSettings.enableOnlyDownloadMode;
     if (nextSettings.downloadConcurrency !== undefined) {
         nextSettings.downloadConcurrency = normalizeDownloadConcurrency(nextSettings.downloadConcurrency);
     }
@@ -741,47 +741,32 @@ let authEnabled = false;
 // authToken 保留用于播放器登录 (player.password) 颁发的 session
 let authToken = sessionStorage.getItem('lx_player_auth');
 // 用户 Token：将明文密码传输改为 Token 验证
-let userToken = localStorage.getItem('lx_user_token');
+let userToken = (window.AccountSession ? window.AccountSession.getToken() : localStorage.getItem('lx_user_token'));
 
 /**
  * 生成用户 API 请求所需的认证 Headers。
- * 优先使用 Token，若无 Token 则兼容旧的 x-user-password 方式。
+ * 使用当前会话或 API Token，不保存或传递账号密码。
  * 注意：此函数总是返回"真实用户"的凭证，不受 isViewingPublicFavorites 影响。
  * 若需要 _open 头，请在调用处手动覆盖 x-user-name。
  */
 function getUserAuthHeaders() {
-    // 始终优先使用已登录的真实用户
-    let username = localStorage.getItem('lx_sync_user') || '';
-    // 过滤掉 _open 假用户
-    if (username === '_open') username = '';
-
-    const adminPass = localStorage.getItem('lx_admin_password');
-
+    const username = window.AccountSession?.getUsername?.() || localStorage.getItem('lx_sync_user') || '';
+    const token = window.AccountSession?.getToken?.() || userToken;
     const headers = {};
-    if (userToken) {
-        headers['x-user-name'] = username;
-        headers['x-user-token'] = userToken;
-    } else {
-        const pass = localStorage.getItem('lx_sync_pass');
-        if (username && pass) {
-            headers['x-user-name'] = username;
-            headers['x-user-password'] = pass;
-        } else if (username) {
-            headers['x-user-name'] = username;
-        }
+    if (token) {
+        headers['x-user-name'] = username === '_open' ? '' : username;
+        headers['x-user-token'] = token;
     }
-    if (adminPass) {
-        headers['x-frontend-auth'] = adminPass;
-    }
+    const adminPass = localStorage.getItem('lx_admin_password');
+    if (adminPass) headers['x-frontend-auth'] = adminPass;
     return headers;
 }
 window.getUserAuthHeaders = getUserAuthHeaders;
 
 function isUserLoggedIn() {
     const user = localStorage.getItem('lx_sync_user');
-    const token = localStorage.getItem('lx_user_token');
-    const pass = localStorage.getItem('lx_sync_pass');
-    return !!user && user !== '_open' && !!(token || pass);
+    const token = window.AccountSession.getToken();
+    return !!user && user !== '_open' && !!token;
 }
 window.isUserLoggedIn = isUserLoggedIn;
 
@@ -932,58 +917,19 @@ async function handleTogglePublicFavorites() {
 }
 window.handleTogglePublicFavorites = handleTogglePublicFavorites;
 
-let userTokenRefreshPromise = null;
-
-async function ensureUserAuthToken(options = {}) {
-    const force = options.force === true;
-    const username = localStorage.getItem('lx_sync_user') || '';
-    const password = localStorage.getItem('lx_sync_pass') || '';
-
-    if (!username || !password) {
-        if (force) {
-            userToken = null;
-            localStorage.removeItem('lx_user_token');
-            if (typeof updateUserUI === 'function') updateUserUI();
-        }
-        return false;
-    }
-    if (userToken && !force) return true;
-    if (userTokenRefreshPromise) return userTokenRefreshPromise;
-
-    userTokenRefreshPromise = (async () => {
-        if (force) {
-            userToken = null;
-            localStorage.removeItem('lx_user_token');
-        }
-        try {
-            const response = await fetch('/api/user/login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, password })
-            });
-            if (!response.ok) return false;
-
-            const result = await response.json();
-            if (!result.success || !result.token) return false;
-
-            userToken = result.token;
-            localStorage.setItem('lx_user_token', userToken);
-            if (typeof updateUserUI === 'function') updateUserUI();
-            return true;
-        } catch (error) {
-            console.warn('[Auth] Token 自动续签失败:', error);
-            return false;
-        } finally {
-            userTokenRefreshPromise = null;
-        }
-    })();
-
-    return userTokenRefreshPromise;
+async function ensureUserAuthToken() {
+    try {
+        const data = await window.AccountSession.verify();
+        if (!data) { window.AccountSession.redirect(); return false; }
+        userToken = window.AccountSession.getToken();
+        if (typeof updateUserUI === 'function') updateUserUI();
+        return true;
+    } catch { return false; }
 }
 window.ensureUserAuthToken = ensureUserAuthToken;
 
 /**
- * 下载相关请求遇到失效会话时续签一次，供队列和本地播放索引共同使用。
+ * 下载请求遇到认证失效时验证现有会话；无法恢复则返回登录页。
  * 保留请求正文，重试时重新读取认证头，防止沿用服务重启前的 Token。
  * @author jingyh
  */
@@ -1007,36 +953,16 @@ window.fetchDownloadWithAuth = fetchDownloadWithAuth;
  */
 function updateUserUI() {
     window.MusicExperience?.accountChanged();
-    const loginBtn = document.getElementById('header-login-btn');
-    const userDisplay = document.getElementById('header-user-display');
-    const usernameEl = document.getElementById('header-username');
-
-    if (!loginBtn || !userDisplay || !usernameEl) return;
-
     const username = localStorage.getItem('lx_sync_user');
-    const token = localStorage.getItem('lx_user_token');
-    document.getElementById('header-account-label')?.classList.toggle('hidden', !!(token && username));
-    document.getElementById('header-sync-logout')?.classList.toggle('hidden', !(token && username));
-
-    if (token && username) {
-        // 已登录
-        loginBtn.classList.add('hidden');
-        loginBtn.classList.remove('flex');
-        userDisplay.classList.add('flex');
-        userDisplay.classList.remove('hidden');
-        usernameEl.innerText = username;
-    } else {
-        // 未登录
-        loginBtn.classList.add('flex');
-        loginBtn.classList.remove('hidden');
-        userDisplay.classList.add('hidden');
-        userDisplay.classList.remove('flex');
-    }
-
-    // 更新自定义目录开关显示状态
-    if (typeof checkAndUpdateCustomDirUI === 'function') {
-        checkAndUpdateCustomDirUI();
-    }
+    const token = window.AccountSession.getToken();
+    const loggedIn = !!(token && username);
+    document.getElementById('header-account-label')?.classList.toggle('hidden', loggedIn);
+    document.getElementById('header-sync-logout')?.classList.toggle('hidden', !loggedIn);
+    const display = document.getElementById('header-user-display');
+    if (display) { display.classList.toggle('hidden', !loggedIn); display.classList.toggle('flex', loggedIn); }
+    const label = document.getElementById('header-username');
+    if (label) label.textContent = window.accountProfileNickname || username || '';
+    if (typeof checkAndUpdateCustomDirUI === 'function') checkAndUpdateCustomDirUI();
 }
 window.updateUserUI = updateUserUI;
 
@@ -1045,7 +971,7 @@ window.updateUserUI = updateUserUI;
  */
 async function checkAndUpdateCustomDirUI() {
     let userEnableCustomDir = false;
-    let localUserToken = typeof userToken !== 'undefined' ? userToken : localStorage.getItem('lx_user_token');
+    let localUserToken = typeof userToken !== 'undefined' ? userToken : window.AccountSession.getToken();
 
     if (localUserToken) {
         try {
@@ -1165,29 +1091,7 @@ window.updateSyncDownloadBtnVisibility = updateSyncDownloadBtnVisibility;
  */
 async function handleHeaderLogout(e) {
     if (e) e.stopPropagation();
-    if (typeof handleSyncLogout === 'function') {
-        await handleSyncLogout(false);
-    } else {
-        const confirmed = typeof showSelect === 'function'
-            ? await showSelect('退出同步账号', '确定要退出当前账号并清除同步凭证？', { danger: true })
-            : confirm('确定要退出当前账号并清除同步凭证？');
-        if (confirmed) {
-            try {
-                if (window.ListStore && typeof window.ListStore.remove === 'function') {
-                    await window.ListStore.remove().catch(() => { });
-                }
-                if ('caches' in window) {
-                    const keys = await caches.keys();
-                    await Promise.all(keys.map(k => caches.delete(k)));
-                }
-            } catch (err) { }
-            const agreementAccepted = localStorage.getItem('lx_agreement_accepted');
-            localStorage.clear();
-            sessionStorage.clear();
-            if (agreementAccepted) localStorage.setItem('lx_agreement_accepted', agreementAccepted);
-            window.location.reload();
-        }
-    }
+    await handleSyncLogout(true);
 }
 window.handleHeaderLogout = handleHeaderLogout;
 
@@ -1246,7 +1150,7 @@ window.handleHeaderLogout = handleHeaderLogout;
         }
 
         // [新增] 客户端模式自动连接远程同步 (仅在已登录到本地账户时触发，防止 _open 访客同步)
-        if (userToken && settings.enableClientModeSync && settings.remoteSyncUrl && settings.remoteSyncCode) {
+        if (userToken && localStorage.getItem('lx_sync_mode') === 'legacy-ws' && settings.enableClientModeSync && settings.remoteSyncUrl && settings.remoteSyncCode) {
             console.info('[Sync] Client mode enabled, auto-connecting to remote server...');
             // 降低延迟，只要认证完成后即可触发
             setTimeout(() => {
@@ -1265,38 +1169,7 @@ window.handleHeaderLogout = handleHeaderLogout;
 })();
 
 // 登出：调用服务端清除 Session，清除本地全量缓存，跳转到登录页
-async function handleLogout() {
-    try {
-        await fetch('/api/music/auth/logout', { method: 'POST' });
-    } catch (e) {
-        console.error('[Auth] 登出请求失败:', e);
-    }
-
-    try {
-        if (typeof audio !== 'undefined' && audio) {
-            shouldAutoRecoverPlayback = false;
-            audio.pause();
-            audio.currentTime = 0;
-            audio.src = '';
-        }
-        if (window.ListStore && typeof window.ListStore.remove === 'function') {
-            await window.ListStore.remove().catch(() => { });
-        }
-        if ('caches' in window) {
-            const keys = await caches.keys();
-            await Promise.all(keys.map(k => caches.delete(k)));
-        }
-    } catch (e) { }
-
-    const agreementAccepted = localStorage.getItem('lx_agreement_accepted');
-    localStorage.clear();
-    sessionStorage.clear();
-    if (agreementAccepted) localStorage.setItem('lx_agreement_accepted', agreementAccepted);
-
-    const playerPath = (window.CONFIG && window.CONFIG['player.path']) || (window.lx_config && window.lx_config['player.path']) || '/';
-    const normalizedPlayerPath = (playerPath === '/' || playerPath === '') ? '' : playerPath.replace(/\/+$/, '');
-    window.location.replace(`${normalizedPlayerPath}/login`);
-}
+async function handleLogout() { await handleSyncLogout(true); }
 // ===== 认证代码结束 =====
 
 // 音质选择器初始化
@@ -1504,7 +1377,7 @@ function changeLyricFontSize(value) {
 // 读取本地字体
 /**
  * 通用加载本地字体逻辑
- * @param {string} targetSelectId - 目标下拉框的 ID，默认为设置页的 'lyric-font-family-select'
+ * @param {string} targetSelectId - 目标下拉框的 ID，默认为播放页弹框的 'lyric-font-family-select'
  * @param {HTMLElement} btnEl - 触发按钮的引用，用于显示加载动画
  */
 async function loadLocalFonts(targetSelectId = 'lyric-font-family-select', btnEl = null) {
@@ -1583,6 +1456,7 @@ function changeQualityPreference(quality) {
 
 // Tab Switching
 function switchTab(tabId, loadRecent = true) {
+    if (tabId === 'downloads') { window.SystemDownloadManager?.renderList(); window.SystemDownloadManager?.syncServerQueue(true); }
     if (tabId === 'recent' && loadRecent) window.RecentView?.load();
     // 兼容协议弹窗和快捷键的旧入口，统一进入设置中的关于页面。
     if (tabId === 'about') {
@@ -1595,6 +1469,13 @@ function switchTab(tabId, loadRecent = true) {
         handleFavoritesClick();
         return;
     }
+
+    // 设置可逆展开，不执行普通切页的模式重置与控件回填。作者：jingyh
+    if (tabId === 'settings' && window.settingsPageToggle) {
+        window.settingsPageToggle.show();
+        return;
+    }
+    window.settingsPageToggle?.discard();
 
     document.querySelectorAll('[id^="view-"]').forEach(el => {
         el.classList.add('hidden');
@@ -3356,7 +3237,7 @@ function renderArtistSongsUI(list, page) {
                             </div>
                         </div>
                         <div class="min-w-0 flex-1">
-                            <div class="font-bold t-text-main text-sm md:text-base leading-tight truncate group-hover:text-emerald-600 transition-colors">${item.name}</div>
+                            <div class="song-file-title font-bold t-text-main text-sm md:text-base leading-tight truncate group-hover:text-emerald-600 transition-colors">${item.name}</div>
                             <div class="flex items-center gap-1 mt-1">
                                 ${getSourceTag ? getSourceTag(item.source) : ''}
                                 ${getQualityTags ? getQualityTags(item) : ''}
@@ -3380,7 +3261,8 @@ function renderArtistSongsUI(list, page) {
                     </div>
 
                     <!-- Actions -->
-                    <div class="col-span-4 sm:col-span-3 md:col-span-2 lg:col-span-2 flex items-center justify-end gap-1 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div class="song-row-actions col-span-4 sm:col-span-3 md:col-span-2 lg:col-span-2 flex items-center justify-end gap-1">
+                        ${window.SongActions?.renderLoveButton(item) || ''}
                         <button class="p-0.5 sm:p-1.5 hover:bg-emerald-50 rounded-lg text-emerald-600 transition-colors" title="播放" onclick="event.stopPropagation(); playFromView(${index})">
                             <i class="fas fa-play w-3.5 h-3.5 flex items-center justify-center"></i>
                         </button>
@@ -3423,6 +3305,7 @@ function renderArtistSongsUI(list, page) {
         </div>
     `;
     content.innerHTML = html;
+    window.SongFileStatus?.update(content, indexedDisplayList.map(obj => obj.item));
 
     // Init Marquee if needed (though we use truncate here)
     if (window.applyMarqueeChecks) applyMarqueeChecks();
@@ -4642,7 +4525,7 @@ function renderResults(list) {
                      </div>
                 </div>
                 <div class="min-w-0 flex-1 flex flex-col justify-center overflow-hidden">
-                    <div class="font-bold t-text-main text-sm md:text-base leading-tight hover:text-emerald-600 transition-colors">
+                    <div class="song-file-title font-bold t-text-main text-sm md:text-base leading-tight hover:text-emerald-600 transition-colors">
                          ${createMarqueeHtml(item.name)}
                     </div>
                     <div class="flex items-center gap-1 mt-0.5 md:mt-1 pr-2 overflow-hidden">
@@ -4673,7 +4556,8 @@ function renderResults(list) {
             </div>
 
             <!-- Actions -->
-            <div class="col-span-4 sm:col-span-3 md:col-span-2 lg:col-span-2 flex items-center justify-end gap-0.5 sm:gap-1 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
+            <div class="song-row-actions col-span-4 sm:col-span-3 md:col-span-2 lg:col-span-2 flex items-center justify-end gap-0.5 sm:gap-1">
+                ${window.SongActions?.renderLoveButton(item) || ''}
                 <button class="p-1 sm:p-1.5 hover:bg-emerald-50 rounded-lg text-emerald-600 transition-colors" 
                         title="播放" 
                         onclick="event.stopPropagation(); playFromView(${actualIndexInOriginal})">
@@ -4719,6 +4603,8 @@ function renderResults(list) {
 
         container.appendChild(row);
     });
+
+    window.SongFileStatus?.update(container, pageList.map(obj => obj.item));
 
     if (window.glSortMode && typeof Sortable !== 'undefined') {
         if (window.glSortableInstance) {
@@ -4784,7 +4670,7 @@ async function toggleDislikeSong(song) {
         // 自动引导跳转到设置-登录区域
         if (typeof switchTab === 'function') {
             switchTab('settings');
-            selectSettingsSection('sync');
+            selectSettingsSection('account');
             setTimeout(() => {
                 const el = document.getElementById('btn-mode-local');
                 if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -4795,6 +4681,7 @@ async function toggleDislikeSong(song) {
 
     try {
         const nowDisliked = await window.DislikeManager.toggleSong(song);
+        if (!nowDisliked) await loadLibraryData();
         // [Fix] 如果当前正在查看不喜欢列表，更新 viewingPlaylist 到最新的 dislikeList
         if (window.currentViewingListId === 'dislike_songs') {
             window.viewingPlaylist = window.DislikeManager.state.dislikeList || [];
@@ -4806,6 +4693,8 @@ async function toggleDislikeSong(song) {
         if (typeof window.renderArtistSongsUI === 'function' && window.currentArtistSongsCache) {
             window.renderArtistSongsUI(window.currentArtistSongsCache);
         }
+        window.LeaderboardManager?.renderSongs?.();
+        if (!document.getElementById('songlist-detail-view')?.classList.contains('hidden')) window.SongListManager?.renderDetail?.();
         // [Fix] 实时刷新侧边栏不喜欢数量徽标
         if (typeof refreshDislikeSidebarCount === 'function') {
             refreshDislikeSidebarCount();
@@ -4821,7 +4710,7 @@ async function toggleDislikeSong(song) {
             }
             if (typeof switchTab === 'function') {
                 switchTab('settings');
-                selectSettingsSection('sync');
+                selectSettingsSection('account');
                 setTimeout(() => {
                     const el = document.getElementById('btn-mode-local');
                     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -6078,18 +5967,17 @@ async function updateServerCacheConfig(location, pattern) {
 window.updateServerCacheConfig = updateServerCacheConfig; // Expose global
 
 /**
- * 查看服务端当前真实存储目录 (综合缓存位置与仅下载模式)
+ * 查看服务端当前播放缓存目录
  */
 async function showServerDirectories() {
     showLoading('正在获取服务器目录信息...');
     try {
         const loc = window.settings?.serverCacheLocation || 'root';
-        const onlyDownload = !!window.settings?.enableOnlyDownloadMode;
 
         const headers = { 'Content-Type': 'application/json' };
         Object.assign(headers, getUserAuthHeaders());
 
-        const url = `/api/music/cache/directories?location=${encodeURIComponent(loc)}&onlyDownload=${onlyDownload ? '1' : '0'}`;
+        const url = `/api/music/cache/directories?location=${encodeURIComponent(loc)}`;
         const res = await fetch(url, { headers });
         const json = await res.json();
         hideLoading();
@@ -6100,9 +5988,6 @@ async function showServerDirectories() {
         }
 
         const data = json.data;
-        const isWindows = data.cacheDirectory.includes('\\');
-        const sep = isWindows ? '\\' : '/';
-        const isSeparated = !data.isSameDirectory;
 
         const modal = document.createElement('div');
         modal.className = "fixed inset-0 z-[200] flex items-center justify-center p-4 animate-fade-in";
@@ -6133,10 +6018,7 @@ async function showServerDirectories() {
                             <i class="fas ${data.isWebDAVSynced ? 'fa-cloud' : 'fa-laptop'} text-xs"></i>
                             位置: ${data.rootType}
                         </span>
-                        <span class="px-2.5 py-1 rounded-md font-medium ${isSeparated ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-900' : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900'} flex items-center gap-1.5">
-                            <i class="fas ${isSeparated ? 'fa-layer-group' : 'fa-folder'} text-xs"></i>
-                            模式: ${isSeparated ? '仅下载已开启 (缓存与下载已分离)' : '仅下载未开启 (缓存与下载合并)'}
-                        </span>
+
                         <span class="px-2.5 py-1 rounded-md font-medium bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-900 flex items-center gap-1.5">
                             <i class="fas fa-user text-xs"></i>
                             空间: ${data.username === '_open' ? '公开空间 (_open)' : data.username}
@@ -6161,34 +6043,11 @@ async function showServerDirectories() {
                         <p class="text-[11px] t-text-muted">播放时在线流式预加载及临时缓存文件存放处，受 LRU 容量自动限制与清理。</p>
                     </div>
 
-                    <!-- 下载目录 -->
-                    <div class="p-3.5 rounded-xl border t-border-main bg-gray-50/70 dark:bg-gray-800/40 space-y-2">
-                        <div class="flex items-center justify-between">
-                            <span class="text-xs font-bold t-text-main flex items-center gap-1.5">
-                                <i class="fas fa-arrow-circle-down text-emerald-500"></i>
-                                歌曲下载目录
-                            </span>
-                            <button class="copy-dir-btn text-xs text-emerald-500 hover:underline flex items-center gap-1 cursor-pointer" data-path="${data.downloadDirectory.replace(/"/g, '&quot;')}">
-                                <i class="far fa-copy"></i>
-                                复制路径
-                            </button>
-                        </div>
-                        <div class="p-2.5 rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 select-all font-mono text-xs break-all text-gray-800 dark:text-gray-200 shadow-sm leading-relaxed">
-                            ${data.downloadDirectory}
-                        </div>
-                        <p class="text-[11px] t-text-muted">
-                            ${isSeparated
-                ? '开启“仅下载模式”时，歌曲将独立持久保存在此目录，不参与缓存容量淘汰，洗版功能仅针对此目录生效。'
-                : '未开启“仅下载模式”时，下载歌曲与缓存歌曲合并存储在同一目录下。'}
-                        </p>
-                    </div>
-
                     <!-- 提示说明 -->
                     <div class="text-xs text-gray-500 dark:text-gray-400 p-3 rounded-lg bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-900/40 flex items-start gap-2">
                         <i class="fas fa-info-circle text-amber-500 mt-0.5 shrink-0"></i>
                         <div class="space-y-1">
                             <div>• <strong>缓存位置</strong>：选择「DATA_PATH」会将文件存放于 WebDAV 同步目录下，备份时可一并打包；选择「运行目录」则仅保存在当前服务器本地。</div>
-                            <div>• <strong>仅下载模式</strong>：开启后下载路径变更为 <code class="px-1 py-0.5 rounded bg-amber-100 dark:bg-amber-900/60 font-mono text-[11px]">music${sep}${data.username}</code>；关闭时统一保存在 <code class="px-1 py-0.5 rounded bg-amber-100 dark:bg-amber-900/60 font-mono text-[11px]">cache${sep}${data.username}</code>。</div>
                         </div>
                     </div>
                 </div>
@@ -8091,7 +7950,7 @@ async function updateSetting(key, value) {
     if (SETTINGS_UI_MAP[key]?.normalize) {
         value = SETTINGS_UI_MAP[key].normalize(value);
     }
-    const restrictedKeys = ['enableServerCache', 'enableServerLyricCache', 'serverCacheLocation', 'serverCacheNamingPattern', 'downloadConcurrency', 'enableOnlyDownloadMode', 'enableRemaster', 'preferredQuality', 'enablePublicSources', 'embedLyricToFile', 'preferServerCache'];
+    const restrictedKeys = ['enableServerCache', 'enableServerLyricCache', 'serverCacheLocation', 'serverCacheNamingPattern', 'downloadConcurrency', 'enableRemaster', 'preferredQuality', 'enablePublicSources', 'embedLyricToFile', 'preferServerCache'];
     const isPublic = !isUserLoggedIn() || currentListData?.username === '_open' || currentListData?.username === 'default' || window.isViewingPublicFavorites;
     const enablePublicRestriction = window.lx_config?.['user.enablePublicRestriction'];
     const enableLoginCacheRestriction = window.lx_config?.['user.enableLoginCacheRestriction'];
@@ -8294,7 +8153,16 @@ const SETTINGS_UI_MAP = {
     // 视觉效果 (Visualizer)
     showFooterVisualizer: { id: 'setting-show-footer-visualizer', type: 'checkbox' },
     footerVisualizerStyle: { id: 'setting-footer-visualizer-style', type: 'value' },
-    showDetailVisualizer: { id: 'setting-show-detail-visualizer', type: 'checkbox' },
+    showDetailVisualizer: {
+        id: 'setting-show-detail-visualizer', type: 'checkbox',
+        action: (enabled) => {
+            const options = document.getElementById('setting-detail-visualizer-options');
+            if (options) options.hidden = !enabled;
+            // 关闭特效时同时收起已打开的下拉浮层，保留用户选择。
+            const wrapper = document.getElementById('cs-w-setting-detail-visualizer-style');
+            if (!enabled && wrapper?.classList.contains('active')) window.CustomSelectManager?.closeAll();
+        }
+    },
     detailVisualizerStyle: { id: 'setting-detail-visualizer-style', type: 'value' },
     visualizerGlobalStyle: { id: 'setting-visualizer-global-style', type: 'value' },
     visualizerOpacity: {
@@ -8324,7 +8192,6 @@ const SETTINGS_UI_MAP = {
     enableServerLyricCache: { id: 'setting-enable-server-lyric-cache', type: 'checkbox' },
     embedLyricToFile: { id: 'setting-embed-lyric-to-file', type: 'checkbox' },
     preferServerCache: { id: 'setting-prefer-server-cache', type: 'checkbox' },
-    enableOnlyDownloadMode: { id: 'setting-only-download-mode', type: 'checkbox' },
     serverCacheLocation: { id: 'setting-server-cache-location', type: 'value' },
     serverCacheNamingPattern: {
         id: 'setting-server-cache-naming',
@@ -8368,7 +8235,7 @@ function syncSettingsUI(key = null, value = null) {
     const enablePublicRestriction = window.lx_config?.['user.enablePublicRestriction'];
     const enableLoginCacheRestriction = window.lx_config?.['user.enableLoginCacheRestriction'];
     const isAdmin = !!localStorage.getItem('lx_admin_password');
-    const restrictedKeys = ['enableServerCache', 'enableServerLyricCache', 'serverCacheLocation', 'serverCacheNamingPattern', 'downloadConcurrency', 'enableOnlyDownloadMode', 'enableRemaster', 'preferredQuality', 'enablePublicSources', 'embedLyricToFile', 'preferServerCache'];
+    const restrictedKeys = ['enableServerCache', 'enableServerLyricCache', 'serverCacheLocation', 'serverCacheNamingPattern', 'downloadConcurrency', 'enableRemaster', 'preferredQuality', 'enablePublicSources', 'embedLyricToFile', 'preferServerCache'];
 
     const updateItem = (itemKey, itemValue, isSingle) => {
         const config = SETTINGS_UI_MAP[itemKey];
@@ -8434,34 +8301,11 @@ function syncSettingsUI(key = null, value = null) {
 
 /**
  * 应用播放页背景样式
- * @param {string} mode - 'blur', 'solid', 'dark'
+ * @param {string} mode 背景模式，沿用原设置与账号保存入口。
+ * @author jingyh
  */
 function applyPlayerBackground(mode) {
-    const detailBg = document.getElementById('view-player-detail');
-    const bgCover = document.getElementById('detail-bg-cover');
-    const bgOverlay = document.getElementById('player-detail-bg-overlay');
-    if (!detailBg || !bgCover || !bgOverlay) return;
-
-    console.log(`[PlayerBackground] Applying style: ${mode}`);
-
-    // 重置默认状态
-    bgCover.style.display = 'block';
-    bgOverlay.className = 'absolute inset-0 t-bg-panel/30 backdrop-blur-3xl';
-    bgOverlay.style.backgroundColor = '';
-    bgOverlay.style.backdropFilter = '';
-    detailBg.style.backgroundColor = '';
-
-    if (mode === 'solid') {
-        bgCover.style.display = 'none';
-        bgOverlay.className = 'absolute inset-0 t-bg-panel';
-        bgOverlay.style.backdropFilter = 'none';
-    } else if (mode === 'dark') {
-        bgCover.style.display = 'none';
-        bgOverlay.className = 'absolute inset-0';
-        bgOverlay.style.backgroundColor = '#000000';
-        bgOverlay.style.backdropFilter = 'none';
-    }
-    // 'blur' 模式由上面的重置逻辑处理
+    window.playerDetailView?.applyBackground(mode);
 }
 
 // ========== 缓存统计与重置逻辑 ==========
@@ -8533,7 +8377,7 @@ async function clearCache(type) {
         clearServerLyric = await showSelect('清除缓存', '是否同时清除本地缓存文件夹内的歌词LRC文件？', { danger: true });
 
         if (clearServerLyric) {
-            const isLogined = !!localStorage.getItem('lx_user_token');
+            const isLogined = !!window.AccountSession.getToken();
             const isPublicUser = !window.currentListData || !window.currentListData.username || window.currentListData.username === 'default';
             if (isPublicUser && window.lx_config && window.lx_config['user.enablePublicRestriction'] && !isLogined) {
                 const isAdminSession = localStorage.getItem('lx_admin_password');
@@ -8746,7 +8590,7 @@ function renderCacheList() {
         const username = (window.currentListData && window.currentListData.username) || localStorage.getItem('lx_sync_user') || '';
         // <img src> 无法携带自定义请求头，将 token 附到 URL 以通过服务端认证
         const authToken = (window.getUserAuthHeaders ? window.getUserAuthHeaders()['x-user-token'] : null)
-            || localStorage.getItem('lx_user_token') || '';
+            || window.AccountSession.getToken() || '';
         const coverUrl = item.hasCover
             ? `/api/music/cache/cover?filename=${encodeURIComponent(item.filename)}&user=${encodeURIComponent(username)}${authToken ? `&token=${encodeURIComponent(authToken)}` : ''}`
             : '/music/assets/logo.svg';
@@ -8797,7 +8641,8 @@ function renderCacheList() {
                     `}
                 </div>
 
-                <div class="flex items-center gap-2 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
+                <div class="song-row-actions flex items-center gap-2">
+                    ${window.SongActions?.renderLoveButton(item) || ''}
                     ${!cacheBatchMode ? `
                         <button onclick="event.stopPropagation(); openCacheItemPlaylist(${idx})"
                                 class="p-2 text-emerald-500 hover:bg-emerald-50 rounded-lg transition-colors" title="添加到歌单">
@@ -8959,7 +8804,7 @@ async function removeCacheItem(index) {
         showError('文件信息已失效，请刷新后重试');
         return;
     }
-    const isLogined = !!localStorage.getItem('lx_user_token');
+    const isLogined = !!window.AccountSession.getToken();
     const isPublicUser = !window.currentListData || !window.currentListData.username || window.currentListData.username === 'default';
     if (isPublicUser && window.lx_config && window.lx_config['user.enablePublicRestriction'] && !isLogined) {
         const isAdminSession = localStorage.getItem('lx_admin_password');
@@ -10268,8 +10113,10 @@ async function saveDislikeLibraryArtists(customList = null) {
         } else {
             headers = { 'Content-Type': 'application/json', ...getUserAuthHeaders() };
         }
-        await fetch(url, { method: 'POST', headers, body: JSON.stringify(listToSave) });
-        // Refresh dislike rules in DislikeManager so song lists get updated with disabled/disliked state
+        const response = await fetch(url, { method: 'POST', headers, body: JSON.stringify(listToSave) });
+        if (!response.ok) throw new Error(await response.text() || '保存不喜欢歌手失败');
+        refreshDislikeSidebarCount();
+        // 保存成功后立即刷新规则和各列表。
         if (window.DislikeManager && typeof window.DislikeManager.load === 'function') {
             await window.DislikeManager.load(true);
             if (typeof renderResults === 'function' && Array.isArray(window.viewingPlaylist)) {
@@ -10279,9 +10126,10 @@ async function saveDislikeLibraryArtists(customList = null) {
                 window.renderArtistSongsUI(window.currentArtistSongsCache);
             }
         }
-        // Mutual Exclusivity: refresh liked list to sync UI
-        setTimeout(() => loadLibraryData(), 500); 
-    } catch (e) { console.error('[DislikeLibrary] 保存不喜欢的歌手失败:', e); }
+        window.LeaderboardManager?.renderSongs?.();
+        if (!document.getElementById('songlist-detail-view')?.classList.contains('hidden')) window.SongListManager?.renderDetail?.();
+        await loadLibraryData();
+    } catch (e) { console.error('[DislikeLibrary] 保存不喜欢的歌手失败:', e); throw e; }
 }
 
 /** 持久化 disliked albums 到后端 */
@@ -10299,8 +10147,10 @@ async function saveDislikeLibraryAlbums(customList = null) {
         } else {
             headers = { 'Content-Type': 'application/json', ...getUserAuthHeaders() };
         }
-        await fetch(url, { method: 'POST', headers, body: JSON.stringify(listToSave) });
-        // Refresh dislike rules in DislikeManager so song lists get updated with disabled/disliked state
+        const response = await fetch(url, { method: 'POST', headers, body: JSON.stringify(listToSave) });
+        if (!response.ok) throw new Error(await response.text() || '保存不喜欢专辑失败');
+        refreshDislikeSidebarCount();
+        // 保存成功后立即刷新规则和各列表。
         if (window.DislikeManager && typeof window.DislikeManager.load === 'function') {
             await window.DislikeManager.load(true);
             if (typeof renderResults === 'function' && Array.isArray(window.viewingPlaylist)) {
@@ -10310,9 +10160,10 @@ async function saveDislikeLibraryAlbums(customList = null) {
                 window.renderArtistSongsUI(window.currentArtistSongsCache);
             }
         }
-        // Mutual Exclusivity: refresh liked list to sync UI
-        setTimeout(() => loadLibraryData(), 500);
-    } catch (e) { console.error('[DislikeLibrary] 保存不喜欢的专辑失败:', e); }
+        window.LeaderboardManager?.renderSongs?.();
+        if (!document.getElementById('songlist-detail-view')?.classList.contains('hidden')) window.SongListManager?.renderDetail?.();
+        await loadLibraryData();
+    } catch (e) { console.error('[DislikeLibrary] 保存不喜欢的专辑失败:', e); throw e; }
 }
 
 /** 检查歌手是否已拉黑 */
@@ -11242,7 +11093,7 @@ function updateSyncStatus(html, showLogout = true) {
 async function handleSyncLogout(skipConfirm = false) {
     if (!skipConfirm) {
         const confirmed = typeof showSelect === 'function'
-            ? await showSelect('退出同步账号', '确定要退出当前账号并清除同步凭证？', { danger: true })
+            ? await showSelect('退出登录', '确定要退出当前账号？', { danger: true })
             : confirm('确定要退出当前账号并清除同步凭证？');
         if (!confirmed) return;
     }
@@ -11324,12 +11175,12 @@ async function handleSyncLogout(skipConfirm = false) {
         if (remoteCode) remoteCode.value = '';
 
         if (typeof showSuccess === 'function') {
-            showSuccess('已安全退出登录并清除所有缓存，正在刷新页面...');
+            showSuccess('已退出登录，正在返回登录页…');
         }
 
         // 8. 自动刷新网页
         setTimeout(() => {
-            window.location.reload();
+            window.location.replace(window.AccountSession.loginUrl());
         }, 300);
 
     } catch (err) {
@@ -11339,94 +11190,8 @@ async function handleSyncLogout(skipConfirm = false) {
 }
 
 async function handleLocalLogin() {
-    const user = document.getElementById('sync-local-user').value;
-    const pass = document.getElementById('sync-local-pass').value;
-    const statusEl = document.getElementById('sync-status');
-
-    if (!user || !pass) {
-        showError('请输入用户名和密码');
-        return;
-    }
-
-    statusEl.innerHTML = '<i class="fas fa-spinner fa-spin text-emerald-500"></i> 正在登录...';
-
-    try {
-        syncManager.initLocal(user, pass);
-        const success = await syncManager.client.login();
-
-        if (success) {
-            statusEl.innerHTML = '<i class="fas fa-check-circle text-emerald-500"></i> 登录成功，正在同步...';
-
-            // 用户主动登录时重新颁发 Token，避免继续使用服务器重启前的会话。
-            {
-                try {
-                    const tokenRes = await fetch('/api/user/login', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ username: user, password: pass })
-                    });
-                    if (tokenRes.ok) {
-                        const tokenData = await tokenRes.json();
-                        if (tokenData.token) {
-                            userToken = tokenData.token;
-                            localStorage.setItem('lx_user_token', userToken);
-                            console.log('[Auth] 新用户 Token 已获取并保存');
-                        }
-                    }
-                } catch (e) {
-                    console.warn('[Auth] Token 获取失败，回退到旧式认证方式:', e);
-                }
-            }
-
-            // [新增] 显示并加载 Token 管理面板
-            const tokenSection = document.getElementById('token-management-section');
-            if (tokenSection) {
-                tokenSection.classList.remove('hidden');
-                loadTokenConfig();
-            }
-
-            // Fetch List
-            const listData = await syncManager.sync();
-            currentListData = listData;
-            if (currentListData) currentListData.username = user; // Attach username
-            window.myPersonalListData = currentListData; // [个人数据缓存]
-            renderMyLists(listData);
-
-            // [Library] 登录后加载收藏歌手/专辑
-            loadLibraryData();
-
-            // [Cache] Save list data immediately for offline availability / quick load
-            await window.ListStore.set(listData).catch(e => console.error('[IDBStore] 保存失败:', e));
-
-            updateSyncStatus(`<i class="fas fa-check-circle text-emerald-500"></i> 已同步 (用户: ${user})`);
-            // Save credentials to localStorage (Simple version)
-            localStorage.setItem('lx_sync_mode', 'local'); // [Fix] Save mode
-            localStorage.setItem('lx_sync_user', user);
-            localStorage.setItem('lx_sync_pass', pass);
-
-            // [新增] 成功登录后立即更新顶部栏 UI
-            if (typeof updateUserUI === 'function') updateUserUI();
-
-            // [New] Fetch settings from server if enabled
-            if (settings.saveAccountSettingsToFile) {
-                fetchSettingsFromServer();
-            }
-
-            // [新增] 客户端模式：登录本地服务器后自动触发远程同步
-            if (settings.enableClientModeSync && settings.remoteSyncUrl && settings.remoteSyncCode) {
-                console.info('[Sync] Client mode auto-triggering remote sync after local login...');
-                setTimeout(() => {
-                    handleRemoteOverwriteConnect(true);
-                }, 1000);
-            }
-        } else {
-            statusEl.innerHTML = '<i class="fas fa-times-circle text-red-500"></i> 登录失败: 用户名或密码错误';
-        }
-    } catch (e) {
-        statusEl.innerHTML = `<i class="fas fa-exclamation-circle text-red-500"></i> 错误: ${e.message}`;
-    }
+    window.location.assign(window.AccountSession.loginUrl());
 }
-
 function showSyncModeModal() {
     const modal = document.getElementById('sync-auth-modal');
     modal.classList.remove('hidden');
@@ -11938,8 +11703,15 @@ function initFavoriteSidebarSortable(container) {
         onMove: event => event.related?.getAttribute('data-sidebar-list-id') !== 'default',
         ghostClass: 'opacity-50',
         chosenClass: 'bg-emerald-50',
+        forceFallback: true,
+        fallbackOnBody: true,
+        delay: 150,
+        delayOnTouchOnly: true,
+        touchStartThreshold: 4,
         onEnd: () => {
-            const ids = Array.from(container.querySelectorAll('[data-sidebar-sort-id]'))
+            // 两组共用原设置字段，合并当前 DOM 顺序，避免一组拖动覆盖另一组。作者：jingyh
+            const groups = ['my-lists-container', 'playlist-lists-container'].map(id => document.getElementById(id)).filter(Boolean);
+            const ids = groups.flatMap(group => Array.from(group.querySelectorAll('[data-sidebar-sort-id]')))
                 .map(el => el.getAttribute('data-sidebar-sort-id'))
                 .filter(Boolean);
             persistFavoriteSidebarOrder(ids);
@@ -12048,7 +11820,7 @@ function renderMyLists(data) {
     playlists.replaceChildren();
 
     if (!data) {
-        container.innerHTML = '<div class="px-6 py-2 text-sm t-text-muted">请先在设置中登录</div>';
+        container.replaceChildren();
         refreshFavoritesChildrenHeight();
         return;
     }
@@ -12190,6 +11962,7 @@ function renderMyLists(data) {
 
     // Removed old dislike injection
     refreshLibrarySidebarCount();
+    initFavoriteSidebarSortable(container);
     initFavoriteSidebarSortable(playlists);
     refreshFavoritesChildrenHeight();
 
@@ -12462,20 +12235,13 @@ function handleFavoritesClick() {
 }
 
 function handleDislikeFolderClick() {
-    exitListSecondaryModes();
+    // 父级只展开目录；子项仍使用原跳转入口，不改变当前页面及操作状态。作者：jingyh
+    const sidebar = document.getElementById('main-sidebar');
+    const wasCollapsed = window.innerWidth >= 1025 && sidebar?.classList.contains('navigation-collapsed');
+    if (wasCollapsed) toggleMainNavigation();
     const children = document.getElementById('dislike-children');
     const arrow = document.getElementById('dislike-arrow');
-    
-    // Highlight Header
-    document.querySelectorAll('[id^="tab-"]').forEach(el => {
-        el.classList.remove('active-tab', 'text-emerald-600');
-        el.classList.add('t-text-muted');
-    });
-    const favTab = document.getElementById('tab-favorites');
-    if (favTab) {
-        favTab.classList.add('active-tab');
-        favTab.classList.remove('t-text-muted');
-    }
+    if (wasCollapsed && !children.classList.contains('hidden') && children.style.height !== '0px') return;
 
     if (children.classList.contains('hidden') || children.style.height === '0px') {
         children.classList.remove('hidden');
@@ -12487,8 +12253,6 @@ function handleDislikeFolderClick() {
             setTimeout(refreshFavoritesChildrenHeight, 300);
         });
         arrow.classList.add('rotate-90');
-        // Auto select dislike songs when opening
-        handleDislikeSongsClick();
     } else {
         children.style.height = '0px';
         setTimeout(() => {
@@ -12580,6 +12344,39 @@ function handleDislikeAlbumsClick() {
         renderLibraryAlbums(window.dislikeLibraryData.albums, true);
     }
 }
+
+/** 返回与新建操作一致的导入目标；浏览公开收藏时仍优先写入个人歌单。 @author jingyh */
+window.getPlaylistImportTarget = () => {
+    const data = (window.isViewingPublicFavorites && window.myPersonalListData) ? window.myPersonalListData : currentListData;
+    if (!data) return null;
+    const username = data.username || localStorage.getItem('lx_sync_user') || '_open';
+    return ['default', 'open'].includes(username) ? '_open' : username;
+};
+
+/** 公开歌单沿用现有管理员验证流程。 @author jingyh */
+window.preparePlaylistImport = async target => !['default', '_open', 'open'].includes(target) || await requireAdminForOpenWrite('公开列表中导入歌单');
+
+/**
+ * 应用服务器已持久化的导入结果，更新列表、缓存与添加歌曲弹框。
+ * @param result 导入接口返回的用户名称及完整列表。
+ * @returns 页面更新完成的 Promise。
+ * @author jingyh
+ */
+window.applyImportedPlaylists = async result => {
+    if (window.getPlaylistImportTarget() !== result.username) return;
+    const data = { ...result.lists, username: result.username };
+    if (window.isViewingPublicFavorites && result.username !== '_open') {
+        window.myPersonalListData = data;
+    } else {
+        currentListData = data;
+        window.currentListData = data;
+        if (result.username !== '_open') window.myPersonalListData = data;
+    }
+    renderMyLists(currentListData);
+    if (typeof renderPlaylistAddGrid === 'function') renderPlaylistAddGrid();
+    // 数据库已提交，缓存写入失败不应把此次导入显示为失败。
+    await window.ListStore.set(data).catch(() => {});
+};
 
 async function handleCreateList() {
     const name = await showInput("新建歌单", "请输入新歌单的名称：", {
@@ -12937,77 +12734,27 @@ document.addEventListener('DOMContentLoaded', async () => {
     const defaultTab = settings.defaultEntry || 'favorites';
     switchTab(defaultTab);
 
-    // 2. Auto-reconnect or auto-login
-    const syncMode = localStorage.getItem('lx_sync_mode');
-
-    if (syncMode === 'local') {
-        // Local mode: auto-login
-        const user = localStorage.getItem('lx_sync_user');
-        const pass = localStorage.getItem('lx_sync_pass');
-        if (user && pass) {
-            document.getElementById('sync-local-user').value = user;
-            document.getElementById('sync-local-pass').value = pass;
-            console.log('[Cache] 自动登录本地账号:', user);
-            handleLocalLogin();
-        }
-    } else if (syncMode === 'remote') {
-        // Remote mode: auto-reconnect
-        const url = localStorage.getItem('lx_sync_url');
-        const code = localStorage.getItem('lx_sync_code');
-        const authStr = localStorage.getItem('lx_ws_auth');
-
-        if (url && code) {
-            document.getElementById('sync-remote-url').value = url;
-            document.getElementById('sync-remote-code').value = code;
-
-            // Check if we have saved authInfo
-            if (authStr) {
-                try {
-                    const authInfo = JSON.parse(authStr);
-                    console.log('[Cache] 使用缓存的认证信息自动重连...');
-
-                    // Pre-populate authInfo in client
-                    syncManager.initRemote(url, code, {
-                        getData: async () => {
-                            const cachedData = await window.ListStore.get().catch(() => null);
-                            return cachedData || { defaultList: [], loveList: [], userList: [] };
-                        },
-                        setData: async (data) => {
-                            await window.ListStore.set(data).catch(e => console.error('[IDBStore] 保存失败:', e));
-                            const oldUsername = currentListData ? currentListData.username : null;
-                            currentListData = data;
-                            if (oldUsername) currentListData.username = oldUsername; // Preserve username
-
-                            renderMyLists(data);
-                            document.getElementById('sync-status').innerHTML = '<i class="fas fa-check-circle text-blue-500"></i> 数据已同步';
-                        },
-                        getSyncMode: async () => {
-                            return new Promise((resolve) => {
-                                syncModeResolve = resolve;
-                                showSyncModeModal();
-                            });
-                        }
-                    });
-
-                    syncManager.client.authInfo = authInfo; // Reuse saved auth
-                    syncManager.client.onLogin = (success) => {
-                        if (success) {
-                            console.log('[Cache] 自动重连成功');
-                            updateSyncStatus('<i class="fas fa-check-circle text-green-500"></i> 已自动重连');
-                        } else {
-                            console.log('[Cache] 自动重连失败,需要手动重新配对');
-                            localStorage.removeItem('lx_ws_auth'); // Clear invalid auth
-                        }
-                    };
-                    syncManager.client.connect();
-                } catch (e) {
-                    console.error('[Cache] 自动重连失败:', e);
-                }
-            } else {
-                console.log('[Cache] 无缓存认证信息,请手动连接');
+    // 使用有效账号会话加载歌单，本地与远程账号均通过 HTTP 入口同步。
+    const account = await window.accountReady;
+    if (account) {
+        userToken = window.AccountSession.getToken();
+        syncManager.initLocal(account.username, '');
+        try {
+            const listData = await syncManager.sync();
+            if (listData) {
+                currentListData = listData;
+                currentListData.username = account.username;
+                window.myPersonalListData = currentListData;
+                renderMyLists(currentListData);
+                await window.ListStore.set(currentListData);
             }
-        }
+            loadLibraryData();
+            if (settings.saveAccountSettingsToFile) await fetchSettingsFromServer();
+            updateUserUI();
+            if (window.loadAccountProfile) await window.loadAccountProfile();
+        } catch (error) { console.warn('[Account] 加载账号数据失败:', error); }
     }
+
 });
 
 window.switchSyncMode = switchSyncMode;
@@ -14325,7 +14072,7 @@ function renderPlaylistAddGrid() {
         btn.onclick = () => handleTogglePlaylist(listId, btn); // Use handler wrapper
 
         btn.innerHTML = `
-            <span class="truncate max-w-[80%]">${listName}</span>
+            <span class="truncate max-w-[80%]">${escapeHtmlText(listName)}</span>
             ${(!isBatch && isIncluded) ? '<i class="fas fa-check text-xs ml-1 opacity-80"></i>' : ''}
         `;
         return btn;
@@ -15358,74 +15105,9 @@ window.showOptions = showOptions;
  */
 async function handleDownloadClick(event) {
     if (event) event.stopPropagation();
-
-    if (!currentPlayingSong) {
-        showInfo('当前没有正在播放的歌曲');
-        return;
-    }
-
-    const song = currentPlayingSong;
-
-    // [优化] 检测是否已缓存
-    const prefQuality = window.settings?.preferredQuality || 'flac';
-    const checkResult = await window.checkServerCache?.(song, prefQuality);
-    const cacheSuffix = (checkResult?.exists && !checkResult?.isCollision) ? ' (已缓存)' : '';
-
-    const isOnlyDownload = window.settings?.enableOnlyDownloadMode === true;
-    const actionLabel = isOnlyDownload ? '下载到服务器' : '缓存到服务器';
-    const options = ['浏览器下载', `${actionLabel}${cacheSuffix}`, '服务器下载'];
-    const modeText = isOnlyDownload ? '仅下载模式' : '缓存模式';
-    const selected = await showOptions('下载与缓存', `[${modeText}] 选择对 [${song.name}] 的操作：`, options);
-    if (!selected) return;
-
-    // 选中操作后的权限拦截校验
-    const isPublic = !isUserLoggedIn() || window.currentListData?.username === 'default' || window.currentListData?.username === '_open';
-    const enablePublicRestriction = window.lx_config?.['user.enablePublicRestriction'];
-    const isAdmin = !!localStorage.getItem('lx_admin_password');
-
-    if (selected === '服务器下载') {
-        await window.downloadSong(song, null, false, '服务器下载');
-    } else if (selected === '浏览器下载') {
-        const isBrowserDownloadAllowed = window.lx_config?.['user.enablePublicNonAdminBrowserDownload'] !== false;
-        if (isPublic && enablePublicRestriction && !isBrowserDownloadAllowed && !isAdmin) {
-            showError('权限限制：管理员已关闭非管理员浏览器下载功能，下载歌曲需要验证管理员身份。');
-            if (typeof window.handleAdminAuth === 'function') {
-                const authorized = await window.handleAdminAuth('管理员已关闭非管理员浏览器下载功能，下载歌曲需要验证管理员身份');
-                if (!authorized) return;
-            } else {
-                return;
-            }
-        }
-
-        if (typeof downloadSong === 'function') {
-            downloadSong(song, null, false, '浏览器下载');
-        } else {
-            showError('下载功能未就绪');
-        }
-    } else if (selected && (selected.startsWith('缓存到服务器') || selected.startsWith('下载到服务器'))) {
-        const isServerCacheAllowed = window.lx_config?.['user.enablePublicNonAdminServerCache'] !== false;
-        if (isPublic && enablePublicRestriction && !isServerCacheAllowed && !isAdmin) {
-            showError('权限限制：管理员已关闭非管理员服务器缓存功能，缓存歌曲需要验证管理员身份。');
-            if (typeof window.handleAdminAuth === 'function') {
-                const authorized = await window.handleAdminAuth('管理员已关闭非管理员服务器缓存功能，缓存歌曲需要验证管理员身份');
-                if (!authorized) return;
-            } else {
-                return;
-            }
-        }
-
-        const isCached = checkResult?.exists && !checkResult?.isCollision;
-        if (!isOnlyDownload && isCached) {
-            showInfo('该歌曲已在服务器缓存');
-            return;
-        }
-
-        if (typeof downloadSong === 'function') {
-            downloadSong(song, null, false, actionLabel);
-        } else {
-            showError('服务器缓存逻辑未就绪');
-        }
-    }
+    if (!currentPlayingSong) { showInfo('当前没有正在播放的歌曲'); return; }
+    if (typeof window.downloadSong !== 'function') { showError('下载功能未就绪'); return; }
+    await window.downloadSong(currentPlayingSong);
 }
 
 // ========================================
@@ -16063,47 +15745,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
-        // [Fix] Auto-Login logic (Restore Session)
-        const savedMode = localStorage.getItem('lx_sync_mode');
-        if (savedMode === 'local') {
-            const u = localStorage.getItem('lx_sync_user');
-            const p = localStorage.getItem('lx_sync_pass');
-            if (u && p) {
-                // [优化] 如果已经有有效的 Token，不再重复登录
-                if (userToken) {
-                    console.log('[AutoLogin] 检测到有效 Token，跳过自动登录流程并直接恢复会话。');
-                    return;
-                }
 
-                console.log('[AutoLogin] 检测到本地账户且无有效 Token，正在自动登录...');
-                // Fill UI
-                const uInput = document.getElementById('sync-local-user');
-                const pInput = document.getElementById('sync-local-pass');
-                if (uInput) uInput.value = u;
-                if (pInput) pInput.value = p;
-                // Trigger login
-                handleLocalLogin();
-            }
-        } else if (savedMode === 'remote') {
-            const url = localStorage.getItem('lx_sync_url');
-            const code = localStorage.getItem('lx_sync_code');
-            if (url && code) {
-                console.log('[AutoLogin] 检测到远程同步设置，正在自动连接...');
-                // Fill UI
-                const remoteUrlInput = document.getElementById('sync-remote-url');
-                const remoteStep1 = document.getElementById('sync-remote-step1');
-                const remoteStep2 = document.getElementById('sync-remote-step2');
-                const remoteCodeInput = document.getElementById('sync-remote-code');
-
-                if (remoteUrlInput) remoteUrlInput.value = url;
-                if (remoteStep1) remoteStep1.classList.add('hidden');
-                if (remoteStep2) remoteStep2.classList.remove('hidden');
-                if (remoteCodeInput) remoteCodeInput.value = code;
-
-                // Trigger connect
-                handleRemoteConnect();
-            }
-        }
     }, 100);
 
     // [New] 全局精简播放栏控制函数
@@ -16681,6 +16323,7 @@ function renderTokenList(tokens) {
     }
 
     list.innerHTML = tokens.map(t => {
+        const nameArgument = escapeHtmlText(JSON.stringify(t.name));
         const masked = `${t.token.slice(0, 6)}...${t.token.slice(-4)}`;
         const isExpired = t.expiresAt && t.expiresAt < Date.now();
         const isDisabled = !!t.disabled;
@@ -16690,7 +16333,7 @@ function renderTokenList(tokens) {
             <div class="flex flex-col md:flex-row md:items-start justify-between gap-4">
                 <div class="flex-1 min-w-0">
                     <div class="text-sm font-bold t-text-main mb-1.5 truncate flex flex-wrap items-center gap-2">
-                        <span>${t.name}</span>
+                        <span>${escapeHtmlText(t.name)}</span>
                         <span class="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 text-[10px] font-mono border border-emerald-500/20">${masked}</span>
                         ${isExpired ? '<span class="px-2 py-0.5 rounded-full bg-red-500/10 text-red-500 text-[9px] font-bold border border-red-500/20 whitespace-nowrap">已过期</span>' : ''}
                         ${isDisabled ? '<span class="px-2 py-0.5 rounded-full bg-orange-500/10 text-orange-500 text-[9px] font-bold border border-orange-500/20 whitespace-nowrap">已禁用</span>' : ''}
@@ -16713,7 +16356,7 @@ function renderTokenList(tokens) {
                     </div>
                     
                     <div class="flex items-center gap-1">
-                        <button onclick="openTokenLogsModal('${masked}', '${t.name}')" 
+                        <button onclick="openTokenLogsModal('${masked}', ${nameArgument})"
                             class="p-2 md:p-2.5 rounded-xl t-bg-track hover:t-bg-primary hover:text-white transition-all group/btn" title="查看日志">
                             <i class="fas fa-list-ul text-[13px] md:text-[14px]"></i>
                         </button>
@@ -17157,7 +16800,7 @@ window.loadTokenConfig = loadTokenConfig;
 // ── 全新自定义下拉框管理模块 (Portal 模式版) ──
 window.CustomSelectManager = {
     initAll() {
-        document.querySelectorAll('select:not(.cs-hidden)').forEach(select => {
+        document.querySelectorAll('select:not(.cs-hidden):not([data-native-select])').forEach(select => {
             this.init(select);
         });
     },
@@ -17307,6 +16950,11 @@ window.CustomSelectManager = {
         }
     },
     updateHighlight(select, wrapper) {
+        // 设置控件保留面板底色，主题色高亮仅用于列表筛选。
+        if (select.closest('#view-settings')) {
+            wrapper.classList.remove('highlight');
+            return;
+        }
         const val = select.value;
         let isDefault = false;
         if (select.id && typeof SETTINGS_UI_MAP !== 'undefined' && typeof DEFAULT_SETTINGS !== 'undefined') {

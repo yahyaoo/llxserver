@@ -128,6 +128,24 @@ export const check = (song: any, username: string, quality?: string, exact = fal
 /** 优先返回下载时保存的歌词，断网播放也可显示歌词。 */
 export const getLyric = (song: any, username: string) => findItem(song, username)?.lyric || null
 
+/**
+ * 批量获取当前用户实际可读取的下载歌曲身份，复用下载文件完整性检查。
+ * @param username 已验证的当前用户名称。
+ * @returns 文件仍然存在且大小正确的歌曲身份集合。
+ * @author jingyh
+ */
+export const getAvailableIdentities = (username: string): Set<string> => {
+  load()
+  const identities = new Set<string>()
+  for (const item of items) {
+    if (item.username !== username) continue
+    try { if (item.size > 0 && itemPath(item)) identities.add(item.identity) } catch (error: any) {
+      if (!['ENOENT', 'ENOTDIR'].includes(error.code)) throw error
+    }
+  }
+  return identities
+}
+
 /** 根据真实音频头识别扩展名，拒绝把 HTML 或错误 JSON 当作歌曲保存。 */
 export const audioExtension = (file: string) => {
   const fd = storageFs.openSync(file, 'r')

@@ -38,7 +38,7 @@ window.SettingsNavigationComponent = class SettingsNavigationComponent {
         button.type = 'button';
         button.className = 'settings-nav-item';
         button.dataset.settingsTarget = item.id;
-        button.setAttribute('aria-controls', item.id === 'logs' ? 'settings-panel-logs' : `settings-section-${item.id}`);
+        button.setAttribute('aria-controls', `settings-section-${item.id}`);
         button.title = item.label;
         const icon = document.createElement('i');
         icon.className = `fas ${item.icon}`;

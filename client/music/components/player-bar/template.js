@@ -39,6 +39,7 @@ window.LXPlayerBarTemplate = String.raw`
                     <button id="btn-player-download" class="player-menu-item" data-player-action onclick="closePlayerPopovers(); handleDownloadClick(event)"><i class="fas fa-download"></i><span>下载/缓存</span></button>
                     <button id="btn-sound-effects" class="player-menu-item" data-player-action onclick="closePlayerPopovers(); window.soundEffects && window.soundEffects.toggle()"><i class="fas fa-sliders-h"></i><span>均衡器 & 音效</span></button>
                     <button class="player-menu-item" data-player-action onclick="closePlayerPopovers(); window.lyricCard && window.lyricCard.open()"><i class="fas fa-image"></i><span>分享歌词卡片</span></button>
+                    <button id="btn-lyric-settings" class="player-menu-item" onclick="window.lyricSettings.open()"><i class="fas fa-language" aria-hidden="true"></i><span>歌词显示设置</span></button>
                     <button class="player-menu-item" data-player-action onclick="closePlayerPopovers(); toggleCommentModal()"><i class="far fa-comment-dots"></i><span>歌曲评论</span></button>
                     <div class="player-speed-control relative group">
                         <div class="player-menu-item"><i class="fas fa-tachometer-alt"></i><span>播放速度</span><button id="playback-rate-btn" onclick="togglePlaybackRateMenu(event)" title="播放速度">1.0x</button></div>

@@ -75,14 +75,15 @@ body > .flex.flex-1 { z-index: 1; }
 .library-search-item small { font-size: 12px; color: var(--text-muted); margin-top: 3px; }
 .library-search-online { display: block; width: 100%; text-align: left; padding: 14px 12px; margin-top: 8px; border-top: 1px solid var(--border-dim); color: var(--c-600); font-size: 13px; overflow-wrap: anywhere; }
 .appearance-choices { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-.appearance-choices .appearance-option { display: flex; align-items: center; justify-content: center; gap: 8px; border: 1px solid var(--border-dim); border-radius: 12px; padding: 12px 8px; font-size: 13px; }
+.appearance-choices .appearance-option { display: flex; align-items: center; justify-content: center; gap: 8px; border: 1px solid var(--border-main); background: var(--bg-panel); color: var(--text-muted); border-radius: 12px; padding: 12px 8px; font-size: 13px; }
 .theme-swatches { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .theme-swatches .theme-option, .custom-theme-option { display: flex; align-items: center; gap: 10px; padding: 11px 12px; border-radius: 12px; border: 1px solid var(--border-dim); font-size: 13px; color: var(--text-main); text-align: left; }
 .theme-option .fa-check { margin-left: auto; color: var(--c-500); visibility: hidden; font-size: 10px; }
 .theme-option[data-active="true"] .fa-check { visibility: visible; }
 .theme-dot { width: 20px; height: 20px; border-radius: 50%; flex-shrink: 0; box-shadow: inset 0 0 0 1px rgb(0 0 0 / 8%); }
 .custom-theme-option { margin-top: 8px; width: 100%; }
-.theme-more { display: flex; align-items: center; justify-content: space-between; width: 100%; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border-dim); font-size: 12px; color: var(--c-600); }
+.theme-more { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; min-height: 42px; margin-top: 14px; padding: 11px 12px; border: 1px solid var(--border-main); border-radius: 10px; background: var(--bg-panel); text-align: left; font-size: 12px; color: var(--c-600); }
+.theme-more .fa-arrow-right { flex-shrink: 0; }
 .settings-theme-panel { max-width: 900px; }
 .settings-theme-panel h3 { font-size: 14px; font-weight: 600; margin: 20px 0 12px; }
 .settings-theme-panel h3:first-child { margin-top: 0; }

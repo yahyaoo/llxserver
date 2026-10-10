@@ -1,4 +1,5 @@
 import type { RequestContext, ServerRuntime } from '../../common/http/RequestContext'
+import { removeMatchedDislikes } from './dislike/removeMatched'
 /** 音乐搜索、歌手专辑查询、自定义歌曲维护和不喜欢规则所需的应用依赖契约。 @author yahyaoo */
 export type DiscoveryServiceRuntime = Pick<ServerRuntime, 'verifyUserAuth' | 'customMusicManager' | 'getUserConfig' | 'readBody' | 'path' | 'storageFs' | 'fileCache' | 'serverDownloads' | 'musicSdk' | 'musicProgressClients' | 'normalizeSongInfo' | 'isSourceSupported' | 'callUserApiGetMusicUrl' | 'needle' | 'getProxyAgent' | 'resolveServerSong' | 'getAudioRemoteSize' | 'formatBytes' | 'getUserSpace' | 'serializeDislikeRules' | 'dislikeMatchOptions' | 'splitSingers' | 'encodeAlbumRule' | 'normalizeText' | 'invalidateDislikeCache'>
 /** 音乐搜索、歌手专辑查询、自定义歌曲维护和不喜欢规则服务。 @author yahyaoo */
@@ -1361,6 +1362,25 @@ export async function postMusicDislikeAdd(context: RequestContext, runtime: Disc
 
             const dm = getUserSpace(verified).dislikeManage
 
+            if (!isAdd && type === 'song' && payload.removeMatched === true) {
+              if (!name) { res.writeHead(400); res.end(JSON.stringify({ success: false, message: 'Missing name' })); return }
+              const { getUserDirname } = require('../../user')
+              const libraryDir = runtime.path.join(global.lx.userPath, getUserDirname(verified), 'dislike', 'library')
+              const readLibrary = (kind: string) => {
+                const file = runtime.path.join(libraryDir, kind + '.json')
+                if (!runtime.storageFs.existsSync(file)) return []
+                const entries = JSON.parse(runtime.storageFs.readFileSync(file, 'utf8'))
+                if (!Array.isArray(entries)) throw new Error('Invalid dislike library')
+                return entries
+              }
+              const artists = readLibrary('artists'), albums = readLibrary('albums')
+              const originalRules = dm.dislikeDataManage.getDislikeRulesString()
+              const next = removeMatchedDislikes({ name, singer, source, albumName: String(payload.albumName || '') }, originalRules, artists, albums, dislikeMatchOptions())
+              if (next.rules !== originalRules) await dm.dislikeDataManage.overwirteDislikeInfo(next.rules)
+              if (next.artists.length !== artists.length) runtime.storageFs.writeFileSync(runtime.path.join(libraryDir, 'artists.json'), JSON.stringify(next.artists), 'utf8')
+              if (next.albums.length !== albums.length) runtime.storageFs.writeFileSync(runtime.path.join(libraryDir, 'albums.json'), JSON.stringify(next.albums), 'utf8')
+            }
+
             let removeKeys: Set<string> = new Set()
             if (type === 'album') {
               const albumName = String(payload.albumName || '')
@@ -1393,7 +1413,7 @@ export async function postMusicDislikeAdd(context: RequestContext, runtime: Disc
                 const { type, ...songData } = payload
                 songData.dislikeRule = ''
                 await dm.dislikeDataManage.addDislikeInfo([songData])
-              } else {
+              } else if (payload.removeMatched !== true) {
                 if (singer) {
                   removeKeys.add(`${name}@${singer}`.toLowerCase())
                   removeKeys.add(`${normalizeText(name)}@${normalizeText(singer)}`.toLowerCase())

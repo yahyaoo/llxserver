@@ -1,19 +1,15 @@
 /** 设置分组导航及顶部下拉交互。 @author yahyaoo @date 2026-10-10 */
 // 导航只引用现有分组标识，不创建新的业务设置。
 const SETTINGS_NAVIGATION = [
-    { id: 'system', label: '系统', icon: 'fa-sliders-h', items: [
-        { id: 'sources', label: '源与基础设置', icon: 'fa-server' },
-        { id: 'network', label: '网络设置', icon: 'fa-globe' },
-        { id: 'updates', label: '版本更新', icon: 'fa-arrow-circle-up' },
-        { id: 'sync', label: '数据同步', icon: 'fa-sync-alt' },
-        { id: 'auto-update', label: '自动更新', icon: 'fa-history' },
-        { id: 'cache', label: '本地缓存与重置', icon: 'fa-database' },
+    { id: 'account', label: '账号设置', icon: 'fa-user-cog', items: [
+        { id: 'account', label: '账号资料', icon: 'fa-user' },
+        { id: 'configuration-import', label: '迁移洛雪配置', icon: 'fa-file-import' },
+        { id: 'token', label: 'Token 配置', icon: 'fa-key' },
     ] },
     { id: 'display', label: '显示', icon: 'fa-desktop', items: [
         { id: 'theme', label: '主题与外观', icon: 'fa-palette' },
         { id: 'layout', label: '界面与布局', icon: 'fa-columns' },
         { id: 'visuals', label: '播放背景与视觉特效', icon: 'fa-image' },
-        { id: 'lyrics', label: '歌词显示设置', icon: 'fa-language' },
     ] },
     { id: 'logic', label: '逻辑', icon: 'fa-microchip', items: [
         { id: 'queue', label: '播放队列与列表', icon: 'fa-list-ul' },
@@ -21,11 +17,16 @@ const SETTINGS_NAVIGATION = [
         { id: 'recovery', label: '播放失败处理策略', icon: 'fa-shield-alt' },
         { id: 'devices', label: '系统交互与外设', icon: 'fa-keyboard' },
     ] },
-    { id: 'logs', label: '日志', icon: 'fa-terminal', items: [
-        { id: 'logs', label: '系统日志', icon: 'fa-terminal' },
+    { id: 'system', label: '系统', icon: 'fa-sliders-h', items: [
+        { id: 'sources', label: '源与基础设置', icon: 'fa-server' },
+        { id: 'network', label: '网络设置', icon: 'fa-globe' },
+        { id: 'updates', label: '版本更新', icon: 'fa-arrow-circle-up' },
+        { id: 'auto-update', label: '自动更新', icon: 'fa-history' },
+        { id: 'cache', label: '本地缓存与重置', icon: 'fa-database' },
     ] },
     { id: 'app', label: '应用', icon: 'fa-info-circle', items: [
         { id: 'admin', label: '后台管理', icon: 'fa-server' },
+        { id: 'logs', label: '系统日志', icon: 'fa-terminal' },
         { id: 'about', label: '关于', icon: 'fa-info-circle' },
     ] },
 ];
@@ -49,16 +50,18 @@ function selectSettingsSection(sectionId) {
     });
     settingsNavigationComponent?.setActive(sectionId);
     document.getElementById('settings-section-title').textContent = item.label;
-    document.getElementById('settings-section-group').textContent = group.label;
     document.getElementById('settings-mobile-label').textContent = item.label;
     (window.getMusicScrollContainer?.('settings-content') || document.getElementById('settings-content')).scrollTop = 0;
     setSettingsMobileOpen(false);
+    if (sectionId === 'account') window.loadAccountProfile?.();
+    if (sectionId === 'token') window.loadTokenConfig?.();
     if (sectionId === 'logs' && window.renderSystemLogs) window.renderSystemLogs();
     if (sectionId === 'about' && typeof loadAboutContent === 'function') loadAboutContent();
 }
 
 /** 保留旧的分组切换入口。 @param {string} groupId 大功能分组标识。 */
 function switchSettingsTab(groupId) {
+    if (groupId === 'logs') { selectSettingsSection('logs'); return; }
     const group = SETTINGS_NAVIGATION.find(group => group.id === groupId);
     if (group) selectSettingsSection(group.items[0].id);
 }

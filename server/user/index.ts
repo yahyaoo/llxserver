@@ -1,5 +1,6 @@
 import { UserDataManage } from './data'
 import storageFs from '../application/persistence/documentFileSystem'
+import { initializeUserDocuments } from '../music/service/configuration/UserInitializationService'
 import {
   ListManage,
   DislikeManage,
@@ -30,6 +31,13 @@ const seartDelayReleaseTimeout = (userName: string) => {
   }, delayTime))
 }
 
+/**
+ * 加载用户空间并按默认值补齐首次使用的账号文档。
+ * @param userName 已认证账号或公共账号名称。
+ * @returns 保留既有歌单和设置的用户空间。
+ * @throws Error 账号重命名或默认数据持久化失败。
+ * @author jingyh
+ */
 export const getUserSpace = (userName: string) => {
   if (renamingUsers.has(userName)) {
     throw new Error(`User ${userName} is being renamed, access denied temporarily`)
@@ -40,6 +48,7 @@ export const getUserSpace = (userName: string) => {
   if (!user) {
     console.log('[用户空间] 初始化用户数据管理器:', userName)
     const dataManage = new UserDataManage(userName)
+    initializeUserDocuments(dataManage.userDir)
     const listManage = new ListManage(dataManage)
     const dislikeManage = new DislikeManage(dataManage)
     users.set(userName, user = {

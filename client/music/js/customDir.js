@@ -822,7 +822,7 @@ window.CustomDirManager = {
         }
 
         const username = this.getCurrentUsername();
-        const authToken = (window.getUserAuthHeaders ? window.getUserAuthHeaders()['x-user-token'] : null) || localStorage.getItem('lx_user_token') || '';
+        const authToken = (window.getUserAuthHeaders ? window.getUserAuthHeaders()['x-user-token'] : null) || (window.AccountSession ? window.AccountSession.getToken() : localStorage.getItem('lx_user_token')) || '';
         const page = this.getPageSlice();
         this.updatePagination();
 
@@ -910,7 +910,7 @@ window.CustomDirManager = {
                     ${coverHtml}
                     <div class="min-w-0 flex-1">
                         <!-- Song Name -->
-                        <div class="font-bold text-sm md:text-base t-text-main truncate group-hover:text-emerald-500 transition-colors cursor-pointer" data-lm-action="play" data-lm-index="${index}">
+                        <div class="song-file-title font-bold text-sm md:text-base t-text-main truncate group-hover:text-emerald-500 transition-colors cursor-pointer" data-lm-action="play" data-lm-index="${index}">
                             ${safeName}
                         </div>
                         
@@ -988,7 +988,8 @@ window.CustomDirManager = {
                 </div>
 
                 <!-- Action Buttons -->
-                <div class="col-span-4 sm:col-span-2 md:col-span-2 lg:col-span-2 flex items-center justify-end gap-0.5 md:gap-2">
+                <div class="song-row-actions col-span-4 sm:col-span-2 md:col-span-2 lg:col-span-2 flex items-center justify-end gap-0.5 md:gap-2">
+                    ${window.SongActions?.renderLoveButton(window.LocalMusicManager?.buildPlaylistSong({ ...item, songInfo: { ...(item.songInfo || {}), meta: { songId: item.songmid || item.id } } }) || { ...item, isLocal: true }) || ''}
                     <div class="hidden lg:block text-xs text-right pr-2 font-mono t-text-muted shrink-0 mr-1">
                         ${formatSize(item.size)}
                     </div>
@@ -1003,7 +1004,7 @@ window.CustomDirManager = {
                         <i class="fas fa-play text-[10px] ml-0.5"></i>
                     </button>
                     <button data-lm-action="download" data-lm-index="${index}"
-                            class="w-7 h-7 flex items-center justify-center rounded-full t-bg-main border t-border-main t-text-main hover:text-blue-500 hover:border-blue-300 transition-all shadow-sm shrink-0" title="保存到设备">
+                            class="w-7 h-7 flex items-center justify-center rounded-full t-bg-main border t-border-main t-text-main hover:text-blue-500 hover:border-blue-300 transition-all shadow-sm shrink-0" title="下载到设备">
                         <i class="fas fa-download text-[10px]"></i>
                     </button>
                     <button data-lm-action="playlist" data-lm-index="${index}"
@@ -1024,6 +1025,7 @@ window.CustomDirManager = {
             window.unobserveLazyImages(container);
         }
         container.innerHTML = html;
+        window.SongFileStatus?.update(container, page.list);
 
         // 绑定封面加载失败兜底
         container.querySelectorAll('.lm-cover-image').forEach(img => {
@@ -1140,7 +1142,7 @@ window.CustomDirManager = {
         const item = this.displayData[index];
         if (!item) return;
 
-        const authToken = (window.getUserAuthHeaders ? window.getUserAuthHeaders()['x-user-token'] : null) || localStorage.getItem('lx_user_token') || '';
+        const authToken = (window.getUserAuthHeaders ? window.getUserAuthHeaders()['x-user-token'] : null) || window.AccountSession.getToken() || '';
         const username = this.getCurrentUsername();
         const playlist = this.displayData.map(d => ({
             ...d.songInfo,
@@ -1163,16 +1165,7 @@ window.CustomDirManager = {
 
     downloadSingle(index) {
         const item = this.displayData[index];
-        if (!item) return;
-        const authToken = (window.getUserAuthHeaders ? window.getUserAuthHeaders()['x-user-token'] : null) || localStorage.getItem('lx_user_token') || '';
-        const username = this.getCurrentUsername();
-        const url = `/api/music/custom/file?filename=${encodeURIComponent(item.filename)}&user=${encodeURIComponent(username)}${authToken ? `&token=${encodeURIComponent(authToken)}` : ''}`;
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = item.filename.split('/').pop() || item.filename;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
+        if (item) window.downloadLibraryFile(item, { username: this.getCurrentUsername(), custom: true });
     },
 
     addItemToPlaylist(index) {
@@ -1277,17 +1270,11 @@ window.CustomDirManager = {
         }
 
         const username = this.getCurrentUsername();
-        const authToken = (window.getUserAuthHeaders ? window.getUserAuthHeaders()['x-user-token'] : null) || localStorage.getItem('lx_user_token') || '';
+        const authToken = (window.getUserAuthHeaders ? window.getUserAuthHeaders()['x-user-token'] : null) || window.AccountSession.getToken() || '';
 
         targets.forEach((item, idx) => {
             setTimeout(() => {
-                const url = `/api/music/custom/file?filename=${encodeURIComponent(item.filename)}&user=${encodeURIComponent(username)}${authToken ? `&token=${encodeURIComponent(authToken)}` : ''}`;
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = item.filename.split('/').pop() || item.filename;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
+                window.downloadLibraryFile(item, { username, custom: true });
             }, idx * 500);
         });
 

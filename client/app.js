@@ -56,7 +56,7 @@ class App {
         }
         // 检查是否已登录
         const savedPassword = localStorage.getItem('lx_auth');
-        if (savedPassword) {
+        if (savedPassword && document.cookie !== undefined) {
             this.password = savedPassword;
             this.showApp();
             this.loadConfig(); // [新增] 初始化时加载配置，确保 configLoaded 标志位正确且持有环境变量数据
@@ -295,8 +295,8 @@ class App {
     }
 
     logout() {
+        fetch('/api/admin/logout', { method: 'POST', headers: { 'x-frontend-auth': this.password || '' } }).finally(() => location.reload());
         localStorage.removeItem('lx_auth');
-        location.reload();
     }
 
     showApp() {
@@ -3351,6 +3351,7 @@ class App {
         const response = await fetch(API_BASE + url, { ...defaultOptions, ...options });
 
         if (response.status === 401) {
+            if (url === '/api/login') throw new Error('密码错误');
             this.logout();
             throw new Error('Unauthorized');
         }

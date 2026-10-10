@@ -30,7 +30,7 @@
             this.spectrumButton = document.createElement('button');
             this.spectrumButton.className = 'player-menu-item player-detail-spectrum';
             this.spectrumButton.setAttribute('role', 'switch');
-            this.spectrumButton.innerHTML = '<i class="fas fa-wave-square"></i><span>底部频谱</span><span class="player-detail-switch" aria-hidden="true"></span>';
+            this.spectrumButton.innerHTML = '<i class="fas fa-wave-square"></i><span>详情页视觉特效</span><span class="player-detail-switch" aria-hidden="true"></span>';
             this.spectrumButton.addEventListener('click', () => {
                 window.updateSetting('showDetailVisualizer', !window.settings.showDetailVisualizer);
                 this.updateSpectrum();
@@ -53,6 +53,7 @@
             }, true);
             document.addEventListener('fullscreenchange', this.onFullscreenChange);
             window.addEventListener('music-account-changed', this.onAccountChange);
+            this.applyBackground();
             this.sync();
         }
 
@@ -92,6 +93,7 @@
                 this.move(document.getElementById('player-source'), footer.querySelector('.player-progress'), document.getElementById('time-total'));
                 document.getElementById('player-artist').after(this.album);
                 document.getElementById('player-more-menu').append(this.spectrumButton);
+                this.applyBackground();
                 this.updateTrack();
                 this.updateSpectrum();
             } else {
@@ -117,7 +119,15 @@
             this.album.textContent = album ? ' · ' + album : '';
             this.album.title = album;
             this.album.hidden = !album;
-            this.background.update(song, force);
+            if (this.view.getAttribute('data-player-background') === 'artist') this.background.update(song, force);
+        }
+
+        /** 仅切换背景层，不改变页面布局、播放控件和歌曲数据。 */
+        applyBackground(mode = window.settings?.playerBackground) {
+            const value = window.PlayerBackground.normalizeMode(mode);
+            if (this.view.getAttribute('data-player-background') !== value) this.background.clear();
+            this.view.setAttribute('data-player-background', value);
+            if (value === 'artist' && this.open) this.background.update(window.currentPlayingSong);
         }
 
         /** 频谱入口仅调用原设置函数；画布与分析器由原模块管理。 */

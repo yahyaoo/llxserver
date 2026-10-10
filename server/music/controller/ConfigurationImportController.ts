@@ -20,7 +20,7 @@ export interface ConfigurationImportDependencies {
 
 const MAX_FILE_BYTES = 20 * 1024 * 1024
 /** @param req 上传请求。 @returns 文件 JSON 文本。 @throws Error 超限、缺少文件或读取失败时拒绝。 */
-async function readUpload(req: IncomingMessage): Promise<string> {
+export async function readUpload(req: IncomingMessage): Promise<string> {
   if (req.headers['content-type']?.startsWith('multipart/form-data')) {
     const uploads: string[] = []
     const form = formidable({ multiples: false, uploadDir: os.tmpdir(), maxFileSize: MAX_FILE_BYTES, maxTotalFileSize: MAX_FILE_BYTES, maxFiles: 1, maxFields: 2 })

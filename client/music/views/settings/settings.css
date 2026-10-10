@@ -117,11 +117,23 @@
 .settings-collapse:hover { color: var(--text-main); }
 .settings-content { min-width: 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 28px 32px; font-size: 16px; }
 .settings-content-heading { margin-bottom: 24px; }
+#view-settings { transform-origin: right top; }
+#view-settings:is(.settings-opening, .settings-closing) { transition: none !important; will-change: clip-path, transform, opacity; }
+/* 内容靠近右上角先出现，目录随后展开；收起时顺序反向。作者：jingyh */
+.settings-opening .settings-content { animation: settings-part-in 240ms 40ms both; }
+.settings-opening .settings-sidebar { animation: settings-part-in 220ms 90ms both; }
+.settings-closing .settings-sidebar { animation: settings-part-out 180ms both; }
+.settings-closing .settings-content { animation: settings-part-out 200ms 40ms both; }
+@keyframes settings-part-in { from { opacity: 0; transform: translate(10px, -6px); } to { opacity: 1; transform: none; } }
+@keyframes settings-part-out { from { opacity: 1; transform: none; } to { opacity: 0; transform: translate(10px, -6px); } }
+@media (prefers-reduced-motion: reduce) {
+    #view-settings, #view-settings :is(.settings-content, .settings-sidebar) { animation: none !important; transition: none !important; }
+}
 .settings-content-heading p { color: var(--text-muted); font-size: 14px; margin-bottom: 8px; }
 .settings-content-heading h2 { font-size: 28px; font-weight: 700; letter-spacing: -.025em; color: var(--text-main); }
-.settings-content-inner { width: 100%; }
-.settings-content .text-sm { font-size: 16px; }
-.settings-content .text-xs { font-size: 14px; }
+.settings-content-inner { width: min(100%, 960px); }
+.settings-content .text-sm { font-size: 14px; }
+.settings-content .text-xs { font-size: 12px; }
 .settings-content h3, .settings-content h4 { font-size: 16px; }
 .settings-content h3 i, .settings-content h4 i { font-size: 18px; }
 .settings-content input:not([type="checkbox"]):not([type="range"]), .settings-content .lm-select { font-size: 15px; }
@@ -169,7 +181,8 @@
 .settings-form-card input:checked + .settings-switch-track::after { transform: translateX(20px); border-color: #fff; }
 .settings-form-card input:focus-visible + .settings-switch-track { outline: 2px solid var(--c-500); outline-offset: 3px; }
 .settings-content [data-settings-section] {
-    padding-top: 0; margin-top: 0; border-top: 0;
+    /* 为所有设置子页面保留统一顶部留白，避免首项紧贴标题分隔线。 */
+    padding-top: 24px; margin-top: 0; border-top: 0;
 }
 .settings-content [data-settings-section] > h3:first-child,
 .settings-content [data-settings-section] > h4:first-child,
@@ -177,7 +190,7 @@
 .settings-content [data-settings-section] .rounded-xl {
     border-radius: 16px; border-color: var(--border-dim);
 }
-.settings-content [data-settings-section] .grid { grid-template-columns: minmax(0, 1fr); }
+.settings-content [data-settings-section] > .grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 16px 28px; }
 .settings-content [data-settings-section] .grid > div { min-width: 0; }
 .settings-content [data-settings-section] .hover\:shadow-sm:hover { box-shadow: none; }
 .settings-content [data-settings-section] .pb-36,
@@ -185,6 +198,30 @@
 .settings-content #settings-panel-logic > .pb-36 { display: none; }
 .settings-content input:not([type="checkbox"]):not([type="range"]),
 .settings-content select { max-width: 100%; }
+/* 限制控件长度，保留地址输入空间与小数值控件的紧凑尺寸。作者：jingyh */
+.settings-content :is(input[type="text"], input[type="password"], input[type="url"], textarea) {
+    width: min(100%, 28rem) !important; min-width: 0; max-width: 100%;
+    min-height: 42px; padding: 9px 12px; border: 1px solid var(--border-dim);
+    border-radius: 10px; color: var(--text-main); background: var(--bg-panel);
+}
+.settings-content input[type="url"] { width: min(100%, 36rem) !important; }
+.settings-content :is(#sync-form-local, #sync-form-remote) { max-width: 28rem; }
+.settings-content :is(#sync-form-local, #sync-form-remote) input { display: block; }
+.settings-content input[type="number"] { max-width: 7rem; min-height: 38px; border: 1px solid var(--border-dim); }
+.settings-content .cs-wrapper { width: min(100%, 22rem); max-width: 100%; flex: 0 1 auto; align-self: flex-start; }
+.settings-content .cs-trigger { min-height: 42px; padding: 9px 12px !important; font-size: 14px; line-height: 1.5; border-radius: 10px; }
+.settings-content :is(#cs-w-setting-download-concurrency, #cs-w-hot-search-limit-input) { width: 7rem; }
+.settings-content input[type="range"] { max-width: 360px; min-width: 0; }
+.settings-content [data-settings-section] > .grid > .col-span-full { grid-column: 1 / -1; }
+.settings-content [data-settings-section] > .grid > div {
+    padding: 18px 0; border: 0; border-bottom: 1px solid var(--content-divider);
+    border-radius: 0; min-width: 0;
+}
+.settings-content .theme-editor { margin-top: 20px; }
+.settings-content .theme-editor label { max-width: 640px; min-height: 46px; }
+.settings-content .theme-editor output { flex-shrink: 0; white-space: nowrap; }
+.settings-content .theme-editor input[type="number"] { min-height: 36px; }
+.settings-content :is(input, textarea):focus-visible { outline: 2px solid var(--c-500); outline-offset: 2px; }
 .settings-shell.nav-collapsed { grid-template-columns: 64px minmax(0, 1fr); }
 .nav-collapsed .settings-sidebar-title,
 .nav-collapsed .settings-nav-label,
@@ -249,5 +286,29 @@
     }
     .settings-content .setting-tooltip-content::after { display: none; }
     .settings-nav-item { min-height: 44px; }
-    .settings-content #settings-panel-logs { height: max(300px, calc(100dvh - 360px)); }
+    .settings-content #settings-section-logs { height: max(300px, calc(100dvh - 360px)); }
 }
+
+/* 账号、版本更新与迁移表单统一控件。 */
+.settings-field-caption { display: inline-flex; align-items: center; gap: 8px; color: var(--text-main); font-size: 14px; font-weight: 600; min-width: 0; }
+.settings-field-caption > i { width: 18px; text-align: center; color: var(--c-500); flex-shrink: 0; }
+.settings-content label.settings-field { display: flex !important; flex-direction: column; align-items: stretch; gap: 10px; }
+.settings-content label.settings-field input { margin-top: 0; min-width: 0; width: 100%; }
+.settings-text-input { display: block; width: 100%; min-height: 42px; padding: 10px 12px; border: 1px solid var(--border-main); border-radius: 10px; background: var(--bg-main); color: var(--text-main); }
+.settings-action { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 42px; padding: 10px 20px; border-radius: 10px; border: 1px solid var(--c-500); background: var(--c-500); color: #fff; font-size: 14px; font-weight: 600; cursor: pointer; }
+.settings-action:hover { background: var(--c-600); }
+.settings-action:disabled { opacity: .5; cursor: default; }
+.settings-content .setting-tooltip-trigger:focus-within .setting-tooltip-content { visibility: visible; opacity: 1; pointer-events: auto; }
+#account-avatar-preview { width: 64px; height: 64px; flex-shrink: 0; }
+.avatar-crop-dialog { padding: 24px; width: min(420px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); overflow-y: auto; border: 1px solid var(--border-main); border-radius: 18px; background: var(--bg-panel); color: var(--text-main); }
+.avatar-crop-dialog::backdrop { background: rgba(0,0,0,.6); }
+.avatar-crop-dialog h2 { font-size: 20px; font-weight: 700; margin-bottom: 8px; }
+.avatar-crop-stage { position: relative; width: 100%; aspect-ratio: 1; margin: 18px 0; overflow: hidden; border-radius: 12px; }
+.avatar-crop-stage canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
+.avatar-crop-stage::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(circle closest-side, transparent 99%, rgba(0,0,0,.45) 100%); }
+.avatar-crop-dialog label { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
+.avatar-crop-dialog input { min-width: 0; flex: 1; accent-color: var(--c-500); }
+.avatar-crop-actions { display: flex; justify-content: flex-end; gap: 10px; }
+.avatar-crop-cancel { background: var(--bg-main); color: var(--text-main); border-color: var(--border-main); }
+
+.settings-action .settings-field-caption, .settings-action .settings-field-caption > i { color: inherit; }

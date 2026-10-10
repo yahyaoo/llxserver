@@ -1,8 +1,5 @@
-const CACHE_NAME = 'lx-music-web-v26';
+const CACHE_NAME = 'lx-music-web-v28';
 const ASSETS_TO_CACHE = [
-    './',
-    './index.html',
-    './login.html',
     './app.js',
     // CSS
     './css/theme_variables.css',
@@ -57,6 +54,8 @@ self.addEventListener('install', (event) => {
 
 self.addEventListener('fetch', (event) => {
     const url = new URL(event.request.url);
+    // 登录及播放器文档必须在线经过会话校验，禁止缓存回退绕过认证。
+    if (event.request.mode === 'navigate' || event.request.destination === 'document') return;
 
     // 1. 过滤非 http(s) 协议 (如 chrome-extension://)，避免 cache.put 报错
     if (!url.protocol.startsWith('http')) return;

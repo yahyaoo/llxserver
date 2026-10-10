@@ -4,11 +4,10 @@ LX Sync Server 提供了多种 RESTful 风格的 API 接口，用于自动化获
 
 ## 概述
 
-为了确保安全性，API 要求进行鉴权。目前主要支持以下两种鉴权方式：
+除 POST /api/login、/api/user/login、/api/user/verify 登录入口外，所有 /api/ 业务请求必须有有效会话或 Token，匿名请求返回 401。OPTIONS 跨域预检只返回空响应。
 
-1. **管理员鉴权 (`x-frontend-auth`)**: 使用管理终端的全局口令（`frontend.password`）。用于敏感的服务控制、用户管理及全局数据提取。
-2. **用户 Token 鉴权 (`x-user-token`)**: 使用通过登录接口获取的动态 Session Token 或管理面板生成的持久化 API Token。用于操作特定用户的数据（如歌单、设置、缓存等）。
-
+1. **后台会话**：POST /api/login，正文包含管理员 password。成功签发 HttpOnly lx_admin_session Cookie，返回的令牌也可作为 x-admin-token。退出使用 POST /api/admin/logout。x-frontend-auth 仅作额外管理员权限校验，不能单独绕过身份认证；有效后台会话自动提供管理员权限。
+2. **用户认证**：登录会话 Cookie、x-user-token 或 Authorization: Bearer。支持登录生成的会话令牌和用户 API Token。普通用户身份与 Token 不自动获得管理员权限。
 所有接口如无特殊说明均**使用 JSON 作为请求体及响应体**类型 (`Content-Type: application/json`)。
 
 ---
@@ -33,24 +32,38 @@ LX Sync Server 提供了多种 RESTful 风格的 API 接口，用于自动化获
 
 使用用户名密码登录并颁发 Token。
 
-- **Body**: `{"username": "...", "password": "..."}`
-- **响应**: `{"success": true, "token": "lx_tk_...", "username": "..."}`
+- **Body**: `{"username":"...","password":"...","rememberMe":true}`。远程模式增加 `serverUrl`，例如 `https://music.example.com:9527`，不带路径或 URL 凭据。
+- **响应**: `{"success":true,"token":"随机会话令牌","username":"...","expiresAt":1790000000000,"rememberMe":true}`，同时签发 HttpOnly、SameSite=Strict Cookie。
+- 普通登录有效期由 `auth.sessionDays` 控制，记住我由 `auth.rememberMeDays` 控制。记住登录在管理 SQLite 中保存令牌摘要及到期时间，可跨服务重启。
+- 远程模式通过当前入口代理该服务器的用户、音乐和个人音源接口；不保存远程密码，远程令牌加密保存。
 
 ### 1.4 用户：登出 (`POST /api/user/logout`)
 
-注销当前的 Session Token。
+注销当前的 Session Token 并清除 Cookie；远程模式同时请求远端撤销会话。
 
 - **Header Auth**: `x-user-token: <Token>`
 
 ### 1.5 用户：认证有效性检查 (`GET /api/user/auth/verify`)
 
-检查当前 Token 是否还有效。
+检查当前 Token 或 Cookie 是否还有效；账号密码改变、账号删除或会话到期后返回 HTTP 401；远程上游校验失败返回 `valid: false`。
 
 - **Header Auth**: `x-user-token: <Token>`
 
 ---
 
+### 1.6 用户：账号设置
+
+这些接口必须通过用户会话或 API Token 认证，账号归属取自认证结果。
+
+- `GET /api/user/account`：返回 `username`、`nickname` 和头像链接 `avatar`，不返回密码。
+- `PUT /api/user/account`：正文 `{"nickname":"昵称"}`；最多 40 字，展示用户名默认使用登录名，登录名不可修改。
+- `POST /api/user/account/avatar`：直接上传图片字节；最大 2 MB，接受 PNG、JPEG、WebP、GIF，服务端解码并保存 256×256 PNG。
+- `GET /api/user/account/avatar`：读取当前账号头像，未设置时返回 404。
+- `POST /api/user/account/password`：正文 `{"currentPassword":"原密码","newPassword":"新密码"}`；新密码为 6–128 位，成功后需重新登录，其他旧会话及旧 API Token 也失效。
+
 ## 2. Token 安全管理 API
+
+在「账号设置 → Token 配置」管理当前账号的 API Token。总开关和令牌记录分别存入 server_api_token_account、server_api_token，按登录名关联账号，保存摘要和加密原值。禁用、删除、到期即时生效，重启后立即可用。旧 JSON 首次读取自动迁移。Token 名称最多 100 字，expiresAt 为 Unix 毫秒或 null（永久）。
 
 用于在管理面板或客户端管理持久化的 API Token。要求使用 `x-user-token` 进行鉴权。
 
@@ -71,6 +84,7 @@ LX Sync Server 提供了多种 RESTful 风格的 API 接口，用于自动化获
 ### 3.1 歌单管理
 
 - `GET /api/user/list`: 获取用户当前完整歌单数据。
+- `POST /api/music/playlists/import?user=<用户名>`: 追加导入歌单。接受 JSON 正文或 `file` 单文件表单（最多 20 MB），支持洛雪 `playList_v2`、本站 `lxserver-playlist` v1 和服务器列表备份。复用洛雪解析与 SQLite 快照事务，生成新歌单 ID，保留歌曲顺序、重复项和扩展字段；不会覆盖原有歌单或播放器设置。当前账号只能导入自己的歌单，`user=_open` 必须具备管理员身份。返回 `{ success, username, playlists, songs, lists }`，其中数量只统计本次导入，`lists` 为保存后的完整列表。
 - `POST /api/user/list`: 全量覆盖更新用户歌单数据（会触发同步广播）。
 - `POST /api/music/user/list/remove`: 批量删除指定歌单中的歌曲 (`{"listId": "...", "songIds": [...]}`)。
 
@@ -196,4 +210,12 @@ LX Sync Server 提供了多种 RESTful 风格的 API 接口，用于自动化获
 
 ### 8.3 实时进度 (SSE)
 - `GET /api/music/progress?reqId=xxx`: 通过 Server-Sent Events (SSE) 实时订阅外链解析、缓存进度等流式信息。
+
+### 8.4 歌曲文件状态
+
+- `POST /api/music/file-status`：批量检查当前认证账号的服务器下载记录、播放缓存、历史音乐目录和已配置的自定义音乐目录。单次最多 500 首，正文最多 1 MB，不接受客户端目录路径。
+- 请求：`{"songs":[{"id":"wy_123","source":"wy","songmid":"123","name":"歌名","singer":"歌手"}]}`。兼容洛雪 `meta.songmid`、`meta.songId` 字段。
+- 响应：`{"success":true,"statuses":[{"id":"wy_123","identity":"wy:123","state":"downloaded"}]}`，保持输入顺序及重复项。
+- `state`：`downloaded` 已下载；`cached` 已缓存；`cloud` 云端、未下载。以实际存在且大小正确的音频文件为准，下载优先于缓存。未关联的自定义文件按歌名、歌手及可用专辑匹配；已关联歌曲只按平台与 ID 匹配。
+- 非法输入返回 400，未登录返回 401，用户名与当前身份不一致返回 403，目录读取失败返回 503。响应不包含路径与认证凭据。
 

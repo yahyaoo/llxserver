@@ -1374,7 +1374,7 @@ window.LocalMusicManager = {
                                 <i class="fas fa-music t-text-muted text-xs"></i>
                              </div>`;
             if (item.hasCover) {
-                const authToken = (window.getUserAuthHeaders ? window.getUserAuthHeaders()['x-user-token'] : null) || localStorage.getItem('lx_user_token') || '';
+                const authToken = (window.getUserAuthHeaders ? window.getUserAuthHeaders()['x-user-token'] : null) || (window.AccountSession ? window.AccountSession.getToken() : localStorage.getItem('lx_user_token')) || '';
                 const coverVersion = [
                     item.coverCheckedVersion || 0,
                     Math.round(item.coverCheckedMtime || item.mtime || 0),
@@ -1416,7 +1416,7 @@ window.LocalMusicManager = {
                     ${coverHtml}
                     <div class="min-w-0 flex-1">
                         <!-- Song Name -->
-                        <div class="font-bold text-sm md:text-base t-text-main truncate group-hover:text-emerald-500 transition-colors cursor-pointer" data-lm-action="play" data-lm-index="${index}">
+                        <div class="song-file-title font-bold text-sm md:text-base t-text-main truncate group-hover:text-emerald-500 transition-colors cursor-pointer" data-lm-action="play" data-lm-index="${index}">
                             ${safeName}
                         </div>
                         
@@ -1495,7 +1495,8 @@ window.LocalMusicManager = {
                 </div>
 
                 <!-- Action Button -->
-                <div class="col-span-4 sm:col-span-2 md:col-span-2 lg:col-span-2 flex items-center justify-end gap-0.5 md:gap-2">
+                <div class="song-row-actions col-span-4 sm:col-span-2 md:col-span-2 lg:col-span-2 flex items-center justify-end gap-0.5 md:gap-2">
+                    ${window.SongActions?.renderLoveButton(this.buildPlaylistSong(item) || { ...item, isLocal: true }) || ''}
                     <div class="hidden lg:block text-xs text-right pr-2 font-mono t-text-muted shrink-0 mr-1">
                         ${formatSize(item.size)}
                     </div>
@@ -1511,7 +1512,7 @@ window.LocalMusicManager = {
                     </button>
                     <!-- Download -->
                     <button data-lm-action="download" data-lm-index="${index}"
-                            class="w-7 h-7 flex items-center justify-center rounded-full t-bg-main border t-border-main t-text-main hover:text-blue-500 hover:border-blue-300 transition-all shadow-sm shrink-0" title="保存到设备">
+                            class="w-7 h-7 flex items-center justify-center rounded-full t-bg-main border t-border-main t-text-main hover:text-blue-500 hover:border-blue-300 transition-all shadow-sm shrink-0" title="下载到设备">
                         <i class="fas fa-download text-[10px]"></i>
                     </button>
                     <button data-lm-action="playlist" data-lm-index="${index}"
@@ -1534,6 +1535,7 @@ window.LocalMusicManager = {
             window.unobserveLazyImages(container);
         }
         container.innerHTML = html;
+        window.SongFileStatus?.update(container, page.list);
         container.querySelectorAll('.lm-cover-image').forEach(img => {
             img.addEventListener('error', () => {
                 const index = parseInt(img.dataset.lmCoverIndex || '', 10);
@@ -1785,7 +1787,7 @@ window.LocalMusicManager = {
 
         // Transform into songInfo for global player
         const username = this.getCurrentUsername();
-        const authToken = (window.getUserAuthHeaders ? window.getUserAuthHeaders()['x-user-token'] : null) || localStorage.getItem('lx_user_token') || '';
+        const authToken = (window.getUserAuthHeaders ? window.getUserAuthHeaders()['x-user-token'] : null) || window.AccountSession.getToken() || '';
 
         // Important: Use existing checkCache via global logic if possible, 
         // or directly supply local URL
@@ -2161,17 +2163,7 @@ window.LocalMusicManager = {
 
     downloadSingle(index) {
         const item = this.displayData[index];
-        if (!item) return;
-        const username = this.getCurrentUsername();
-        const authToken = (window.getUserAuthHeaders ? window.getUserAuthHeaders()['x-user-token'] : null) || localStorage.getItem('lx_user_token') || '';
-        const url = `/api/music/cache/file/${encodeURIComponent(username)}/${encodeURIComponent(item.filename)}?folder=${item.folder}${authToken ? `&token=${encodeURIComponent(authToken)}` : ''}`;
-
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = item.filename;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
+        if (item) window.downloadLibraryFile(item, { username: this.getCurrentUsername(), custom: false });
     },
 
     batchDownloadToDevice() {
@@ -2183,18 +2175,12 @@ window.LocalMusicManager = {
         }
 
         const username = this.getCurrentUsername();
-        const authToken = (window.getUserAuthHeaders ? window.getUserAuthHeaders()['x-user-token'] : null) || localStorage.getItem('lx_user_token') || '';
+        const authToken = (window.getUserAuthHeaders ? window.getUserAuthHeaders()['x-user-token'] : null) || window.AccountSession.getToken() || '';
 
         // Use a slight delay to prevent browser from blocking multiple downloads
         targets.forEach((item, idx) => {
             setTimeout(() => {
-                const url = `/api/music/cache/file/${encodeURIComponent(username)}/${encodeURIComponent(item.filename)}?folder=${item.folder}${authToken ? `&token=${encodeURIComponent(authToken)}` : ''}`;
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = item.filename;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
+                window.downloadLibraryFile(item, { username, custom: false });
             }, idx * 500);
         });
 
@@ -2325,7 +2311,7 @@ window.LocalMusicManager = {
 
         try {
             const username = this.getCurrentUsername();
-            const authToken = (window.getUserAuthHeaders ? window.getUserAuthHeaders()['x-user-token'] : null) || localStorage.getItem('lx_user_token') || '';
+            const authToken = (window.getUserAuthHeaders ? window.getUserAuthHeaders()['x-user-token'] : null) || window.AccountSession.getToken() || '';
 
             const resp = await fetch('/api/music/identify', {
                 method: 'POST',
@@ -2633,7 +2619,7 @@ window.LocalMusicManager = {
         console.log('[AutoLink] Using AcoustID first for:', localItem.filename);
         try {
             const username = this.getCurrentUsername();
-            const authToken = (window.getUserAuthHeaders ? window.getUserAuthHeaders()['x-user-token'] : null) || localStorage.getItem('lx_user_token') || '';
+            const authToken = (window.getUserAuthHeaders ? window.getUserAuthHeaders()['x-user-token'] : null) || window.AccountSession.getToken() || '';
 
             const resp = await fetch('/api/music/identify', {
                 method: 'POST',
@@ -3101,7 +3087,7 @@ window.LocalMusicManager = {
             const username = isCustomDir
                 ? ((window.getCurrentUser && window.getCurrentUser()) || localStorage.getItem('lx_user_username') || 'default')
                 : this.getCurrentUsername();
-            const authToken = (window.getUserAuthHeaders ? window.getUserAuthHeaders()['x-user-token'] : null) || localStorage.getItem('lx_user_token') || '';
+            const authToken = (window.getUserAuthHeaders ? window.getUserAuthHeaders()['x-user-token'] : null) || window.AccountSession.getToken() || '';
 
             container.innerHTML = pageItems.map(item => {
                 const selected = this.remasterSelectedItems.has(item.filename);

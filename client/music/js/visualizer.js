@@ -65,12 +65,17 @@ const musicVisualizer = (function () {
      * 应用歌词详情页频谱设置。
      */
     function applySettings() {
+        const s = window.settings || {};
+        const style = ['spectrum', 'pulse', 'dots', 'flower'].includes(s.detailVisualizerStyle) ? s.detailVisualizerStyle : 'spectrum';
+        const view = document.getElementById('view-player-detail');
+        // 画布尺寸先随所选效果切换，未播放时也能正确预览页面布局。作者：jingyh
+        if (view) view.dataset.playerVisualizer = style;
+        if (detailCanvas) detailCanvas.style.opacity = s.showDetailVisualizer ? (s.visualizerOpacity ?? 0.5) : '0';
         if (!isInitialized) return;
 
         // 每次应用设置前同步一次尺寸，确保全宽对齐
         syncSize();
 
-        const s = window.settings || {};
         const themeColor = getComputedStyle(document.documentElement).getPropertyValue('--c-500').trim() || '#10b981';
         const opacity = s.visualizerOpacity !== undefined ? s.visualizerOpacity : 0.5;
         const globalStyle = s.visualizerGlobalStyle || 'blocks';
@@ -79,7 +84,6 @@ const musicVisualizer = (function () {
         // --- Handle Detail Visualizer ---
         waveDetail.clearAnimations();
         if (s.showDetailVisualizer && detailCanvas) {
-            const style = s.detailVisualizerStyle || 'pulse';
             const options = {
                 fillColor: themeColor,
                 lineColor: themeColor,
@@ -100,8 +104,8 @@ const musicVisualizer = (function () {
                 options.diameter = 200;
             }
 
-            // 独立播放页仅替换绘制样式，沿用同一个分析器和动画调度。作者：jingyh
-            if (window.playerDetailView?.open && window.PlayerDetailSpectrum) {
+            // 现有底部频谱作为独立选项，其他效果沿用原绘制器与分析器。作者：jingyh
+            if (style === 'spectrum' && window.PlayerDetailSpectrum) {
                 AnimationClass = window.PlayerDetailSpectrum;
             }
 

@@ -61,6 +61,53 @@ test('关闭更新不请求，开启只调用本地接口；发布说明转义�
 })
 
 /** 最小浏览器环境：测试导航与主题交互，不触发真实设置保存。 */
+test('详情页特效下拉随开关同步，关闭保留选择，账号设置回读也能恢复显示', () => {
+  const app = fs.readFileSync(path.join(__dirname, '../client/music/app.js'), 'utf8').replace(/\r\n/g, '\n')
+  const entry = app.slice(app.indexOf('    showDetailVisualizer: {'), app.indexOf('    detailVisualizerStyle: {'))
+  const sync = app.slice(app.indexOf('function syncSettingsUI('), app.indexOf('/**\n * 应用播放页背景样式'))
+  const nodes = new Map([
+    ['setting-show-detail-visualizer', { checked: false }],
+    ['setting-detail-visualizer-options', { hidden: true }],
+    ['setting-detail-visualizer-style', { value: 'pulse' }],
+  ])
+  const context = vm.createContext({ document: { getElementById: id => nodes.get(id) },
+    window: {}, settings: { showDetailVisualizer: false }, currentListData: null,
+    isUserLoggedIn: () => true, localStorage: { getItem: () => null },
+    updateStorageStatsUI() {}, updateServerCacheSize() {},
+  })
+  vm.runInContext(`const SETTINGS_UI_MAP = {${entry}}; ${sync}`, context)
+  for (const enabled of [false, true, false]) {
+    context.syncSettingsUI('showDetailVisualizer', enabled)
+    assert.equal(nodes.get('setting-show-detail-visualizer').checked, enabled)
+    assert.equal(nodes.get('setting-detail-visualizer-options').hidden, !enabled)
+    assert.equal(nodes.get('setting-detail-visualizer-style').value, 'pulse')
+  }
+  context.settings.showDetailVisualizer = true
+  context.syncSettingsUI()
+  assert.equal(nodes.get('setting-detail-visualizer-options').hidden, false)
+  let closed = 0
+  nodes.set('cs-w-setting-detail-visualizer-style', { classList: { contains: () => true } })
+  context.window.CustomSelectManager = { closeAll: () => closed++ }
+  context.syncSettingsUI('showDetailVisualizer', false)
+  assert.equal(closed, 1, '关闭开关同时关闭展开的浮层')
+  assert.equal(nodes.get('setting-detail-visualizer-options').hidden, true)
+})
+
+test('设置下拉选中非默认值仍使用面板底色，列表筛选继续高亮', () => {
+  const app = fs.readFileSync(path.join(__dirname, '../client/music/app.js'), 'utf8')
+  const method = app.slice(app.indexOf('    updateHighlight(select, wrapper) {'), app.indexOf('    closeAll() {', app.indexOf('    updateHighlight(select, wrapper) {')))
+  const context = vm.createContext({})
+  vm.runInContext(`this.manager = {${method}}`, context)
+  const classes = new Set(['highlight'])
+  const wrapper = { classList: { add: key => classes.add(key), remove: key => classes.delete(key) } }
+  for (const value of ['blur', 'pulse', 'flower']) {
+    context.manager.updateHighlight({ value, closest: () => ({}) }, wrapper)
+    assert.equal(classes.has('highlight'), false)
+  }
+  context.manager.updateHighlight({ id: 'library-filter', value: 'custom-filter', closest: () => null }, wrapper)
+  assert.equal(classes.has('highlight'), true)
+})
+
 function createMusicSettingsContext() {
   class Element {
     constructor(id = '') {
@@ -84,7 +131,7 @@ function createMusicSettingsContext() {
   }
   const elements = new Map()
   const get = id => { if (!elements.has(id)) elements.set(id, new Element(id)); return elements.get(id) }
-  const sections = ['sources', 'network', 'updates', 'sync', 'auto-update', 'cache', 'theme', 'layout', 'visuals', 'lyrics', 'queue', 'playback', 'recovery', 'devices', 'logs', 'admin', 'about'].map(id => {
+  const sections = ['sources', 'network', 'updates', 'account', 'configuration-import', 'token', 'auto-update', 'cache', 'theme', 'layout', 'visuals', 'queue', 'playback', 'recovery', 'devices', 'logs', 'admin', 'about'].map(id => {
     const element = get('settings-section-' + id); element.dataset.settingsSection = id; return element
   })
   const themeButtons = ['pink', 'emerald', 'blue', 'amber', 'violet', 'rose', 'pink', 'emerald', 'blue', 'amber', 'violet', 'rose'].map(id => {
@@ -123,21 +170,25 @@ function createMusicSettingsContext() {
 test('设置树完整分组，切换仅改变可见性并保留控件状态；无效目标不破坏当前内容', () => {
   const { context, get, sections } = createMusicSettingsContext()
   assert.equal(get('settings-navigation').children.length, 5)
-  assert.equal(get('settings-navigation').children.flatMap(group => group.children.slice(1)).length, 17)
+  const groups = get('settings-navigation').children
+  assert.deepEqual(groups.map(group => group.children[0].textContent), ['账号设置', '显示', '逻辑', '系统', '应用'])
+  assert.deepEqual(groups.at(-1).children.slice(1).map(button => button.dataset.settingsTarget), ['admin', 'logs', 'about'])
+  assert.equal(groups.at(-1).children[2].getAttribute('aria-controls'), 'settings-section-logs')
+  assert.equal(get('settings-navigation').children.flatMap(group => group.children.slice(1)).length, 18)
   const control = { value: '未保存的输入' }
-  get('settings-section-sync').appendChild(control)
-  context.selectSettingsSection('sync')
-  assert.equal(get('settings-section-title').textContent, '数据同步')
-  assert.equal(get('settings-panel-system').classList.contains('hidden'), false)
+  get('settings-section-account').appendChild(control)
+  context.selectSettingsSection('account')
+  assert.equal(get('settings-section-title').textContent, '账号资料')
+  assert.equal(get('settings-panel-account').classList.contains('hidden'), false)
   assert.equal(sections.filter(section => !section.classList.contains('hidden')).length, 1)
-  context.selectSettingsSection('lyrics')
-  assert.equal(get('settings-panel-system').classList.contains('hidden'), true)
+  context.selectSettingsSection('visuals')
+  assert.equal(get('settings-panel-account').classList.contains('hidden'), true)
   assert.equal(get('settings-panel-display').classList.contains('hidden'), false)
-  context.selectSettingsSection('sync')
-  assert.equal(get('settings-section-sync').children[0], control)
+  context.selectSettingsSection('account')
+  assert.equal(get('settings-section-account').children[0], control)
   assert.equal(control.value, '未保存的输入')
   context.selectSettingsSection('does-not-exist')
-  assert.equal(get('settings-section-title').textContent, '数据同步')
+  assert.equal(get('settings-section-title').textContent, '账号资料')
   assert.equal(get('settings-content').scrollTop, 0)
 })
 
@@ -152,6 +203,9 @@ test('旧分组入口兼容且日志每次进入刷新；手机选择后收起�
   assert.equal(get('settings-section-title').textContent, '播放队列与列表')
   assert.equal(get('settings-mobile-toggle').getAttribute('aria-expanded'), 'false')
   context.switchSettingsTab('logs')
+  assert.equal(get('settings-panel-app').classList.contains('hidden'), false)
+  assert.equal(get('settings-panel-system').classList.contains('hidden'), true)
+  assert.equal(get('settings-section-logs').classList.contains('hidden'), false)
   context.selectSettingsSection('logs')
   assert.equal(renders, 2)
   context.toggleSettingsNavigation()
@@ -242,8 +296,10 @@ test('独立设置页面组件同步挂载，重复挂载保留控件草稿；�
   context.window.SettingsView.mount(container)
   assert.equal(container.dataset.settingsMounted, 'true')
   assert.ok(container.innerHTML.includes('id="settings-navigation"'))
-  assert.ok(container.innerHTML.includes('id="btn-mode-local"'))
-  assert.equal([...container.innerHTML.matchAll(/data-settings-section=/g)].length, 17)
+  assert.ok(container.innerHTML.includes('id="account-username"'))
+  assert.ok(!container.innerHTML.includes('id="sync-local-pass"'))
+  assert.ok(container.innerHTML.includes('id="account-password-section"'))
+  assert.equal([...container.innerHTML.matchAll(/data-settings-section=/g)].length, 18)
   assert.ok(container.innerHTML.includes('data-theme-controls'))
   assert.ok(container.innerHTML.includes('data-experience-control="color"'))
   assert.ok(container.innerHTML.includes('id="nav-admin-link"'))
@@ -258,7 +314,7 @@ test('独立设置页面组件同步挂载，重复挂载保留控件草稿；�
   assert.ok(page.includes('views/settings/settings.css'))
 })
 
-test('应用分组切换后台和关于；旧关于入口进入设置并保持主导航选中态', () => {
+test('应用分组切换后台和关于；移除左侧设置入口后旧关于入口仍能进入设置', () => {
   const { context, get, sections } = createMusicSettingsContext()
   let aboutLoads = 0
   context.loadAboutContent = () => aboutLoads++
@@ -269,10 +325,12 @@ test('应用分组切换后台和关于；旧关于入口进入设置并保持�
   const originalQuery = context.document.querySelectorAll
   context.document.querySelectorAll = selector => {
     if (selector === '[id^="view-"]') return [get('view-search'), get('view-settings')]
-    if (selector === '[id^="tab-"]') return [get('tab-search'), get('tab-settings')]
+    if (selector === '[id^="tab-"]') return [get('tab-search')]
     return originalQuery(selector)
   }
   context.window.innerWidth = 1440
+  const originalGet = context.document.getElementById
+  context.document.getElementById = id => id === 'tab-settings' ? null : originalGet(id)
   context.setTimeout = callback => callback()
   context.expandBtnTimeout = null
   context.toggleLyricsBtnTimeout = null
@@ -283,7 +341,7 @@ test('应用分组切换后台和关于；旧关于入口进入设置并保持�
   context.switchTab('about')
   assert.equal(get('view-settings').classList.contains('hidden'), false)
   assert.equal(get('view-search').classList.contains('hidden'), true)
-  assert.equal(get('tab-settings').classList.contains('active-tab'), true)
+  assert.equal(get('tab-search').classList.contains('active-tab'), false)
   assert.equal(get('settings-section-about').classList.contains('hidden'), false)
   assert.equal(get('settings-section-title').textContent, '关于')
   assert.equal(aboutLoads, 1)

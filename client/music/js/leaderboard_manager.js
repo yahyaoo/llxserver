@@ -218,7 +218,7 @@ window.LeaderboardManager = (function () {
                         </div>
                     </div>
                     <div class="min-w-0 flex-1 flex flex-col justify-center overflow-hidden">
-                        <div class="font-bold text-sm t-text-main group-hover:text-emerald-500 transition-colors">
+                        <div class="song-file-title font-bold text-sm t-text-main group-hover:text-emerald-500 transition-colors">
                             ${window.createMarqueeHtml ? window.createMarqueeHtml(song.name) : `<span class="truncate">${song.name}</span>`}
                         </div>
                         <div class="flex items-center gap-1 mt-0.5 overflow-hidden">
@@ -246,7 +246,8 @@ window.LeaderboardManager = (function () {
                     ${song.interval || '--:--'}
                 </div>
                 <!-- 操作 -->
-                <div class="col-span-4 sm:col-span-3 md:col-span-2 lg:col-span-2 flex items-center justify-end gap-0 sm:gap-1 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
+                <div class="song-row-actions col-span-4 sm:col-span-3 md:col-span-2 lg:col-span-2 flex items-center justify-end gap-0 sm:gap-1">
+                    ${window.SongActions?.renderLoveButton(song) || ''}
                     <button class="p-0.5 sm:p-1.5 hover:bg-emerald-50 rounded-lg text-emerald-600 transition-colors"
                             title="播放"
                             onclick="event.stopPropagation(); window.LeaderboardManager.playSong(${index})">
@@ -271,6 +272,8 @@ window.LeaderboardManager = (function () {
             </div>
             `;
         }).join('');
+
+        window.SongFileStatus?.update(container, pageList.map(obj => obj.item));
 
         if (typeof window.lazyLoadImages === 'function') window.lazyLoadImages();
         if (typeof window.applyMarqueeChecks === 'function') window.applyMarqueeChecks();

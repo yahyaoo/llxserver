@@ -5,8 +5,9 @@ const project = path.resolve(__dirname, '../..')
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
 
 /** 启动隔离实例，不访问现有数据目录；返回地址与关闭方法供 HTTP 和浏览器测试使用。 */
-async function startLeaderboardRuntime() {
+async function startLeaderboardRuntime(prepare) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'lx-leaderboard-system-'))
+  if (prepare) await prepare(root)
   const probe = http.createServer()
   await new Promise(resolve => probe.listen(0, '127.0.0.1', resolve))
   const port = probe.address().port
@@ -25,13 +26,20 @@ async function startLeaderboardRuntime() {
   child.stdout.on('data', chunk => { logs += chunk }); child.stderr.on('data', chunk => { logs += chunk })
   const stop = async () => {
     if (child.exitCode === null) { const done = new Promise(resolve => child.once('exit', resolve)); child.kill(); await done }
-    fs.rmSync(root, { recursive: true, force: true })
+    fs.rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
   }
   const origin = `http://127.0.0.1:${port}`
   try {
     for (let i = 0; i < 180; i++) {
       if (child.exitCode !== null) throw new Error('测试实例启动失败：' + logs.slice(-2000))
-      try { if ((await fetch(origin + '/')).ok) return { origin, stop } } catch {}
+      try { const adminLogin = await fetch(origin + '/api/login', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:'leaderboard-test'})}); if (adminLogin.ok) {
+        const adminToken = (await adminLogin.json()).token;
+        const imported = await fetch(origin + '/api/config/import', { method: 'POST', headers: { 'x-frontend-auth': 'leaderboard-test', 'x-admin-token': adminToken, 'Content-Type': 'application/json' }, body: JSON.stringify({ content: "module.exports={users:[{name:'test',password:'leaderboard123'}]}" }) })
+        if (!imported.ok) throw new Error('测试账号初始化失败')
+        const response = await fetch(origin + '/api/user/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: 'test', password: 'leaderboard123' }) })
+        const account = await response.json()
+        return { origin, stop, headers: { cookie: response.headers.get('set-cookie').split(';')[0], 'x-user-token': account.token } }
+      } } catch {}
       await sleep(100)
     }
     throw new Error('测试实例启动超时：' + logs.slice(-2000))

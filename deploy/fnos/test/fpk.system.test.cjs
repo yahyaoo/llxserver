@@ -47,12 +47,18 @@ test('独立飞牛 FPK：两个实际载荷协同运行，客户端无服务代�
     const start = (cwd, args, env) => { const child = spawn(process.execPath, args, { cwd, windowsHide: true, env: { ...process.env, ...env, DISABLE_TELEMETRY: 'true' } }); children.push(child); child.stdout.on('data', b => { logs += b; }); child.stderr.on('data', b => { logs += b; }); return child; };
     start(serverRoot, ['-e', "require('./dist/server/modules/utils/musicSdk/index.js').default.init=async()=>{};require('./index.js')"], { CONFIG_PATH: path.join(serverRoot, 'config.js'), PORT: String(serverPort), DATA_PATH: path.join(temp, 'data'), LOG_PATH: path.join(temp, 'logs'), FRONTEND_PASSWORD: 'fpk-split-test' });
     start(clientRoot, ['deploy/client/gateway.cjs'], { CONFIG_PATH: path.join(clientRoot, 'config.js') });
-    let ready = false;
-    for (let i = 0; i < 100; i++) { try { if ((await fetch(origin + '/api/config', { headers: { 'x-frontend-auth': 'fpk-split-test' } })).ok) { ready = true; break; } } catch {} await new Promise(resolve => setTimeout(resolve, 100)); }
+    let ready = false, adminToken;
+    for (let i = 0; i < 100; i++) { try { const response = await fetch(origin + '/api/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ password: 'fpk-split-test' }) }); if (response.ok) { adminToken = (await response.json()).token; ready = true; break; } } catch {} await new Promise(resolve => setTimeout(resolve, 100)); }
     assert.ok(ready, logs.slice(-2500));
-    assert.ok((await (await fetch(origin + '/')).text()).includes('洛洛雪音乐'));
+    const admin = { 'content-type': 'application/json', 'x-frontend-auth': 'fpk-split-test', 'x-admin-token': adminToken };
+    assert.equal((await fetch(origin + '/api/config', { headers: admin })).status, 200);
+    assert.equal((await fetch(origin + '/api/config/import', { method: 'POST', headers: admin, body: JSON.stringify({ content: "module.exports={users:[{name:'fpk-user',password:'fpk-player-test'}]}" }) })).status, 200);
+    const login = await fetch(origin + '/api/user/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ username: 'fpk-user', password: 'fpk-player-test' }) });
+    assert.equal(login.status, 200); const headers = { Cookie: login.headers.get('set-cookie').split(';')[0] };
+    assert.equal((await fetch(origin + '/', { redirect: 'manual' })).status, 302);
+    assert.ok((await (await fetch(origin + '/', { headers })).text()).includes('洛洛雪音乐'));
     assert.equal((await fetch(origin + '/admin/')).status, 200);
-    assert.ok((await (await fetch(origin + '/music/assets/logo.svg')).text()).includes('洛洛雪音乐'));
+    assert.ok((await (await fetch(origin + '/music/assets/logo.svg', { headers })).text()).includes('洛洛雪音乐'));
   } finally {
     for (const child of children) if (child.exitCode === null) { const stopped = new Promise(resolve => child.once('exit', resolve)); child.kill(); await stopped; }
     fs.rmSync(temp, { recursive: true, force: true });
@@ -119,19 +125,25 @@ test('真实载荷：隔离安装锁定生产依赖并启动 HTTP 服务', { tim
     child.stdout.on('data', chunk => { output += chunk; });
     child.stderr.on('data', chunk => { output += chunk; });
     const origin = `http://127.0.0.1:${port}`;
-    let ready = false;
+    let ready = false, adminToken;
     for (let attempt = 0; attempt < 100; attempt++) {
       assert.equal(child.exitCode, null, output.slice(-2500));
       try {
-        const response = await fetch(origin + '/api/config', { headers: { 'x-frontend-auth': 'fpk-system-test' } });
-        if (response.ok) { ready = true; break; }
+        const response = await fetch(origin + '/api/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ password: 'fpk-system-test' }) });
+        if (response.ok) { adminToken = (await response.json()).token; ready = true; break; }
       } catch {}
       await wait(100);
     }
     assert.equal(ready, true, output.slice(-2500));
-    assert.equal((await fetch(origin + '/music')).status, 200);
+    const admin = { 'content-type': 'application/json', 'x-frontend-auth': 'fpk-system-test', 'x-admin-token': adminToken };
+    assert.equal((await fetch(origin + '/api/config', { headers: admin })).status, 200);
+    assert.equal((await fetch(origin + '/api/config/import', { method: 'POST', headers: admin, body: JSON.stringify({ content: "module.exports={users:[{name:'fpk-user',password:'fpk-player-test'}],'player.path':'/music'}" }) })).status, 200);
+    assert.equal((await fetch(origin + '/music', { redirect: 'manual' })).status, 302);
+    const login = await fetch(origin + '/api/user/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ username: 'fpk-user', password: 'fpk-player-test' }) });
+    assert.equal(login.status, 200); const headers = { Cookie: login.headers.get('set-cookie').split(';')[0] };
+    assert.equal((await fetch(origin + '/music', { headers })).status, 200);
     assert.equal((await fetch(origin + '/admin')).status, 200);
-    const updates = await (await fetch(origin + '/api/app/update/check')).json();
+    const updates = await (await fetch(origin + '/api/app/update/check', { headers: admin })).json();
     assert.equal(updates.currentVersion, version);
     assert.equal(updates.enabled, false);
   } finally {

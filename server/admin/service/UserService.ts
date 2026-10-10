@@ -1,6 +1,6 @@
 import type { RequestContext, ServerRuntime } from '../../common/http/RequestContext'
 /** 管理用户维护、用户空间迁移与同步连接处理所需的应用依赖契约。 @author yahyaoo */
-export type UserServiceRuntime = Pick<ServerRuntime, 'readBody' | 'path' | 'checkAndCreateDir' | 'saveUsers' | 'storageFs' | 'getSyncDownloadData' | 'migrateSyncStorage' | 'wss' | 'SYNC_CLOSE_CODE' | 'renameUserSpace' | 'migrateUserData' | 'finishRenameUserSpace'>
+export type UserServiceRuntime = Pick<ServerRuntime, 'readBody' | 'path' | 'checkAndCreateDir' | 'saveUsers' | 'storageFs' | 'getSyncDownloadData' | 'migrateSyncStorage' | 'wss' | 'SYNC_CLOSE_CODE' | 'renameUserSpace' | 'migrateUserData' | 'finishRenameUserSpace' | 'userSessions'>
 /** 管理用户维护、用户空间迁移与同步连接处理服务。 @author yahyaoo */
 
 /**
@@ -249,6 +249,7 @@ dataPath: string }[] = []
                       if (client.userInfo?.name === targetName) client.close(SYNC_CLOSE_CODE.normal)
                     }
                   }
+                  runtime.userSessions.revokeUser(targetName)
                   global.lx.config.users.splice(idx, 1)
                   deletedCount++
                 }

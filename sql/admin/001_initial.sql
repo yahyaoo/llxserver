@@ -119,3 +119,33 @@ CREATE TABLE IF NOT EXISTS server_legacy_document (
 );
 CREATE INDEX IF NOT EXISTS idx_server_legacy_document_order ON server_legacy_document (document_key, sort_order);
 
+
+-- 登录会话：启动时自动补建；到期时间使用 Unix 毫秒，远程令牌用会话密钥加密。
+CREATE TABLE IF NOT EXISTS server_login_session (
+  token_hash TEXT PRIMARY KEY, -- 浏览器令牌的 SHA-256 摘要
+  username TEXT NOT NULL, -- 登录账号
+  created_at INTEGER NOT NULL, -- 登录时间
+  expires_at INTEGER NOT NULL, -- 到期时间
+  credential_hash TEXT NOT NULL, -- 本地账号凭据摘要，用于密码修改后撤销
+  remote_url TEXT, -- 所选远程服务器地址
+  remote_token TEXT -- 加密的远程会话令牌
+);
+CREATE INDEX IF NOT EXISTS idx_server_login_session_expiry ON server_login_session (expires_at);
+
+-- 用户 API Token 总开关，账号名称与现有用户配置关联。
+CREATE TABLE IF NOT EXISTS server_api_token_account (
+  username TEXT PRIMARY KEY, -- 关联登录账号
+  enabled INTEGER NOT NULL CHECK (enabled IN (0, 1)) -- 账号令牌认证总开关
+);
+-- API Token 使用摘要检索；原值按账号凭据加密，供本人管理及复制。
+CREATE TABLE IF NOT EXISTS server_api_token (
+  token_hash TEXT PRIMARY KEY, -- 令牌摘要
+  username TEXT NOT NULL REFERENCES server_api_token_account(username) ON DELETE CASCADE, -- 令牌所属账号
+  token_encrypted TEXT NOT NULL, -- 使用账号凭据密钥加密的令牌
+  name TEXT NOT NULL, -- 用户设置的令牌名称
+  created_at INTEGER NOT NULL, -- 创建时间，毫秒
+  expires_at INTEGER, -- 到期时间，空值表示永久
+  last_used INTEGER, -- 最近访问时间，毫秒
+  disabled INTEGER NOT NULL CHECK (disabled IN (0, 1)) -- 单个令牌禁用标志
+);
+CREATE INDEX IF NOT EXISTS idx_server_api_token_user ON server_api_token (username);

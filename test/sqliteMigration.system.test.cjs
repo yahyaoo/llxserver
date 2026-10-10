@@ -25,8 +25,9 @@ test('真实系统：迁移旧 JSON、事务覆盖、库隔离、浏览器存储
   fs.writeFileSync(config, 'module.exports = ' + JSON.stringify({ disableTelemetry: true, 'frontend.password': 'system-test', 'player.enableAuth': false,
     'user.enablePublicRestriction': true, 'configBackup.enable': false, users: [{ name: 'alice', password: 'alice-test' }, { name: 'bob', password: 'bob-test' }] }))
   // 业务配置仅保存在 SQLite，旧 JS 文件不会在启动时自动导入。
-  const { createAdminRepository } = require('../dist/server/admin/repository/AdminRepository')
-  const { GlobalConfigurationService } = require('../dist/server/admin/service/GlobalConfigurationService')
+  require('tsx/cjs')
+  const { createAdminRepository } = require('../server/admin/repository/AdminRepository.ts')
+  const { GlobalConfigurationService } = require('../server/admin/service/GlobalConfigurationService.ts')
   const repository = createAdminRepository(data)
   new GlobalConfigurationService(repository).save(config, require(config))
   repository.close()
@@ -46,13 +47,13 @@ test('真实系统：迁移旧 JSON、事务覆盖、库隔离、浏览器存储
   let child, logs = ''
   const admin = { 'x-frontend-auth': 'system-test', 'Content-Type': 'application/json' }
   const start = async () => {
-    const bootstrap = `require(${JSON.stringify(path.join(project, 'dist/server/modules/utils/musicSdk/index.js'))}).default.init = async () => {}; require(${JSON.stringify(path.join(project, 'index.js'))});`
-    child = spawn(process.execPath, ['-e', bootstrap], { cwd: project, windowsHide: true, env: { ...process.env, PORT: String(port), BIND_IP: '127.0.0.1',
+    const bootstrap = `require(${JSON.stringify(path.join(project, 'server/modules/utils/musicSdk/index.js'))}).default.init = async () => {}; require(${JSON.stringify(path.join(project, 'server/index.ts'))});`
+    child = spawn(process.execPath, ['-r', 'tsx/cjs', '-e', bootstrap], { cwd: project, windowsHide: true, env: { ...process.env, PORT: String(port), BIND_IP: '127.0.0.1',
       DATA_PATH: data, LOG_PATH: path.join(root, 'logs'), CONFIG_PATH: config, STATIC_PATH: path.join(project, 'client'), NODE_ENV: 'production' } })
     child.stdout.on('data', chunk => { logs += chunk }); child.stderr.on('data', chunk => { logs += chunk })
     for (let i = 0; i < 150; i++) {
       if (child.exitCode !== null) throw new Error('服务器退出：' + logs.slice(-2500))
-      try { if ((await fetch(origin + '/api/config', { headers: admin })).ok) return } catch {}
+      try { const loggedIn = await fetch(origin + '/api/login', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ password: 'system-test' }) }); if (loggedIn.ok) { admin['x-admin-token'] = (await loggedIn.json()).token; return } } catch {}
       await wait(100)
     }
     throw new Error('服务器启动超时：' + logs.slice(-2500))
@@ -67,14 +68,14 @@ test('真实系统：迁移旧 JSON、事务覆盖、库隔离、浏览器存储
     assert.deepEqual((await get('/api/data?user=_open')).defaultList, [legacySong])
     assert.equal(fs.existsSync(path.join(data, 'database/admin.sqlite')), true)
     assert.equal(fs.existsSync(path.join(data, 'database/music.sqlite')), true)
-    assert.equal((await post(importRoute, { settings: { preferredQuality: 'flac' } }, { 'Content-Type': 'application/json' })).status, 403)
+    assert.equal((await post(importRoute, { settings: { preferredQuality: 'flac' } }, { 'Content-Type': 'application/json' } )).status, 401)
     const oldSettingsText = fs.readFileSync(path.join(open, 'settings.json'), 'utf8')
     const song = { id: 'wy_new', name: '迁移中文歌曲', source: 'wy', meta: { unknown: '扩展' } }
     const lists = { defaultList: [song, song], loveList: [song], userList: [{ id: 'list_1', name: '自定义歌单', list: [song] }] }
     const payload = { settings: { preferredQuality: 'flac', volume: 0.6 }, lists, soundEffects: { equalizer: [1, 2, 3] }, library: { artists: [{ id: 'a', name: '歌手', source: 'wy' }], albums: [] } }
     const form = new FormData()
     form.append('file', new Blob(['\uFEFF' + JSON.stringify(payload)], { type: 'application/json' }), '洛雪配置.json')
-    const upload = await fetch(origin + importRoute, { method: 'POST', headers: { 'x-frontend-auth': 'system-test' }, body: form })
+    const upload = await fetch(origin + importRoute, { method: 'POST', headers: { 'x-frontend-auth': 'system-test', 'x-admin-token':admin['x-admin-token'] }, body: form })
     assert.equal(upload.status, 200, await upload.clone().text())
     assert.equal((await upload.json()).songs, 4)
     assert.deepEqual(await get('/api/user/settings'), payload.settings)

@@ -19,7 +19,7 @@
     </aside>
     <div id="settings-content" class="settings-content custom-scrollbar">
         <div class="settings-content-inner">
-            <div class="settings-content-heading"><p id="settings-section-group">系统</p><h2 id="settings-section-title">源与基础设置</h2></div>
+            <div class="settings-content-heading"><h2 id="settings-section-title">源与基础设置</h2></div>
     <!-- System Settings Panel -->
     <div id="settings-panel-system" class="space-y-6 animate-fade-in">
         <!-- 源与基础设置 -->
@@ -302,9 +302,9 @@
             </div>
         </div>
 
-        <div id="settings-section-updates" data-settings-section="updates" class="pt-6 border-t t-border-main">
+        <div id="settings-section-updates" data-settings-section="updates" class="settings-form-card space-y-4">
             <h3 class="font-medium text-emerald-600 mb-4">版本更新</h3>
-            <div class="settings-form-card space-y-4">
+            <div class="space-y-4">
                 <label class="flex items-center justify-between text-sm t-text-main" for="setting-app-update-enabled">检查更新（默认关闭）
                     <span class="relative inline-flex items-center cursor-pointer">
                         <input type="checkbox" id="setting-app-update-enabled" class="sr-only peer" />
@@ -312,110 +312,14 @@
                     </span>
                 </label>
                 <div><label for="setting-app-update-server" class="block text-sm t-text-main mb-2">检查更新服务器地址</label>
-                    <input type="url" id="setting-app-update-server" class="lm-input !w-full" />
+                    <input type="url" id="setting-app-update-server" class="settings-text-input" />
                     <p class="text-xs t-text-muted mt-2">默认使用 llxserver 的 GitHub 发布；可改为 Gitea 或 GitHub 的 latest release API。</p>
                 </div>
                 <div><label for="setting-app-update-token" class="block text-sm t-text-main mb-2">访问令牌（可选）</label>
-                    <input type="password" id="setting-app-update-token" class="lm-input !w-full" autocomplete="new-password" placeholder="私有仓库填写，留空保留已存令牌" />
+                    <input type="password" id="setting-app-update-token" class="settings-text-input" autocomplete="new-password" placeholder="私有仓库填写，留空保留已存令牌" />
                     <label class="block text-xs t-text-muted mt-2"><input type="checkbox" id="setting-app-update-clear-token" class="accent-emerald-500" /> 清除已保存令牌</label>
                 </div>
-                <button type="button" onclick="saveAppUpdateSettings()" class="lm-btn">保存更新设置</button>
-            </div>
-        </div>
-
-        <!-- Sync Settings Moved inside System Panel -->
-        <div id="settings-section-sync" data-settings-section="sync" class="pt-6 border-t t-border-main">
-            <h3 class="font-medium text-emerald-600 mb-4">数据同步</h3>
-            <div class="space-y-3 mb-4">
-                <div class="text-sm font-bold t-text-main">迁移洛雪配置</div>
-                <p class="text-xs t-text-muted">上传 JSON，将文件中提供的设置、歌单、音效和媒体库覆盖到当前账号。未提供的部分保持原值。</p>
-                <input id="configuration-import-file" type="file" accept=".json,application/json" class="hidden" onchange="importLxConfiguration(this)">
-                <button id="configuration-import-button" type="button" class="lm-btn" onclick="selectLxConfiguration()">上传 JSON 并迁移</button>
-                <p id="configuration-import-status" class="text-xs t-text-muted" role="status" aria-live="polite"></p>
-            </div>
-
-            <div class="flex gap-4 mb-4">
-                <button id="btn-mode-local" onclick="switchSyncMode('local')"
-                    class="px-4 py-2 rounded-lg text-sm font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400 transition-all">本地服务器</button>
-                <button id="btn-mode-remote" onclick="switchSyncMode('remote')"
-                    class="px-4 py-2 rounded-lg text-sm font-medium t-bg-track t-text-muted hover:t-bg-item-hover transition-all">远程同歩</button>
-            </div>
-
-            <!-- Local Mode Form -->
-            <div id="sync-form-local" class="space-y-4">
-                <input type="text" id="sync-local-user" placeholder="用户名"
-                    class="w-full px-4 py-2 border t-border-main rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400 text-sm">
-                <input type="password" id="sync-local-pass" placeholder="密码"
-                    class="w-full px-4 py-2 border t-border-main rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400 text-sm">
-                <button onclick="handleLocalLogin()"
-                    class="w-full py-2 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-lg transition-colors shadow-md">登录并同步</button>
-            </div>
-
-            <!-- Remote Mode Form (Hidden) -->
-            <div id="sync-form-remote" class="space-y-4 hidden">
-                <p class="text-xs text-gray-500">请输入 LX Music 桌面端或移动端的连接信息</p>
-
-                <!-- Step 1: URL -->
-                <div id="sync-remote-step1">
-                    <label class="block text-xs font-bold t-text-muted mb-1">链接</label>
-                    <input type="text" id="sync-remote-url" placeholder="ws://192.168.x.x:xxx"
-                        class="w-full px-4 py-2 border t-border-main rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400 text-sm mb-2">
-                    <button onclick="handleRemoteStep1()"
-                        class="w-full py-2 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-lg transition-colors shadow-md">
-                        下一步
-                    </button>
-                </div>
-
-                <!-- Step 2: Code (Hidden) -->
-                <div id="sync-remote-step2" class="hidden">
-                    <label class="block text-xs font-bold t-text-muted mb-1">连接码</label>
-                    <input type="text" id="sync-remote-code" placeholder="输入连接码"
-                        class="w-full px-4 py-2 border t-border-main rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400 text-sm mb-2">
-                    <div class="flex gap-2">
-                        <button onclick="handleRemoteBack()"
-                            class="flex-1 py-2 bg-gray-200 hover:bg-gray-300 t-text-muted font-bold rounded-lg transition-colors">
-                            上一步
-                        </button>
-                        <button onclick="handleRemoteConnect()"
-                            class="flex-[2] py-2 bg-blue-500 hover:bg-blue-600 text-white font-bold rounded-lg transition-colors shadow-md">
-                            连接
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <div id="sync-status" class="mt-3 text-sm text-gray-500 flex items-center gap-2">
-                <i class="fas fa-circle text-[8px] text-gray-300"></i> 状态: 未连接
-            </div>
-
-            <!-- Token Management Section (Shown after local login) -->
-            <div id="token-management-section"
-                class="mt-6 pt-4 border-t t-border-main hidden animate-fade-in">
-                <div class="flex items-center justify-between mb-4">
-                    <div class="flex flex-col">
-                        <h4 class="text-sm font-bold t-text-main flex items-center gap-2">
-                            <i class="fas fa-key text-emerald-500"></i> 启用 Token 认证
-                        </h4>
-                        <span class="text-[10px] t-text-muted mt-0.5">API 访问凭证管理</span>
-                    </div>
-                    <label class="relative inline-flex items-center cursor-pointer">
-                        <input type="checkbox" id="setting-enable-persistent-token"
-                            class="sr-only peer" onchange="toggleTokenAuthSetting(this.checked)">
-                        <div
-                            class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500 transition-all">
-                        </div>
-                    </label>
-                </div>
-                <div id="token-list-container"
-                    class="space-y-4 opacity-50 pointer-events-none transition-all duration-300">
-                    <div id="token-items" class="space-y-2 max-h-60 overflow-y-auto hide-scrollbar">
-                        <!-- Token 列表由 JS 注入 -->
-                    </div>
-                    <button onclick="openAddTokenModal()"
-                        class="w-full py-2 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-500/20 rounded-xl text-xs font-bold hover:bg-emerald-100 dark:hover:bg-emerald-500/20 transition-all flex items-center justify-center gap-2">
-                        <i class="fas fa-plus"></i> 生成新验证 Token
-                    </button>
-                </div>
+                <button type="button" onclick="saveAppUpdateSettings()" class="settings-action">保存更新设置</button>
             </div>
         </div>
 
@@ -805,29 +709,6 @@
                     </label>
                 </div>
 
-                <!-- Only Download Mode -->
-                <div class="flex items-center justify-between pb-3 border-b t-border-main">
-                    <div>
-                        <div class="text-sm font-bold t-text-main flex items-center">
-                            仅下载模式
-                            <span class="setting-tooltip-trigger ml-1">
-                                <i class="fas fa-question-circle"></i>
-                                <span class="setting-tooltip-content">未开启时下载到
-                                    /server/cache/用户名 (或
-                                    /server/data/cache/)；<br>开启后下载到
-                                    /server/music/用户名 (或 /server/data/music/)。</span>
-                            </span>
-                        </div>
-                    </div>
-                    <label class="relative inline-flex items-center cursor-pointer">
-                        <input type="checkbox" id="setting-only-download-mode" class="sr-only peer"
-                            onchange="updateSetting('enableOnlyDownloadMode', this.checked)">
-                        <div
-                            class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500 transition-all">
-                        </div>
-                    </label>
-                </div>
-
                 <!-- Remaster Feature -->
                 <div class="pb-3 border-b t-border-main space-y-3">
                     <div class="flex items-center justify-between">
@@ -887,7 +768,7 @@
                             <span class="setting-tooltip-trigger ml-1">
                                 <i class="fas fa-question-circle"></i>
                                 <span
-                                    class="setting-tooltip-content">设置服务端存储文件的命名规则（对标准缓存和仅下载模式均生效）。不影响已有文件。</span>
+                                    class="setting-tooltip-content">设置服务端存储文件的命名规则（用于播放缓存）。不影响已有文件。</span>
                             </span>
                         </div>
                     </div>
@@ -910,10 +791,10 @@
                                 <span class="setting-tooltip-trigger ml-1">
                                     <i class="fas fa-question-circle"></i>
                                     <span
-                                        class="setting-tooltip-content">根据「缓存歌曲位置」与「仅下载模式」计算当前系统下的绝对存储物理路径。</span>
+                                        class="setting-tooltip-content">根据「缓存歌曲位置」显示当前播放缓存的绝对路径。</span>
                                 </span>
                             </div>
-                            <div class="text-xs t-text-muted mt-0.5">查看当前账号缓存与下载目录的物理绝对路径</div>
+                            <div class="text-xs t-text-muted mt-0.5">查看当前账号播放缓存目录的绝对路径</div>
                         </div>
                         <button type="button" onclick="showServerDirectories()"
                             class="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-emerald-500 hover:bg-emerald-600 text-white shadow-sm hover:shadow transition-all active:scale-95 flex items-center gap-1.5 shrink-0">
@@ -958,7 +839,7 @@
                         </span>
                     </div>
                     <div class="flex flex-col gap-1 text-right">
-                        <div id="server-music-info" title="仅下载模式目录 (/music)"
+                        <div id="server-music-info" title="历史音乐目录 (/music)"
                             class="text-[10px] md:text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">
                             正在统计音乐...</div>
                         <div id="server-cache-info" title="标准缓存目录 (/cache)"
@@ -1000,6 +881,75 @@
     </div>
 
     <!-- Display Settings Panel -->
+    <div id="settings-panel-account" class="hidden space-y-6">
+        <div id="settings-section-account" data-settings-section="account" class="pt-2 space-y-6">
+            <div class="settings-form-card space-y-4">
+                <h3 class="text-lg font-bold t-text-main">账号资料</h3>
+                <div class="flex items-center gap-4"><span id="account-avatar-preview" class="header-avatar"><i class="fas fa-user"></i></span><label class="settings-action cursor-pointer">上传头像<input id="account-avatar-file" type="file" accept="image/png,image/jpeg,image/webp,image/gif" class="hidden" onchange="uploadAccountAvatar(this)"></label></div>
+                <p class="text-xs t-text-muted">支持 PNG、JPEG、WebP、GIF，最大 2 MB。</p>
+                <form id="account-profile-form" class="space-y-4" onsubmit="saveAccountProfile(event)">
+                    <label class="block text-sm t-text-muted">登录名<input id="account-username" readonly aria-readonly="true" class="w-full mt-2 px-4 py-2 rounded-lg t-bg-track t-text-muted border t-border-main"></label>
+                    <label class="block text-sm t-text-muted">用户名<input id="account-nickname" maxlength="40" class="w-full mt-2 px-4 py-2 rounded-lg t-bg-main t-text-main border t-border-main"></label>
+                    <p class="text-xs t-text-muted">用户名最多 40 字，留空时使用登录名。</p>
+                    <button type="submit" class="settings-action"><i class="fas fa-save"></i>保存用户名</button>
+                </form>
+                <p id="account-profile-status" role="status" aria-live="polite" class="text-sm t-text-muted"></p>
+            </div>
+            <div id="account-password-section" class="settings-form-card space-y-4">
+                <h3 class="text-lg font-bold t-text-main">修改密码</h3>
+                <form id="account-password-form" class="space-y-4" onsubmit="changeAccountPassword(event)">
+                    <label class="block text-sm t-text-muted">原密码<input type="password" id="account-current-password" autocomplete="current-password" required class="w-full mt-2 px-4 py-2 rounded-lg t-bg-main t-text-main border t-border-main"></label>
+                    <label class="block text-sm t-text-muted">新密码<input type="password" id="account-new-password" autocomplete="new-password" required minlength="6" maxlength="128" class="w-full mt-2 px-4 py-2 rounded-lg t-bg-main t-text-main border t-border-main"></label>
+                    <label class="block text-sm t-text-muted">确认新密码<input type="password" id="account-confirm-password" autocomplete="new-password" required minlength="6" maxlength="128" class="w-full mt-2 px-4 py-2 rounded-lg t-bg-main t-text-main border t-border-main"></label>
+                    <button type="submit" class="settings-action">修改密码</button>
+                </form>
+                <p class="text-xs t-text-muted">密码修改后需重新登录。</p>
+                <p id="account-password-status" role="status" aria-live="polite" class="text-sm t-text-muted"></p>
+            </div>
+        </div>
+        <div id="settings-section-configuration-import" data-settings-section="configuration-import" class="settings-form-card space-y-4">
+            <div class="space-y-3 mb-4">
+                <div class="text-sm font-bold t-text-main">迁移洛雪配置</div>
+                <p class="text-xs t-text-muted">上传 JSON，将文件中提供的设置、歌单、音效和媒体库覆盖到当前账号。未提供的部分保持原值。</p>
+                <input id="configuration-import-file" type="file" accept=".json,application/json" class="hidden" onchange="importLxConfiguration(this)">
+                <button id="configuration-import-button" type="button" class="settings-action" onclick="selectLxConfiguration()"><i class="fas fa-file-import"></i>上传 JSON 并迁移</button>
+                <p id="configuration-import-status" class="text-xs t-text-muted" role="status" aria-live="polite"></p>
+            </div>
+
+        </div>
+        <div id="settings-section-token" data-settings-section="token" class="settings-form-card">
+            <!-- 当前账号的 API 访问凭证 -->
+            <div id="token-management-section"
+                class="space-y-4 animate-fade-in">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex flex-col">
+                        <h4 class="text-sm font-bold t-text-main flex items-center gap-2">
+                            <i class="fas fa-key text-emerald-500"></i> 启用 Token 认证
+                        </h4>
+                        <span class="text-[10px] t-text-muted mt-0.5">API 访问凭证管理</span>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="setting-enable-persistent-token" aria-label="启用 Token 认证"
+                            class="sr-only peer" onchange="toggleTokenAuthSetting(this.checked)">
+                        <div
+                            class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500 transition-all">
+                        </div>
+                    </label>
+                </div>
+                <div id="token-list-container"
+                    class="space-y-4 opacity-50 pointer-events-none transition-all duration-300">
+                    <div id="token-items" class="space-y-2 max-h-60 overflow-y-auto hide-scrollbar">
+                        <!-- Token 列表由 JS 注入 -->
+                    </div>
+                    <button onclick="openAddTokenModal()"
+                        class="w-full py-2 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-500/20 rounded-xl text-xs font-bold hover:bg-emerald-100 dark:hover:bg-emerald-500/20 transition-all flex items-center justify-center gap-2">
+                        <i class="fas fa-plus"></i> 生成新验证 Token
+                    </button>
+                </div>
+            </div>
+        </div>
+
+    </div>
     <div id="settings-panel-display" class="hidden space-y-8 animate-fade-in">
 <div id="settings-section-theme" data-settings-section="theme" class="settings-theme-panel settings-form-card hidden">
         <div data-theme-controls></div>
@@ -1018,7 +968,6 @@
             <label>模糊度<input type="range" min="0" max="40" data-experience-control="blur" aria-label="背景模糊度"><output></output></label>
             <p>支持 PNG、JPEG、WebP、GIF，最大 10 MB。</p>
         </div>
-        <p id="experience-save-status" role="status">配置自动保存到当前账号</p>
     </div>
         <!-- 界面与布局 -->
         <div id="settings-section-layout" data-settings-section="layout" class="col-span-full border-t t-border-main pt-6 mt-4 space-y-4">
@@ -1127,6 +1076,8 @@
                     <select id="setting-player-background"
                         onchange="updateSetting('playerBackground', this.value)"
                         class="lm-select !w-full !py-2">
+                        <option value="theme">跟随页面（透明背景）</option>
+                        <option value="artist">歌手氛围</option>
                         <option value="blur">封面虚化</option>
                         <option value="solid">纯色背景</option>
                         <option value="dark">黑色背景</option>
@@ -1138,7 +1089,7 @@
                     class="t-bg-panel rounded-xl border t-border-main p-4 hover:shadow-sm transition-shadow flex flex-col gap-3">
                     <div class="flex items-center justify-between">
                         <h4 class="text-sm font-bold t-text-main flex items-center">
-                            <i class="fas fa-film mr-2 text-emerald-500"></i> 详情页背景
+                            <i class="fas fa-film mr-2 text-emerald-500"></i> 详情页视觉特效
                             <span class="setting-tooltip-trigger ml-1">
                                 <i class="fas fa-question-circle"></i>
                                 <span class="setting-tooltip-content">歌词详情页（全屏模式）下的背景视觉特效。</span>
@@ -1153,13 +1104,16 @@
                             </div>
                         </label>
                     </div>
-                    <select id="setting-detail-visualizer-style"
-                        onchange="updateSetting('detailVisualizerStyle', this.value)"
-                        class="lm-select !w-full !py-2">
-                        <option value="pulse">频率脉冲</option>
-                        <option value="dots">点阵频谱</option>
-                        <option value="flower">灵动莲花</option>
-                    </select>
+                    <div id="setting-detail-visualizer-options" hidden>
+                        <select id="setting-detail-visualizer-style"
+                            onchange="updateSetting('detailVisualizerStyle', this.value)"
+                            class="lm-select !w-full !py-2">
+                            <option value="spectrum">底部频谱</option>
+                            <option value="pulse">频率脉冲</option>
+                            <option value="dots">点阵频谱</option>
+                            <option value="flower">灵动莲花</option>
+                        </select>
+                    </div>
                 </div>
 
                 <!-- Global Style (Blocks vs Connected) -->
@@ -1205,190 +1159,6 @@
             </div>
         </div>
 
-        <!-- 歌词显示设置 -->
-        <div id="settings-section-lyrics" data-settings-section="lyrics" class="col-span-full border-t t-border-main pt-6 mt-4 space-y-4">
-            <h4 class="text-sm font-bold t-text-main flex items-center">
-                <i class="fas fa-language mr-2 text-emerald-500"></i> 歌词显示设置
-            </h4>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-
-                <!-- Lyric Font Size -->
-                <div
-                    class="t-bg-panel rounded-xl border t-border-main p-4 hover:shadow-sm transition-shadow col-span-full">
-                    <div
-                        class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4">
-                        <h4 class="text-sm font-bold t-text-main flex items-center mb-0 shrink-0">
-                            <i class="fas fa-font mr-2 text-emerald-500"></i> 歌词字体大小
-                            <span class="setting-tooltip-trigger ml-1">
-                                <i class="fas fa-question-circle"></i>
-                                <span class="setting-tooltip-content">设置播放详情页歌词显示的大小 (单位:
-                                    rem)</span>
-                            </span>
-                        </h4>
-                        <div class="flex items-center gap-3 flex-1">
-                            <input type="range" id="lyric-font-size-slider"
-                                class="flex-1 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-emerald-500"
-                                min="0.8" max="3.0" step="0.1" value="1.2"
-                                oninput="changeLyricFontSize(this.value)">
-                            <span id="lyric-font-size-value"
-                                class="text-sm font-mono text-emerald-600 w-8 text-right">1.2</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Lyric Glow Toggle -->
-                <div
-                    class="t-bg-panel rounded-xl border t-border-main p-4 hover:shadow-sm transition-shadow">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <h4 class="text-sm font-bold t-text-main flex items-center">
-                                歌词荧光效果
-                                <span class="setting-tooltip-trigger ml-1">
-                                    <i class="fas fa-question-circle"></i>
-                                    <span class="setting-tooltip-content">为当前播放的歌词添加荧光发光效果。</span>
-                                </span>
-                            </h4>
-                        </div>
-                        <label class="relative inline-flex items-center cursor-pointer">
-                            <input type="checkbox" id="setting-enable-lyric-glow"
-                                class="sr-only peer"
-                                onchange="updateSetting('enableLyricGlow', this.checked)">
-                            <div
-                                class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500 transition-all">
-                            </div>
-                        </label>
-                    </div>
-                </div>
-
-                <!-- Lyric Translation Toggle -->
-                <div
-                    class="t-bg-panel rounded-xl border t-border-main p-4 hover:shadow-sm transition-shadow">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <h4 class="text-sm font-bold t-text-main flex items-center">
-                                显示歌词翻译
-                                <span class="setting-tooltip-trigger ml-1">
-                                    <i class="fas fa-question-circle"></i>
-                                    <span class="setting-tooltip-content">如果歌曲有翻译，则在原词下方显示。</span>
-                                </span>
-                            </h4>
-                        </div>
-                        <label class="relative inline-flex items-center cursor-pointer">
-                            <input type="checkbox" id="setting-show-lyric-translation"
-                                class="sr-only peer"
-                                onchange="updateSetting('showLyricTranslation', this.checked)">
-                            <div
-                                class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500 transition-all">
-                            </div>
-                        </label>
-                    </div>
-                </div>
-
-                <!-- Lyric Roma Toggle -->
-                <div
-                    class="t-bg-panel rounded-xl border t-border-main p-4 hover:shadow-sm transition-shadow">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <h4 class="text-sm font-bold t-text-main flex items-center">
-                                显示歌词罗马音
-                                <span class="setting-tooltip-trigger ml-1">
-                                    <i class="fas fa-question-circle"></i>
-                                    <span class="setting-tooltip-content">如果歌曲有罗马音，则在原词下方显示。</span>
-                                </span>
-                            </h4>
-                        </div>
-                        <label class="relative inline-flex items-center cursor-pointer">
-                            <input type="checkbox" id="setting-show-lyric-roma" class="sr-only peer"
-                                onchange="updateSetting('showLyricRoma', this.checked)">
-                            <div
-                                class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500 transition-all">
-                            </div>
-                        </label>
-                    </div>
-                </div>
-
-                <!-- Swap Trans Roma Toggle -->
-                <div
-                    class="t-bg-panel rounded-xl border t-border-main p-4 hover:shadow-sm transition-shadow">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <h4 class="text-sm font-bold t-text-main flex items-center">
-                                交换翻译与罗马音位置
-                                <span class="setting-tooltip-trigger ml-1">
-                                    <i class="fas fa-question-circle"></i>
-                                    <span class="setting-tooltip-content">开启后，罗马音将显示在翻译上方。</span>
-                                </span>
-                            </h4>
-                        </div>
-                        <label class="relative inline-flex items-center cursor-pointer">
-                            <input type="checkbox" id="setting-swap-lyric-trans-roma"
-                                class="sr-only peer"
-                                onchange="updateSetting('swapLyricTransRoma', this.checked)">
-                            <div
-                                class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500 transition-all">
-                            </div>
-                        </label>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Lyric Font Family -->
-            <div
-                class="t-bg-panel rounded-xl border t-border-main p-4 hover:shadow-sm transition-shadow col-span-full">
-                <h3 class="font-bold t-text-main text-sm mb-3 flex items-center">
-                    <i class="fas fa-font mr-2 text-emerald-500"></i> 歌词字体
-                    <span class="setting-tooltip-trigger">
-                        <i class="fas fa-question-circle"></i>
-                        <span class="setting-tooltip-content">设置歌词显示的字体 (支持本地安装的字体，如
-                            'SimHei',
-                            'Microsoft YaHei')</span>
-                    </span>
-                </h3>
-                <div class="flex items-center justify-between gap-4">
-                    <div class="relative flex-1">
-                        <select id="lyric-font-family-select" class="lm-select !w-full !py-1.5"
-                            onchange="changeLyricFontFamily(this.value)">
-                            <option value="">默认字体</option>
-                            <optgroup label="常用中文字体">
-                                <option value="Microsoft YaHei">微软雅黑 (Microsoft YaHei)</option>
-                                <option value="SimHei">黑体 (SimHei)</option>
-                                <option value="KaiTi">楷体 (KaiTi)</option>
-                                <option value="SimSun">宋体 (SimSun)</option>
-                                <option value="FangSong">仿宋 (FangSong)</option>
-                            </optgroup>
-                            <optgroup label="常用英文字体">
-                                <option value="Arial">Arial</option>
-                                <option value="Segoe UI">Segoe UI</option>
-                                <option value="Times New Roman">Times New Roman</option>
-                                <option value="Roboto">Roboto</option>
-                            </optgroup>
-                        </select>
-                    </div>
-                    <button onclick="loadLocalFonts()"
-                        class="px-3 py-1.5 t-bg-track hover:bg-gray-200 t-text-muted rounded-lg text-xs transition-colors whitespace-nowrap shrink-0"
-                        title="尝试读取系统安装的所有字体 (需要浏览器支持)">
-                        <i class="fas fa-sync-alt mr-1"></i>读取
-                    </button>
-                </div>
-                <!-- Font Preview Panel -->
-                <div
-                    class="mt-4 p-4 t-bg-main rounded-lg border t-border-main text-center transition-all duration-300">
-                    <div class="text-xs t-text-muted mb-2">字体预览</div>
-                    <div id="lyric-font-preview"
-                        style="font-family: var(--lyric-font-family, inherit);">
-                        <div class="text-xl font-bold t-text-main break-words tracking-widest mb-2">
-                            0123456789
-                        </div>
-                        <div class="text-lg t-text-main break-words mb-2">
-                            The Quick Brown Fox Jumps Over The Lazy Dog
-                        </div>
-                        <div class="text-2xl font-medium t-text-main break-words">
-                            落霞与孤鹜齐飞，秋水共长天一色
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
         <!-- Mobile bottom spacer -->
         <div class="pb-36 md:pb-4"></div>
     </div>
@@ -1918,31 +1688,8 @@
                 <i class="fas fa-server" aria-hidden="true"></i> 打开后台管理
             </button>
         </div>
-                <div id="settings-section-about" data-settings-section="about"
-                    class="hidden">
-                    <div
-                        class="t-bg-panel rounded-2xl shadow-sm border t-border-main p-8 max-w-3xl mx-auto w-full prose prose-emerald">
-                        <div id="about-content" class="animate-pulse">
-                            <div class="h-8 bg-gray-200 rounded w-1/3 mb-4"></div>
-                            <div class="h-4 bg-gray-200 rounded w-full mb-2"></div>
-                            <div class="h-4 bg-gray-200 rounded w-full mb-2"></div>
-                            <div class="h-4 bg-gray-200 rounded w-2/3"></div>
-                        </div>
-
-                        <!-- Check for Updates Button -->
-                        <div class="mt-8 pt-8 border-t t-border-main flex flex-col items-center gap-4">
-                            <button onclick="checkForUpdates()"
-                                class="flex items-center gap-2 px-8 py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl shadow-lg shadow-emerald-100 transition-all hover:scale-105 active:scale-95 text-sm font-bold group">
-                                <i class="fas fa-sync-alt group-hover:rotate-180 transition-transform duration-500"></i>
-                                检查版本更新
-                            </button>
-                            <p class="text-xs t-text-muted">点击通过云端检查是否有新版本可用</p>
-                        </div>
-                    </div>
-                </div>
-    </div>
     <!-- Logs Settings Panel -->
-    <div id="settings-panel-logs" data-settings-section="logs" class="hidden space-y-6 animate-fade-in h-96 flex flex-col">
+    <div id="settings-section-logs" data-settings-section="logs" class="hidden space-y-6 animate-fade-in h-96 flex flex-col">
         <div class="flex flex-wrap items-center justify-between gap-3 mb-2">
             <h3 class="font-bold t-text-main text-lg flex items-center">
                 <i class="fas fa-terminal mr-2 text-emerald-500"></i> 系统日志
@@ -1972,10 +1719,95 @@
             * 显示系统启动后的 Console 输出
         </div>
     </div>
+                <div id="settings-section-about" data-settings-section="about"
+                    class="hidden">
+                    <div
+                        class="t-bg-panel rounded-2xl shadow-sm border t-border-main p-8 max-w-3xl mx-auto w-full prose prose-emerald">
+                        <div id="about-content" class="animate-pulse">
+                            <div class="h-8 bg-gray-200 rounded w-1/3 mb-4"></div>
+                            <div class="h-4 bg-gray-200 rounded w-full mb-2"></div>
+                            <div class="h-4 bg-gray-200 rounded w-full mb-2"></div>
+                            <div class="h-4 bg-gray-200 rounded w-2/3"></div>
+                        </div>
+
+                        <!-- Check for Updates Button -->
+                        <div class="mt-8 pt-8 border-t t-border-main flex flex-col items-center gap-4">
+                            <button onclick="checkForUpdates()"
+                                class="flex items-center gap-2 px-8 py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl shadow-lg shadow-emerald-100 transition-all hover:scale-105 active:scale-95 text-sm font-bold group">
+                                <i class="fas fa-sync-alt group-hover:rotate-180 transition-transform duration-500"></i>
+                                检查版本更新
+                            </button>
+                            <p class="text-xs t-text-muted">点击通过云端检查是否有新版本可用</p>
+                        </div>
+                    </div>
+                </div>
+    </div>
         </div>
     </div>
 </div>
 `;
+
+
+    /** 补齐设置项的图标和说明，已有问号及说明保持原样。 */
+    function decorateSettings(container) {
+        if (!container.querySelectorAll) return;
+        const help = {
+            '登录名': '创建账号时设置的登录标识，只读显示。',
+            '用户名': '用于页面展示，最多 40 字；留空时使用登录名。',
+            '原密码': '输入当前账号的登录密码。',
+            '新密码': '设置 6–128 位新密码，保存后需要重新登录。',
+            '确认新密码': '再次输入新密码，两次输入必须一致。',
+            '检查更新（默认关闭）': '开启后允许服务端检查应用发布信息。',
+            '检查更新服务器地址': '填写 GitHub 或 Gitea 的 latest release API 地址。',
+            '访问令牌（可选）': '私有仓库可填写访问令牌；留空保留已有值。',
+            '清除已保存令牌': '保存更新设置时删除已经保存的仓库访问令牌。',
+            '启用 Token 认证': '开启后可使用当前账号生成的 Token 访问 API，支持禁用和有效期。',
+            '上传头像': '选择最大 2 MB 的图片，拖动和缩放后确认裁剪。',
+            '迁移洛雪配置': '上传洛雪 JSON 配置，迁移文件中提供的数据到当前账号。',
+        };
+        const icons = [
+            [/密码|令牌|Token/, 'fa-key'], [/登录|用户|账号|头像/, 'fa-user'],
+            [/更新/, 'fa-sync-alt'], [/网络|代理/, 'fa-globe'],
+            [/颜色|主题/, 'fa-palette'], [/背景|图片|视觉|位置|模糊/, 'fa-image'],
+            [/歌词|字体/, 'fa-language'], [/播放|音效|音量/, 'fa-headphones-alt'],
+            [/缓存|记录|保存/, 'fa-database'], [/上传|迁移/, 'fa-file-import'],
+        ];
+        container.querySelectorAll('label, h3, h4, div.text-sm.font-bold').forEach(label => {
+            const textNodes = Array.from(label.childNodes).filter(node => node.nodeType === 3 && node.textContent.trim());
+            if (!textNodes.length) return;
+            const title = textNodes.map(node => node.textContent.trim()).join(' ');
+            if (label.closest('.setting-tooltip-content')) return;
+            const caption = document.createElement('span');
+            caption.className = 'settings-field-caption';
+            label.insertBefore(caption, textNodes[0]);
+            if (!label.querySelector('i:not(.fa-question-circle)')) {
+                const icon = document.createElement('i');
+                icon.className = 'fas ' + (icons.find(([pattern]) => pattern.test(title))?.[1] || 'fa-sliders-h');
+                icon.setAttribute('aria-hidden', 'true');
+                caption.append(icon);
+            }
+            textNodes.forEach(node => caption.append(node));
+            if (!label.querySelector('.setting-tooltip-trigger')) {
+                const trigger = document.createElement('span');
+                trigger.className = 'setting-tooltip-trigger';
+                trigger.tabIndex = 0;
+                trigger.setAttribute('aria-label', title + '说明');
+                const icon = document.createElement('i');
+                icon.className = 'fas fa-question-circle';
+                icon.setAttribute('aria-hidden', 'true');
+                const content = document.createElement('span');
+                content.className = 'setting-tooltip-content';
+                const paragraph = label.parentElement?.querySelector('p');
+                content.textContent = help[title] || paragraph?.textContent.trim() || ('设置' + title + '，修改后按当前页面的保存方式生效。');
+                trigger.append(icon, content);
+                caption.append(trigger);
+            }
+            if (label.tagName === 'LABEL' && label.querySelector('input:not([type="checkbox"]):not([type="file"])')) label.classList.add('settings-field');
+        });
+        container.querySelectorAll('.setting-tooltip-trigger').forEach(trigger => {
+            if (!trigger.hasAttribute('tabindex')) trigger.tabIndex = 0;
+        });
+    }
 
     window.SettingsView = class SettingsView {
         /**
@@ -1985,6 +1817,7 @@
         static mount(container) {
             if (!container || container.dataset.settingsMounted === 'true') return;
             container.innerHTML = template;
+            decorateSettings(container);
             container.dataset.settingsMounted = 'true';
         }
     };

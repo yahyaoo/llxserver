@@ -5,7 +5,7 @@
     "method": "postLogin",
     "route": "/api/login",
     "condition": "pathname === '/api/login' && req.method === 'POST'",
-    "baselineDigest": "5cd3dca6e6342fc5fab5d098fb4085c615e4251f5b17319341fe826b81a5dacf"
+    "baselineDigest": "f917d1a079e20e35d1742df1b27b79929de04ffe04c7ce8d71953fb715bea0b0"
   },
   {
     "group": "adminOperations",
@@ -29,7 +29,7 @@
     "method": "handleUsers",
     "route": "/api/users",
     "condition": "pathname === '/api/users'",
-    "baselineDigest": "b7141f0e6849c29a075250ca1b163bed840a149328edce1db31457fcbc52da81"
+    "baselineDigest": "7287ddf9d20bf1453710f0b80af3c94c2ccdee2a57913604886dae3b93c46d52"
   },
   {
     "group": "musicPlaylist",
@@ -109,7 +109,7 @@
     "method": "postUserVerify",
     "route": "/api/user/verify",
     "condition": "pathname === '/api/user/verify' && req.method === 'POST'",
-    "baselineDigest": "a0353666bd285671a27b3a06daee529bb4b03e9b9dea9aae15479ea17493bf29"
+    "baselineDigest": "c446691ee6d91a6556bdf5d57b40ff2e826edf8e39393a9747b28d372322564b"
   },
   {
     "group": "musicAuthentication",
@@ -117,7 +117,7 @@
     "method": "postUserLogin",
     "route": "/api/user/login",
     "condition": "pathname === '/api/user/login' && req.method === 'POST'",
-    "baselineDigest": "7cc281cf90fc8806d41dd0e4c804c34bc486b48d92f0ef5fe193c359f879fb05"
+    "baselineDigest": "68148f58f936803a79d621fee99ca676e762cabad14c1257a36f00027253f2f8"
   },
   {
     "group": "musicAuthentication",
@@ -125,7 +125,7 @@
     "method": "postUserLogout",
     "route": "/api/user/logout",
     "condition": "pathname === '/api/user/logout' && req.method === 'POST'",
-    "baselineDigest": "725b820e4f0e799618e0d60c8306a18ea3999412c7ff4885a1d7366a0429ba18"
+    "baselineDigest": "b31e9d9726d10af82c1a7f4a180df2217fa4b889a456668098135db902e2f7e7"
   },
   {
     "group": "musicAuthentication",
@@ -133,7 +133,7 @@
     "method": "getUserAuthVerify",
     "route": "/api/user/auth/verify",
     "condition": "pathname === '/api/user/auth/verify' && req.method === 'GET'",
-    "baselineDigest": "c802818c0446c077b40a9f2af16d9bc665a85bbdfdbfe02307647d52f52c0225"
+    "baselineDigest": "0bdfcc1dd69093474b5e20bffe5a4248bc85550d1cfd4afccceda2beba6293b3"
   },
   {
     "group": "musicPlaylist",
@@ -277,7 +277,7 @@
     "method": "postUserSettings",
     "route": "/api/user/settings",
     "condition": "pathname === '/api/user/settings' && req.method === 'POST'",
-    "baselineDigest": "343b717733b3befad7e160901c01c6c17946b6d8143c745e981cb8fb71fa9a3a"
+    "baselineDigest": "2e56b2f9559fb05bc6cc099f27a22ff96ee5a0bcfed9393ec255577eec555802"
   },
   {
     "group": "musicAuthentication",
@@ -325,7 +325,7 @@
     "method": "getUserTokenLogs",
     "route": "/api/user/token/logs",
     "condition": "pathname === '/api/user/token/logs' && req.method === 'GET'",
-    "baselineDigest": "8fd29efb4c728fd94665ed63ac7691000bdfa3e4c4725af5b267fc73df9e7a90"
+    "baselineDigest": "78cbedd6dbf172bfb68320ac0006a187e8d65dc3c43f3a07521d6e3a2a63ea41"
   },
   {
     "group": "musicSettings",
@@ -989,7 +989,7 @@
     "method": "postMusicDislikeAdd",
     "route": "/api/music/dislike/add",
     "condition": "(pathname === '/api/music/dislike/add' || pathname === '/api/music/dislike/remove') && req.method === 'POST'",
-    "baselineDigest": "a23e82e889a92128eb6bbd360770c08bdb625380a54d0e18f5c4921b2407fed3"
+    "baselineDigest": "9bcff86c294cde080e534d12517220ebcf5e4c35126ee60e7cd61e195375a797"
   },
   {
     "group": "adminOperations",

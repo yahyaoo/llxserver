@@ -1,6 +1,7 @@
+import { ADMIN_SESSION_COOKIE, ADMIN_USERNAME, sessionTTL } from '../../application/auth/UserSessionStore'
 import type { RequestContext, ServerRuntime } from '../../common/http/RequestContext'
 /** 管理认证、运行监控、日志、数据重载和文件管理所需的应用依赖契约。 @author yahyaoo */
-export type OperationsServiceRuntime = Pick<ServerRuntime, 'readBody' | 'loginLog' | 'os' | 'wss' | 'getLoadedApisCount' | 'storageFs' | 'path' | 'appUpdates' | 'ElFinderConnector' | 'getSystemRoot' | 'getMime' | 'formidable' | 'status' | 'reloadServerData'>
+export type OperationsServiceRuntime = Pick<ServerRuntime, 'readBody' | 'loginLog' | 'os' | 'wss' | 'getLoadedApisCount' | 'storageFs' | 'path' | 'appUpdates' | 'ElFinderConnector' | 'getSystemRoot' | 'getMime' | 'formidable' | 'status' | 'reloadServerData' | 'generateSessionId' | 'userSessions'>
 /** 管理认证、运行监控、日志、数据重载和文件管理服务。 @author yahyaoo */
 
 /**
@@ -19,8 +20,10 @@ export async function postLogin(context: RequestContext, runtime: OperationsServ
             const { password } = JSON.parse(body)
             if (password === global.lx.config['frontend.password']) {
               loginLog.info(`Admin login success from ${ip}`)
-              res.writeHead(200, { 'Content-Type': 'application/json' })
-              res.end(JSON.stringify({ success: true }))
+              const token = runtime.generateSessionId(), now = Date.now()
+              runtime.userSessions.set(token, { username: ADMIN_USERNAME, createdAt: now, expiresAt: now + sessionTTL(global.lx.config, false), rememberMe: false })
+              res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'Set-Cookie': ADMIN_SESSION_COOKIE + '=' + token + '; HttpOnly; Path=/; SameSite=Strict' + ((req.socket as any).encrypted ? '; Secure' : '') })
+              res.end(JSON.stringify({ success: true, token }))
             } else {
               loginLog.warn(`Admin login failed from ${ip}`)
               res.writeHead(401, { 'Content-Type': 'application/json' })

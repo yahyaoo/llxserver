@@ -326,7 +326,7 @@ async function requestServerLyricCache(song, quality = null, force = false) {
         };
         if (quality) songInfoForCache.quality = quality;
 
-        const enableOnlyDownloadMode = window.settings?.enableOnlyDownloadMode || false;
+        const enableOnlyDownloadMode = false;
 
         const cacheRes = await fetch(cacheUrl, {
             method: 'POST',
@@ -350,252 +350,51 @@ async function requestServerLyricCache(song, quality = null, force = false) {
 // Placeholder for download function
 // Download single song
 // Download single song
-async function downloadSong(songOrId, forceQuality = null, suppressAlerts = false, skipPromptTarget = null) {
-    let song;
-    if (typeof songOrId === 'object') {
-        song = songOrId;
-    } else {
-        if (!currentPlaylist) return false;
-        song = currentPlaylist.find(s => s.id === songOrId);
+/** 验证当前下载位置的权限，沿用服务端公开账号配置。 */
+async function authorizeDownloadTarget(target) {
+    const isPublic = !isUserLoggedIn() || ['default', '_open'].includes(window.currentListData?.username);
+    const flag = target === '服务器下载' ? 'user.enablePublicNonAdminServerCache' : 'user.enablePublicNonAdminBrowserDownload';
+    if (isPublic && window.lx_config?.['user.enablePublicRestriction'] && window.lx_config?.[flag] === false && !localStorage.getItem('lx_admin_password')) {
+        return !!(await window.handleAdminAuth?.('当前下载操作需要验证管理员身份'));
     }
-
-    if (!song) {
-        if (!suppressAlerts) showError('未找到歌曲信息');
-        return false;
-    }
-
-    const isOnlyDownload = window.settings?.enableOnlyDownloadMode === true;
-    const actionLabel = isOnlyDownload ? '下载到服务器' : '缓存到服务器';
-
-    let selected = skipPromptTarget;
-    if (!selected) {
-        // [优化] 检测是否已缓存
-        const prefQuality = window.settings?.preferredQuality || 'flac';
-        const checkResult = await window.checkServerCache?.(song, prefQuality);
-        const cacheSuffix = (checkResult?.exists && !checkResult?.isCollision) ? ' (已缓存)' : '';
-
-        const options = ['浏览器下载', `${actionLabel}${cacheSuffix}`, '服务器下载'];
-        const modeText = isOnlyDownload ? '仅下载模式' : '缓存模式';
-        selected = await showOptions('下载与缓存', `[${modeText}] 选择对 [${song.name}] 的操作：`, options);
-    }
-    if (!selected) return false;
-
-    // 选中操作后的权限拦截校验
-    const isPublic = !isUserLoggedIn() || window.currentListData?.username === 'default' || window.currentListData?.username === '_open';
-    const enablePublicRestriction = window.lx_config?.['user.enablePublicRestriction'];
-    const isAdmin = !!localStorage.getItem('lx_admin_password');
-
-    if (selected === '服务器下载') {
-        const isAllowed = window.lx_config?.['user.enablePublicNonAdminServerCache'] !== false;
-        if (isPublic && enablePublicRestriction && !isAllowed && !isAdmin) {
-            if (!(await window.handleAdminAuth?.('服务器下载需要验证管理员身份'))) return false;
-        }
-        let quality = forceQuality;
-        if (!quality) {
-            const qualities = getSelectableQualityOrder(song);
-            const labels = await buildQualityOptionLabels(song, qualities);
-            const chosen = await showOptions('选择下载音质', `请选择对 [${song.name}] 的下载音质：`, labels);
-            if (!chosen) return false;
-            quality = qualities[labels.indexOf(chosen)];
-        }
-        const mode = await showOptions('歌词写入', '请选择服务器下载的歌词写入方式：', ['使用后台默认方式', '内嵌到音频（默认）', '外部 .lrc 文件']);
-        if (!mode) return false;
-        if (!window.SystemDownloadManager) { showError('下载管理器未就绪'); return false; }
-        await window.SystemDownloadManager.addTasks([{ ...song, isServer: true, serverDownload: true,
-            quality, lyricMode: mode === '使用后台默认方式' ? undefined : (mode === '外部 .lrc 文件' ? 'external' : 'embedded') }]);
-        return true;
-    } else if (selected === '浏览器下载') {
-        const isBrowserDownloadAllowed = window.lx_config?.['user.enablePublicNonAdminBrowserDownload'] !== false;
-        if (isPublic && enablePublicRestriction && !isBrowserDownloadAllowed && !isAdmin) {
-            showError('权限限制：管理员已关闭非管理员浏览器下载功能，下载歌曲需要验证管理员身份。');
-            if (typeof window.handleAdminAuth === 'function') {
-                const authorized = await window.handleAdminAuth('管理员已关闭非管理员浏览器下载功能，下载歌曲需要验证管理员身份');
-                if (!authorized) return false;
-            } else {
-                return false;
-            }
-        }
-
-        if (window.SystemDownloadManager) {
-            const availableQualities = getSelectableQualityOrder(song);
-            const qualityDisplayNames = await buildQualityOptionLabels(song, availableQualities);
-            const selectedQualityDisplay = await showOptions('选择下载音质', `请选择对 [${song.name}] 的下载音质：`, qualityDisplayNames);
-            if (!selectedQualityDisplay) return false;
-
-            const selectedQualityIndex = qualityDisplayNames.indexOf(selectedQualityDisplay);
-            const targetQuality = availableQualities[selectedQualityIndex];
-
-            window.SystemDownloadManager.addTasks([{
-                ...song,
-                quality: targetQuality
-            }]);
-
-            if (!suppressAlerts) showInfo(`已添加任务，您可以在右侧下载管理面板查看进度`);
-            return true;
-        } else {
-            showError('下载管理器未就绪');
-            return false;
-        }
-    } else if (selected && (selected.startsWith('缓存到服务器') || selected.startsWith('下载到服务器'))) {
-        const isServerCacheAllowed = window.lx_config?.['user.enablePublicNonAdminServerCache'] !== false;
-        if (isPublic && enablePublicRestriction && !isServerCacheAllowed && !isAdmin) {
-            showError('权限限制：管理员已关闭非管理员服务器缓存功能，缓存到服务器需要验证管理员。');
-            if (typeof window.handleAdminAuth === 'function') {
-                const authorized = await window.handleAdminAuth('管理员已关闭非管理员服务器缓存功能，缓存到服务器需要验证管理员身份');
-                if (!authorized) return false;
-            } else {
-                return false;
-            }
-        }
-
-        // [优化] 检测是否已缓存
-        const prefQuality = window.settings?.preferredQuality || 'flac';
-        const checkResult = await window.checkServerCache?.(song, prefQuality);
-        const isCached = checkResult?.exists && !checkResult?.isCollision;
-
-        if (!isOnlyDownload && isCached) {
-            showInfo('该歌曲已在服务器缓存');
-            return false;
-        }
-        let targetQuality = forceQuality;
-        if (!targetQuality) {
-            const availableQualities = getSelectableQualityOrder(song);
-            const qualityDisplayNames = await buildQualityOptionLabels(song, availableQualities);
-            const selectedQualityDisplay = await showOptions('选择缓存音质', `请选择对 [${song.name}] 的缓存音质：`, qualityDisplayNames);
-            if (!selectedQualityDisplay) return false;
-
-            const selectedQualityIndex = qualityDisplayNames.indexOf(selectedQualityDisplay);
-            targetQuality = availableQualities[selectedQualityIndex];
-        }
-
-        try {
-            // [Unified] 统一交给下载管理器调度
-            if (window.SystemDownloadManager) {
-                window.SystemDownloadManager.addTasks([{
-                    ...song,
-                    taskId: 'server_' + (song.id || song.songmid),
-                    isServer: true,
-                    quality: targetQuality // Let DM handle best quality resolution
-                }]);
-                if (!suppressAlerts) showInfo(`已添加云端缓存任务`);
-                return true;
-            } else {
-                showError('下载管理器未就绪');
-                return false;
-            }
-        } catch (e) {
-            if (!suppressAlerts) showError('操作失败: ' + e.message);
-            return false;
-        }
-    }
-    return false;
+    return true;
 }
 
-// Batch download function shared by list selection and album downloads.
+/** 使用单层浮层选择下载参数，显式传入目标和音质时兼容后台调用。 */
+async function downloadSong(songOrId, forceQuality = null, suppressAlerts = false, skipPromptTarget = null) {
+    const song = typeof songOrId === 'object' ? songOrId : currentPlaylist?.find(item => item.id === songOrId);
+    if (!song) { if (!suppressAlerts) showError('未找到歌曲信息'); return false; }
+    if ((song.isLocal || song._localLibraryItem) && (song.filename || song._localFilename)) return window.downloadLibraryFile(song);
+    const trigger = window.DownloadOptions.anchor();
+    const qualities = getSelectableQualityOrder(song);
+    const labels = qualities.map(quality => getQualityOptionLabel(song, quality));
+    const choice = skipPromptTarget && forceQuality ? { target: skipPromptTarget, quality: forceQuality }
+        : await window.DownloadOptions.choose({ name: song.name, qualities, labels, quality: forceQuality, target: skipPromptTarget || '浏览器下载', trigger });
+    if (!choice || !await authorizeDownloadTarget(choice.target)) return false;
+    if (!window.SystemDownloadManager) { showError('下载管理器未就绪'); return false; }
+    await window.SystemDownloadManager.addTasks([{ ...song, quality: choice.quality, lyricMode: choice.lyricMode,
+        isServer: choice.target === '服务器下载', serverDownload: choice.target === '服务器下载' }]);
+    if (!suppressAlerts) showInfo('已添加任务，可在下载管理查看进度');
+    return true;
+}
+
+/** 批量下载与单曲使用同一个参数浮层，不再嵌套音质与歌词弹窗。 */
 async function batchDownloadSongs(songsToDownload, batchOptions = {}) {
-    if (!Array.isArray(songsToDownload) || songsToDownload.length === 0) {
-        showError(batchOptions.emptyMessage || '未找到要下载的歌曲');
-        return false;
+    if (!Array.isArray(songsToDownload) || !songsToDownload.length) { showError(batchOptions.emptyMessage || '未找到要下载的歌曲'); return false; }
+    const trigger = window.DownloadOptions.anchor();
+    const qualities = getSelectableQualityOrder();
+    const labels = qualities.map(q => window.QualityManager ? window.QualityManager.getQualityDisplayName(q) : q);
+    const choice = await window.DownloadOptions.choose({ title: '批量下载', name: batchOptions.selectionLabel || '已选择 ' + songsToDownload.length + ' 首歌曲', qualities, labels, trigger });
+    if (!choice || !await authorizeDownloadTarget(choice.target)) return false;
+    if (!window.SystemDownloadManager) { showError('下载管理器未就绪'); return false; }
+    await window.SystemDownloadManager.addTasks(songsToDownload.map(song => ({ ...song, quality: choice.quality, lyricMode: choice.lyricMode,
+        isServer: choice.target === '服务器下载', serverDownload: choice.target === '服务器下载' })));
+    if (batchOptions.clearSelection !== false) {
+        if (typeof exitBatchMode === 'function') exitBatchMode();
+        else if (typeof deselectAll === 'function') deselectAll();
     }
-
-    const clearSelection = batchOptions.clearSelection !== false;
-    const selectionLabel = batchOptions.selectionLabel || `选择了 ${songsToDownload.length} 首歌曲`;
-    const targetOptions = ['浏览器下载', '缓存到服务器'];
-    const modeText = window.settings?.['enableOnlyDownloadMode'] ? '仅下载模式' : '缓存模式';
-    const selected = await showOptions('批量下载与缓存', `[${modeText}] ${selectionLabel}，请选择操作：`, targetOptions);
-
-    if (!selected) return false;
-
-    // 选中操作后的权限拦截校验
-    const isPublic = !isUserLoggedIn() || window.currentListData?.username === 'default' || window.currentListData?.username === '_open';
-    const enablePublicRestriction = window.lx_config?.['user.enablePublicRestriction'];
-    const isAdmin = !!localStorage.getItem('lx_admin_password');
-
-    if (selected === '浏览器下载') {
-        const isBrowserDownloadAllowed = window.lx_config?.['user.enablePublicNonAdminBrowserDownload'] !== false;
-        if (isPublic && enablePublicRestriction && !isBrowserDownloadAllowed && !isAdmin) {
-            showError('权限限制：管理员已关闭非管理员浏览器下载功能，批量下载需要验证管理员身份。');
-            if (typeof window.handleAdminAuth === 'function') {
-                const authorized = await window.handleAdminAuth('管理员已关闭非管理员浏览器下载功能，批量下载需要验证管理员身份');
-                if (!authorized) return false;
-            } else {
-                return false;
-            }
-        }
-
-        if (window.SystemDownloadManager) {
-            // 使用全局音质优先级展示可选音质
-            const availableQualities = getSelectableQualityOrder();
-            const qualityDisplayNames = availableQualities.map(q => window.QualityManager ? window.QualityManager.getQualityDisplayName(q) : q);
-            const selectedQualityDisplay = await showOptions('选择下载音质', `请选择批量下载的音质：\n将优先请求所选音质，解析失败时按自动降级设置处理`, qualityDisplayNames);
-
-            if (!selectedQualityDisplay) return false;
-            const selectedQualityIndex = qualityDisplayNames.indexOf(selectedQualityDisplay);
-            const targetQuality = availableQualities[selectedQualityIndex];
-
-            const tasks = songsToDownload.map(s => ({
-                ...s,
-                quality: targetQuality
-            }));
-
-            await window.SystemDownloadManager.addTasks(tasks);
-
-            showInfo(`已将 ${songsToDownload.length} 项任务添加到下载列表，您可以前往右侧下载管理面板查看进度`);
-            if (clearSelection) {
-                if (typeof exitBatchMode === 'function') exitBatchMode();
-                else if (typeof deselectAll === 'function') deselectAll();
-            }
-            return true;
-        } else {
-            showError('下载管理器未就绪');
-            return false;
-        }
-    } else if (selected === '缓存到服务器') {
-        const isServerCacheAllowed = window.lx_config?.['user.enablePublicNonAdminServerCache'] !== false;
-        if (isPublic && enablePublicRestriction && !isServerCacheAllowed && !isAdmin) {
-            showError('权限限制：管理员已关闭非管理员服务器缓存功能，批量缓存需要验证管理员身份。');
-            if (typeof window.handleAdminAuth === 'function') {
-                const authorized = await window.handleAdminAuth('管理员已关闭非管理员服务器缓存功能，批量缓存需要验证管理员身份');
-                if (!authorized) return false;
-            } else {
-                return false;
-            }
-        }
-
-        // 使用全局音质优先级展示可选音质
-        const availableQualities = getSelectableQualityOrder();
-        const qualityDisplayNames = availableQualities.map(q => window.QualityManager ? window.QualityManager.getQualityDisplayName(q) : q);
-        const selectedQualityDisplay = await showOptions('选择全局缓存音质', `请选择批量请求服务器缓存的音质，下载歌曲的音质将取不超过该音质的最大音质`, qualityDisplayNames);
-
-        if (!selectedQualityDisplay) return false;
-        const selectedQualityIndex = qualityDisplayNames.indexOf(selectedQualityDisplay);
-        const targetQuality = availableQualities[selectedQualityIndex];
-
-        if (!window.SystemDownloadManager) {
-            showError('下载管理器未就绪');
-            return false;
-        }
-
-        // 1. 直接将歌曲注册到下载管理器，由其内部调度器控制并发
-        const tasks = songsToDownload.map(s => {
-            return {
-                ...s,
-                taskId: 'server_' + (s.id || s.songmid),
-                isServer: true,
-                quality: targetQuality // 调度器启动时会重新计算最佳音质
-            };
-        });
-        await window.SystemDownloadManager.addTasks(tasks);
-
-        if (clearSelection) {
-            if (typeof exitBatchMode === 'function') exitBatchMode();
-            else if (typeof deselectAll === 'function') deselectAll();
-        }
-        showInfo(`已将 ${songsToDownload.length} 首歌曲加入缓存队列`);
-        return true;
-    }
-
-    return false;
+    showInfo('已将 ' + songsToDownload.length + ' 项任务添加到下载管理');
+    return true;
 }
 
 async function batchDownloadFromList() {

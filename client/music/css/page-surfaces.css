@@ -35,33 +35,6 @@
     border-radius: 0;
 }
 
-/* 播放详情直接使用应用背景；隐藏后方页面，避免透明层叠露出列表。 */
-body.player-detail-open .music-shell { visibility: hidden; }
-:root #view-player-detail {
-    --text-main: inherit;
-    --text-muted: inherit;
-    --text-dim: inherit;
-    --bg-panel: inherit;
-    --bg-item-hover: inherit;
-    --border-main: inherit;
-    --border-dim: inherit;
-    background: transparent !important;
-    backdrop-filter: none !important;
-    box-shadow: none !important;
-}
-#view-player-detail .player-detail-background { background: transparent; }
-#view-player-detail .player-detail-background::before,
-#view-player-detail .player-detail-background::after,
-#view-player-detail #player-artist-background { display: none; }
-#view-player-detail :is(.player-detail-toolbar button, .player-transport .player-icon-button, #play-mode-btn, #btn-play, .lyric-line) {
-    color: var(--text-main);
-}
-#view-player-detail :is(#player-more-menu, #play-mode-menu, #playback-rate-menu, .player-volume-popover) {
-    background: var(--bg-panel);
-}
-#view-player-detail #progress-container { background: var(--bg-item-hover); }
-#view-player-detail :is(#progress-bar, .player-progress-thumb) { background: var(--text-main); }
-
 /* 内容区域使用轻量上下分隔线，不围四边框。 */
 :root { --content-divider: color-mix(in srgb, var(--text-main) 10%, transparent); }
 :root .music-shell :is(#view-search, #view-songlist, #songlist-detail-view, #view-leaderboard, #view-localmusic, #view-settings, #view-recent)

@@ -48,7 +48,8 @@ window.DislikeManager = (function () {
         /(?:[\s\-–—_]*[（(](?:live|remix|现场|伴奏|纯音乐|demo|翻唱|acoustic|instrumental|off\s*vocal|版)[^）)]*[）)]|[\s]*[-–—]\s*(?:live|remix|现场|伴奏|纯音乐|demo|翻唱|acoustic|instrumental|off\s*vocal))\s*$/i;
     const normalizeSongName = (v) => normalize(v).replace(VERSION_SUFFIX_RE, '').trim();
 
-    const getAlbumName = (song) => song?.albumName ?? song?.meta?.albumName ?? song?.album ?? '';
+    const getAlbumName = (song) => song?.albumName ?? song?.meta?.albumName ??
+        (typeof song?.album === 'string' ? song.album : song?.album?.name) ?? '';
 
     async function request(url, payload) {
         if (typeof ensureUserAuthToken === 'function') {
@@ -100,18 +101,20 @@ window.DislikeManager = (function () {
 
     /** 拉取规则（已加载过则直接返回，force=true 强制刷新） */
     async function load(force) {
+        if (state.loading) return state.loading;
         if (state.initialized && !force) return state;
-        if (state.loading) return state;
-        state.loading = true;
-        try {
-            const r = await request(API_BASE);
-            if (r && r.success) applyData(r.data, r.options);
-        } catch (e) {
-            console.error('[Dislike] load failed:', e);
-        } finally {
-            state.loading = false;
-        }
-        return state;
+        state.loading = (async () => {
+            try {
+                const r = await request(API_BASE);
+                if (r && r.success) applyData(r.data, r.options);
+            } catch (e) {
+                console.error('[Dislike] load failed:', e);
+            } finally {
+                state.loading = false;
+            }
+            return state;
+        })();
+        return state.loading;
     }
 
     /** 判定一首歌是否命中不喜欢规则 */
@@ -133,21 +136,12 @@ window.DislikeManager = (function () {
             const an = normalize(albumName);
             for (const alb of state.albums) {
                 if (normalize(alb.albumName ?? '') !== an) continue;
-                if (alb.singers && alb.singers.length) {
-                    if (!singers.length) {
-                        // 歌曲没有歌手信息：requireSinger 时无法确认，保守放过
-                        if (state.requireSinger) continue;
-                    } else {
-                        const albumSingers = alb.singers.map((s) =>
-                            state.normalizeName ? normalizeSongName(s) : normalize(s)
-                        );
-                        const hit = singers.some((x) =>
-                            albumSingers.some((a) => x === a || x.includes(a) || a.includes(x))
-                        );
-                        if (!hit) continue;
-                    }
-                }
-                return true;
+                const albumSingers = (alb.singers || []).map(normalize);
+                if (!singers.length || !albumSingers.length) continue;
+                const hit = state.duetMode === 'all'
+                    ? singers.every(s => albumSingers.includes(s))
+                    : singers.some(s => albumSingers.includes(s));
+                if (hit) return true;
             }
         }
 
@@ -189,7 +183,7 @@ window.DislikeManager = (function () {
     }
 
     const addSong = (song) => mutate('add', { ...song, type: 'song' });
-    const removeSong = (song) => mutate('remove', { ...song, type: 'song' });
+    const removeSong = (song) => mutate('remove', { ...song, albumName: getAlbumName(song), type: 'song', removeMatched: true });
     const addSinger = (singer) => mutate('add', { type: 'singer', singer: singer || '' });
     const removeSinger = (singer) => mutate('remove', { type: 'singer', singer: singer || '' });
     const addAlbum = (song) =>
@@ -198,12 +192,20 @@ window.DislikeManager = (function () {
         mutate('remove', { type: 'album', albumName: getAlbumName(song), singer: song?.singer || '' });
 
     /** 切换某首歌的不喜欢状态，返回切换后的最终不喜欢状态布尔值 */
-    async function toggleSong(song) {
-        await load();
-        const willDislike = !isDisliked(song);
-        const success = willDislike ? await addSong(song) : await removeSong(song);
-        if (!success) throw new Error('操作未成功完成');
-        return willDislike;
+    let mutationQueue = Promise.resolve();
+    function toggleSong(song) {
+        const operation = mutationQueue.then(async () => {
+            await load();
+            if (!state.initialized) throw new Error('无法加载不喜欢规则，请稍后重试');
+            const willDislike = !isDisliked(song);
+            const success = willDislike ? await addSong(song) : await removeSong(song);
+            if (!success) throw new Error('操作未成功完成');
+            const finalState = isDisliked(song);
+            if (finalState !== willDislike) throw new Error('不喜欢规则未成功更新，请刷新后重试');
+            return finalState;
+        });
+        mutationQueue = operation.catch(() => {});
+        return operation;
     }
 
     return {

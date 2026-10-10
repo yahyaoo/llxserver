@@ -8,6 +8,20 @@
             this.lookupCache = new Map();
         }
 
+        /** 保留旧背景值，新旧配置均能安全应用；未知模式沿用透明页面外观。 */
+        static normalizeMode(mode) {
+            return ['theme', 'artist', 'blur', 'solid', 'dark'].includes(mode) ? mode : 'theme';
+        }
+
+        /** 清除头像并使在途请求失效，防止切换背景模式后旧图片重新出现。 */
+        clear() {
+            ++this.revision;
+            this.key = null;
+            this.image.hidden = true;
+            this.image.onload = this.image.onerror = null;
+            this.image.removeAttribute('src');
+        }
+
         /** 仅接受图片地址；歌曲封面不作为歌手头像的替代。 */
         static avatarUrl(song) {
             const candidates = [song?.artistAvatar, song?.artistImageUrl, song?.singerAvatar, song?.artist?.avatar,

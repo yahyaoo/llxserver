@@ -1,3 +1,7 @@
+import { ApiTokenStore } from '../auth/ApiTokenStore'
+import { handleAccount } from '../../music/service/AccountService'
+import { UserSessionStore, USER_SESSION_COOKIE, ADMIN_SESSION_COOKIE, ADMIN_USERNAME } from '../auth/UserSessionStore'
+import { proxyRemoteRequest } from '../auth/RemoteSessionGateway'
 import { clientFileExists, clientMetadata, externalClient } from './ClientAssets'
 import { DatabaseLocationService } from '../persistence/DatabaseLocationService'
 import { reloadActiveUserSpaces } from '../../user'
@@ -9,6 +13,9 @@ import { BrowserStorageRepository } from '../../music/repository/BrowserStorageR
 /** 服务装配与 HTTP 路由：初始化依赖、同步 WebSocket、播放器鉴权和媒体响应。 @author yahyaoo */
 import * as adminOperationsController from '../../admin/controller/OperationsController'
 import { importConfiguration } from '../../music/controller/ConfigurationImportController'
+import { importPlaylists } from '../../music/controller/PlaylistImportController'
+import { songFileStatus } from '../../music/controller/SongFileStatusController'
+import { songFileStatusService } from '../../music/service/library/SongFileStatusSources'
 import { MusicConfigurationRepository } from '../../music/repository/MusicConfigurationRepository'
 import { LxConfigurationImportService } from '../../music/service/configuration/LxConfigurationImportService'
 import { repositories } from '../persistence/storage'
@@ -304,165 +311,22 @@ interface UserTokenConfig {
 }
 
 /** 用户 Token 存储：token → { username, createdAt } */
-const userSessions = new Map<string, { /** 用户名称，用于隔离用户数据。 */
-username: string; /** 记录创建时间，单位毫秒。 */
-createdAt: number }>()
-const USER_SESSION_TTL = 7 * 24 * 60 * 60 * 1000 // 7天
+const userSessions = new UserSessionStore()
 
-/** 持久化 Token 快速查找缓存：token → username */
-const persistentTokens = new Map<string, string>()
+const apiTokenStore = new ApiTokenStore(getUserDirname)
+const getUserTokenConfig = (username: string): UserTokenConfig => apiTokenStore.get(username)
+const saveUserTokenConfig = (username: string, config: UserTokenConfig) => apiTokenStore.save(username, config)
 
-/** 持久化 Token 元数据缓存：token → token 对象（含 disabled/expiresAt/lastUsed）*/
-const persistentTokenMeta = new Map<string, { /** 条目名称。 */
-name: string; /** 认证令牌。 */
-token: string;
-disabled?: boolean;
-expiresAt?: number;
-lastUsed?: number }>()
-
-/** lastUsed 防抖写盘队列：username → debounce timer */
-const persistentTokenSaveQueue = new Map<string, ReturnType<typeof setTimeout>>()
-
-/** 触发防抖写盘，10s 内的高频更新只写一次 */
-const scheduleSaveTokenConfig = (username: string) => {
-  if (persistentTokenSaveQueue.has(username)) clearTimeout(persistentTokenSaveQueue.get(username)!)
-  const timer = setTimeout(() => {
-    persistentTokenSaveQueue.delete(username)
-    // 从内存重建完整 config 并写盘
-    const tokens: any[] = []
-    for (const [, meta] of persistentTokenMeta) {
-      if (persistentTokens.get(meta.token) === username) {
-        tokens.push({ ...meta })
-      }
-    }
-    // 同时保留已过期/禁用的 token（从文件读取合并）
-    const existing = getUserTokenConfig(username)
-    const existingNonActive = existing.tokens.filter(t => !persistentTokenMeta.has(t.token))
-    const merged = [...existingNonActive, ...tokens]
-    const config = { ...existing, tokens: merged }
-    const userDirname = getUserDirname(username)
-    const userPath = path.join(global.lx.userPath, userDirname)
-    const tokenPath = path.join(userPath, File.userTokensJSON)
-    if (!storageFs.existsSync(userPath)) storageFs.mkdirSync(userPath, { recursive: true })
-    storageFs.writeFile(tokenPath, JSON.stringify(config, null, 2), 'utf8', (err) => {
-      if (err) console.error('[凭证管理] 写盘失败:', err)
-    })
-  }, 10_000)
-  persistentTokenSaveQueue.set(username, timer)
-}
-
-const getUserTokenConfig = (username: string): UserTokenConfig => {
-  const userDirname = getUserDirname(username)
-  const userPath = path.join(global.lx.userPath, userDirname)
-  const tokenPath = path.join(userPath, File.userTokensJSON)
-
-  if (storageFs.existsSync(tokenPath)) {
-    try {
-      return JSON.parse(storageFs.readFileSync(tokenPath, 'utf8'))
-    } catch (e) {
-      return { enabled: false, tokens: [] }
-    }
-  }
-  return { enabled: false, tokens: [] }
-}
-
-const saveUserTokenConfig = (username: string, config: UserTokenConfig) => {
-  const userDirname = getUserDirname(username)
-  const userPath = path.join(global.lx.userPath, userDirname)
-  const tokenPath = path.join(userPath, File.userTokensJSON)
-  if (!storageFs.existsSync(userPath)) storageFs.mkdirSync(userPath, { recursive: true })
-  storageFs.writeFileSync(tokenPath, JSON.stringify(config, null, 2), 'utf8')
-
-  // 更新内存缓存（清理该用户旧条目）
-  for (const [tk, name] of persistentTokens.entries()) {
-    if (name === username) {
-      persistentTokens.delete(tk)
-      persistentTokenMeta.delete(tk)
-    }
-  }
-  // 写入新的有效 token
-  if (config.enabled) {
-    for (const t of config.tokens) {
-      if (!t.expiresAt || t.expiresAt > Date.now()) {
-        persistentTokens.set(t.token, username)
-        persistentTokenMeta.set(t.token, {
-          name: t.name,
-          token: t.token,
-          disabled: t.disabled ?? false,
-          expiresAt: t.expiresAt ?? undefined,
-          lastUsed: t.lastUsed,
-        })
-      }
-    }
-  }
-}
-
-// 初始化加载所有用户的持久化 Token
-setTimeout(() => {
-  if (global.lx.config && global.lx.config.users) {
-    global.lx.config.users.forEach((u: any) => saveUserTokenConfig(u.name, getUserTokenConfig(u.name)))
-  }
-}, 5000)
-
-/**
- * 验证请求中的用户 Token（x-user-token header）。
- * 1. 优先验证内存 Session Token（网页登陆产生）
- * 2. 其次验证持久化 API Token（管理面板产生，需开启账户 Token 功能）
- * 返回已验证的用户名，或 null 表示未认证。
- */
+/** 会话 Cookie、请求头以及标准 Bearer Token 统一认证。 */
 export const verifyUserAuth = (req: IncomingMessage): string | null => {
-  const token = req.headers['x-user-token'] as string
-  if (token) {
-    // 1. Session Token 验证
-    const session = userSessions.get(token)
-    if (session && Date.now() - session.createdAt <= USER_SESSION_TTL) {
-      return session.username
-    }
-
-    // 2. 持久化 API Token 验证（全程走内存，不读磁盘）
-    const persistentUsername = persistentTokens.get(token)
-    if (persistentUsername) {
-      const meta = persistentTokenMeta.get(token)
-      if (meta) {
-        // 检查是否被禁用
-        if (meta.disabled) {
-          tokenLog.warn(`User ${persistentUsername} attempted to use DISABLED token: ${meta.name}`)
-          return null
-        }
-        // 检查有效期
-        if (!meta.expiresAt || meta.expiresAt > Date.now()) {
-          // 仅更新内存中的 lastUsed，通过防抖延迟批量写盘
-          meta.lastUsed = Date.now()
-          scheduleSaveTokenConfig(persistentUsername)
-
-          // 记录 Token 日志
-          const ip = getIP(req)
-          const masked = `${meta.token.slice(0, 6)}...${meta.token.slice(-4)}`
-          tokenLog.info(`API Token [${meta.name}] (${masked}) used by ${persistentUsername} from ${ip} to access ${req.url}`)
-
-          return persistentUsername
-        } else {
-          // 已过期，从内存缓存移除
-          persistentTokens.delete(token)
-          persistentTokenMeta.delete(token)
-        }
-      }
-    }
-
-    return null // Token 存在但无效/过期
-  }
-
-  // 后端所有用户名密码明文校验逻辑
-  /*
-  const username = req.headers['x-user-name'] as string
-  const password = req.headers['x-user-password'] as string
-  if (username && password) {
-    const user = global.lx.config.users.find((u: any) => u.name === username && u.password === password)
-    if (user) return username
-  }
-  */
-
-  return null
+  const bearer = /^Bearer (.+)$/i.exec(req.headers.authorization || '')?.[1]
+  const token = (req.headers['x-user-token'] as string) || bearer || parseCookies(req.headers.cookie)[USER_SESSION_COOKIE]
+  if (!token) return null
+  const session = userSessions.get(token)
+  if (session && session.username !== ADMIN_USERNAME) return session.username
+  const username = apiTokenStore.verify(token)
+  if (username) tokenLog.info('API Token (' + token.slice(0, 6) + '...' + token.slice(-4) + ') used by ' + username + ' from ' + getIP(req) + ' to access ' + (req.url || '').split('?')[0])
+  return username
 }
 
 const getCacheRequestUsername = (req: IncomingMessage): string | null => {
@@ -471,21 +335,7 @@ const getCacheRequestUsername = (req: IncomingMessage): string | null => {
   return verifyUserAuth(req)
 }
 
-/** 定期清理过期用户 Token（每小时） */
-setInterval(() => {
-  const now = Date.now()
-  // 清理内存 Session
-  for (const [token, session] of userSessions) {
-    if (now - session.createdAt > USER_SESSION_TTL) userSessions.delete(token)
-  }
-  // 清理加载到内存的过期 API Token（直接走内存 meta，不读磁盘）
-  for (const [token, meta] of persistentTokenMeta) {
-    if (meta.expiresAt && meta.expiresAt <= now) {
-      persistentTokens.delete(token)
-      persistentTokenMeta.delete(token)
-    }
-  }
-}, 60 * 60 * 1000)
+setInterval(() => userSessions.prune(), 60 * 60 * 1000)
 // ===== End User Session Token Store =====
 
 
@@ -720,6 +570,8 @@ const saveUsers = () => {
     storageFs.writeFileSync(usersJsonPath, JSON.stringify(global.lx.config.users.map(u => ({
       name: u.name,
       password: u.password,
+      nickname: u.nickname,
+      avatarVersion: u.avatarVersion,
       maxSnapshotNum: u.maxSnapshotNum,
       'list.addMusicLocationType': u['list.addMusicLocationType'],
       enableCustomMusicDir: u.enableCustomMusicDir,
@@ -1284,6 +1136,50 @@ const handleStartServer = async (port = 9527, ip = '0.0.0.0') => await new Promi
     const urlObj = new URL(req.url ?? '', `http://${req.headers.host}`)
     const pathname = urlObj.pathname
 
+    // 远程账号通过当前入口访问远端接口，Cookie 与管理员凭据不转发。
+    // 已有播放器音频链接携带会话令牌，沿用其访问方式。
+    const mediaToken = urlObj.searchParams.get('token')
+    if (mediaToken && !req.headers['x-user-token'] && !parseCookies(req.headers.cookie)[USER_SESSION_COOKIE] && /^\/api\/music\/(cache|custom|server-download)\//.test(pathname)) req.headers['x-user-token'] = mediaToken
+    const accountToken = (req.headers['x-user-token'] as string) || /^Bearer (.+)$/i.exec(req.headers.authorization || '')?.[1] || parseCookies(req.headers.cookie)[USER_SESSION_COOKIE]
+    const accountSession = accountToken ? userSessions.get(accountToken) : undefined
+    const accountApi = pathname.startsWith('/api/')
+    const authEntry = req.method === 'POST' && ['/api/login', '/api/user/login', '/api/user/verify'].includes(pathname)
+    if (accountSession?.remoteUrl && pathname === '/api/user/auth/verify') {
+      try {
+        const response = await fetch(accountSession.remoteUrl + '/api/user/auth/verify', { headers: { 'x-user-token': accountSession.remoteToken || '' }, signal: AbortSignal.timeout(10000), redirect: 'error' })
+        const result = await response.json() as any
+        if (!response.ok || !result.valid) { userSessions.delete(accountToken); res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ valid: false })); return }
+        res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' })
+        res.end(JSON.stringify({ ...result, username: accountSession.username, token: accountToken, rememberMe: accountSession.rememberMe, expiresAt: Math.min(accountSession.expiresAt, result.expiresAt || Infinity) }))
+      } catch { res.writeHead(502, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ valid: false, message: '无法连接远程服务器' })) }
+      return
+    }
+    if (accountSession?.remoteUrl && accountApi && pathname !== '/api/user/login' && pathname !== '/api/user/logout') {
+      if (req.headers['x-lx-remote-hop']) { res.writeHead(409); res.end('远程服务器不能循环连接'); return }
+      await proxyRemoteRequest(req, res, accountSession)
+      return
+    }
+    const adminToken = parseCookies(req.headers.cookie)[ADMIN_SESSION_COOKIE] || (req.headers['x-admin-token'] as string)
+    const adminSession = adminToken ? userSessions.get(adminToken) : undefined
+    const adminAuthenticated = adminSession?.username === ADMIN_USERNAME
+    if (adminAuthenticated) req.headers['x-frontend-auth'] = global.lx.config['frontend.password']
+    if (accountApi && !authEntry && !verifyUserAuth(req) && !adminAuthenticated) {
+      res.writeHead(401, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' })
+      res.end(JSON.stringify({ success: false, message: '请登录后访问系统' }))
+      return
+    }
+
+    if (pathname === '/api/admin/logout' && req.method === 'POST') {
+      if (adminToken) userSessions.delete(adminToken)
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Set-Cookie': ADMIN_SESSION_COOKIE + '=; HttpOnly; Path=/; SameSite=Strict; Max-Age=0' })
+      res.end(JSON.stringify({ success: true }))
+      return
+    }
+    if (pathname === '/api/user/account' || pathname.startsWith('/api/user/account/')) {
+      await handleAccount({ req, res, pathname, urlObj, ip }, serverRuntime)
+      return
+    }
+
     // 读取路径配置（每次请求都重新读取，保存后立刻生效）
     const normalizePath = (p: string) => (p || '').replace(/\/+$/, '')
     const playerPath = global.lx.config['player.path'] ?? '/'
@@ -1349,8 +1245,8 @@ const handleStartServer = async (port = 9527, ip = '0.0.0.0') => await new Promi
         isLegacyPlayerAsset
 
       // 认证检查
-      if (!isLoginPage && !isPublicAsset && global.lx.config['player.enableAuth']) {
-        if (!checkPlayerAuth(req)) {
+      if (!isLoginPage && !isPublicAsset) {
+        if (!verifyUserAuth(req)) {
           res.writeHead(302, { 'Location': `${normalizedPrefix}/login` })
           res.end()
           return
@@ -1489,6 +1385,9 @@ const handleStartServer = async (port = 9527, ip = '0.0.0.0') => await new Promi
       }
 
       if (clientFileExists(generalFilePath)) {
+        if (path.resolve(generalFilePath) === path.resolve(global.lx.staticPath, 'music/index.html') && !verifyUserAuth(req)) {
+          res.writeHead(302, { Location: (playerPath === '/' ? '' : playerPath.replace(/\/+$/, '')) + '/login' }); res.end(); return
+        }
         serveStatic(req, res, generalFilePath)
         return
       }
@@ -1503,11 +1402,23 @@ const handleStartServer = async (port = 9527, ip = '0.0.0.0') => await new Promi
 
 
     if (pathname.startsWith('/api/')) {
+      if (pathname === '/api/music/file-status' && req.method === 'POST') {
+        await songFileStatus({ req, res, pathname, urlObj, ip }, serverRuntime, songFileStatusService)
+        return
+      }
       if (pathname === '/api/music/storage/list') {
         await browserList(req, res, {
           verifyUser: verifyUserAuth,
           userDirectory: username => path.join(global.lx.userPath, getUserDirname(username)),
           service: new BrowserStorageService(new BrowserStorageRepository(repositories().music)),
+        })
+        return
+      }
+      if (pathname === '/api/music/playlists/import' && req.method === 'POST') {
+        await importPlaylists(req, res, urlObj.searchParams.get('user'), {
+          verifyUser: verifyUserAuth,
+          userSpace: getUserSpace,
+          service: new LxConfigurationImportService(new MusicConfigurationRepository(repositories().music)),
         })
         return
       }
@@ -2956,12 +2867,15 @@ const startSubsonicStandaloneServer = () => {
 // }
 
 /**
- * 初始化音乐 SDK、音源、缓存与下载解析器，启动 HTTP 和可选 Subsonic 监听，再启动任务调度。
+ * 初始化公共账号默认数据、音乐 SDK、音源、缓存与下载解析器，再启动监听和任务调度。
  * @param port HTTP 监听端口。
  * @param ip 服务绑定地址。
- * @author yahyaoo
+ * @author jingyh
  */
 export const startServer = async (port: number, ip: string) => {
+  // 监听前持久化公共账号默认文档；数据库故障时不启动未初始化的服务。 @author jingyh
+  const openUserSpace = getUserSpace('_open')
+  await openUserSpace.listManage.listDataManage.initPromise
   // Initialize file cache settings from global config
   if (global.lx.config) {
     if (global.lx.config.serverCacheLocation) fileCache.setCacheLocation(global.lx.config.serverCacheLocation)
@@ -3037,7 +2951,6 @@ export const startServer = async (port: number, ip: string) => {
   // [Fix] 服务启动时从 _open 用户 settings.json 读取 serverCacheLocation 并预初始化 fileCache，
   // 避免前端初始化同步时因服务端内存状态（默认 'root'）与持久化设置不一致而触发权限检查返回 403
   try {
-    const openUserSpace = getUserSpace('_open')
     const settingsPath = path.join(openUserSpace.dataManage.userDir, File.userSettingsJSON)
     if (storageFs.existsSync(settingsPath)) {
       const savedSettings = JSON.parse(storageFs.readFileSync(settingsPath, 'utf8'))

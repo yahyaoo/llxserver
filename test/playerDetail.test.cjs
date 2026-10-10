@@ -27,6 +27,7 @@ function environment() {
     get firstElementChild() { return this.children.find(node => node.tagName !== '#comment') || null; }
     get isConnected() { return this === body || !!this.parent?.isConnected; }
     setAttribute(key, value) { this.attributes[key] = value; }
+    getAttribute(key) { return this.attributes[key] ?? null; }
     removeAttribute(key) { delete this.attributes[key]; if (key === 'src') this.src = ''; }
     addEventListener(key, handler) { (this.events[key] ||= []).push(handler); }
     insertBefore(node, before) { node.remove(); const index = before ? this.children.indexOf(before) : this.children.length; assert.ok(index >= 0); this.children.splice(index, 0, node); node.parent = this; }
@@ -109,6 +110,30 @@ test('进入播放页复用唯一控件，按钮顺序正确，退出恢复原�
   assert.deepEqual(window.currentPlayingSong, track);
   env.open(); env.close();
   assert.equal(page.moves.length, 0);
+});
+
+test('背景模式保留旧值并支持页面与歌手模式；无效值安全回退，切换不修改歌曲', () => {
+  const env = environment(), { page, window, nodes } = env;
+  const original = { ...window.currentPlayingSong };
+  env.open();
+  for (const mode of ['theme', 'artist', 'blur', 'solid', 'dark', 'unknown']) {
+    page.applyBackground(mode);
+    assert.equal(nodes.get('view-player-detail').getAttribute('data-player-background'), mode === 'unknown' ? 'theme' : mode);
+    assert.deepEqual(window.currentPlayingSong, original);
+  }
+  window.settings.playerBackground = 'dark'; env.close(); env.open();
+  assert.equal(nodes.get('view-player-detail').getAttribute('data-player-background'), 'dark');
+});
+
+test('退出歌手背景后，迟到的头像请求和旧图片回调不能重新显示背景', async () => {
+  const env = environment(), Background = env.window.PlayerBackground;
+  const image = env.nodes.get('player-artist-background'), background = new Background(image);
+  let resolve;
+  env.window.LibraryArtwork = { attach: (probe, url) => new Promise(done => { resolve = () => { probe.src = url; done(); }; }) };
+  const pending = background.update({ artistAvatar: 'https://example.test/artist.jpg' });
+  background.clear(); resolve(); await pending;
+  assert.equal(image.hidden, true); assert.equal(image.src, '');
+  assert.equal(image.onload, null); assert.equal(image.onerror, null);
 });
 
 test('竖向音量只换算坐标并调用原入口；退出后不拦截横向点击', () => {
@@ -236,6 +261,46 @@ test('底部频谱沿画布底边绘制，全宽覆盖且空数据安全', () =>
   assert.equal(bars.length, 120); assert.equal(bars[0][0], 0); assert.equal(bars.at(-1)[0], 952);
   assert.ok(bars.every(([, y, , height]) => y + height === 120));
   spectrum.draw([], ctx); assert.equal(bars.length, 120);
+});
+
+test('底部频谱遵循方块与连体设置，连体柱宽连续覆盖画布', () => {
+  const env = environment(), Spectrum = env.window.PlayerDetailSpectrum;
+  const widths = gap => {
+    const bars = [], ctx = { canvas: { width: 960, height: 120 }, fillRect: (...args) => bars.push(args) };
+    new Spectrum({ fillColor: '#ec4899', gap }).draw(new Uint8Array(256).fill(255), ctx);
+    return bars.map(bar => bar[2]);
+  };
+  assert.ok(widths(2).every(width => width === 6));
+  assert.ok(widths(0).every(width => width === 8));
+});
+
+test('详情频谱真实调度按选项使用不同绘制器，开关与透明度即时生效', () => {
+  const env = environment(), animations = [];
+  const canvas = { style: {}, getBoundingClientRect: () => ({ width: 960, height: 120 }) };
+  const view = { dataset: {} };
+  class Turntable { constructor(options) { this.options = options; } }
+  class Glob extends Turntable {} class Flower extends Turntable {}
+  class Wave {
+    constructor() { this.animations = { Turntable, Glob, Flower }; }
+    clearAnimations() { animations.length = 0; }
+    addAnimation(animation) { animations.push(animation); }
+  }
+  const audio = { addEventListener() {} };
+  const document = { documentElement: {}, getElementById: id => ({ 'audio-player': audio, 'detail-visualizer': canvas, 'view-player-detail': view })[id] };
+  const window = { Wave, AudioContext: class {}, soundEffects: { getAnalyser: () => ({}) }, devicePixelRatio: 1,
+    PlayerDetailSpectrum: env.window.PlayerDetailSpectrum, settings: { showDetailVisualizer: true, visualizerOpacity: 0.4 }, addEventListener() {} };
+  const context = vm.createContext({ window, document, Wave, console: { log() {}, error() {} }, getComputedStyle: () => ({ getPropertyValue: () => '#ec4899' }) });
+  vm.runInContext(read('client/music/js/visualizer.js'), context);
+  window.musicVisualizer.init();
+  for (const [style, Type] of [['spectrum', window.PlayerDetailSpectrum], ['pulse', Turntable], ['dots', Glob], ['flower', Flower]]) {
+    window.settings.detailVisualizerStyle = style; window.musicVisualizer.applySettings();
+    assert.equal(animations.length, 1); assert.ok(animations[0] instanceof Type);
+    assert.equal(view.dataset.playerVisualizer, style); assert.equal(canvas.style.opacity, 0.4);
+  }
+  window.settings.visualizerGlobalStyle = 'connected'; window.settings.detailVisualizerStyle = 'pulse'; window.musicVisualizer.applySettings();
+  assert.equal(animations[0].options.gap, 0);
+  window.settings.showDetailVisualizer = false; window.musicVisualizer.applySettings();
+  assert.equal(animations.length, 0); assert.equal(canvas.style.opacity, '0');
 });
 
 test('页面模板独立加载，控件 ID 唯一，中文文档与内联入口可解析', () => {

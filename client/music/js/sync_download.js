@@ -23,7 +23,7 @@
     if (typeof window.getUserAuthHeaders === 'function') {
       Object.assign(h, window.getUserAuthHeaders())
     }
-    const token = localStorage.getItem('lx_user_token') || sessionStorage.getItem('lx_user_token') || ''
+    const token = (window.AccountSession ? window.AccountSession.getToken() : localStorage.getItem('lx_user_token')) || sessionStorage.getItem('lx_user_token') || ''
     if (token && !h['x-user-token']) h['x-user-token'] = token
     const user = localStorage.getItem('lx_sync_user') || ''
     if (user && user !== '_open' && !h['x-user-name']) h['x-user-name'] = user

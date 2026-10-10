@@ -63,6 +63,8 @@ const config: LX.Config = {
   'snapshot.backupPath': '',
 
   // Web播放器配置
+  'auth.sessionDays': 1, // 普通登录有效期，单位天
+  'auth.rememberMeDays': 30, // 记住我有效期，单位天
   'player.enableAuth': false,
   'player.password': '123456',
 

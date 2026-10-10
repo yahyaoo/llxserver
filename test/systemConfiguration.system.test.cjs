@@ -31,7 +31,7 @@ test('系统配置：显式导入、独立迁库、失败保留、SQLite备份�
     child.stdout.on('data', chunk => { logs += chunk }); child.stderr.on('data', chunk => { logs += chunk })
     for (let i = 0; i < 150; i++) {
       if (child.exitCode !== null) throw new Error('启动失败：' + logs.slice(-3000))
-      try { if ((await fetch(origin + '/api/config', { headers })).ok) return } catch {}
+      try { const loggedIn = await fetch(origin + '/api/login', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ password: 'system-config-test' }) }); if (loggedIn.ok) { headers['x-admin-token'] = (await loggedIn.json()).token; return } } catch {}
       await sleep(100)
     }
     throw new Error('启动超时：' + logs.slice(-3000))
@@ -91,6 +91,8 @@ test('系统配置：显式导入、独立迁库、失败保留、SQLite备份�
     assert.equal(response.status, 200, await response.clone().text())
     assert.equal((await response.json()).authenticationChanged, true)
     assert.equal((await fetch(origin + '/api/config', { headers })).status, 401)
-    assert.equal((await fetch(origin + '/api/config', { headers: { 'x-frontend-auth': 'imported-admin-password' } })).status, 200)
+    const loggedIn = await post('/api/login', {password:'imported-admin-password'}, {'Content-Type':'application/json'})
+    assert.equal(loggedIn.status,200)
+    assert.equal((await fetch(origin + '/api/config', { headers: { 'x-frontend-auth': 'imported-admin-password', 'x-admin-token':(await loggedIn.json()).token } })).status, 200)
   } finally { await stop(); fs.rmSync(root, { recursive: true, force: true }) }
 })

@@ -17,7 +17,8 @@ async (page) => {
   check(await page.locator('#lb-sidebar').evaluate(node => getComputedStyle(node).backgroundColor === 'rgba(0, 0, 0, 0)' && [...node.querySelectorAll('.lb-board-item')].every(button => getComputedStyle(button).backgroundColor === 'rgba(0, 0, 0, 0)' && getComputedStyle(button).color === 'rgb(0, 0, 0)')), '榜单目录及选中项无底色，文字为黑色')
   await page.evaluate(() => { settings.itemsPerPage = 20; window.LeaderboardManager.renderSongs(); document.getElementById('view-leaderboard').scrollTop = 0; document.getElementById('lb-boards-list').scrollTop = 0 })
   await page.locator('#lb-board-board-1').hover()
-  check(await page.locator('#lb-board-board-1').evaluate(node => getComputedStyle(node).backgroundColor === 'rgba(0, 0, 0, 0)' && getComputedStyle(node).color === 'rgb(0, 0, 0)'), '悬停榜单仍保持透明底色和黑色文字')
+  await page.waitForTimeout(200)
+  check(await page.locator('#lb-board-board-1').evaluate(node => getComputedStyle(node).backgroundColor.includes('/ 0.06)') && getComputedStyle(node).color === 'rgb(0, 0, 0)'), '悬停榜单具有浅色动效并保留黑色文字')
   const dimensions = () => page.evaluate(() => {
     const ids = ['view-leaderboard', 'lb-sidebar', 'lb-boards-list', 'lb-songs-container', 'lb-songs-list', 'lb-pagination']
     return Object.fromEntries(ids.map(id => {
@@ -27,7 +28,7 @@ async (page) => {
   })
   let before = await dimensions()
   check(before['lb-songs-list'].overflow === 'visible' && before['lb-songs-container'].overflow === 'visible', '歌曲区没有嵌套滚动')
-  await page.getByText('已从服务器恢复设置', { exact: true }).waitFor({ state: 'hidden' })
+  await page.waitForFunction(() => ![...document.querySelectorAll('[data-text="已从服务器恢复设置"]')].some(n => n.getClientRects().length))
   await page.screenshot({ path: 'D:/opensource/fn-lxserver/output/playwright/leaderboard-desktop.png' })
   await page.mouse.move(before['lb-songs-list'].left + 200, 300)
   await page.mouse.wheel(0, 600)
@@ -69,16 +70,19 @@ async (page) => {
   await page.evaluate(() => { window.__leaderboardPlayback = null; window.updatePlaylist = (...args) => { window.__leaderboardPlayback = args } })
   await view.getByRole('button', { name: '播放全部', exact: true }).click()
   check(await page.evaluate(() => window.__leaderboardPlayback?.[0].length === 80 && window.__leaderboardPlayback[2] === 'leaderboard'), '播放全部保留原队列入口和歌曲列表')
-  for (const viewport of [{ width: 1024, height: 768 }, { width: 390, height: 844 }]) {
+  for (const viewport of [{ width: 1024, height: 768 }, { width: 768, height: 1024 }, { width: 390, height: 844 }, { width: 375, height: 812 }, { width: 320, height: 568 }]) {
     await page.setViewportSize(viewport)
     await page.evaluate(() => { document.getElementById('view-leaderboard').scrollTop = 0 })
     await view.getByTitle('切换榜单列表', { exact: true }).click()
     await page.waitForFunction(() => !document.getElementById('lb-sidebar').classList.contains('-translate-x-full'))
-    check(await page.locator('#lb-sidebar-overlay').isVisible(), `${viewport.width}px 目录抽屉和遮罩正常展开`)
+    check(await page.locator('#lb-sidebar').isVisible() && !await page.locator('#lb-sidebar-overlay').isVisible(), `${viewport.width}px 目录展开且不使用覆盖歌曲的遮罩`)
+    check(await page.locator('#lb-sidebar').evaluate(node => node.getBoundingClientRect().bottom <= document.querySelector('.leaderboard-content').getBoundingClientRect().top + 1), `${viewport.width}px 目录与歌曲区没有重叠`)
+    check(await page.locator('#lb-boards-list').evaluate(node => node.clientHeight <= innerHeight * .46 && getComputedStyle(node).overflowY === 'auto' && node.scrollHeight > node.clientHeight), `${viewport.width}px 榜单目录限高并独立滚动`)
+    await page.screenshot({ path: `D:/opensource/fn-lxserver/output/playwright/leaderboard-open-${viewport.width}.png` })
     await page.locator('#lb-board-board-1').click()
     await page.waitForFunction(() => document.getElementById('lb-sidebar').classList.contains('-translate-x-full') && document.getElementById('lb-board-title').textContent === '测试榜单 2')
-    await page.waitForFunction(() => document.getElementById('lb-sidebar-overlay').classList.contains('hidden') && document.getElementById('lb-sidebar').getBoundingClientRect().right <= document.getElementById('view-leaderboard').getBoundingClientRect().left + 1)
-    check(true, `${viewport.width}px 选择榜单后目录完全移出视口且遮罩关闭`)
+    await page.waitForFunction(() => getComputedStyle(document.getElementById('lb-sidebar')).display === 'none')
+    check(true, `${viewport.width}px 选择榜单后目录收起且歌曲回到顶部`)
     check(await page.locator('#view-leaderboard').evaluate(node => node.scrollWidth === node.clientWidth), `${viewport.width}px 页面没有横向溢出`)
     await page.screenshot({ path: `D:/opensource/fn-lxserver/output/playwright/leaderboard-${viewport.width}.png` })
   }

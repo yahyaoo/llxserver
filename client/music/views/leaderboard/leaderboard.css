@@ -85,20 +85,23 @@ body.player-bar-floating .music-shell #view-leaderboard #lb-songs-list {
     .leaderboard-shell { grid-template-columns: 238px minmax(0, 1fr); }
     .leaderboard-content { padding-left: 24px; padding-right: 24px; }
 }
-/* 与项目自定义 md 断点一致，平板和手机继续使用原有目录抽屉。 */
+/* 小屏目录直接展开在歌曲区上方，透明目录不再叠在歌曲文字上。作者：jingyh */
 @media (max-width: 1024px) {
-    .leaderboard-shell { grid-template-columns: minmax(0, 1fr); }
-    .leaderboard-content { grid-column: 1; padding-left: 12px; padding-right: 12px; }
+    .leaderboard-shell { grid-template-columns: minmax(0, 1fr); align-content: start; }
+    .leaderboard-content { grid-column: 1; grid-row: 2; padding-left: 12px; padding-right: 12px; }
     .leaderboard-toolbar { gap: 8px; margin-bottom: 16px; }
     .leaderboard-mobile-toggle, .leaderboard-sidebar-heading button { display: inline-flex; }
     .music-shell #view-leaderboard #lb-sidebar {
-        width: min(280px, calc(100vw - 48px)); z-index: 30;
-        transition: transform .3s; box-shadow: 8px 0 24px rgb(0 0 0 / 12%);
+        position: relative; top: auto; width: 100%; height: auto;
+        padding: calc(var(--top-bar-clearance, 92px) + 16px) 12px 0;
+        transform: none; transition: none; z-index: auto;
     }
-    .music-shell #view-leaderboard #lb-sidebar.-translate-x-full { transform: translateX(-100%); }
-    #view-leaderboard #lb-sidebar-overlay:not(.hidden) {
-        display: block; position: sticky; top: 0; grid-column: 1; grid-row: 1;
-        height: 100dvh; height: 100cqh; z-index: 20;
+    .music-shell #view-leaderboard #lb-sidebar.-translate-x-full { display: none; transform: none; }
+    .music-shell #view-leaderboard #lb-boards-list {
+        flex: none; height: min(320px, 40dvh, max(100px, calc(100cqh - var(--top-bar-clearance, 92px) - var(--player-bar-clearance, 112px) - 80px)));
+        padding-bottom: 8px;
     }
+    #view-leaderboard #lb-sidebar:not(.-translate-x-full) ~ .leaderboard-content { padding-top: 16px; }
+    #view-leaderboard #lb-sidebar-overlay:not(.hidden) { display: none; }
     #view-leaderboard #lb-batch-toolbar { flex-wrap: wrap; gap: 12px; }
 }

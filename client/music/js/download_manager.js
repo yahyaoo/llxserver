@@ -10,7 +10,7 @@ class DownloadManager {
         this.activeCount = 0; // Currently active (local downloading + triggered server tasks)
 
         // UI Elements
-        this.drawer = document.getElementById('download-drawer');
+        this.view = document.getElementById('view-downloads');
         this.listContainer = document.getElementById('download-list-container');
         this.globalSpeedEl = document.getElementById('download-global-speed');
         this.progressTextEl = document.getElementById('download-progress-text');
@@ -154,7 +154,7 @@ class DownloadManager {
                     quality: task.quality,
                     serverDownload: task.serverDownload === true,
                     lyricMode: task.lyricMode,
-                    enableOnlyDownloadMode: window.settings?.enableOnlyDownloadMode || false,
+                    enableOnlyDownloadMode: false,
                     cacheLyric: window.settings?.enableServerLyricCache !== false,
                     embedLyric: !!(window.settings?.embedLyricToFile ?? true)
                 }))
@@ -192,9 +192,11 @@ class DownloadManager {
             if (!Array.isArray(items)) return;
             const remoteIds = new Set();
             const updatedTasks = [];
+            let filesChanged = false;
             items.forEach(item => {
                 remoteIds.add(item.id);
                 let task = this.tasks.find(t => t.isServer && (t.serverQueueId === item.id || t.id === item.id));
+                if (item.status === 'finished' && task?.status !== 'finished') filesChanged = true;
                 if (!task) {
                     task = {
                         id: item.id,
@@ -239,6 +241,7 @@ class DownloadManager {
             if (!this.serverQueuePending) {
                 this.tasks = this.tasks.filter(task => !task.serverManaged || remoteIds.has(task.serverQueueId || task.id));
             }
+            if (filesChanged) window.SongFileStatus?.refresh();
             this.serverQueueLoaded = true;
             if (render) this.renderList();
             else updatedTasks.forEach(task => this.renderTask(task));
@@ -315,8 +318,7 @@ class DownloadManager {
             task.isServer &&
             task.status === 'finished' &&
             window.requestServerLyricCache &&
-            window.settings?.enableServerLyricCache !== false &&
-            window.settings?.enableOnlyDownloadMode !== true
+            window.settings?.enableServerLyricCache !== false
         );
     }
 
@@ -606,13 +608,10 @@ class DownloadManager {
         }
     }
 
-    // Toggle drawer
+    // 兼容旧入口，统一打开独立下载管理页。
     toggleDrawer() {
-        if (this.drawer.classList.contains('translate-x-full')) {
-            this.drawer.classList.remove('translate-x-full');
-        } else {
-            this.drawer.classList.add('translate-x-full');
-        }
+        window.switchTab?.('downloads');
+        this.renderList();
     }
 
     // Convert bytes to readable string
@@ -709,9 +708,8 @@ class DownloadManager {
         for (const { song, quality, cacheResult } of results) {
             const isServerTask = song.isServer || false;
             if (cacheResult.exists && !cacheResult.isCollision) {
-                const onlyDownloadMode = window.settings?.enableOnlyDownloadMode === true;
-                const targetAlreadyExists = song.serverDownload ? cacheResult.folder === 'download' : (!onlyDownloadMode || cacheResult.folder === 'music');
-                if (isServerTask && targetAlreadyExists) { // 仅下载模式下 cache 命中仍需交给后端复制到 music 目录
+                const targetAlreadyExists = song.serverDownload ? cacheResult.folder === 'download' : true;
+                if (isServerTask && targetAlreadyExists) {
                     skipCount++;
                     continue;
                 }
@@ -765,10 +763,8 @@ class DownloadManager {
             window.showInfo(`${skipCount} 首歌曲已存在，已跳过`);
         }
 
-        // Auto open drawer; renderList only paints the first visible slice for large batches.
-        if (this.drawer && this.drawer.classList.contains('translate-x-full')) {
-            this.toggleDrawer();
-        }
+        // 新增任务后进入完整列表页。
+        window.switchTab?.('downloads');
 
         this.renderList();
         this.processQueue();
@@ -841,7 +837,7 @@ class DownloadManager {
                 requestedSource,
                 downloadSource: result.downloadSource || resolvedSong.source,
                 sourceName: result.sourceName || '',
-                enableOnlyDownloadMode: window.settings?.enableOnlyDownloadMode || false,
+                enableOnlyDownloadMode: false,
                 cacheLyric: window.settings?.enableServerLyricCache !== false,
                 embedLyric: !!(window.settings?.embedLyricToFile ?? true)
             };
@@ -893,7 +889,7 @@ class DownloadManager {
                 finalUrl = task.cacheUrl;
 
                 // 补全 Token
-                const authToken = (window.getUserAuthHeaders ? window.getUserAuthHeaders()['x-user-token'] : null) || localStorage.getItem('lx_user_token') || '';
+                const authToken = (window.getUserAuthHeaders ? window.getUserAuthHeaders()['x-user-token'] : null) || (window.AccountSession ? window.AccountSession.getToken() : localStorage.getItem('lx_user_token')) || '';
                 if (authToken && !finalUrl.includes('token=')) {
                     finalUrl += (finalUrl.includes('?') ? '&' : '?') + `token=${encodeURIComponent(authToken)}`;
                 }
@@ -1458,7 +1454,7 @@ class DownloadManager {
         });
 
         if (this.globalSpeedEl) {
-            this.globalSpeedEl.innerText = `${this.formatSize(totalSpeed)}/s • ${this.tasks.length} TASKS`;
+            this.globalSpeedEl.innerText = `${this.formatSize(totalSpeed)}/s • ${this.tasks.length} 项任务`;
         }
 
         if (this.progressTextEl) {
@@ -1505,7 +1501,7 @@ class DownloadManager {
             // 云端任务：若 totalBytes=0 且 progress=0，说明还没轮询到进度，显示 indeterminate 而非 "云端 0%"
             const hasRealProgress = isServerTask && (task.totalBytes > 0 || task.progress > 0);
             statusText = isServerTask
-                ? (hasRealProgress ? `云端 ${progressWidth}%` : '云端下载中')
+                ? (hasRealProgress ? `服务器 ${progressWidth}%` : '服务器下载中')
                 : (task.nativeDownloadDispatched ? `浏览器 ${progressWidth}%` : `${progressWidth}%`);
             speedText = `${this.formatSize(Math.max(0, task.speed || 0))}/s`;
 
@@ -1538,10 +1534,10 @@ class DownloadManager {
             `;
         } else if (task.status === 'finished' || task.status === 'exists') {
             statusBg = 'bg-emerald-100 text-emerald-600';
-            statusText = task.status === 'exists' ? '已存在' : (isServerTask ? '已存云端' : '已完成');
+            statusText = task.status === 'exists' ? '已存在' : (isServerTask ? '已存服务器' : '已完成');
             progressWidth = 100;
         } else if (task.status === 'waiting') {
-            statusText = isServerTask ? '云端排队' : '等待中';
+            statusText = isServerTask ? '服务器排队' : '等待中';
             if (!isServerTask) {
                 actionBtnHTML = `
                     <button onclick="window.SystemDownloadManager.pauseTask('${task.id}')" class="w-8 h-8 rounded-full border border-yellow-200 text-yellow-500 hover:bg-yellow-50 flex items-center justify-center transition-colors shadow-sm" title="暂停">
@@ -1566,69 +1562,13 @@ class DownloadManager {
             `;
         }
 
-        return `
-            <div id="dl-task-${task.id}" class="relative p-3 rounded-xl t-bg-panel hover:bg-gray-50/50 dark:hover:bg-gray-800/50 transition-colors border border-transparent hover:t-border-main group flex gap-3 overflow-hidden shadow-sm mb-2">
-                <!-- Progress Bar Background -->
-                ${task.status !== 'waiting' && task.status !== 'error' ? `
-                <div class="absolute bottom-0 left-0 h-1.5 ${isServerTask ? 'bg-orange-400' : 'bg-emerald-400'} transition-all duration-300 opacity-60" style="width: ${progressWidth}%"></div>
-                ` : ''}
-
-                <!-- Cover -->
-                <div class="relative w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 shadow-sm border t-border-main">
-                    <img src="${this.escapeHtml(coverSrc)}" class="w-full h-full object-cover">
-                    ${(task.status === 'downloading') ? `
-                    <div class="absolute inset-0 bg-black/40 flex items-center justify-center backdrop-blur-[2px]">
-                        <i class="fas ${(isServerTask ? 'fa-cloud-upload-alt' : 'fa-spinner fa-spin')} text-white text-xs"></i>
-                    </div>` : ''}
-                </div>
-
-                <!-- Info -->
-                <div class="flex-1 min-w-0 flex flex-col justify-center">
-                    <div class="flex items-center gap-1.5 mb-1 flex-nowrap">
-                        <span class="shrink-0 text-[10px] font-bold text-white ${isServerTask ? 'bg-orange-500' : 'bg-red-400'} px-1.5 py-0.5 rounded uppercase tracking-wider">${this.escapeHtml(sourceName)}</span>
-                        <span class="shrink-0 text-[10px] font-bold text-white ${isServerTask ? 'bg-purple-500' : 'bg-sky-500'} px-1.5 py-0.5 rounded tracking-wider">${isServerTask ? '云端' : '本地'}</span>
-                        <h4 class="text-sm font-bold t-text-main truncate leading-tight flex-1 min-w-0 dynamic-marquee overflow-hidden" data-text="${this.escapeHtml(task.song.name)}">${this.escapeHtml(task.song.name)}</h4>
-                    </div>
-                    
-                    <div class="flex items-center justify-between mt-1">
-                        <div class="text-[10px] t-text-muted truncate flex gap-2 items-center">
-                            <span class="text-emerald-600 font-medium px-1 bg-emerald-50 rounded">${this.escapeHtml(qualityLabel)}</span>
-                            <span class="truncate opacity-60">${this.escapeHtml(task.song.singer)}</span>
-                        </div>
-                        
-                        <div class="flex items-center gap-1.5 font-bold">
-                            ${speedText ? `<span class="text-[10px] font-mono text-emerald-500">${speedText}</span>` : ''}
-                            
-                            <!-- LRC Status Tag -->
-                            ${isServerTask && !task.serverDownload && task.status === 'finished' ? `
-                                ${task.hasLyric === true ? `
-                                    <span class="text-[9px] bg-emerald-500 text-white px-1 rounded h-3.5 flex items-center shadow-sm" title="歌词已同步">LRC</span>
-                                ` : task.hasLyric === false ? `
-                                    <div onclick="event.stopPropagation(); window.SystemDownloadManager.retryLyric('${task.id}')" class="text-[9px] bg-red-400 hover:bg-red-500 text-white px-1 rounded h-3.5 flex items-center gap-0.5 cursor-pointer shadow-sm transition-colors" title="歌词缺失，点击重试">
-                                        <span>LRC+</span>
-                                        <i class="fas fa-redo-alt text-[7px]"></i>
-                                    </div>
-                                ` : `
-                                    <span class="text-[9px] bg-gray-400 text-white px-1 rounded h-3.5 flex items-center opacity-60" title="正在检查歌词...">LRC</span>
-                                `}
-                            ` : ''}
-
-                            <span class="text-[10px] px-1.5 py-0.5 rounded ${statusBg} truncate max-w-[100px]">
-                                ${task.errorMsg ? `<span title="${this.escapeHtml(task.errorMsg)}">${this.escapeHtml(task.errorMsg)}</span>` : statusText}
-                            </span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Actions -->
-                <div class="flex items-center pl-1 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-all sm:translate-x-2 group-hover:translate-x-0">
-                    <button onclick="window.SystemDownloadManager.addTaskToPlaylist('${task.id}')" class="w-8 h-8 rounded-full border border-emerald-100 text-emerald-500 hover:bg-emerald-50 flex items-center justify-center transition-colors mr-1 shadow-sm" title="添加到歌单">
-                        <i class="fas fa-plus text-xs"></i>
-                    </button>
-                    ${actionBtnHTML}
-                </div>
-            </div>
-        `;
+        return `<div id="dl-task-${task.id}" class="download-task-row">
+            <div class="download-task-song"><img src="${this.escapeHtml(coverSrc)}" alt="" loading="lazy"><div><strong>${this.escapeHtml(task.song.name)}</strong><small>${this.escapeHtml(task.song.singer)} · ${this.escapeHtml(sourceName || '')}</small></div></div>
+            <span class="download-task-destination">${isServerTask ? '服务器' : '此设备'}</span>
+            <span class="download-task-quality">${this.escapeHtml(qualityLabel)}</span>
+            <div class="download-task-status"><span title="${this.escapeHtml(task.errorMsg || statusText)}">${this.escapeHtml(task.errorMsg || statusText)}</span><small>${speedText}</small><div class="download-task-progress"><span style="width:${Math.max(0, Math.min(100, Number(progressWidth) || 0))}%"></span></div></div>
+            <div class="download-task-actions">${isServerTask && !task.serverDownload && task.status === 'finished' && task.hasLyric === false ? `<button onclick="window.SystemDownloadManager.retryLyric('${task.id}')" class="w-8 h-8 text-pink-500" title="补全歌词"><i class="fas fa-file-audio"></i></button>` : ''}<button onclick="window.SystemDownloadManager.addTaskToPlaylist('${task.id}')" class="w-8 h-8 rounded-full text-emerald-500" title="添加到歌单"><i class="fas fa-plus"></i></button>${actionBtnHTML}</div>
+        </div>`;
     }
 
     // Refresh entire list DOM
@@ -1663,7 +1603,7 @@ class DownloadManager {
 
         const firstTaskEl = this.listContainer.querySelector('[id^="dl-task-"]');
         if (firstTaskEl) {
-            const measuredHeight = firstTaskEl.getBoundingClientRect().height + 8;
+            const measuredHeight = firstTaskEl.getBoundingClientRect().height;
             if (measuredHeight > 0 && Math.abs(measuredHeight - this.estimatedTaskHeight) > 6) {
                 this.estimatedTaskHeight = measuredHeight;
             }
@@ -1711,11 +1651,7 @@ window.toggleDownloadDrawer = function () {
 };
 
 window.openDownloadManager = function () {
-    if (window.SystemDownloadManager) {
-        if (window.SystemDownloadManager.drawer.classList.contains('translate-x-full')) {
-            window.SystemDownloadManager.toggleDrawer();
-        }
-    }
+    window.SystemDownloadManager?.toggleDrawer();
 };
 
 // Initialize globally

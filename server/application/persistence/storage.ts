@@ -20,7 +20,7 @@ export interface StorageTarget {
 /** 数据变动通知用于保留音源热加载；不暴露数据库内容。 @author yahyaoo */
 export const storageEvents = new EventEmitter()
 const stores = new Map<string, { /** 管理域 SQLite 仓储。 */
-admin: SqliteDocumentRepository,
+admin: ReturnType<typeof createAdminRepository>,
 music: SqliteDocumentRepository }>()
 
 /** @returns 当前数据根目录，沿用原 DATA_PATH 配置优先级。 */

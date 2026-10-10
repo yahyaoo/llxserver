@@ -1,5 +1,7 @@
 /** 后台缺失的系统字段元数据，值类型与现有业务默认值一致。 @author yahyaoo */
 export const additionalConfigurationFields = [
+  { key: 'auth.sessionDays', label: '普通登录有效期（天）', type: 'number', min: 1, max: 365, group: '基本配置', hint: '账号登录必须验证；普通登录关闭浏览器后需重新登录。修改后立即生效。' },
+  { key: 'auth.rememberMeDays', label: '记住我有效期（天）', type: 'number', min: 1, max: 365, group: '基本配置', hint: '记住登录可跨浏览器重开和服务重启；缩短有效期立即生效。' },
   { key: 'bindIP', label: '绑定 IP 配置', type: 'text', group: '基本配置', hint: '保留此配置值；当前主 HTTP 服务固定监听 0.0.0.0。' },
   { key: 'port', label: '服务监听端口', type: 'number', min: 1, max: 65535, group: '基本配置', hint: '保存后重启服务；环境变量 PORT 优先。' },
   { key: 'disableTelemetry', label: '禁用匿名数据收集', type: 'checkbox', group: '基本配置', hint: '关闭版本及运行环境的匿名统计，保存后重启服务。' },

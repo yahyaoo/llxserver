@@ -1,0 +1,5 @@
+.song-file-title { display: flex; align-items: center; gap: .375rem; min-width: 0; }
+.song-file-name { min-width: 0; flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.song-file-status { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 1rem; font-size: .7rem; color: var(--text-muted, #94a3b8); }
+.song-file-status[data-file-state="downloaded"] { color: #10b981; }
+.song-file-status[data-file-state="cached"] { color: #3b82f6; }

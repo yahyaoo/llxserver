@@ -34,7 +34,10 @@ test('实际整体 ZIP 和两个独立 ZIP 均可启动，鉴权、配置、资�
     processes.push(child); child.stdout.on('data', b => { logs += b; }); child.stderr.on('data', b => { logs += b; }); return child;
   };
   const wait = async (origin, child) => {
-    for (let i = 0; i < 120; i++) { if (child.exitCode !== null) throw new Error(logs.slice(-3000)); try { if ((await fetch(origin + '/api/config', { headers: { 'x-frontend-auth': 'package-test' } })).ok) return; } catch {} await delay(100); }
+    for (let i = 0; i < 120; i++) { if (child.exitCode !== null) throw new Error(logs.slice(-3000)); try {
+      const response = await fetch(origin + '/api/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ password: 'package-test' }) });
+      if (response.ok) { const admin = { 'content-type': 'application/json', 'x-frontend-auth': 'package-test', 'x-admin-token': (await response.json()).token }; assert.equal((await fetch(origin + '/api/config', { headers: admin })).status, 200); return admin; }
+    } catch {} await delay(100); }
     throw new Error('交付包启动超时：' + logs.slice(-3000));
   };
   try {
@@ -53,7 +56,9 @@ test('实际整体 ZIP 和两个独立 ZIP 均可启动，鉴权、配置、资�
     const data = path.join(temp, 'split-data'), config = path.join(standaloneServer, 'config.js');
     const common = { DATA_PATH: data, LOG_PATH: path.join(temp, 'logs'), CONFIG_PATH: config, FRONTEND_PASSWORD: 'package-test', ENABLE_WEBPLAYER_AUTH: 'true', WEBPLAYER_PASSWORD: 'player-test' };
     const backend = launch(standaloneServer, ['-e', setup], { ...common, PORT: String(backendPort), CLIENT_MODE: 'external' });
-    const backendOrigin = `http://127.0.0.1:${backendPort}`; await wait(backendOrigin, backend);
+    const backendOrigin = `http://127.0.0.1:${backendPort}`; const admin = await wait(backendOrigin, backend);
+    const accountConfig = { content: "module.exports={users:[{name:'package-user',password:'player-test'}],'player.path':'/'}" };
+    assert.equal((await fetch(backendOrigin + '/api/config/import', { method: 'POST', headers: admin, body: JSON.stringify(accountConfig) })).status, 200);
     // 地址与监听端口只来自独立客户端 config.js，证明无需源码和环境变量也可连接后端。
     fs.writeFileSync(path.join(standaloneClient, 'config.js'), `module.exports={'client.serverUrl':'${backendOrigin}','client.port':${clientPort},'client.bindIP':'127.0.0.1'}`);
     const client = launch(standaloneClient, ['deploy/client/gateway.cjs'], { CONFIG_PATH: path.join(standaloneClient, 'config.js') });
@@ -61,13 +66,12 @@ test('实际整体 ZIP 和两个独立 ZIP 均可启动，鉴权、配置、资�
     const unauthorized = await fetch(origin + '/', { redirect: 'manual' }); assert.equal(unauthorized.status, 302); assert.equal(unauthorized.headers.get('location'), '/login');
     assert.ok((await (await fetch(origin + '/login')).text()).includes('洛洛雪音乐'));
     assert.equal((await fetch(origin + '/api/config')).status, 401);
-    const login = await fetch(origin + '/api/music/auth', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ password: 'player-test' }) });
+    const login = await fetch(origin + '/api/user/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ username: 'package-user', password: 'player-test' }) });
     assert.equal(login.status, 200); const cookie = login.headers.get('set-cookie').split(';')[0];
     const page = await fetch(origin + '/', { headers: { Cookie: cookie } }); assert.equal(page.status, 200); assert.ok((await page.text()).includes('洛洛雪音乐'));
     assert.equal((await fetch(origin + '/admin/')).status, 200);
     for (const resource of ['/music/assets/logo.svg', '/music/views/settings/SettingsView.js', '/js/config.js']) { const response = await fetch(origin + resource, { headers: { Cookie: cookie } }); assert.equal(response.status, 200, resource); assert.ok((await response.text()).length > 50); assert.equal(response.headers.get('x-llx-client-asset'), null); }
     const manifest = await (await fetch(origin + '/manifest.json')).json(); assert.equal(manifest.name, '洛洛雪音乐'); assert.equal(manifest.scope, '/');
-    const admin = { 'content-type': 'application/json', 'x-frontend-auth': 'package-test' };
     assert.equal((await fetch(origin + '/api/config', { method: 'POST', headers: admin, body: JSON.stringify({ serverName: '独立部署测试', 'player.path': '/listen' }) })).status, 200);
     const dynamic = await (await fetch(origin + '/js/config.js')).text(); assert.ok(dynamic.includes('独立部署测试')); assert.ok(dynamic.includes('/listen'));
     assert.equal((await fetch(origin + '/listen/', { headers: { Cookie: cookie } })).status, 200);
@@ -75,9 +79,13 @@ test('实际整体 ZIP 和两个独立 ZIP 均可启动，鉴权、配置、资�
     const db = new Database(path.join(data, 'database/admin.sqlite'), { readonly: true }); assert.ok(db.prepare('SELECT COUNT(*) AS n FROM server_config').get().n > 0); db.close();
     assert.equal(fs.existsSync(path.join(data, 'database/music.sqlite')), true);
     const combined = launch(all, ['-e', setup], { PORT: String(allPort), DATA_PATH: path.join(temp, 'all-data'), CONFIG_PATH: path.join(all, 'config.js'), LOG_PATH: path.join(temp, 'all-logs'), FRONTEND_PASSWORD: 'package-test', CLIENT_MODE: 'local' });
-    const combinedOrigin = `http://127.0.0.1:${allPort}`; await wait(combinedOrigin, combined);
-    assert.equal((await fetch(combinedOrigin + '/')).status, 200); assert.equal((await fetch(combinedOrigin + '/admin/')).status, 200);
-    assert.ok((await (await fetch(combinedOrigin + '/music/assets/logo.svg')).text()).includes('洛洛雪音乐'));
+    const combinedOrigin = `http://127.0.0.1:${allPort}`; const combinedAdmin = await wait(combinedOrigin, combined);
+    assert.equal((await fetch(combinedOrigin + '/api/config/import', { method: 'POST', headers: combinedAdmin, body: JSON.stringify(accountConfig) })).status, 200);
+    assert.equal((await fetch(combinedOrigin + '/', { redirect: 'manual' })).status, 302);
+    const combinedLogin = await fetch(combinedOrigin + '/api/user/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ username: 'package-user', password: 'player-test' }) });
+    assert.equal(combinedLogin.status, 200); const combinedCookie = combinedLogin.headers.get('set-cookie').split(';')[0];
+    assert.equal((await fetch(combinedOrigin + '/', { headers: { Cookie: combinedCookie } })).status, 200); assert.equal((await fetch(combinedOrigin + '/admin/')).status, 200);
+    assert.ok((await (await fetch(combinedOrigin + '/music/assets/logo.svg', { headers: { Cookie: combinedCookie } })).text()).includes('洛洛雪音乐'));
   } finally {
     for (const child of processes) if (child.exitCode === null) { const exited = once(child, 'exit'); child.kill(); await exited; }
     fs.rmSync(temp, { recursive: true, force: true });

@@ -17,6 +17,7 @@
         })();
     </script>
     <script src="/js/config.js"></script>
+    <script src="js/account-session.js"></script>
     <!-- PostHog Analytics -->
     <script>
         if (!window.CONFIG || !window.CONFIG.disableTelemetry) {
@@ -44,6 +45,11 @@
     <link rel="stylesheet" href="views/leaderboard/leaderboard.css">
     <link rel="stylesheet" href="components/theme-controls/appearance.css">
     <link rel="stylesheet" href="css/page-surfaces.css">
+    <link rel="stylesheet" href="components/song-file-status/style.css">
+    <link rel="stylesheet" href="views/player-detail/appearance.css">
+    <link rel="stylesheet" href="css/interactions.css">
+    <link rel="stylesheet" href="css/popovers.css">
+    <link rel="stylesheet" href="views/downloads/downloads.css">
 </head>
 
 <body class="t-bg-main h-screen flex flex-col overflow-hidden t-text-main font-sans">
@@ -689,15 +695,15 @@
                                 <i class="fas fa-user-shield text-emerald-500"></i>
                             </div>
                         </div>
-                        <h2 class="text-2xl md:text-3xl font-bold t-text-main tracking-tight">开启云端收藏之旅</h2>
+                        <h2 class="text-2xl md:text-3xl font-bold t-text-main tracking-tight">开始收藏音乐</h2>
                         <p class="text-gray-500 mt-4 mb-10 text-center max-w-md leading-relaxed px-6">
-                            您的收藏暂时无法同步。请前往设置页面登录，同步您的音乐歌单，享受跨设备的一致体验。
+                            收藏的歌曲会显示在这里。
                         </p>
                         <button
-                            onclick="switchTab('settings'); selectSettingsSection('sync'); setTimeout(() => { document.getElementById('btn-mode-local').scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 100);"
+                            onclick="switchTab('search')"
                             class="px-10 py-4 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-2xl shadow-xl shadow-emerald-200 transition-all transform hover:-translate-y-1 active:translate-y-0 flex items-center gap-3 group">
                             <i class="fas fa-sign-in-alt group-hover:translate-x-1 transition-transform"></i>
-                            立即去登录 (Go to Login)
+                            去搜索音乐
                         </button>
                     </div>
                 </div>
@@ -2187,78 +2193,6 @@
         </div>
     </div>
 
-    <!-- Download Management Drawer (下载管理) -->
-    <div id="download-drawer"
-        class="fixed inset-y-0 right-0 w-full md:w-[450px] t-bg-panel/95 backdrop-blur-xl z-[60] shadow-[-10px_0_30px_rgba(0,0,0,0.1)] transform translate-x-full transition-transform duration-300 ease-out border-l t-border-main flex flex-col">
-        <!-- Header -->
-        <div class="p-6 border-b t-border-main flex items-center justify-between">
-            <div class="flex flex-col">
-                <h3 class="text-xl font-black t-text-main flex items-center gap-2">
-                    <i class="fas fa-cloud-download-alt text-emerald-500"></i>
-                    下载管理
-                </h3>
-                <p id="download-global-speed" class="text-[10px] t-text-muted font-bold uppercase tracking-widest mt-1">
-                    0 KB/s • 0 TASKS
-                </p>
-            </div>
-            <div class="flex items-center gap-2">
-                <button onclick="window.SystemDownloadManager && window.SystemDownloadManager.retryAllLyrics()"
-                    title="一键补全缺失歌词" class="p-2 t-text-muted hover:text-pink-500 transition-colors">
-                    <i class="fas fa-file-audio"></i>
-                </button>
-                <button onclick="window.SystemDownloadManager && window.SystemDownloadManager.pauseAll()" title="全部暂停"
-                    class="p-2 t-text-muted hover:text-yellow-500 transition-colors">
-                    <i class="fas fa-pause"></i>
-                </button>
-                <button onclick="window.SystemDownloadManager && window.SystemDownloadManager.resumeAll()" title="全部继续"
-                    class="p-2 t-text-muted hover:text-emerald-500 transition-colors">
-                    <i class="fas fa-play"></i>
-                </button>
-                <button onclick="toggleDownloadDrawer()" title="关闭"
-                    class="p-2 t-text-muted hover:text-red-500 transition-colors">
-                    <i class="fas fa-times text-lg"></i>
-                </button>
-            </div>
-        </div>
-
-        <!-- Toolbar -->
-        <div
-            class="px-6 py-3 t-bg-panel-light border-b t-border-main flex items-center justify-between transition-all duration-300">
-            <div class="flex items-center gap-2">
-                <span class="text-xs font-bold text-emerald-600 hidden sm:inline">总进度:</span>
-                <span id="download-progress-text" class="text-xs font-bold text-emerald-600">0%</span>
-            </div>
-            <div class="flex gap-2">
-                <button onclick="window.SystemDownloadManager && window.SystemDownloadManager.retryAllFailed()"
-                    title="全部重试"
-                    class="px-3 py-1.5 text-xs font-bold text-blue-500 bg-blue-50 hover:bg-blue-100 rounded-lg shadow-sm transition-all flex items-center gap-1.5">
-                    <i class="fas fa-redo text-[10px]"></i>
-                    <span class="hidden md:inline">全部重试</span>
-                </button>
-                <button onclick="window.SystemDownloadManager && window.SystemDownloadManager.clearCompleted()"
-                    title="清空已完成"
-                    class="px-3 py-1.5 text-xs font-bold text-gray-500 bg-gray-100 hover:bg-gray-200 rounded-lg shadow-sm transition-all flex items-center gap-1.5 dark:bg-gray-800 dark:hover:bg-gray-700">
-                    <i class="fas fa-broom text-[10px]"></i>
-                    <span class="hidden md:inline">清空已完成</span>
-                </button>
-                <button onclick="window.SystemDownloadManager && window.SystemDownloadManager.clearAll()" title="清空全部"
-                    class="px-3 py-1.5 text-xs font-bold text-red-500 bg-red-50 hover:bg-red-100 rounded-lg shadow-sm transition-all flex items-center gap-1.5">
-                    <i class="fas fa-trash text-[10px]"></i>
-                    <span class="hidden md:inline">清空全部</span>
-                </button>
-            </div>
-        </div>
-
-        <!-- List Content -->
-        <div id="download-list-container" class="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-1">
-            <!-- Items injected here by JS -->
-            <div class="flex flex-col items-center justify-center h-full text-center p-10 space-y-4">
-                <i class="fas fa-inbox text-4xl t-text-muted opacity-20"></i>
-                <p class="text-sm t-text-muted font-medium">暂无下载任务</p>
-            </div>
-        </div>
-    </div>
-
     <!-- Sound Effects Modal -->
     <div id="sound-effects-modal"
         class="fixed inset-0 z-[70] hidden items-center justify-center p-4 md:p-6 transition-all duration-300">
@@ -2978,6 +2912,7 @@
     <script src="components/top-bar/AccountActions.js"></script>
     <script src="components/top-bar/index.js"></script>
     <script src="views/main-navigation/MainNavigation.js"></script>
+    <script src="views/main-navigation/PlaylistActions.js"></script>
     <script src="views/main-navigation/index.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
     <script src="js/NoSleep.min.js"></script>
@@ -2988,23 +2923,30 @@
     <script src="js/idb_store.js"></script>
     <script src="js/user_sync.js"></script>
     <script src="js/batch_pagination.js"></script>
+    <script src="views/downloads/DownloadOptions.js"></script>
     <script src="js/single_song_ops.js"></script>
     <script src="views/settings/SettingsView.js"></script>
     <script src="views/settings/SettingsNavigation.js"></script>
     <script src="js/theme_manager.js"></script>
     <script src="views/settings/index.js"></script>
+    <script src="views/settings/SettingsToggle.js"></script>
     <script src="views/settings/ConfigurationImport.js"></script>
+    <script src="views/settings/AvatarCropper.js"></script>
+    <script src="views/settings/AccountSettings.js"></script>
     <script src="js/list_search.js"></script>
+    <script src="components/song-file-status/index.js"></script>
     <script src="js/songlist_manager.js"></script>
     <script src="views/leaderboard/components/LeaderboardNavigation.js"></script>
     <script src="views/leaderboard/LeaderboardView.js"></script>
     <script src="js/leaderboard_manager.js"></script>
     <script src="js/dislike_manager.js"></script>
+    <script src="js/song_actions.js"></script>
     <script src="components/player-bar/template.js"></script>
     <script src="components/player-bar/index.js"></script>
     <script src="views/player-detail/template.js"></script>
     <script src="views/player-detail/components/PlayerBackground.js"></script>
     <script src="views/player-detail/components/Spectrum.js"></script>
+    <script src="views/player-detail/components/LyricSettings.js"></script>
     <script src="views/player-detail/PlayerDetailView.js"></script>
     <script src="js/wave.js"></script>
     <script src="js/visualizer.js"></script>
@@ -3012,6 +2954,7 @@
     <script src="js/lyric-card.js"></script>
     <script src="js/ios-background-audio.js"></script>
     <script src="js/sound-effects.js"></script>
+    <script src="views/downloads/DownloadsView.js"></script>
     <script src="js/download_manager.js"></script>
     <script src="js/local_music.js"></script>
     <script src="js/customDir.js"></script>

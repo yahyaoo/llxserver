@@ -11,6 +11,10 @@ declare namespace LX {
      * 连接密码
      */
     password: string
+    /** 用户自行设置的昵称，不影响登录账号。 */
+    nickname?: string
+    /** 头像文件是否存在；实际路径由服务端确定。 */
+    avatarVersion?: number
 
     /**
      * 最大备份快照数
@@ -234,6 +238,10 @@ declare namespace LX {
     /**
      * 是否开启Web播放器访问密码
      */
+    /** 普通账号登录有效期，单位天。 */
+    'auth.sessionDays': number
+    /** 记住我有效期，单位天。 */
+    'auth.rememberMeDays': number
     'player.enableAuth'?: boolean
 
     /**

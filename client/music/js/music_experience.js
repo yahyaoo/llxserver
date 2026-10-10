@@ -114,14 +114,13 @@
             value = { ...value, ...patch }; apply();
             const snapshot = { ...value }, owner = accountName(), auth = headers();
             localStorage.setItem(cacheKey(owner), JSON.stringify(snapshot));
-            const status = document.getElementById('experience-save-status'); if (status) status.textContent = '正在保存…';
             saved = saved.catch(() => {}).then(async () => {
                 const response = await fetch('/api/user/appearance', { method: 'PUT', headers: auth, body: JSON.stringify(snapshot) });
                 if (!response.ok) throw new Error((await response.json()).message || '配置保存失败');
                 const normalized = await response.json();
-                if (owner === accountName() && requestRevision === revision) { value = normalized; localStorage.setItem(cacheKey(owner), JSON.stringify(value)); apply(); }
-                if (owner === accountName() && status) status.textContent = '已保存到当前账号';
-            }).catch(error => { if (owner === accountName()) { if (status) status.textContent = '保存失败，请重试'; report(error); } });
+                // 服务端可能返回部分字段；保留本次配置，避免旧版本响应清空滑块数值。
+                if (owner === accountName() && requestRevision === revision) { value = { ...defaults, ...snapshot, ...normalized }; localStorage.setItem(cacheKey(owner), JSON.stringify(value)); apply(); }
+            }).catch(error => { if (owner === accountName()) report(error); });
             return saved;
         },
         async upload(file) {

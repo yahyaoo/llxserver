@@ -145,11 +145,13 @@ export async function postUserSettings(context: RequestContext, runtime: Setting
             const settingsPath = path.join(userSpace.dataManage.userDir, File.userSettingsJSON)
 
             let settings = JSON.parse(body)
+            // 旧手动缓存下载入口已移除，不再持久化其专用开关。
+            delete settings.enableOnlyDownloadMode
 
             // [核心逻辑] 如果是受限的公开用户，仅允许保存特定的 3 项设置
             if (resolvedUsername === '_open' && global.lx.config['user.enablePublicRestriction']) {
               const restrictedSettings: any = {}
-              const allowedKeys = ['enableServerCache', 'enableServerLyricCache', 'serverCacheLocation', 'serverCacheNamingPattern', 'downloadConcurrency', 'enableRemaster', 'preferredQuality', 'enableOnlyDownloadMode', 'enablePublicSources', 'embedLyricToFile', 'preferServerCache']
+              const allowedKeys = ['enableServerCache', 'enableServerLyricCache', 'serverCacheLocation', 'serverCacheNamingPattern', 'downloadConcurrency', 'enableRemaster', 'preferredQuality', 'enablePublicSources', 'embedLyricToFile', 'preferServerCache']
               allowedKeys.forEach(key => {
                 if (settings[key] !== undefined) restrictedSettings[key] = settings[key]
               })

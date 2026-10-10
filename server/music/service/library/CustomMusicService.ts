@@ -236,7 +236,7 @@ export const customIndexManager = new CustomIndexManager()
 
 // 同步自定义目录下的歌曲并生成/更新 custom_index.json
 // 递归扫描目录下的所有音频文件（支持任意深层子目录）
-const scanAllFilesRecursively = async (baseDir: string, currentDir: string = baseDir): Promise<{ /** 相对于业务数据目录的路径。 */
+const scanAllFilesRecursively = async (baseDir: string, currentDir: string = baseDir, strict = false): Promise<{ /** 相对于业务数据目录的路径。 */
 relativePath: string; /** 文件完整路径。 */
 fullPath: string }[]> => {
     const extensions = ['.mp3', '.flac', '.m4a', '.ogg', '.wav', '.ape']
@@ -249,7 +249,7 @@ fullPath: string }[] = []
             if (entry.name.startsWith('.') || entry.name === 'node_modules') continue
             const fullPath = path.join(currentDir, entry.name)
             if (entry.isDirectory()) {
-                const subResults = await scanAllFilesRecursively(baseDir, fullPath)
+                const subResults = await scanAllFilesRecursively(baseDir, fullPath, strict)
                 results = results.concat(subResults)
             } else if (entry.isFile()) {
                 const ext = path.extname(entry.name).toLowerCase()
@@ -260,6 +260,7 @@ fullPath: string }[] = []
             }
         }
     } catch (e) {
+        if (strict) throw e
         console.error(`[自定义音乐] 读取目录 ${currentDir} 出错:`, e)
     }
     return results
@@ -330,9 +331,10 @@ const buildLinkedInfoMap = (rootDir: string): Map<string, any> => {
 /**
  * 扫描用户自定义目录中的音频文件，补齐元信息并更新 SQL 索引。
  * @param username 已解析的用户名称。
+ * @param strict 是否传播目录读取错误；文件状态查询启用，避免误报未下载。
  * @author yahyaoo
  */
-export const syncCustomIndex = async (username: string) => {
+export const syncCustomIndex = async (username: string, strict = false) => {
     const customDir = getCustomMusicDir(username)
     if (!customDir || !storageFs.existsSync(customDir)) {
         throw new Error('用户未开启或未配置自定义音乐目录')
@@ -345,7 +347,7 @@ export const syncCustomIndex = async (username: string) => {
     const extensions = ['.mp3', '.flac', '.m4a', '.ogg', '.wav', '.ape']
 
     // 递归深层扫描所有子目录中的音频文件
-    const scannedFiles = await scanAllFilesRecursively(customDir)
+    const scannedFiles = await scanAllFilesRecursively(customDir, customDir, strict)
 
     const foundRelPaths = new Set<string>()
     let updated = false

@@ -18,7 +18,7 @@ export interface DocumentTable {
  */
 export class SqliteDocumentRepository {
   /** 独立数据库连接，业务代码不能直接使用。 */
-  private database: any
+  protected database: any
   /** 当前数据库允许操作的表名。 */
   private readonly tables: Set<string>
   /** 数据根目录；内部作用域使用相对路径，移动数据目录后仍可读取。 */

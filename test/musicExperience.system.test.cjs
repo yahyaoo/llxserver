@@ -18,7 +18,7 @@ test('真实 HTTP：搜索分组、头像缓存、主题上传与丢失回退、
     child.stdout.on('data', chunk => { logs += chunk }); child.stderr.on('data', chunk => { logs += chunk })
     for (let i = 0; i < 180; i++) {
       if (child.exitCode !== null) throw new Error('启动失败：' + logs.slice(-3500))
-      try { if ((await fetch(origin + '/api/config', { headers: admin })).ok) return } catch {}
+      try { const loggedIn = await fetch(origin + '/api/login', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ password: 'experience-test' }) }); if (loggedIn.ok) { admin['x-admin-token'] = (await loggedIn.json()).token; return } } catch {}
       await sleep(100)
     }
     throw new Error('启动超时：' + logs.slice(-3500))
@@ -69,10 +69,13 @@ test('真实 HTTP：搜索分组、头像缓存、主题上传与丢失回退、
     const artistDir = path.join(cache, 'artist-avatars'); fs.mkdirSync(artistDir, { recursive: true }); const hash = require('node:crypto').createHash('sha256').update('周杰伦').digest('hex'); fs.writeFileSync(path.join(artistDir, hash + '.img'), png)
     assert.equal((await fetch(origin + '/api/music/library/avatar?name=' + encodeURIComponent('周杰伦'), { headers: alice })).status, 200)
     const db = new Database(path.join(data, 'database/music.sqlite'), { readonly: true })
+    try {
     assert.ok(db.prepare('SELECT count(*) AS n FROM client_recent_play').get().n === 2)
     assert.ok(db.prepare('SELECT count(*) AS n FROM client_appearance').get().n > 0)
     assert.equal(db.prepare("SELECT count(*) AS n FROM client_appearance WHERE record_key = 'recentLimit'").get().n, 0)
-    assert.equal(db.prepare("SELECT value_json FROM client_recent_setting WHERE record_key = 'maxRecords'").get().value_json, '2'); db.close()
+    const aliceRecentKey = 'data:users/alice_' + require('node:crypto').createHash('md5').update('alice').digest('hex').slice(0, 6) + '/recent-setting.json'
+    assert.equal(db.prepare("SELECT value_json FROM client_recent_setting WHERE record_key = 'maxRecords' AND document_key = ?").get(aliceRecentKey).value_json, '2')
+    } finally { db.close() }
     await stop(); await start(); const reauthenticated = await login('alice')
     assert.equal((await json('/api/user/appearance', reauthenticated)).background.file, file)
     assert.equal((await json('/api/user/appearance', reauthenticated)).recentLimit, 2)
@@ -82,6 +85,6 @@ test('真实 HTTP：搜索分组、头像缓存、主题上传与丢失回退、
     fs.unlinkSync(path.join(cache, 'theme-backgrounds', file))
     value = await json('/api/user/appearance', reauthenticated); assert.equal(value.theme, 'pink'); assert.equal(value.background, null)
     await json('/api/user/recent', reauthenticated, 'DELETE'); assert.deepEqual((await json('/api/user/recent', reauthenticated)).items, [])
-    const page = await fetch(origin + '/'); const html = await page.text(); assert.ok(html.includes('components/top-bar/index.js'), page.url + ' ' + page.status); assert.ok(!html.includes('id="lm-quick-search"'))
+    const page = await fetch(origin + '/', { headers: reauthenticated }); const html = await page.text(); assert.ok(html.includes('components/top-bar/index.js'), page.url + ' ' + page.status); assert.ok(!html.includes('id="lm-quick-search"'))
   } finally { await stop(); fs.rmSync(root, { recursive: true, force: true }) }
 })
