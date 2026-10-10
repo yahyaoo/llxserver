@@ -2,7 +2,7 @@
 
 基于 [XCQ0607/lxserver](https://github.com/XCQ0607/lxserver) 的飞牛 NAS 版本。原 `lxserver-source` 自定义源码和 `lxserver` 飞牛打包工程已整合到本仓库，运行、测试、构建 FPK 都只需要这个仓库。
 
-当前源码、网页与 FPK 版本：**2.1.3**，发布标签：**v2.1.3**。官方最新版本为 v2.1.2（2026-10-09 核对），本仓库按**官方补丁号加一**编号。保留上游 Apache-2.0 协议、版权和音源实现。
+保留上游 Apache-2.0 协议、版权和音源实现。
 
 [本仓库发布](https://github.com/yahyaoo/fn-lxserver/releases) · [官方原说明](README_UPSTREAM.md) · [同步服务配置](md/lxserver.md) · [官方帮助文档](https://xcq0607.github.io/lxserver/)
 
@@ -99,11 +99,11 @@ FNPACK_BIN=/opt/fnpack npm run build:fpk
 输出：
 
 ```text
-fnos/dist/levis.lxserver-v2.1.3.fpk
-fnos/dist/levis.lxserver-v2.1.3.fpk.sha256
+fnos/dist/levis.lxserver-<标签>.fpk
+fnos/dist/levis.lxserver-<标签>.fpk.sha256
 ```
 
-打包时自动同步网页与 manifest 版本，检查根锁文件版本，复制生产依赖锁文件；个人 `config.js` 不进入安装包。归档检查包含 Linux 执行权限、换行、选盘字段和服务器下载模块。
+打包时复制生产依赖锁文件；个人 `config.js` 不进入安装包。归档检查包含 Linux 执行权限、换行、选盘字段和服务器下载模块。
 
 ## 飞牛安装与配置
 
@@ -131,34 +131,29 @@ python fnos/scripts/release.test.py
 
 `npm test` 包括真实隔离服务、临时配置和本地测试音源的接口系统测试，覆盖下载队列、歌词、Range 播放、鉴权、缓存路径、配置保存、重启和更新检查，不使用个人音源或 NAS 数据。也可分别运行 `npm run test:unit` 与 `npm run test:system`。`npm run test:fpk` 覆盖归档权限与生成载荷；完成 `npm run build:fpk` 后，执行 `npm run test:fpk:system` 验证真实安装包与本仓库文件逐字节一致。实际飞牛向导、NAS 目录 ACL 和设备播放需在 NAS 上验证。
 
-## 版本与发布
+## 发布
 
-源码使用 `2.1.3`，Git 标签及发布名使用 `v2.1.3`。后续每次发布先核对官方最新稳定版本，使用其补丁号加一，例如官方 `v2.2.0` 对应本仓库 `v2.2.1`。已发布版本不可覆盖；若官方版本未变化，继续在分支开发，直到可以发布新版本。
-
-每次发布只操作本仓库，源码、网页、FPK 与同一个附注标签同步。准备步骤：
+每次发布只操作本仓库，使用附注标签关联源码与安装包。准备好发布配置及 `fnos/releases/` 中的发布说明后，执行：
 
 ```bash
-# 示例：官方已经发布 v2.1.3 时，我们使用 2.1.4
-npm version 2.1.4 --no-git-tag-version
-# 编写 fnos/releases/v2.1.4.md
 npm run build:fpk
 npm test
 npm run test:fpk
 npm run test:fpk:system
 python fnos/scripts/release.test.py
 git add .
-git commit -m "chore: prepare v2.1.4 release"
+git commit -m "chore: prepare release"
 python fnos/scripts/release.py --check
 python fnos/scripts/release.py
 ```
 
 发布工具默认使用 `origin`，本仓库为 GitHub。认证优先读取 `GH_TOKEN` / `GITHUB_TOKEN`，其次读取已配置的 Git 凭据，交互运行时也可隐藏输入令牌。令牌须具备仓库代码和发布写入权限。凭据只在进程中使用，不写入源码、安装包或发布说明。
 
-脚本读取官方 latest release，核对版本、干净工作区、manifest 与 SHA256，创建附注标签并原子推送当前分支和标签，然后创建草稿、上传 FPK 和 SHA256、回读校验，再公开发布。任何失败都不会自动删除或覆盖远端标签、发布；附件失败留下的草稿需检查后处理。
+脚本核对发布配置、干净工作区、manifest 与 SHA256，创建附注标签并原子推送当前分支和标签，然后创建草稿、上传 FPK 和 SHA256、回读校验，再公开发布。任何失败都不会自动删除或覆盖远端标签、发布；附件失败留下的草稿需检查后处理。
 
-如需继续发布到自己的 Gitea，在同一仓库配置一个 Gitea 远端，再运行 `python fnos/scripts/release.py --remote gitea --username <账号>`。不再要求两套仓库分别打标签。迁移的旧 `v_jyh_2.1.2` 说明仅作为历史记录保留。
+如需继续发布到自己的 Gitea，在同一仓库配置一个 Gitea 远端，再运行 `python fnos/scripts/release.py --remote gitea --username <账号>`。不再要求两套仓库分别打标签。
 
-原官方桌面与 ZIP 发布工作流保留为手动触发，不在本仓库的版本标签推送时自动运行；飞牛发布使用上述脚本，不删除历史 Release。
+原官方桌面与 ZIP 发布工作流保留为手动触发，不在本仓库的标签推送时自动运行；飞牛发布使用上述脚本，不删除历史 Release。
 
 ## 协议与上游
 
