@@ -46,7 +46,7 @@ npm start
 
 `--ignore-scripts` 跳过不必要的 Electron 安装；本项目的原生依赖使用平台对应的预编译包。`npm run build` 编译到 `server/`。构建和启动不会自动查询或下载 fpcalc，普通播放和服务器下载不依赖它。
 
-需使用歌曲指纹识别时，可联网执行 `npm run download:fpcalc`，或自行安装平台对应的 fpcalc 到系统 PATH 或 `public/music/bin/`。手动下载命令会查询 Chromaprint 发布并下载；只有主动执行该命令时才会运行。
+需使用歌曲指纹识别时，按下方步骤单独安装 fpcalc。
 
 默认访问：播放器 `http://localhost:9527/`，后台 `http://localhost:9527/admin`。示例后台密码为 `123456`，请在自己的运行配置中修改。开发时可用 `npm run dev` 直接运行 TypeScript。
 
@@ -76,6 +76,45 @@ DISABLE_TELEMETRY=true npm start
 ```
 
 后台保存设置会写入实际运行配置和用户数据。私有音源通过现有页面导入，存放在运行数据目录，不随源码或 FPK 分发。
+
+### 可选：安装歌曲指纹识别工具
+
+普通播放、服务器下载和构建不需要 fpcalc。需要歌曲指纹识别时，可选择以下任一方式。
+
+**方式一：命令下载**
+
+在仓库根目录执行：
+
+```bash
+npm run download:fpcalc
+```
+
+该命令会主动查询 [Chromaprint 官方发布](https://github.com/acoustid/chromaprint/releases)，并下载当前系统对应的 fpcalc 到 `public/music/bin/`。需要能访问 GitHub；网络超时可改用手动下载。已存在当前平台的工具时会跳过下载。
+
+**方式二：手动下载**
+
+1. 打开 [Chromaprint 官方发布页](https://github.com/acoustid/chromaprint/releases)，选择与运行设备匹配的压缩包：Windows x64 选择 `windows-x86_64.zip`，Linux x64 选择 `linux-x86_64.tar.gz`，ARM 设备选择对应 ARM 架构的包。
+2. 解压后取出 `fpcalc.exe`（Windows）或 `fpcalc`（Linux/macOS）。
+3. 将文件放到仓库的 `public/music/bin/`：Windows 文件名为 `fpcalc.exe`，Linux/macOS 文件名为 `fpcalc`；也可安装到系统 PATH。
+
+Windows PowerShell 示例（将源路径替换为实际解压位置）：
+
+```powershell
+New-Item -ItemType Directory -Force .\public\music\bin | Out-Null
+Copy-Item 'C:\tools\chromaprint\fpcalc.exe' .\public\music\bin\fpcalc.exe
+& .\public\music\bin\fpcalc.exe -version
+```
+
+Linux/macOS 示例：
+
+```bash
+mkdir -p public/music/bin
+cp /path/to/extracted/fpcalc public/music/bin/fpcalc
+chmod +x public/music/bin/fpcalc
+./public/music/bin/fpcalc -version
+```
+
+输出工具版本信息后，重启服务即可使用。工具需与实际运行环境匹配；给飞牛 NAS 使用时选择 NAS 架构对应的 Linux 二进制，不能复制 Windows 的 `.exe`。这些二进制不提交 Git。
 
 ## 构建 FPK
 
