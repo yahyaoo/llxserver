@@ -1,0 +1,8 @@
+{
+  "settings": { "preferredQuality": "flac" },
+  "lists": {
+    "defaultList": [{ "id": "wy_ui", "name": "浏览器迁移歌曲", "source": "wy", "meta": {} }],
+    "loveList": [],
+    "userList": []
+  }
+}

@@ -1,4 +1,7 @@
 #!/usr/bin/env node
+import storageFs from './application/persistence/documentFileSystem'
+import { repositories } from './application/persistence/storage'
+import { GlobalConfigurationService } from './admin/service/GlobalConfigurationService'
 
 import fs from 'fs'
 import path from 'path'
@@ -14,7 +17,7 @@ if (typeof (global as any).navigator === 'undefined') {
   (global as any).navigator = { userAgent: 'node.js' }
 }
 
-import { initLogger } from '@/utils/log4js'
+import { initLogger } from './utils/log4js'
 import defaultConfig from './defaultConfig'
 import { ENV_PARAMS, File } from './constants'
 import { checkAndCreateDirSync } from './utils'
@@ -83,8 +86,8 @@ const setBoolConfig = <K extends keyof LX.Config>(key: K, val?: string) => {
 let lastConfigHash = ''
 const getConfigHash = (filePath: string) => {
   try {
-    if (!fs.existsSync(filePath)) return ''
-    const content = fs.readFileSync(filePath)
+    if (!storageFs.existsSync(filePath)) return ''
+    const content = storageFs.readFileSync(filePath)
     return crypto.createHash('md5').update(content).digest('hex')
   } catch {
     return ''
@@ -126,13 +129,13 @@ const getTimestampStr = () => {
 const cleanOldConfigBackups = () => {
   const backupDir = getConfigBackupDir()
   try {
-    if (!fs.existsSync(backupDir)) return
+    if (!storageFs.existsSync(backupDir)) return
     const cutoff = Date.now() - getConfigBackupRetention() * 24 * 60 * 60 * 1000
-    for (const name of fs.readdirSync(backupDir)) {
+    for (const name of storageFs.readdirSync(backupDir)) {
       if (!/^config-.*\.js$/.test(name)) continue
       const fp = path.join(backupDir, name)
       try {
-        if (fs.statSync(fp).mtimeMs < cutoff) fs.unlinkSync(fp)
+        if (storageFs.statSync(fp).mtimeMs < cutoff) storageFs.unlinkSync(fp)
       } catch { /* ignore */ }
     }
   } catch (err) {
@@ -143,24 +146,24 @@ const cleanOldConfigBackups = () => {
 // 迁移旧备份：当配置了自定义备份目录时，自动将默认路径（data/backups）下的历史备份搬迁过来
 const migrateConfigBackups = (targetBackupDir: string) => {
   const legacyDir = path.join(dataPath, 'backups')
-  if (path.resolve(targetBackupDir) === path.resolve(legacyDir) || !fs.existsSync(legacyDir)) return
+  if (path.resolve(targetBackupDir) === path.resolve(legacyDir) || !storageFs.existsSync(legacyDir)) return
   try {
-    fs.mkdirSync(targetBackupDir, { recursive: true })
-    for (const name of fs.readdirSync(legacyDir)) {
+    storageFs.mkdirSync(targetBackupDir, { recursive: true })
+    for (const name of storageFs.readdirSync(legacyDir)) {
       if (!/^config-.*\.js$/.test(name)) continue
       const src = path.join(legacyDir, name)
       const dst = path.join(targetBackupDir, name)
-      if (!fs.existsSync(dst)) {
+      if (!storageFs.existsSync(dst)) {
         try {
-          fs.renameSync(src, dst)
+          storageFs.renameSync(src, dst)
           console.log(`[Config] Migrated backup ${name} -> ${targetBackupDir}`)
         } catch (e) {
           console.warn(`[Config] Failed to migrate backup ${name}:`, e)
         }
       }
     }
-    if (fs.readdirSync(legacyDir).length === 0) {
-      try { fs.rmdirSync(legacyDir) } catch { }
+    if (storageFs.readdirSync(legacyDir).length === 0) {
+      try { storageFs.rmdirSync(legacyDir) } catch { }
     }
   } catch (err) {
     console.warn('[Config] Error during config backup migration:', err)
@@ -175,9 +178,9 @@ const backupConfig = () => {
   const dateStr = getTodayStr()
   if (dateStr === lastBackupDate) return
   try {
-    if (!global.lx?.configPath || !fs.existsSync(global.lx.configPath)) return
-    fs.mkdirSync(backupDir, { recursive: true })
-    fs.copyFileSync(global.lx.configPath, path.join(backupDir, `config-${dateStr}.js`))
+    if (!global.lx?.configPath || !storageFs.existsSync(global.lx.configPath)) return
+    storageFs.mkdirSync(backupDir, { recursive: true })
+    storageFs.copyFileSync(global.lx.configPath, path.join(backupDir, `config-${dateStr}.js`))
     lastBackupDate = dateStr
     console.log(`[Config] Local backup saved to ${backupDir}/config-${dateStr}.js`)
   } catch (err) {
@@ -190,12 +193,12 @@ const backupConfig = () => {
 const backupConfigNow = (): { success: boolean, filename?: string, error?: string } => {
   const backupDir = getConfigBackupDir()
   try {
-    if (!global.lx?.configPath || !fs.existsSync(global.lx.configPath)) {
+    if (!global.lx?.configPath || !storageFs.existsSync(global.lx.configPath)) {
       return { success: false, error: 'Config file not found' }
     }
-    fs.mkdirSync(backupDir, { recursive: true })
+    storageFs.mkdirSync(backupDir, { recursive: true })
     const filename = `config-manual-${getTimestampStr()}.js`
-    fs.copyFileSync(global.lx.configPath, path.join(backupDir, filename))
+    storageFs.copyFileSync(global.lx.configPath, path.join(backupDir, filename))
     console.log(`[Config] Manual backup saved to ${backupDir}/${filename}`)
     return { success: true, filename }
   } catch (err: any) {
@@ -207,11 +210,12 @@ const backupConfigNow = (): { success: boolean, filename?: string, error?: strin
 const saveConfigToFile = () => {
   const content = `module.exports = ${JSON.stringify(global.lx.config, null, 2)}`
   try {
+    new GlobalConfigurationService(repositories().admin).save(global.lx.configPath, global.lx.config, content)
     const targetDir = path.dirname(global.lx.configPath)
-    if (!fs.existsSync(targetDir)) {
-      fs.mkdirSync(targetDir, { recursive: true })
+    if (!storageFs.existsSync(targetDir)) {
+      storageFs.mkdirSync(targetDir, { recursive: true })
     }
-    fs.writeFileSync(global.lx.configPath, content)
+    storageFs.writeFileSync(global.lx.configPath, content)
     lastConfigHash = crypto.createHash('md5').update(content).digest('hex')
     // console.log('Current memory config saved to ' + global.lx.configPath)
     backupConfig()
@@ -259,9 +263,9 @@ const mergeConfigFileEnv = (config: Partial<Record<ENV_PARAMS_Value_Type, string
 const margeConfig = (p: string) => {
   let config
   try {
-    config = path.extname(p) == '.js'
+    config = new GlobalConfigurationService(repositories().admin).load(p, () => path.extname(p) == '.js'
       ? require(p)
-      : JSON.parse(fs.readFileSync(p).toString()) as LX.Config
+      : JSON.parse(fs.readFileSync(p).toString()) as LX.Config)
   } catch (err: any) {
     console.warn('Read config error: ' + (err.message as string))
     return false
@@ -285,7 +289,7 @@ const margeConfig = (p: string) => {
   }
   global.lx.config = newConfig
 
-  mergeConfigFileEnv(config)
+  mergeConfigFileEnv(config as unknown as Partial<Record<ENV_PARAMS_Value_Type, string>>)
   return true
 }
 
@@ -294,22 +298,22 @@ const activeConfigPath = global.lx.configPath
 const rootLegacyConfigPath = path.join(process.cwd(), 'config.js')
 const bundledConfigPath = path.join(__dirname, '../config.js')
 
-if (fs.existsSync(activeConfigPath)) {
+if (storageFs.existsSync(activeConfigPath) || repositories().admin.hasMigration('admin_config', activeConfigPath)) {
   margeConfig(activeConfigPath)
 } else {
   // 如果当前目标配置文件尚不存在（例如首次启动或从旧版升级）
   // 优先尝试从根目录的旧 config.js 迁移过来
-  const candidateLegacy = fs.existsSync(rootLegacyConfigPath)
+  const candidateLegacy = storageFs.existsSync(rootLegacyConfigPath)
     ? rootLegacyConfigPath
-    : (fs.existsSync(bundledConfigPath) ? bundledConfigPath : null)
+    : (storageFs.existsSync(bundledConfigPath) ? bundledConfigPath : null)
 
   if (candidateLegacy && path.resolve(candidateLegacy) !== path.resolve(activeConfigPath)) {
     try {
       const targetDir = path.dirname(activeConfigPath)
-      if (!fs.existsSync(targetDir)) {
-        fs.mkdirSync(targetDir, { recursive: true })
+      if (!storageFs.existsSync(targetDir)) {
+        storageFs.mkdirSync(targetDir, { recursive: true })
       }
-      fs.copyFileSync(candidateLegacy, activeConfigPath)
+      storageFs.copyFileSync(candidateLegacy, activeConfigPath)
       console.log(`[Config] Initialized config in data dir: copied ${candidateLegacy} -> ${activeConfigPath}`)
       margeConfig(activeConfigPath)
     } catch (e: any) {
@@ -320,7 +324,7 @@ if (fs.existsSync(activeConfigPath)) {
 }
 
 // 显式指定的 CONFIG_PATH 具有最高配置文件优先级
-if (envParams.CONFIG_PATH && fs.existsSync(envParams.CONFIG_PATH) && path.resolve(envParams.CONFIG_PATH) !== path.resolve(activeConfigPath)) {
+if (envParams.CONFIG_PATH && storageFs.existsSync(envParams.CONFIG_PATH) && path.resolve(envParams.CONFIG_PATH) !== path.resolve(activeConfigPath)) {
   margeConfig(envParams.CONFIG_PATH)
 }
 if (envParams.PROXY_HEADER) {
@@ -650,9 +654,9 @@ checkAndCreateDir(global.lx.userPath)
 
 // Load users from users.json if exists
 const usersJsonPath = path.join(global.lx.dataPath, 'users.json')
-if (fs.existsSync(usersJsonPath)) {
+if (storageFs.existsSync(usersJsonPath)) {
   try {
-    const users = JSON.parse(fs.readFileSync(usersJsonPath, 'utf-8'))
+    const users = JSON.parse(storageFs.readFileSync(usersJsonPath, 'utf-8'))
     if (Array.isArray(users)) {
       console.log('[用户] 从 users.json 加载用户列表')
       global.lx.config.users = users.map(u => ({ ...u, dataPath: '' }))
@@ -663,7 +667,7 @@ if (fs.existsSync(usersJsonPath)) {
 } else {
   // Save initial users to users.json
   try {
-    fs.writeFileSync(usersJsonPath, JSON.stringify(global.lx.config.users.map(u => ({
+    storageFs.writeFileSync(usersJsonPath, JSON.stringify(global.lx.config.users.map(u => ({
       name: u.name,
       password: u.password,
       maxSnapshotNum: u.maxSnapshotNum,
@@ -684,7 +688,7 @@ console.log(`[用户] 已注册用户:
 ${global.lx.config.users.map(user => `  ${user.name}: ${user.password}`).join('\n') || '  (暂无用户)'}
 `)
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const { getUserDirname } = require('@/user')
+const { getUserDirname } = require('./user')
 let hasUserCustomDirModified = false
 for (const user of global.lx.config.users) {
   const dataPath = path.join(global.lx.userPath, getUserDirname(user.name))
@@ -696,7 +700,7 @@ for (const user of global.lx.config.users) {
     if (user.customMusicDir && typeof user.customMusicDir === 'string' && user.customMusicDir.trim()) {
       const resolvedDir = path.resolve(user.customMusicDir.trim())
       try {
-        if (fs.existsSync(resolvedDir) && fs.statSync(resolvedDir).isDirectory()) {
+        if (storageFs.existsSync(resolvedDir) && storageFs.statSync(resolvedDir).isDirectory()) {
           isValid = true
         }
       } catch {
@@ -715,7 +719,7 @@ for (const user of global.lx.config.users) {
 if (hasUserCustomDirModified) {
   saveConfigToFile()
   try {
-    fs.writeFileSync(usersJsonPath, JSON.stringify(global.lx.config.users.map(u => ({
+    storageFs.writeFileSync(usersJsonPath, JSON.stringify(global.lx.config.users.map(u => ({
       name: u.name,
       password: u.password,
       maxSnapshotNum: u.maxSnapshotNum,
@@ -755,19 +759,19 @@ function normalizePort(val: string) {
 // const bindIP = envParams.BIND_IP ?? '127.0.0.1'
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const { createModuleEvent } = require('@/event')
+const { createModuleEvent } = require('./event')
 createModuleEvent()
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-require('@/utils/migrate').default(global.lx.dataPath, global.lx.userPath)
+require('./utils/migrate').default(global.lx.dataPath, global.lx.userPath)
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const { startServer } = require('@/server')
+const { startServer } = require('./server')
 
 // 初始化 WebDAV 同步
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const WebDAVSync = require('@/utils/webdavSync').default
-const webdavSync = new WebDAVSync({
+const { createWebDavGateway } = require('./integrations/webdav/WebDavGateway') as typeof import('./integrations/webdav/WebDavGateway')
+const webdavSync = createWebDavGateway({
   enable: global.lx.config['webdav.enable'],
   url: global.lx.config['webdav.url'],
   username: global.lx.config['webdav.username'],
@@ -793,7 +797,7 @@ if (webdavSync.isConfigured()) {
 
       // 1. 重新从磁盘加载最新的 config.js 到内存 (解决实时生效问题)
       const configPath = global.lx.configPath
-      if (fs.existsSync(configPath)) {
+      if (storageFs.existsSync(configPath)) {
         console.log('[WebDAV] 恢复完成后重新加载配置文件: ' + configPath)
         // 清除 node require 缓存以强制重载
         try {
@@ -806,16 +810,16 @@ if (webdavSync.isConfigured()) {
 
       // 2. 重新加载 users.json
       const usersJsonPath = path.join(global.lx.dataPath, 'users.json')
-      if (fs.existsSync(usersJsonPath)) {
+      if (storageFs.existsSync(usersJsonPath)) {
         try {
-          const users = JSON.parse(fs.readFileSync(usersJsonPath, 'utf-8'))
+          const users = JSON.parse(storageFs.readFileSync(usersJsonPath, 'utf-8'))
           if (Array.isArray(users)) {
             console.log('[WebDAV] 从恢复的 users.json 重新加载用户列表')
             global.lx.config.users = users.map(u => ({ ...u, dataPath: '' }))
 
             // 重新初始化用户目录
             // eslint-disable-next-line @typescript-eslint/no-var-requires
-            const { getUserDirname } = require('@/user')
+            const { getUserDirname } = require('./user')
             for (const user of global.lx.config.users) {
               const dataPath = path.join(global.lx.userPath, getUserDirname(user.name))
               checkAndCreateDir(dataPath)
@@ -829,7 +833,7 @@ if (webdavSync.isConfigured()) {
 
       // 3. 重新加载所有自定义源 (解决前端显示加载中/旧源问题)
       // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const { initUserApis } = require('@/server/userApi')
+      const { initUserApis } = require('./integrations/custom-source/CustomSourceGateway')
       console.log('[WebDAV] 正在重新初始化自定义源...')
       await initUserApis()
     }
@@ -843,11 +847,11 @@ if (webdavSync.isConfigured()) {
 // [新增] 确保数据目录下的 _open 及 _open/library 目录存在 (用于公共受限资源 & 公开收藏)
 const openDir = path.join(global.lx.userPath, '_open')
 const openLibDir = path.join(openDir, 'library')
-if (!fs.existsSync(openDir)) {
-  fs.mkdirSync(openDir, { recursive: true })
+if (!storageFs.existsSync(openDir)) {
+  storageFs.mkdirSync(openDir, { recursive: true })
 }
-if (!fs.existsSync(openLibDir)) {
-  fs.mkdirSync(openLibDir, { recursive: true })
+if (!storageFs.existsSync(openLibDir)) {
+  storageFs.mkdirSync(openLibDir, { recursive: true })
 }
 
 // 启动前最后保存一次合并后的配置，确保环境变量被固化到 config.js 中
@@ -862,10 +866,10 @@ startServer(global.lx.config.port, '0.0.0.0')
 
 // 监控配置文件变动以实现热重载 (由于 nodemon 已忽略该文件)
 const activeWatcherConfigPath = global.lx.configPath
-if (fs.existsSync(activeWatcherConfigPath)) {
+if (storageFs.existsSync(activeWatcherConfigPath)) {
   lastConfigHash = getConfigHash(activeWatcherConfigPath)
   let debounceTimer: NodeJS.Timeout | null = null
-  fs.watch(activeWatcherConfigPath, (event) => {
+  storageFs.watch(activeWatcherConfigPath, (event) => {
     if (event === 'change') {
       if (debounceTimer) clearTimeout(debounceTimer)
       debounceTimer = setTimeout(() => {

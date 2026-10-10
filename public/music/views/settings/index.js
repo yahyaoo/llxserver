@@ -10,6 +10,7 @@ const SETTINGS_NAVIGATION = [
         { id: 'cache', label: '本地缓存与重置', icon: 'fa-database' },
     ] },
     { id: 'display', label: '显示', icon: 'fa-desktop', items: [
+        { id: 'theme', label: '主题与外观', icon: 'fa-palette' },
         { id: 'layout', label: '界面与布局', icon: 'fa-columns' },
         { id: 'visuals', label: '播放背景与视觉特效', icon: 'fa-image' },
         { id: 'lyrics', label: '歌词显示设置', icon: 'fa-language' },
@@ -22,6 +23,10 @@ const SETTINGS_NAVIGATION = [
     ] },
     { id: 'logs', label: '日志', icon: 'fa-terminal', items: [
         { id: 'logs', label: '系统日志', icon: 'fa-terminal' },
+    ] },
+    { id: 'app', label: '应用', icon: 'fa-info-circle', items: [
+        { id: 'admin', label: '后台管理', icon: 'fa-server' },
+        { id: 'about', label: '关于', icon: 'fa-info-circle' },
     ] },
 ];
 let activeSettingsSection = 'sources';
@@ -49,6 +54,7 @@ function selectSettingsSection(sectionId) {
     document.getElementById('settings-content').scrollTop = 0;
     setSettingsMobileOpen(false);
     if (sectionId === 'logs' && window.renderSystemLogs) window.renderSystemLogs();
+    if (sectionId === 'about' && typeof loadAboutContent === 'function') loadAboutContent();
 }
 
 /** 保留旧的分组切换入口。 @param {string} groupId 大功能分组标识。 */

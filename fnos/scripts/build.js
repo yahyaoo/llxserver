@@ -59,6 +59,7 @@ function main() {
     ['scripts/update-build-hash.js'],
     ['node_modules/typescript/bin/tsc', '--project', 'tsconfig.json'],
     ['node_modules/tsc-alias/dist/bin/index.js', '-p', 'tsconfig.json'],
+    ['scripts/copy-sql.js'],
   ]) {
     console.log('[build] node ' + args.join(' '));
     execFileSync(process.execPath, args, { cwd: ROOT, stdio: 'inherit' });

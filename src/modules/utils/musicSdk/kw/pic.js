@@ -1,10 +1,3 @@
-import { httpFetch } from '../../request'
-import { formatPic } from './util'
-
-export default {
-  getPic({ songmid }) {
-    const requestObj = httpFetch(`http://artistpicserver.kuwo.cn/pic.web?corp=kuwo&type=rid_pic&pictype=1000&size=1000&rid=${songmid}`)
-    requestObj.promise = requestObj.promise.then(({ body }) => /^http/.test(body) ? formatPic(body) : null)
-    return requestObj.promise
-  },
-}
+/** 原模块路径兼容入口。实现已按职责移动，保持调用方导出协议。 @author yahyaoo */
+export * from '../../../../integrations/music-sdk/internal/musicSdk/kw/pic.js'
+export { default } from '../../../../integrations/music-sdk/internal/musicSdk/kw/pic.js'

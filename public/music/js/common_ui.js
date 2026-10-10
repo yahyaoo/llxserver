@@ -136,13 +136,14 @@ function readAgreementInAbout() {
     if (typeof switchTab === 'function') {
         switchTab('about');
         setTimeout(() => {
-            const aboutContainer = document.getElementById('view-about');
+            const aboutContainer = document.getElementById('settings-section-about');
             if (aboutContainer) {
                 const agreementHeader = Array.from(aboutContainer.querySelectorAll('h2')).find(h => h.innerText.includes('项目协议'));
                 if (agreementHeader) {
                     agreementHeader.scrollIntoView({ behavior: 'smooth' });
                 } else {
-                    aboutContainer.scrollTo({ top: aboutContainer.scrollHeight, behavior: 'smooth' });
+                    const content = document.getElementById('settings-content');
+                    content?.scrollTo({ top: content.scrollHeight, behavior: 'smooth' });
                 }
             }
         }, 500);

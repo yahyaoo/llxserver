@@ -64,7 +64,7 @@ test('关闭更新不请求，开启只调用本地接口；发布说明转义�
 function createMusicSettingsContext() {
   class Element {
     constructor(id = '') {
-      this.id = id; this.dataset = {}; this.attributes = {}; this.children = []; this.scrollTop = 80
+      this.id = id; this.dataset = {}; this.attributes = {}; this.children = []; this.scrollTop = 80; this.style = {}
       const classes = new Set()
       this.classList = {
         add: (...values) => values.forEach(value => classes.add(value)),
@@ -84,13 +84,13 @@ function createMusicSettingsContext() {
   }
   const elements = new Map()
   const get = id => { if (!elements.has(id)) elements.set(id, new Element(id)); return elements.get(id) }
-  const sections = ['sources', 'network', 'updates', 'sync', 'auto-update', 'cache', 'layout', 'visuals', 'lyrics', 'queue', 'playback', 'recovery', 'devices', 'logs'].map(id => {
+  const sections = ['sources', 'network', 'updates', 'sync', 'auto-update', 'cache', 'theme', 'layout', 'visuals', 'lyrics', 'queue', 'playback', 'recovery', 'devices', 'logs', 'admin', 'about'].map(id => {
     const element = get('settings-section-' + id); element.dataset.settingsSection = id; return element
   })
-  const themeButtons = ['emerald', 'blue', 'amber', 'violet', 'rose'].map(id => {
+  const themeButtons = ['emerald', 'blue', 'amber', 'violet', 'rose', 'emerald', 'blue', 'amber', 'violet', 'rose'].map(id => {
     const element = new Element(); element.setAttribute('data-theme', id); return element
   })
-  const appearanceButtons = ['light', 'dark', 'system'].map(id => {
+  const appearanceButtons = ['light', 'dark', 'system', 'light', 'dark', 'system'].map(id => {
     const element = new Element(); element.setAttribute('data-appearance', id); return element
   })
   const menus = ['theme', 'account'].map(id => {
@@ -122,8 +122,8 @@ function createMusicSettingsContext() {
 
 test('设置树完整分组，切换仅改变可见性并保留控件状态；无效目标不破坏当前内容', () => {
   const { context, get, sections } = createMusicSettingsContext()
-  assert.equal(get('settings-navigation').children.length, 4)
-  assert.equal(get('settings-navigation').children.flatMap(group => group.children.slice(1)).length, 14)
+  assert.equal(get('settings-navigation').children.length, 5)
+  assert.equal(get('settings-navigation').children.flatMap(group => group.children.slice(1)).length, 17)
   const control = { value: '未保存的输入' }
   get('settings-section-sync').appendChild(control)
   context.selectSettingsSection('sync')
@@ -175,18 +175,20 @@ test('顶部下拉互斥，外部点击和 Esc 关闭并恢复键盘焦点', () 
   assert.equal(get('header-theme-menu').classList.contains('hidden'), true)
 })
 
-test('顶部主题沿用原有存储、选中态与外观模式，无效主题不改写偏好', () => {
+test('顶部与设置中的主题共享存储、选中态与外观模式，无效主题不改写偏好', () => {
   const { context, get, values, themeButtons, appearanceButtons } = createMusicSettingsContext()
   context.setTheme('violet')
   assert.equal(values.get('lx_theme'), 'violet')
   assert.equal(get('header-theme-label').textContent, '紫微星')
-  assert.equal(themeButtons.filter(button => button.getAttribute('aria-pressed') === 'true').length, 1)
+  assert.equal(themeButtons.filter(button => button.getAttribute('aria-pressed') === 'true').length, 2)
+  assert.equal(themeButtons[8].getAttribute('aria-pressed'), 'true', '设置中的主题也同步选中')
   context.setTheme('invalid')
   assert.equal(values.get('lx_theme'), 'violet')
   context.setAppearance('dark')
   assert.equal(values.get('lx_appearance'), 'dark')
   assert.equal(context.document.documentElement.classList.contains('dark'), true)
   assert.equal(appearanceButtons[1].getAttribute('aria-pressed'), 'true')
+  assert.equal(appearanceButtons[4].getAttribute('aria-pressed'), 'true')
   context.setAppearance('light')
   assert.equal(context.document.documentElement.classList.contains('dark'), false)
   context.setAppearance('system')
@@ -216,7 +218,11 @@ test('独立设置页面组件同步挂载，重复挂载保留控件草稿；�
   assert.equal(container.dataset.settingsMounted, 'true')
   assert.ok(container.innerHTML.includes('id="settings-navigation"'))
   assert.ok(container.innerHTML.includes('id="btn-mode-local"'))
-  assert.equal([...container.innerHTML.matchAll(/data-settings-section=/g)].length, 14)
+  assert.equal([...container.innerHTML.matchAll(/data-settings-section=/g)].length, 17)
+  assert.equal([...container.innerHTML.matchAll(/data-theme=/g)].length, 5)
+  assert.equal([...container.innerHTML.matchAll(/data-appearance=/g)].length, 3)
+  assert.ok(container.innerHTML.includes('id="nav-admin-link"'))
+  assert.ok(container.innerHTML.includes('id="about-content"'))
   const controls = [...container.innerHTML.matchAll(/<(?:input|select|textarea)\b/g)].length
   assert.ok(controls > 60, '完整挂载现有设置控件')
   container.innerHTML = '保留已挂载控件及未保存草稿'
@@ -225,4 +231,94 @@ test('独立设置页面组件同步挂载，重复挂载保留控件草稿；�
   const page = fs.readFileSync(path.join(__dirname, '../public/music/index.html'), 'utf8')
   assert.ok(page.indexOf('views/settings/SettingsView.js') < page.indexOf('src="app.js"'), '先挂载控件再执行原有业务脚本')
   assert.ok(page.includes('views/settings/settings.css'))
+})
+
+test('应用分组切换后台和关于；旧关于入口进入设置并保持主导航选中态', () => {
+  const { context, get, sections } = createMusicSettingsContext()
+  let aboutLoads = 0
+  context.loadAboutContent = () => aboutLoads++
+  context.selectSettingsSection('admin')
+  assert.equal(get('settings-panel-app').classList.contains('hidden'), false)
+  assert.equal(get('settings-section-title').textContent, '后台管理')
+  assert.equal(sections.filter(section => !section.classList.contains('hidden'))[0].dataset.settingsSection, 'admin')
+  const originalQuery = context.document.querySelectorAll
+  context.document.querySelectorAll = selector => {
+    if (selector === '[id^="view-"]') return [get('view-search'), get('view-settings')]
+    if (selector === '[id^="tab-"]') return [get('tab-search'), get('tab-settings')]
+    return originalQuery(selector)
+  }
+  context.window.innerWidth = 1440
+  context.setTimeout = callback => callback()
+  context.expandBtnTimeout = null
+  context.toggleLyricsBtnTimeout = null
+  context.exitListSecondaryModes = () => {}
+  const source = fs.readFileSync(path.join(__dirname, '../public/music/app.js'), 'utf8')
+  const switchTabStart = source.indexOf('function switchTab(')
+  vm.runInContext(source.slice(switchTabStart, source.indexOf('\n/**', switchTabStart)), context)
+  context.switchTab('about')
+  assert.equal(get('view-settings').classList.contains('hidden'), false)
+  assert.equal(get('view-search').classList.contains('hidden'), true)
+  assert.equal(get('tab-settings').classList.contains('active-tab'), true)
+  assert.equal(get('settings-section-about').classList.contains('hidden'), false)
+  assert.equal(get('settings-section-title').textContent, '关于')
+  assert.equal(aboutLoads, 1)
+})
+
+test('主导航独立组件同步挂载，重复挂载保留收藏树；管理和关于只在设置中提供', () => {
+  const { context } = createMusicSettingsContext()
+  context.document.getElementById = () => null
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '../public/music/views/main-navigation/MainNavigation.js'), 'utf8'), context)
+  const container = { dataset: {}, innerHTML: '' }
+  context.window.MainNavigation.mount(container)
+  assert.equal(container.dataset.navigationMounted, 'true')
+  assert.ok(container.innerHTML.includes('id="my-lists-container"'))
+  assert.ok(container.innerHTML.includes('id="main-navigation-collapse"'))
+  assert.ok(!container.innerHTML.includes('nav-admin-link'))
+  assert.ok(!container.innerHTML.includes('tab-about'))
+  container.innerHTML = '保留歌单树与当前展开状态'
+  context.window.MainNavigation.mount(container)
+  assert.equal(container.innerHTML, '保留歌单树与当前展开状态')
+  const page = fs.readFileSync(path.join(__dirname, '../public/music/index.html'), 'utf8')
+  assert.ok(page.indexOf('views/main-navigation/MainNavigation.js') < page.indexOf('src="app.js"'))
+  assert.ok(page.indexOf('views/main-navigation/MainNavigation.js') < page.indexOf('js/user_sync.js'))
+  assert.ok(page.includes('views/main-navigation/main-navigation.css'))
+  assert.ok(page.includes('views/main-navigation/index.js'))
+})
+
+test('桌面导航收起保留手机抽屉和收藏状态，点击收藏展开导航；手机不使用桌面收起', () => {
+  const { context, get } = createMusicSettingsContext()
+  const sidebar = get('main-sidebar')
+  const button = get('main-navigation-collapse')
+  const label = { textContent: '收起' }
+  button.querySelector = () => label
+  context.window.innerWidth = 1440
+  sidebar.classList.add('-translate-x-full')
+  get('tab-search').classList.add('active-tab')
+  get('favorites-children').style.height = '128px'
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '../public/music/views/main-navigation/index.js'), 'utf8'), context)
+  context.toggleMainNavigation()
+  assert.equal(sidebar.classList.contains('navigation-collapsed'), true)
+  assert.equal(sidebar.classList.contains('-translate-x-full'), true)
+  assert.equal(button.getAttribute('aria-expanded'), 'false')
+  assert.equal(button.getAttribute('aria-label'), '展开主导航')
+  assert.equal(get('tab-search').classList.contains('active-tab'), true)
+  assert.equal(get('favorites-children').style.height, '128px')
+  let favoritesToggles = 0
+  context.exitListSecondaryModes = () => {}
+  context.toggleFavorites = () => favoritesToggles++
+  const source = fs.readFileSync(path.join(__dirname, '../public/music/app.js'), 'utf8')
+  vm.runInContext(source.slice(source.indexOf('function handleFavoritesClick()'), source.indexOf('function handleDislikeFolderClick()')), context)
+  context.handleFavoritesClick()
+  assert.equal(sidebar.classList.contains('navigation-collapsed'), false)
+  assert.equal(button.getAttribute('aria-expanded'), 'true')
+  assert.equal(favoritesToggles, 0, '收藏已展开时只展开主导航，不关闭子树')
+  assert.equal(get('favorites-children').style.height, '128px')
+  assert.equal(label.textContent, '收起')
+  context.toggleMainNavigation()
+  get('favorites-children').style.height = '0px'
+  context.handleFavoritesClick()
+  assert.equal(favoritesToggles, 1, '收藏关闭时正常展开子树')
+  context.window.innerWidth = 1024
+  context.toggleMainNavigation()
+  assert.equal(sidebar.classList.contains('navigation-collapsed'), false)
 })

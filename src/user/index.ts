@@ -1,8 +1,9 @@
 import { UserDataManage } from './data'
+import storageFs from '../application/persistence/documentFileSystem'
 import {
   ListManage,
   DislikeManage,
-} from '@/modules'
+} from '../modules'
 
 export interface UserSpace {
   dataManage: UserDataManage
@@ -62,6 +63,33 @@ export const releaseUserSpace = (userName: string, force = false) => {
     clearDelayReleaseTimeout(userName)
     users.delete(userName)
   } else seartDelayReleaseTimeout(userName)
+}
+
+/**
+ * 备份恢复后更新已加载用户的快照与歌单；保持用户空间对象引用，避免中断同步连接。
+ * @returns 所有已加载空间完成恢复后的结果。
+ * @author yahyaoo
+ */
+export const reloadActiveUserSpaces = async (): Promise<void> => {
+  for (const space of users.values()) {
+    await space.listManage.listDataManage.initPromise
+    for (const snapshots of [space.listManage.snapshotDataManage, space.dislikeManage.snapshotDataManage]) {
+      if (!storageFs.existsSync(snapshots.snapshotInfoFilePath)) continue
+      const info = JSON.parse(storageFs.readFileSync(snapshots.snapshotInfoFilePath, 'utf8'))
+      snapshots.snapshotInfo = info
+      snapshots.clientSnapshotKeys = Object.values(info.clients || {}).map((client: any) => client.snapshotKey).filter(Boolean)
+    }
+    const lists = space.listManage.snapshotDataManage
+    if (lists.snapshotInfo.latest) {
+      const data = await lists.getSnapshot(lists.snapshotInfo.latest)
+      if (data) await space.listManage.listDataManage.restore(data)
+    }
+    const dislike = space.dislikeManage.snapshotDataManage
+    if (dislike.snapshotInfo.latest) {
+      const data = await dislike.getSnapshot(dislike.snapshotInfo.latest)
+      if (data) space.dislikeManage.dislikeDataManage.dislikeRules = data
+    }
+  }
 }
 
 /**

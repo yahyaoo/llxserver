@@ -1,9 +1,10 @@
+import storageFs from '../application/persistence/documentFileSystem'
 import fs from 'node:fs'
 import path from 'node:path'
 import { randomBytes } from 'node:crypto'
-import { throttle } from '@/utils/common'
-import { filterFileName, toMD5 } from '@/utils'
-import { File } from '@/constants'
+import { throttle } from '../utils/common'
+import { filterFileName, toMD5 } from '../utils'
+import { File } from '../constants'
 
 
 interface ServerInfo {
@@ -16,13 +17,13 @@ interface DevicesInfo {
 }
 const serverInfoFilePath = path.join(global.lx.dataPath, File.serverInfoJSON)
 const saveServerInfoThrottle = throttle(() => {
-  fs.writeFile(serverInfoFilePath, JSON.stringify(serverInfo), 'utf8', (err) => {
+  storageFs.writeFile(serverInfoFilePath, JSON.stringify(serverInfo), 'utf8', (err) => {
     if (err) console.error(err)
   })
 })
 let serverInfo: ServerInfo
-if (fs.existsSync(serverInfoFilePath)) {
-  serverInfo = JSON.parse(fs.readFileSync(serverInfoFilePath).toString())
+if (storageFs.existsSync(serverInfoFilePath)) {
+  serverInfo = JSON.parse(storageFs.readFileSync(serverInfoFilePath).toString())
 } else {
   serverInfo = {
     serverId: randomBytes(4 * 4).toString('base64'),
@@ -64,10 +65,10 @@ export const getUserConfig = (userName: string): Required<LX.User> => {
 
 // 读取所有用户目录下的devicesInfo信息，建立clientId与用户的对应关系，用于非首次连接
 const deviceUserMap = new Map<string, string>()
-for (const deviceInfo of fs.readdirSync(global.lx.userPath).map(dirname => {
+for (const deviceInfo of storageFs.readdirSync(global.lx.userPath).map(dirname => {
   const devicesFilePath = path.join(global.lx.userPath, dirname, File.userDevicesJSON)
-  if (fs.existsSync(devicesFilePath)) {
-    const devicesInfo = JSON.parse(fs.readFileSync(devicesFilePath).toString()) as DevicesInfo
+  if (storageFs.existsSync(devicesFilePath)) {
+    const devicesInfo = JSON.parse(storageFs.readFileSync(devicesFilePath).toString()) as DevicesInfo
     if (getUserDirname(devicesInfo.userName) == dirname) return { userName: devicesInfo.userName, devices: devicesInfo.clients }
   }
   return { userName: '', devices: {} }
@@ -99,8 +100,8 @@ export const migrateUserData = (oldName: string, newName: string) => {
   const oldDirPath = path.join(global.lx.userPath, oldDirname)
   const newDirPath = path.join(global.lx.userPath, newDirname)
 
-  if (fs.existsSync(newDirPath)) throw new Error('Target directory already exists')
-  if (!fs.existsSync(oldDirPath)) {
+  if (storageFs.existsSync(newDirPath)) throw new Error('Target directory already exists')
+  if (!storageFs.existsSync(oldDirPath)) {
     // 如果旧目录不存在，可能是还没产生过数据，直接返回新路径即可
     return newDirPath
   }
@@ -108,7 +109,7 @@ export const migrateUserData = (oldName: string, newName: string) => {
   // 1. 迁移文件夹数据 (Copy-then-Delete 方案，对 Windows 更友好)
   try {
     // 递归复制整个目录
-    fs.cpSync(oldDirPath, newDirPath, { recursive: true })
+    storageFs.cpSync(oldDirPath, newDirPath, { recursive: true })
   } catch (err: any) {
     console.error(`[MigrateData] Copy failed: ${err.message}`)
     throw err
@@ -116,11 +117,11 @@ export const migrateUserData = (oldName: string, newName: string) => {
 
   // 2. 更新新目录中的 devices.json 内部的 userName
   const devicesFilePath = path.join(newDirPath, File.userDevicesJSON)
-  if (fs.existsSync(devicesFilePath)) {
+  if (storageFs.existsSync(devicesFilePath)) {
     try {
-      const devicesInfo = JSON.parse(fs.readFileSync(devicesFilePath, 'utf-8')) as DevicesInfo
+      const devicesInfo = JSON.parse(storageFs.readFileSync(devicesFilePath, 'utf-8')) as DevicesInfo
       devicesInfo.userName = newName
-      fs.writeFileSync(devicesFilePath, JSON.stringify(devicesInfo, null, 2))
+      storageFs.writeFileSync(devicesFilePath, JSON.stringify(devicesInfo, null, 2))
 
       // 3. 更新内存中的 deviceUserMap
       for (const client of Object.values(devicesInfo.clients)) {
@@ -133,7 +134,7 @@ export const migrateUserData = (oldName: string, newName: string) => {
 
   // 4. 尝试删除旧文件夹 (如果锁定则跳过，不影响新用户使用)
   try {
-    fs.rmSync(oldDirPath, { recursive: true, force: true })
+    storageFs.rmSync(oldDirPath, { recursive: true, force: true })
   } catch (err: any) {
     console.warn(`[MigrateData] Could not remove old directory ${oldDirname}: ${err.message}. It may be locked by another process.`)
   }
@@ -188,10 +189,10 @@ export class UserDataManage {
     this.userName = userName
     this.userDir = path.join(global.lx.userPath, getUserDirname(userName))
     this.devicesFilePath = path.join(this.userDir, File.userDevicesJSON)
-    this.devicesInfo = fs.existsSync(this.devicesFilePath) ? JSON.parse(fs.readFileSync(this.devicesFilePath).toString()) : { userName, clients: {} }
+    this.devicesInfo = storageFs.existsSync(this.devicesFilePath) ? JSON.parse(storageFs.readFileSync(this.devicesFilePath).toString()) : { userName, clients: {} }
 
     this.saveDevicesInfoThrottle = throttle(() => {
-      fs.writeFile(this.devicesFilePath, JSON.stringify(this.devicesInfo), 'utf8', (err) => {
+      storageFs.writeFile(this.devicesFilePath, JSON.stringify(this.devicesInfo), 'utf8', (err) => {
         if (err) console.error(err)
       })
     })

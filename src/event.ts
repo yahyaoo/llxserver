@@ -4,7 +4,7 @@ import {
   type ListEventType,
   DislikeEvent,
   type DislikeEventType,
-} from '@/modules'
+} from './modules'
 
 export type {
   // AppType,

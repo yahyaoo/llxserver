@@ -1,15 +1,15 @@
 import type http from 'http'
-import { SYNC_CODE } from '@/constants'
+import { SYNC_CODE } from '../constants'
 import {
   aesEncrypt,
   aesDecrypt,
   rsaEncrypt,
   getIP,
-} from '@/utils/tools'
+} from '../utils/tools'
 import querystring from 'node:querystring'
-import store from '@/utils/cache'
-import { getUserSpace, getUserName, setUserName, createClientKeyInfo } from '@/user'
-import { toMD5 } from '@/utils'
+import store from '../utils/cache'
+import { getUserSpace, getUserName, setUserName, createClientKeyInfo } from '../user'
+import { toMD5 } from '../utils'
 
 const getAvailableIP = (req: http.IncomingMessage) => {
   let ip = getIP(req)

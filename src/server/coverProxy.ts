@@ -1,5 +1,5 @@
 import http from 'http'
-import { getProxyAgent } from '../modules/utils/proxy.js'
+import { getProxyAgent } from '../integrations/music-sdk/NetworkGateway'
 
 /**
  * 封面图片代理与缓存（图片显示核心实现）

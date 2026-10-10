@@ -7,8 +7,8 @@ extraMetadata:
   main: electron/main.js
   description: LX Music Sync Server Desktop
 
-# [核心修复] 禁用打包时的原生模块自动重编，防止本地因缺少 C++ 编译环境而报错
-npmRebuild: false
+# SQLite 必须按 Electron ABI 重编；缺少编译工具时显式失败，避免生成无法启动的安装包。
+npmRebuild: true
 
 directories:
   output: dist-electron
@@ -42,6 +42,7 @@ asarUnpack:
   - node_modules/music-tag-native/**/*
   - node_modules/bufferutil/**/*
   - node_modules/utf-8-validate/**/*
+  - node_modules/better-sqlite3/**/*
   - public/**/*
 
 # 应用图标（提供 512x512 PNG，electron-builder 自动生成 ico / icns）

@@ -1,4 +1,4 @@
-import { modules } from '@/modules'
+import { modules } from '../../modules'
 
 export const registerLocalSyncEvent = async(wss: LX.SocketServer) => {
   unregisterLocalSyncEvent()

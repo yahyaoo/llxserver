@@ -1,8 +1,8 @@
 import * as path from 'path'
-import * as fs from 'fs'
+import fs from '../application/persistence/documentFileSystem'
 import * as crypto from 'crypto'
 import { ZipArchive } from 'archiver'
-import unzipper from 'unzipper'
+import { archiveGateway } from '../integrations/archive/ArchiveGateway'
 
 // elFinder 文件管理器连接器
 export class ElFinderConnector {
@@ -573,9 +573,9 @@ export class ElFinderConnector {
                 const fileName = path.basename(filePath)
 
                 if (stats.isDirectory()) {
-                    archive.directory(filePath, fileName)
+                    archiveGateway.append(archive, fs, filePath, fileName)
                 } else {
-                    archive.file(filePath, { name: fileName })
+                    archiveGateway.append(archive, fs, filePath, fileName)
                 }
             }
 
@@ -599,25 +599,8 @@ export class ElFinderConnector {
             }
         }
 
-        return new Promise((resolve, reject) => {
-            fs.createReadStream(target)
-                .pipe(unzipper.Extract({ path: extractPath }))
-                .on('close', async () => {
-                    // 简单起见，返回解压目录的信息，或者强制刷新
-                    // elFinder 期望返回 added 列表，这里我们返回解压后的根目录（如果是 makedir）或父目录的更新
-                    if (makedir) {
-                        const info = await this.getFileInfo(extractPath)
-                        resolve({ added: [info] })
-                    } else {
-                        // 如果解压到当前目录，很难知道增加了哪些文件，通常返回空 added 并让前端刷新
-                        // 或者我们可以尝试列出目录
-                        resolve({ added: [] }) // 前端可能不会自动刷新，但至少操作完成了
-                    }
-                })
-                .on('error', (err: any) => {
-                    reject({ error: [err.message] })
-                })
-        })
+        await archiveGateway.extract(fs, target, extractPath, true)
+        return makedir ? { added: [await this.getFileInfo(extractPath)] } : { added: [] }
     }
 
     // size - 获取大小
@@ -691,9 +674,9 @@ export class ElFinderConnector {
                     const stats = fs.statSync(filePath)
                     const name = path.basename(filePath)
                     if (stats.isDirectory()) {
-                        archive.directory(filePath, name)
+                        archiveGateway.append(archive, fs, filePath, name)
                     } else {
-                        archive.file(filePath, { name })
+                        archiveGateway.append(archive, fs, filePath, name)
                     }
                 } catch (e) { }
             }

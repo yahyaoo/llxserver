@@ -1,5 +1,5 @@
-import { FeaturesList } from '@/constants'
-import { featureVersion, modules } from '@/modules'
+import { FeaturesList } from '../../constants'
+import { featureVersion, modules } from '../../modules'
 
 
 export const sync = async(socket: LX.Socket) => {

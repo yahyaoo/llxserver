@@ -1,12 +1,2 @@
-
-// 构建列表信息对象，用于统一字段位置顺序
-export const buildUserListInfoFull = ({ id, name, source, sourceListId, list, locationUpdateTime }: LX.List.UserListInfoFull) => {
-  return {
-    id,
-    name,
-    source,
-    sourceListId,
-    locationUpdateTime,
-    list,
-  }
-}
+/** 原模块路径兼容入口。实现已按职责移动，保持调用方导出协议。 @author yahyaoo */
+export * from '../../music/service/playlist/utils'

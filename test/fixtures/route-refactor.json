@@ -1,0 +1,1282 @@
+[
+  {
+    "group": "adminOperations",
+    "file": "src/admin/service/OperationsService.ts",
+    "method": "postLogin",
+    "route": "/api/login",
+    "condition": "pathname === '/api/login' && req.method === 'POST'",
+    "baselineDigest": "5cd3dca6e6342fc5fab5d098fb4085c615e4251f5b17319341fe826b81a5dacf"
+  },
+  {
+    "group": "adminOperations",
+    "file": "src/admin/service/OperationsService.ts",
+    "method": "getStatus",
+    "route": "/api/status",
+    "condition": "pathname === '/api/status' && req.method === 'GET'",
+    "baselineDigest": "47b2327421e6b084aa1aaa69981124e0f1a6d9c0ee3c37641344d15477058718"
+  },
+  {
+    "group": "adminOperations",
+    "file": "src/admin/service/OperationsService.ts",
+    "method": "getAppUpdateCheck",
+    "route": "/api/app/update/check",
+    "condition": "pathname === '/api/app/update/check' && req.method === 'GET'",
+    "baselineDigest": "91c1d1411620c1efc1768bf21d28eb9eed78af02b9530898a01c8bb56976c280"
+  },
+  {
+    "group": "adminUser",
+    "file": "src/admin/service/UserService.ts",
+    "method": "handleUsers",
+    "route": "/api/users",
+    "condition": "pathname === '/api/users'",
+    "baselineDigest": "b7141f0e6849c29a075250ca1b163bed840a149328edce1db31457fcbc52da81"
+  },
+  {
+    "group": "musicPlaylist",
+    "file": "src/music/service/PlaylistService.ts",
+    "method": "getData",
+    "route": "/api/data",
+    "condition": "pathname === '/api/data' && req.method === 'GET'",
+    "baselineDigest": "5dd106d51283913052d6ab6b1d9c059db827b845aaaec386aa3df6514a3c68d6"
+  },
+  {
+    "group": "musicPlaylist",
+    "file": "src/music/service/PlaylistService.ts",
+    "method": "getDataSnapshots",
+    "route": "/api/data/snapshots",
+    "condition": "pathname === '/api/data/snapshots' && req.method === 'GET'",
+    "baselineDigest": "fa0b00406ec09937f2749efd3dd46e328bf761e558df1ea22644b0a0e4337889"
+  },
+  {
+    "group": "musicPlaylist",
+    "file": "src/music/service/PlaylistService.ts",
+    "method": "getDataSnapshot",
+    "route": "/api/data/snapshot",
+    "condition": "pathname === '/api/data/snapshot' && req.method === 'GET'",
+    "baselineDigest": "81a9cb3ea9be0bd87d56d059cb8de9d6bf517b0aa5a1c49b3d0597b433b0e500"
+  },
+  {
+    "group": "musicPlaylist",
+    "file": "src/music/service/PlaylistService.ts",
+    "method": "postDataRestoreSnapshot",
+    "route": "/api/data/restore-snapshot",
+    "condition": "pathname === '/api/data/restore-snapshot' && req.method === 'POST'",
+    "baselineDigest": "79ab948dde47518f8bda94341472c8b54d33402396caaf10685c8d9c2ca0a96f"
+  },
+  {
+    "group": "musicPlaylist",
+    "file": "src/music/service/PlaylistService.ts",
+    "method": "postMusicUserListRemove",
+    "route": "/api/music/user/list/remove",
+    "condition": "pathname === '/api/music/user/list/remove' && req.method === 'POST'",
+    "baselineDigest": "01e0e2f97f2041b8ae0adc31b8e5f12d6aab5a1dbcd7c4d476e76654b47d9fc0"
+  },
+  {
+    "group": "musicPlaylist",
+    "file": "src/music/service/PlaylistService.ts",
+    "method": "postMusicUserListReorder",
+    "route": "/api/music/user/list/reorder",
+    "condition": "pathname === '/api/music/user/list/reorder' && req.method === 'POST'",
+    "baselineDigest": "dfc60fbc3c212ff0bd4a0a5990be90e6abcf202de7f48599d51093d3cfd2674b"
+  },
+  {
+    "group": "musicPlaylist",
+    "file": "src/music/service/PlaylistService.ts",
+    "method": "postMusicUserListAdd",
+    "route": "/api/music/user/list/add",
+    "condition": "pathname === '/api/music/user/list/add' && req.method === 'POST'",
+    "baselineDigest": "01dba4a2bf2074a54a3ae10e860cbaedf45a54bc790f34dba592ce46e18b9e95"
+  },
+  {
+    "group": "musicPlaylist",
+    "file": "src/music/service/PlaylistService.ts",
+    "method": "postDataDeleteSnapshot",
+    "route": "/api/data/delete-snapshot",
+    "condition": "pathname === '/api/data/delete-snapshot' && req.method === 'POST'",
+    "baselineDigest": "16add0125938e5d9bf0ab7435290008c53fa532cd4676a9f5899c9fafeb070a6"
+  },
+  {
+    "group": "musicPlaylist",
+    "file": "src/music/service/PlaylistService.ts",
+    "method": "postDataUploadSnapshot",
+    "route": "/api/data/upload-snapshot",
+    "condition": "pathname === '/api/data/upload-snapshot' && req.method === 'POST'",
+    "baselineDigest": "34c06f18e27bc89284ff962c258195ba2aed60b780ca29d2db7b86adcc0dd3d9"
+  },
+  {
+    "group": "musicAuthentication",
+    "file": "src/music/service/AuthenticationService.ts",
+    "method": "postUserVerify",
+    "route": "/api/user/verify",
+    "condition": "pathname === '/api/user/verify' && req.method === 'POST'",
+    "baselineDigest": "a0353666bd285671a27b3a06daee529bb4b03e9b9dea9aae15479ea17493bf29"
+  },
+  {
+    "group": "musicAuthentication",
+    "file": "src/music/service/AuthenticationService.ts",
+    "method": "postUserLogin",
+    "route": "/api/user/login",
+    "condition": "pathname === '/api/user/login' && req.method === 'POST'",
+    "baselineDigest": "7cc281cf90fc8806d41dd0e4c804c34bc486b48d92f0ef5fe193c359f879fb05"
+  },
+  {
+    "group": "musicAuthentication",
+    "file": "src/music/service/AuthenticationService.ts",
+    "method": "postUserLogout",
+    "route": "/api/user/logout",
+    "condition": "pathname === '/api/user/logout' && req.method === 'POST'",
+    "baselineDigest": "725b820e4f0e799618e0d60c8306a18ea3999412c7ff4885a1d7366a0429ba18"
+  },
+  {
+    "group": "musicAuthentication",
+    "file": "src/music/service/AuthenticationService.ts",
+    "method": "getUserAuthVerify",
+    "route": "/api/user/auth/verify",
+    "condition": "pathname === '/api/user/auth/verify' && req.method === 'GET'",
+    "baselineDigest": "c802818c0446c077b40a9f2af16d9bc665a85bbdfdbfe02307647d52f52c0225"
+  },
+  {
+    "group": "musicPlaylist",
+    "file": "src/music/service/PlaylistService.ts",
+    "method": "getUserList",
+    "route": "/api/user/list",
+    "condition": "pathname === '/api/user/list' && req.method === 'GET'",
+    "baselineDigest": "795e42a45336ef25a57f0c0cce005bba3fd9e39393ba73f5264434c445101ab8"
+  },
+  {
+    "group": "musicPlaylist",
+    "file": "src/music/service/PlaylistService.ts",
+    "method": "postUserList",
+    "route": "/api/user/list",
+    "condition": "pathname === '/api/user/list' && req.method === 'POST'",
+    "baselineDigest": "68b29364929094e72569410d5e981d5f708dbc1f3fba857a543eec8b7ced6df3"
+  },
+  {
+    "group": "musicLibrary",
+    "file": "src/music/service/LibraryService.ts",
+    "method": "getUserLibraryArtists",
+    "route": "/api/user/library/artists",
+    "condition": "pathname === '/api/user/library/artists' && req.method === 'GET'",
+    "baselineDigest": "5dfa496bfd662e156571cc2b38c115b76347bc66c3081ccc55e57627bbb7e4e0"
+  },
+  {
+    "group": "musicLibrary",
+    "file": "src/music/service/LibraryService.ts",
+    "method": "postUserLibraryArtists",
+    "route": "/api/user/library/artists",
+    "condition": "pathname === '/api/user/library/artists' && req.method === 'POST'",
+    "baselineDigest": "9b01aeb5629e6b7d3d7ca86724aeb81ca3f678402ac8217ab788c93068871fbd"
+  },
+  {
+    "group": "musicLibrary",
+    "file": "src/music/service/LibraryService.ts",
+    "method": "getUserLibraryAlbums",
+    "route": "/api/user/library/albums",
+    "condition": "pathname === '/api/user/library/albums' && req.method === 'GET'",
+    "baselineDigest": "3d165ed1c1c0d7f66a3d73cd49a8475a3d2fbbd67557ec405d6b35d2a4a0d62c"
+  },
+  {
+    "group": "musicLibrary",
+    "file": "src/music/service/LibraryService.ts",
+    "method": "postUserLibraryAlbums",
+    "route": "/api/user/library/albums",
+    "condition": "pathname === '/api/user/library/albums' && req.method === 'POST'",
+    "baselineDigest": "5a7a8011bee1be617d08c031a27a6d24be100fa6d8834d2d5d2b714c48e3fbbe"
+  },
+  {
+    "group": "musicLibrary",
+    "file": "src/music/service/LibraryService.ts",
+    "method": "getUserDislikeLibraryArtists",
+    "route": "/api/user/dislike/library/artists",
+    "condition": "pathname === '/api/user/dislike/library/artists' && req.method === 'GET'",
+    "baselineDigest": "ca6cb7d76e0288174ec064541175fb1610eca2fc2e1ae9dafb077cc553d4c52d"
+  },
+  {
+    "group": "musicLibrary",
+    "file": "src/music/service/LibraryService.ts",
+    "method": "postUserDislikeLibraryArtists",
+    "route": "/api/user/dislike/library/artists",
+    "condition": "pathname === '/api/user/dislike/library/artists' && req.method === 'POST'",
+    "baselineDigest": "42ec16a51b5301ad17b85b90afc7c88b9f375c28d9bd38474e992b67000a131a"
+  },
+  {
+    "group": "musicLibrary",
+    "file": "src/music/service/LibraryService.ts",
+    "method": "getUserDislikeLibraryAlbums",
+    "route": "/api/user/dislike/library/albums",
+    "condition": "pathname === '/api/user/dislike/library/albums' && req.method === 'GET'",
+    "baselineDigest": "53065f96a9c3fd620a6811d177da7daea21b0861ea0fbb701f4f55b51983aa32"
+  },
+  {
+    "group": "musicLibrary",
+    "file": "src/music/service/LibraryService.ts",
+    "method": "postUserDislikeLibraryAlbums",
+    "route": "/api/user/dislike/library/albums",
+    "condition": "pathname === '/api/user/dislike/library/albums' && req.method === 'POST'",
+    "baselineDigest": "98615a62efde6ebef4bb558aae237aa108bab61848bf9a9ba77e9648d4deb219"
+  },
+  {
+    "group": "musicDownload",
+    "file": "src/music/service/DownloadService.ts",
+    "method": "getUserSyncDownloadStatus",
+    "route": "/api/user/sync-download/status",
+    "condition": "pathname === '/api/user/sync-download/status' && req.method === 'GET'",
+    "baselineDigest": "f3dffd7be4b1bc70d8bb46e4fdc99779543005594737e6841380e22ece74117a"
+  },
+  {
+    "group": "musicSettings",
+    "file": "src/music/service/SettingsService.ts",
+    "method": "putUserSyncDownloadSettings",
+    "route": "/api/user/sync-download/settings",
+    "condition": "pathname === '/api/user/sync-download/settings' && req.method === 'PUT'",
+    "baselineDigest": "6805b43590dd7f7708e115e441dc29fa55f8b548847c1fc4f6afe5a2970bdc74"
+  },
+  {
+    "group": "musicDownload",
+    "file": "src/music/service/DownloadService.ts",
+    "method": "postUserSyncDownloadTrigger",
+    "route": "/api/user/sync-download/trigger",
+    "condition": "pathname === '/api/user/sync-download/trigger' && req.method === 'POST'",
+    "baselineDigest": "1c958813cc00f0cb19ce9320e74433f08aff9a1f3d6394330e0b74f9a36a3f98"
+  },
+  {
+    "group": "musicDownload",
+    "file": "src/music/service/DownloadService.ts",
+    "method": "postUserSyncDownloadCancel",
+    "route": "/api/user/sync-download/cancel",
+    "condition": "(pathname === '/api/user/sync-download/cancel' || pathname === '/api/user/sync-download/pause') && req.method === 'POST'",
+    "baselineDigest": "39c5b6fe78355497ab2272dfd2eabfa851c1ccda4166cb7b0e0450bcf5157c08"
+  },
+  {
+    "group": "musicDownload",
+    "file": "src/music/service/DownloadService.ts",
+    "method": "getUserSyncDownloadProgress",
+    "route": "/api/user/sync-download/progress",
+    "condition": "pathname === '/api/user/sync-download/progress' && req.method === 'GET'",
+    "baselineDigest": "5b582d8c93374759046f10db7b789f46adb876d4c9967776b6c9dd0f12433094"
+  },
+  {
+    "group": "musicDownload",
+    "file": "src/music/service/DownloadService.ts",
+    "method": "postUserSyncDownloadMigrateStorage",
+    "route": "/api/user/sync-download/migrate-storage",
+    "condition": "pathname === '/api/user/sync-download/migrate-storage' && req.method === 'POST'",
+    "baselineDigest": "a72dc316308b4716c80520b5430d2bfeef32550e8a4ba2c4422d9acc4393701f"
+  },
+  {
+    "group": "musicSettings",
+    "file": "src/music/service/SettingsService.ts",
+    "method": "getUserSettings",
+    "route": "/api/user/settings",
+    "condition": "pathname === '/api/user/settings' && req.method === 'GET'",
+    "baselineDigest": "01168a121984f5d376ab24dffe2ac8f549f89a1ccf116a6d2c7564ad6bee478e"
+  },
+  {
+    "group": "musicSettings",
+    "file": "src/music/service/SettingsService.ts",
+    "method": "postUserSettings",
+    "route": "/api/user/settings",
+    "condition": "pathname === '/api/user/settings' && req.method === 'POST'",
+    "baselineDigest": "343b717733b3befad7e160901c01c6c17946b6d8143c745e981cb8fb71fa9a3a"
+  },
+  {
+    "group": "musicAuthentication",
+    "file": "src/music/service/AuthenticationService.ts",
+    "method": "handleUserTokenConfig",
+    "route": "/api/user/token/config",
+    "condition": "pathname === '/api/user/token/config'",
+    "baselineDigest": "ef1ccc0b41584e6a9a9c441158efd51955564396f084a90d825daf977b1b213a"
+  },
+  {
+    "group": "musicAuthentication",
+    "file": "src/music/service/AuthenticationService.ts",
+    "method": "postUserTokenAdd",
+    "route": "/api/user/token/add",
+    "condition": "pathname === '/api/user/token/add' && req.method === 'POST'",
+    "baselineDigest": "11baec99cb8e881b7758531cfd743b3811fbef1b8d47d3c870669a1af6f488a2"
+  },
+  {
+    "group": "musicAuthentication",
+    "file": "src/music/service/AuthenticationService.ts",
+    "method": "postUserTokenRemove",
+    "route": "/api/user/token/remove",
+    "condition": "pathname === '/api/user/token/remove' && req.method === 'POST'",
+    "baselineDigest": "ee665c9905a4bd9f5d1c0de7ef0b93013eb03888495ee39b0095174d17975b7d"
+  },
+  {
+    "group": "musicAuthentication",
+    "file": "src/music/service/AuthenticationService.ts",
+    "method": "postUserTokenUpdate",
+    "route": "/api/user/token/update",
+    "condition": "pathname === '/api/user/token/update' && req.method === 'POST'",
+    "baselineDigest": "9eb339b7facffa4b2874e0c2c1997c027fa3cfaa6f2ca5fe557498353270a11b"
+  },
+  {
+    "group": "musicAuthentication",
+    "file": "src/music/service/AuthenticationService.ts",
+    "method": "postUserTokenToggle",
+    "route": "/api/user/token/toggle",
+    "condition": "pathname === '/api/user/token/toggle' && req.method === 'POST'",
+    "baselineDigest": "72b570ba9a72810d88dc8e9a372472009a0a3d5b11d6c5746ad4aa9cf883d21e"
+  },
+  {
+    "group": "musicAuthentication",
+    "file": "src/music/service/AuthenticationService.ts",
+    "method": "getUserTokenLogs",
+    "route": "/api/user/token/logs",
+    "condition": "pathname === '/api/user/token/logs' && req.method === 'GET'",
+    "baselineDigest": "8fd29efb4c728fd94665ed63ac7691000bdfa3e4c4725af5b267fc73df9e7a90"
+  },
+  {
+    "group": "musicSettings",
+    "file": "src/music/service/SettingsService.ts",
+    "method": "getUserSoundEffects",
+    "route": "/api/user/sound-effects",
+    "condition": "pathname === '/api/user/sound-effects' && req.method === 'GET'",
+    "baselineDigest": "701dd9d85cf4211c12f9f4b7aad0c927cc1c5a20a57907eb0447cb173f0573c8"
+  },
+  {
+    "group": "musicDownload",
+    "file": "src/music/service/DownloadService.ts",
+    "method": "getTasksStatus",
+    "route": "/api/tasks/status",
+    "condition": "(pathname === '/api/tasks/status' || pathname === '/api/music/tasks/status') && req.method === 'GET'",
+    "baselineDigest": "e68909fed408d2eb2ee7caecd3acddc5a871447bd504a7ff39a730d29c4a47a6"
+  },
+  {
+    "group": "musicDownload",
+    "file": "src/music/service/DownloadService.ts",
+    "method": "postTasksTrigger",
+    "route": "/api/tasks/trigger",
+    "condition": "(pathname === '/api/tasks/trigger' || pathname === '/api/music/tasks/trigger') && req.method === 'POST'",
+    "baselineDigest": "f239c97350722258f13372ecfbef224074c2e7ce8bf83f243d1cfd482e42e053"
+  },
+  {
+    "group": "musicDownload",
+    "file": "src/music/service/DownloadService.ts",
+    "method": "getTasksUserData",
+    "route": "/api/tasks/user-data",
+    "condition": "(pathname === '/api/tasks/user-data' || pathname === '/api/music/tasks/user-data') &&\n          (req.method === 'GET' || req.method === 'POST')",
+    "baselineDigest": "190481d4e41896389f214b7e853449a707931d7d3d68df92cc324e59d11ca604"
+  },
+  {
+    "group": "musicSettings",
+    "file": "src/music/service/SettingsService.ts",
+    "method": "postUserSoundEffects",
+    "route": "/api/user/sound-effects",
+    "condition": "pathname === '/api/user/sound-effects' && req.method === 'POST'",
+    "baselineDigest": "259fa0c26cdf5332c7bd6026e463d1a1f5f6a6e2c8c8ae8f7c23c988fa7121a3"
+  },
+  {
+    "group": "musicDownload",
+    "file": "src/music/service/DownloadService.ts",
+    "method": "handleMusicRemaster",
+    "route": "/api/music/remaster/",
+    "condition": "pathname.startsWith('/api/music/remaster/')",
+    "baselineDigest": "6e9a4592f6657e3a7c85d43d01b788e388d3c72e5e1d16142d0de161d70b0b57"
+  },
+  {
+    "group": "musicDownload",
+    "file": "src/music/service/DownloadService.ts",
+    "method": "postMusicCacheConfig",
+    "route": "/api/music/cache/config",
+    "condition": "pathname === '/api/music/cache/config' && req.method === 'POST'",
+    "baselineDigest": "48101c1bbbc643def7f6185613da60c3b564fc445ac457283484389ac7c0f838"
+  },
+  {
+    "group": "musicDownload",
+    "file": "src/music/service/DownloadService.ts",
+    "method": "getMusicCacheDirectories",
+    "route": "/api/music/cache/directories",
+    "condition": "pathname === '/api/music/cache/directories' && req.method === 'GET'",
+    "baselineDigest": "83a5987d42aa11e7133a18d63147ce3204ba65a25f4c1ca310077f0b329c9ee9"
+  },
+  {
+    "group": "musicDownload",
+    "file": "src/music/service/DownloadService.ts",
+    "method": "postMusicCacheSync",
+    "route": "/api/music/cache/sync",
+    "condition": "pathname === '/api/music/cache/sync' && req.method === 'POST'",
+    "baselineDigest": "feb741e9252334fced789993122ac25520c8f65a5f88550b578f17b518fcb640"
+  },
+  {
+    "group": "musicDownload",
+    "file": "src/music/service/DownloadService.ts",
+    "method": "getMusicCacheSubdirs",
+    "route": "/api/music/cache/subdirs",
+    "condition": "pathname === '/api/music/cache/subdirs' && req.method === 'GET'",
+    "baselineDigest": "54096f7efb03f0149572941ac9cd4bfa051906ea4b878bef9e7a88f8c6ab4bfe"
+  },
+  {
+    "group": "musicDownload",
+    "file": "src/music/service/DownloadService.ts",
+    "method": "postMusicCacheMkdir",
+    "route": "/api/music/cache/mkdir",
+    "condition": "pathname === '/api/music/cache/mkdir' && req.method === 'POST'",
+    "baselineDigest": "0167a96ee3947ec8ca3eebfe4b319339346be46d12e7ac17ffa506dd9b1f80f4"
+  },
+  {
+    "group": "musicDownload",
+    "file": "src/music/service/DownloadService.ts",
+    "method": "postMusicCacheCategorize",
+    "route": "/api/music/cache/categorize",
+    "condition": "pathname === '/api/music/cache/categorize' && req.method === 'POST'",
+    "baselineDigest": "dd5ca82937367ba3647cc917d44fc201497814ace6678327aafb2a4285c04e8c"
+  },
+  {
+    "group": "musicDownload",
+    "file": "src/music/service/DownloadService.ts",
+    "method": "postMusicCacheSubdirsRename",
+    "route": "/api/music/cache/subdirs/rename",
+    "condition": "pathname === '/api/music/cache/subdirs/rename' && req.method === 'POST'",
+    "baselineDigest": "56248dd0e8e620d744b937b9156e392d437507a694e326ce93dd4c8551bbabb6"
+  },
+  {
+    "group": "musicDownload",
+    "file": "src/music/service/DownloadService.ts",
+    "method": "postUtilsCheckDir",
+    "route": "/api/utils/check-dir",
+    "condition": "pathname === '/api/utils/check-dir' && req.method === 'POST'",
+    "baselineDigest": "9894ac588cf698fde2820c9d910f89a08486dcc631999c908377b3b32fa87e04"
+  },
+  {
+    "group": "musicDownload",
+    "file": "src/music/service/DownloadService.ts",
+    "method": "postMusicCacheSubdirsDelete",
+    "route": "/api/music/cache/subdirs/delete",
+    "condition": "pathname === '/api/music/cache/subdirs/delete' && req.method === 'POST'",
+    "baselineDigest": "340864212e0da25a9bb21a109f5ed2bfc93aafda751dd93189589b8a1008803b"
+  },
+  {
+    "group": "musicDownload",
+    "file": "src/music/service/DownloadService.ts",
+    "method": "postMusicCacheRename",
+    "route": "/api/music/cache/rename",
+    "condition": "pathname === '/api/music/cache/rename' && req.method === 'POST'",
+    "baselineDigest": "02aa2ce718d8a8edb55f56bcef523ec871f0d4a827fc2c98a223b0bde1388d33"
+  },
+  {
+    "group": "musicDownload",
+    "file": "src/music/service/DownloadService.ts",
+    "method": "getMusicServerDownloadCheck",
+    "route": "/api/music/server-download/check",
+    "condition": "pathname === '/api/music/server-download/check' && req.method === 'GET'",
+    "baselineDigest": "f8e6962363d6c40147ffbaa55f818c267ad0f0b892e778046955abaaf31cd548"
+  },
+  {
+    "group": "musicDownload",
+    "file": "src/music/service/DownloadService.ts",
+    "method": "handleMusicServerDownloadFile",
+    "route": "/api/music/server-download/file/",
+    "condition": "pathname.startsWith('/api/music/server-download/file/')",
+    "baselineDigest": "3610a4b7e5c16dc70640df9374fa0b79bba80031d8ab27ead4cfe4bfc88fca06"
+  },
+  {
+    "group": "musicDownload",
+    "file": "src/music/service/DownloadService.ts",
+    "method": "getMusicCacheCheck",
+    "route": "/api/music/cache/check",
+    "condition": "pathname === '/api/music/cache/check' && req.method === 'GET'",
+    "baselineDigest": "7b784007d925832b5501f30bb95e6b2f8ce492bd64cb6aace477774aaed78bce"
+  },
+  {
+    "group": "musicDownload",
+    "file": "src/music/service/DownloadService.ts",
+    "method": "getMusicCacheQueue",
+    "route": "/api/music/cache/queue",
+    "condition": "pathname === '/api/music/cache/queue' && req.method === 'GET'",
+    "baselineDigest": "65cbb44364706057e9729222dd2b5ecffaa97a885c7c0178fbc517a2d5abc92c"
+  },
+  {
+    "group": "musicDownload",
+    "file": "src/music/service/DownloadService.ts",
+    "method": "postMusicCacheQueue",
+    "route": "/api/music/cache/queue",
+    "condition": "pathname === '/api/music/cache/queue' && req.method === 'POST'",
+    "baselineDigest": "0cba2acf49c72f0fb569bc9780fd3cf2703d0978f4969013455d5e153d3ac022"
+  },
+  {
+    "group": "musicDownload",
+    "file": "src/music/service/DownloadService.ts",
+    "method": "postMusicCacheQueueConcurrency",
+    "route": "/api/music/cache/queue/concurrency",
+    "condition": "pathname === '/api/music/cache/queue/concurrency' && req.method === 'POST'",
+    "baselineDigest": "2ae23f60f23bfbb73712ee53c37c17dc1b388faac2e79845bebbb1a01948943a"
+  },
+  {
+    "group": "musicDownload",
+    "file": "src/music/service/DownloadService.ts",
+    "method": "postMusicCacheQueueResume",
+    "route": "/api/music/cache/queue/resume",
+    "condition": "pathname === '/api/music/cache/queue/resume' && req.method === 'POST'",
+    "baselineDigest": "13f535b42148e3ae25e02120cda244fdaec03bdfa7b5b1b309c31d38611a6f75"
+  },
+  {
+    "group": "musicDownload",
+    "file": "src/music/service/DownloadService.ts",
+    "method": "postMusicCacheQueueRemove",
+    "route": "/api/music/cache/queue/remove",
+    "condition": "pathname === '/api/music/cache/queue/remove' && req.method === 'POST'",
+    "baselineDigest": "f782a6838c5b4215f4809535313fa742492aa3f00e94f7a2067b9180cd290bd9"
+  },
+  {
+    "group": "musicDownload",
+    "file": "src/music/service/DownloadService.ts",
+    "method": "postMusicCacheDownload",
+    "route": "/api/music/cache/download",
+    "condition": "pathname === '/api/music/cache/download' && req.method === 'POST'",
+    "baselineDigest": "8b6c6178cffece7055bdc7861b536ff834b03643b9a02de413ea5de4a5f15e25"
+  },
+  {
+    "group": "musicDownload",
+    "file": "src/music/service/DownloadService.ts",
+    "method": "postMusicCacheStop",
+    "route": "/api/music/cache/stop",
+    "condition": "pathname === '/api/music/cache/stop' && req.method === 'POST'",
+    "baselineDigest": "2a507546a652dcd20d0b892663429a43cbbb7cc7a59ee291af05d08343f4ad3e"
+  },
+  {
+    "group": "musicDownload",
+    "file": "src/music/service/DownloadService.ts",
+    "method": "handleMusicCacheFile",
+    "route": "/api/music/cache/file/",
+    "condition": "pathname.startsWith('/api/music/cache/file/')",
+    "baselineDigest": "3769a8b66522d407cf60be8b5b73db056ee731d4ccfd50f212315fd0b996abc7"
+  },
+  {
+    "group": "musicDownload",
+    "file": "src/music/service/DownloadService.ts",
+    "method": "getMusicCacheStats",
+    "route": "/api/music/cache/stats",
+    "condition": "pathname === '/api/music/cache/stats' && req.method === 'GET'",
+    "baselineDigest": "9f045125b3a6684e13a13086a5f247ee1e0c8af98bbaa46eafcc2436dec0ec89"
+  },
+  {
+    "group": "musicDownload",
+    "file": "src/music/service/DownloadService.ts",
+    "method": "postMusicCacheClear",
+    "route": "/api/music/cache/clear",
+    "condition": "pathname === '/api/music/cache/clear' && req.method === 'POST'",
+    "baselineDigest": "5a9455c33ce9c7381104b11d59badd8151205a1c0dae7c89664bcd8e5ad8fff0"
+  },
+  {
+    "group": "musicDownload",
+    "file": "src/music/service/DownloadService.ts",
+    "method": "postMusicCacheLyricClear",
+    "route": "/api/music/cache/lyric/clear",
+    "condition": "pathname === '/api/music/cache/lyric/clear' && req.method === 'POST'",
+    "baselineDigest": "13551fe13b09691b6b5584ea0cbac55cf98818560e3e4c7a020fc6b11120a7d1"
+  },
+  {
+    "group": "musicDownload",
+    "file": "src/music/service/DownloadService.ts",
+    "method": "getMusicCacheProgress",
+    "route": "/api/music/cache/progress",
+    "condition": "pathname === '/api/music/cache/progress' && req.method === 'GET'",
+    "baselineDigest": "8f83382db57eee415ec349b3645abc8ecf937115b36274218d7dc2da2bf24c57"
+  },
+  {
+    "group": "musicPlaylist",
+    "file": "src/music/service/PlaylistService.ts",
+    "method": "getMusicCacheList",
+    "route": "/api/music/cache/list",
+    "condition": "pathname === '/api/music/cache/list' && req.method === 'GET'",
+    "baselineDigest": "728276704ddee83935e49ed5f90e015a50e2242fd87dd772f30f6f9ed98ed175"
+  },
+  {
+    "group": "musicDownload",
+    "file": "src/music/service/DownloadService.ts",
+    "method": "getMusicCacheCover",
+    "route": "/api/music/cache/cover",
+    "condition": "pathname === '/api/music/cache/cover' && req.method === 'GET'",
+    "baselineDigest": "e41e3b5e02650f6a312196fdb33a1c8266e9d0c5736925903ca20d090623b971"
+  },
+  {
+    "group": "musicDownload",
+    "file": "src/music/service/DownloadService.ts",
+    "method": "postMusicCacheRemove",
+    "route": "/api/music/cache/remove",
+    "condition": "pathname === '/api/music/cache/remove' && req.method === 'POST'",
+    "baselineDigest": "680f75fab82904210192a06cd135359a2655380cf55b9a91aa864e5bb712663c"
+  },
+  {
+    "group": "musicPlaylist",
+    "file": "src/music/service/PlaylistService.ts",
+    "method": "getMusicCustomList",
+    "route": "/api/music/custom/list",
+    "condition": "pathname === '/api/music/custom/list' && req.method === 'GET'",
+    "baselineDigest": "6c733088a60b4411be015573f32b22605ae51dca488b8885b8b31ccd42d053fc"
+  },
+  {
+    "group": "musicDiscovery",
+    "file": "src/music/service/DiscoveryService.ts",
+    "method": "postMusicCustomSync",
+    "route": "/api/music/custom/sync",
+    "condition": "pathname === '/api/music/custom/sync' && req.method === 'POST'",
+    "baselineDigest": "814e12f2d5af3ec135e277013adff93d9f09a730a34dc6b94739cf10e5eaebfa"
+  },
+  {
+    "group": "musicDiscovery",
+    "file": "src/music/service/DiscoveryService.ts",
+    "method": "handleMusicCustomFile",
+    "route": "/api/music/custom/file",
+    "condition": "pathname === '/api/music/custom/file' || pathname.startsWith('/api/music/custom/file/')",
+    "baselineDigest": "00073ce0a008ec55e5ad4263aed8d35701a6d77f583752e036d0717ae2ded834"
+  },
+  {
+    "group": "musicDiscovery",
+    "file": "src/music/service/DiscoveryService.ts",
+    "method": "getMusicCustomCover",
+    "route": "/api/music/custom/cover",
+    "condition": "pathname === '/api/music/custom/cover' && req.method === 'GET'",
+    "baselineDigest": "69240a5c1eda3ef3300e6a9130dfa0afc5c64ef81736dd35235a7e1510a1fe08"
+  },
+  {
+    "group": "musicDiscovery",
+    "file": "src/music/service/DiscoveryService.ts",
+    "method": "postMusicCustomRemove",
+    "route": "/api/music/custom/remove",
+    "condition": "pathname === '/api/music/custom/remove' && req.method === 'POST'",
+    "baselineDigest": "09a5fab8503d415edfd8f08dc56d965f5d24bf183c96ee799f1a77e34483f7ec"
+  },
+  {
+    "group": "musicDiscovery",
+    "file": "src/music/service/DiscoveryService.ts",
+    "method": "postMusicCustomLink",
+    "route": "/api/music/custom/link",
+    "condition": "pathname === '/api/music/custom/link' && req.method === 'POST'",
+    "baselineDigest": "d8d353ade1b7d873c3ca16cd29319368e8ab68be973f8baa99648d33e24400df"
+  },
+  {
+    "group": "musicDiscovery",
+    "file": "src/music/service/DiscoveryService.ts",
+    "method": "postMusicCustomUpdateMetadata",
+    "route": "/api/music/custom/updateMetadata",
+    "condition": "pathname === '/api/music/custom/updateMetadata' && req.method === 'POST'",
+    "baselineDigest": "24674b7c366e335283a96197b20b673024737726a4d3c28fd80de0b8a58a8445"
+  },
+  {
+    "group": "musicDiscovery",
+    "file": "src/music/service/DiscoveryService.ts",
+    "method": "getMusicCustomEmbedLyric",
+    "route": "/api/music/custom/embedLyric",
+    "condition": "pathname === '/api/music/custom/embedLyric' && req.method === 'GET'",
+    "baselineDigest": "460b3e40444196475443feec90c4e9a054d95ea8834d2387313a696d26560c38"
+  },
+  {
+    "group": "musicDiscovery",
+    "file": "src/music/service/DiscoveryService.ts",
+    "method": "postMusicCustomEmbedLyric",
+    "route": "/api/music/custom/embedLyric",
+    "condition": "pathname === '/api/music/custom/embedLyric' && req.method === 'POST'",
+    "baselineDigest": "4ae1f0a5e0697c4e13ecdd7d7ad44fa5596b13e862c14f5a18d6dd37d448d63b"
+  },
+  {
+    "group": "musicDownload",
+    "file": "src/music/service/DownloadService.ts",
+    "method": "postMusicCacheMove",
+    "route": "/api/music/cache/move",
+    "condition": "pathname === '/api/music/cache/move' && req.method === 'POST'",
+    "baselineDigest": "de8bbcbc9b48b81e2992a3651f6e87fe88f6b8ef4be813c40b9e1db7b9a8a359"
+  },
+  {
+    "group": "musicDownload",
+    "file": "src/music/service/DownloadService.ts",
+    "method": "postMusicCacheSwitchBase",
+    "route": "/api/music/cache/switch-base",
+    "condition": "pathname === '/api/music/cache/switch-base' && req.method === 'POST'",
+    "baselineDigest": "0c9bf4c18169e55857696bb4fdb7486dae49839662cd5d7477470278259e7c2d"
+  },
+  {
+    "group": "musicDownload",
+    "file": "src/music/service/DownloadService.ts",
+    "method": "postMusicCacheUpdateMetadata",
+    "route": "/api/music/cache/updateMetadata",
+    "condition": "pathname === '/api/music/cache/updateMetadata' && req.method === 'POST'",
+    "baselineDigest": "322299146e77f5eccd52987b2dc6d4f679118a565988e40a05f9879c5d34a7ee"
+  },
+  {
+    "group": "musicDownload",
+    "file": "src/music/service/DownloadService.ts",
+    "method": "getMusicCacheEmbedLyric",
+    "route": "/api/music/cache/embedLyric",
+    "condition": "pathname === '/api/music/cache/embedLyric' && req.method === 'GET'",
+    "baselineDigest": "bb3daeca344c640ecf3253bb89bc1b8aa332777080faecd75366075bc93ab1f0"
+  },
+  {
+    "group": "musicDownload",
+    "file": "src/music/service/DownloadService.ts",
+    "method": "postMusicCacheEmbedLyric",
+    "route": "/api/music/cache/embedLyric",
+    "condition": "pathname === '/api/music/cache/embedLyric' && req.method === 'POST'",
+    "baselineDigest": "5779898aabbdfc2cff357e177551abf23b425029d5151affa5ebf0355a407219"
+  },
+  {
+    "group": "musicDownload",
+    "file": "src/music/service/DownloadService.ts",
+    "method": "postMusicCacheLink",
+    "route": "/api/music/cache/link",
+    "condition": "pathname === '/api/music/cache/link' && req.method === 'POST'",
+    "baselineDigest": "ccd0c9547b223c64e32d26de828e601f7ff063f5450be481a5fddc8652ee75e7"
+  },
+  {
+    "group": "musicDiscovery",
+    "file": "src/music/service/DiscoveryService.ts",
+    "method": "postMusicIdentify",
+    "route": "/api/music/identify",
+    "condition": "pathname === '/api/music/identify' && req.method === 'POST'",
+    "baselineDigest": "d9e941bede7355019b81fcfd3cf14d18744300050582010cf4e9f9f931efc2a6"
+  },
+  {
+    "group": "musicDiscovery",
+    "file": "src/music/service/DiscoveryService.ts",
+    "method": "getMusicLyric",
+    "route": "/api/music/lyric",
+    "condition": "pathname === '/api/music/lyric' && req.method === 'GET'",
+    "baselineDigest": "c837670b99f3c7d7a75c8316fd4d46b5efc647cc4725c6977678837f90d6e8bc"
+  },
+  {
+    "group": "musicDownload",
+    "file": "src/music/service/DownloadService.ts",
+    "method": "getMusicCacheLyric",
+    "route": "/api/music/cache/lyric",
+    "condition": "pathname === '/api/music/cache/lyric' && req.method === 'GET'",
+    "baselineDigest": "a555e4ca363450abafbfd7b61b4782a9a84f93e6ffd5aeb1c172a318f846dfae"
+  },
+  {
+    "group": "musicDownload",
+    "file": "src/music/service/DownloadService.ts",
+    "method": "postMusicCacheLyric",
+    "route": "/api/music/cache/lyric",
+    "condition": "pathname === '/api/music/cache/lyric' && req.method === 'POST'",
+    "baselineDigest": "c503466f3897733c9fdeea610bbc549e01bc6f0b7572e379e88bb435310e1c26"
+  },
+  {
+    "group": "musicDownload",
+    "file": "src/music/service/DownloadService.ts",
+    "method": "getMusicDownload",
+    "route": "/api/music/download",
+    "condition": "pathname === '/api/music/download' && req.method === 'GET'",
+    "baselineDigest": "683c53aaeb48fca123a51438edd48e76f3057af98f5335bf743b6960f73a2acc"
+  },
+  {
+    "group": "musicPlaylist",
+    "file": "src/music/service/PlaylistService.ts",
+    "method": "postDataDeletePlaylist",
+    "route": "/api/data/delete-playlist",
+    "condition": "pathname === '/api/data/delete-playlist' && req.method === 'POST'",
+    "baselineDigest": "f61ac47accbf0dd4cbf26eeb7494f6008f028885aa6d5dfd1138ce8ac1d73ec1"
+  },
+  {
+    "group": "musicPlaylist",
+    "file": "src/music/service/PlaylistService.ts",
+    "method": "postDataDeleteSong",
+    "route": "/api/data/delete-song",
+    "condition": "pathname === '/api/data/delete-song' && req.method === 'POST'",
+    "baselineDigest": "85d0f8c5e9a28d2fd7df77eadb5e1d4217d1b177a05bd89ff72f50d82383a773"
+  },
+  {
+    "group": "musicPlaylist",
+    "file": "src/music/service/PlaylistService.ts",
+    "method": "postDataRenamePlaylist",
+    "route": "/api/data/rename-playlist",
+    "condition": "pathname === '/api/data/rename-playlist' && req.method === 'POST'",
+    "baselineDigest": "971321029d53c3fa9a816bfc982ff99ed9cca454a007dd79291f6a2507c9b424"
+  },
+  {
+    "group": "musicPlaylist",
+    "file": "src/music/service/PlaylistService.ts",
+    "method": "postDataBatchDeleteSongs",
+    "route": "/api/data/batch-delete-songs",
+    "condition": "pathname === '/api/data/batch-delete-songs' && req.method === 'POST'",
+    "baselineDigest": "2cb09f9b55e216ab066583a0bd945a32488656c50644f6ed83a1485bc38a016f"
+  },
+  {
+    "group": "musicAuthentication",
+    "file": "src/music/service/AuthenticationService.ts",
+    "method": "getMusicConfig",
+    "route": "/api/music/config",
+    "condition": "pathname === '/api/music/config' && req.method === 'GET'",
+    "baselineDigest": "e53b28cdc77ee94c71f8f178957f8278004c9603ac7b6624e1ce4997a91464df"
+  },
+  {
+    "group": "musicAuthentication",
+    "file": "src/music/service/AuthenticationService.ts",
+    "method": "postMusicAuth",
+    "route": "/api/music/auth",
+    "condition": "pathname === '/api/music/auth' && req.method === 'POST'",
+    "baselineDigest": "acc3e118a0ca38517895331ef23818e51f452147a731594232df6b7eed2203a9"
+  },
+  {
+    "group": "musicAuthentication",
+    "file": "src/music/service/AuthenticationService.ts",
+    "method": "postMusicAuthLogout",
+    "route": "/api/music/auth/logout",
+    "condition": "pathname === '/api/music/auth/logout' && req.method === 'POST'",
+    "baselineDigest": "01d5af7c9fce722b3264071550f72acaad9e652bdb9a071ff4025b64f04d42bd"
+  },
+  {
+    "group": "musicAuthentication",
+    "file": "src/music/service/AuthenticationService.ts",
+    "method": "getMusicAuthVerify",
+    "route": "/api/music/auth/verify",
+    "condition": "pathname === '/api/music/auth/verify' && req.method === 'GET'",
+    "baselineDigest": "69f14ff559e9f84cd6d0df5864f53d96a05f8c6fe51d39c4bccf460b62db25f6"
+  },
+  {
+    "group": "musicDiscovery",
+    "file": "src/music/service/DiscoveryService.ts",
+    "method": "getMusicSearch",
+    "route": "/api/music/search",
+    "condition": "pathname === '/api/music/search' && req.method === 'GET'",
+    "baselineDigest": "748de980532d2466894685a75ab88cbb4ce25989d4430ecc70f630a8993cf784"
+  },
+  {
+    "group": "musicDiscovery",
+    "file": "src/music/service/DiscoveryService.ts",
+    "method": "getMusicTipSearch",
+    "route": "/api/music/tipSearch",
+    "condition": "pathname === '/api/music/tipSearch' && req.method === 'GET'",
+    "baselineDigest": "463ba9fda6f46a696860cef7e469686da729550e1559eae24c7e81a5206afe50"
+  },
+  {
+    "group": "musicDiscovery",
+    "file": "src/music/service/DiscoveryService.ts",
+    "method": "getMusicArtistDetail",
+    "route": "/api/music/artistDetail",
+    "condition": "pathname === '/api/music/artistDetail' && req.method === 'GET'",
+    "baselineDigest": "0f7e3e91e483c47edc38e1ef69d3f1294197bd52aff5968bd925610d07823398"
+  },
+  {
+    "group": "musicDiscovery",
+    "file": "src/music/service/DiscoveryService.ts",
+    "method": "getMusicArtistAlbums",
+    "route": "/api/music/artistAlbums",
+    "condition": "pathname === '/api/music/artistAlbums' && req.method === 'GET'",
+    "baselineDigest": "06e51f1be1347c8499e95490f102267b36431e06249c35cc5e04c641f7091601"
+  },
+  {
+    "group": "musicDiscovery",
+    "file": "src/music/service/DiscoveryService.ts",
+    "method": "getMusicArtistSongs",
+    "route": "/api/music/artistSongs",
+    "condition": "pathname === '/api/music/artistSongs' && req.method === 'GET'",
+    "baselineDigest": "bef1ae4a764977ffa57c144e1c429949d8dd3c15c9b344257b4635ad9cff62ad"
+  },
+  {
+    "group": "musicDiscovery",
+    "file": "src/music/service/DiscoveryService.ts",
+    "method": "getMusicAlbumSongs",
+    "route": "/api/music/albumSongs",
+    "condition": "pathname === '/api/music/albumSongs' && req.method === 'GET'",
+    "baselineDigest": "bd9d3e84acbf2dd54fb2b22cd8f0d064517b85a739ca2fb64b1cd37d3544f4a9"
+  },
+  {
+    "group": "musicDiscovery",
+    "file": "src/music/service/DiscoveryService.ts",
+    "method": "getMusicProgress",
+    "route": "/api/music/progress",
+    "condition": "pathname === '/api/music/progress' && req.method === 'GET'",
+    "baselineDigest": "4af931a38bedaf724c7289110a915a77e76a179d86b3c4bb43295d29c9dfdba4"
+  },
+  {
+    "group": "musicDiscovery",
+    "file": "src/music/service/DiscoveryService.ts",
+    "method": "postMusicUrl",
+    "route": "/api/music/url",
+    "condition": "pathname === '/api/music/url' && req.method === 'POST'",
+    "baselineDigest": "a39c8c71cdad8a5a31f3e3ed2fe5fa537a0e533a139f11d176b626ef62c005d1"
+  },
+  {
+    "group": "musicDiscovery",
+    "file": "src/music/service/DiscoveryService.ts",
+    "method": "postMusicQualitySize",
+    "route": "/api/music/quality/size",
+    "condition": "pathname === '/api/music/quality/size' && req.method === 'POST'",
+    "baselineDigest": "918023084d475baafc42b3f23cc93a4ea2cbbdfd26772743a54abbc99c8502aa"
+  },
+  {
+    "group": "musicDiscovery",
+    "file": "src/music/service/DiscoveryService.ts",
+    "method": "postMusicLyric",
+    "route": "/api/music/lyric",
+    "condition": "pathname === '/api/music/lyric' && req.method === 'POST'",
+    "baselineDigest": "a7576fc2722bb379a9ceceab9a222922c7d1392c72f83da782be1ea3f7e6e249"
+  },
+  {
+    "group": "musicDiscovery",
+    "file": "src/music/service/DiscoveryService.ts",
+    "method": "getMusicHotSearch",
+    "route": "/api/music/hotSearch",
+    "condition": "pathname === '/api/music/hotSearch' && req.method === 'GET'",
+    "baselineDigest": "6aaef96f4284e9e656bbca5fb291604873d1b2dda7587d125756ab67218d5825"
+  },
+  {
+    "group": "musicDiscovery",
+    "file": "src/music/service/DiscoveryService.ts",
+    "method": "getMusicSongListTags",
+    "route": "/api/music/songList/tags",
+    "condition": "pathname === '/api/music/songList/tags' && req.method === 'GET'",
+    "baselineDigest": "b2a1f6da6b5a778f9134007560f683fffd24fb410cfc7466720cd203b54cc39b"
+  },
+  {
+    "group": "musicPlaylist",
+    "file": "src/music/service/PlaylistService.ts",
+    "method": "getMusicSongListList",
+    "route": "/api/music/songList/list",
+    "condition": "pathname === '/api/music/songList/list' && req.method === 'GET'",
+    "baselineDigest": "b509f2fa51fc7318ebc7ce5441cd9b3e96311d4c8484cc374d2e859d151530a3"
+  },
+  {
+    "group": "musicDiscovery",
+    "file": "src/music/service/DiscoveryService.ts",
+    "method": "getMusicSongListDetail",
+    "route": "/api/music/songList/detail",
+    "condition": "pathname === '/api/music/songList/detail' && req.method === 'GET'",
+    "baselineDigest": "5f60c4e554a452ff4b7cf3588f37daffebdaf1e23e7618866017a6b6d9817d50"
+  },
+  {
+    "group": "musicDiscovery",
+    "file": "src/music/service/DiscoveryService.ts",
+    "method": "getMusicSongListSearch",
+    "route": "/api/music/songList/search",
+    "condition": "pathname === '/api/music/songList/search' && req.method === 'GET'",
+    "baselineDigest": "e89bbc3fdafc92c3ae46ce2a673ffaa7d054dd5e178c2633eb3161389b0a2af2"
+  },
+  {
+    "group": "musicDiscovery",
+    "file": "src/music/service/DiscoveryService.ts",
+    "method": "getMusicSongListUserPlaylist",
+    "route": "/api/music/songList/userPlaylist",
+    "condition": "pathname === '/api/music/songList/userPlaylist' && req.method === 'GET'",
+    "baselineDigest": "22e7be6a165ff8cc1e8d912d5c20c72f7160e4f8a213fa881a87903607ed7f1b"
+  },
+  {
+    "group": "musicDiscovery",
+    "file": "src/music/service/DiscoveryService.ts",
+    "method": "getMusicLeaderboardBoards",
+    "route": "/api/music/leaderboard/boards",
+    "condition": "pathname === '/api/music/leaderboard/boards' && req.method === 'GET'",
+    "baselineDigest": "b328cf87e4e4eaf5d84825d78e37975334203fe7f50f587f87d574d98a3d5ac2"
+  },
+  {
+    "group": "musicPlaylist",
+    "file": "src/music/service/PlaylistService.ts",
+    "method": "getMusicLeaderboardList",
+    "route": "/api/music/leaderboard/list",
+    "condition": "pathname === '/api/music/leaderboard/list' && req.method === 'GET'",
+    "baselineDigest": "20aaa6cf791144b4ba09407ccb4292667c293230764ca6a59e406eb8575fbff9"
+  },
+  {
+    "group": "musicDiscovery",
+    "file": "src/music/service/DiscoveryService.ts",
+    "method": "postMusicComment",
+    "route": "/api/music/comment",
+    "condition": "pathname === '/api/music/comment' && req.method === 'POST'",
+    "baselineDigest": "56bb7f9d2d5af808b5ed7416c1584a33e029995fce53d6b04d11a3a575c641ed"
+  },
+  {
+    "group": "musicDiscovery",
+    "file": "src/music/service/DiscoveryService.ts",
+    "method": "getMusicDislike",
+    "route": "/api/music/dislike",
+    "condition": "pathname === '/api/music/dislike' && req.method === 'GET'",
+    "baselineDigest": "9aa9a05e2cec83a1c4f5a5d594b1a3b4739daa202bf362d9c3e20f62be13967f"
+  },
+  {
+    "group": "musicDiscovery",
+    "file": "src/music/service/DiscoveryService.ts",
+    "method": "postMusicDislikeAdd",
+    "route": "/api/music/dislike/add",
+    "condition": "(pathname === '/api/music/dislike/add' || pathname === '/api/music/dislike/remove') && req.method === 'POST'",
+    "baselineDigest": "a23e82e889a92128eb6bbd360770c08bdb625380a54d0e18f5c4921b2407fed3"
+  },
+  {
+    "group": "adminOperations",
+    "file": "src/admin/service/OperationsService.ts",
+    "method": "postAdminVerify",
+    "route": "/api/admin/verify",
+    "condition": "pathname === '/api/admin/verify' && req.method === 'POST'",
+    "baselineDigest": "99a3be8b2b57b9e0d47796e001a69d7b68a51cd752ef34f81da1c41ee72b13e7"
+  },
+  {
+    "group": "adminSource",
+    "file": "src/admin/service/SourceService.ts",
+    "method": "postCustomSourceValidate",
+    "route": "/api/custom-source/validate",
+    "condition": "pathname === '/api/custom-source/validate' && req.method === 'POST'",
+    "baselineDigest": "691e93c9e4d3a90fcde643b7668f91b7b5bc492a82459f3375971ff4f1ca4cd7"
+  },
+  {
+    "group": "adminSource",
+    "file": "src/admin/service/SourceService.ts",
+    "method": "postCustomSourceImport",
+    "route": "/api/custom-source/import",
+    "condition": "pathname === '/api/custom-source/import' && req.method === 'POST'",
+    "baselineDigest": "d45c7b9326a298eba673ea80074aeb626b85f2e06009b720f1b7b70c34065c23"
+  },
+  {
+    "group": "adminSource",
+    "file": "src/admin/service/SourceService.ts",
+    "method": "postCustomSourceUpload",
+    "route": "/api/custom-source/upload",
+    "condition": "pathname === '/api/custom-source/upload' && req.method === 'POST'",
+    "baselineDigest": "e84058a305406d8d3d393ec8c9271c8fa6b9f7afdf1fabe4c77ec315aa3774fe"
+  },
+  {
+    "group": "adminSource",
+    "file": "src/admin/service/SourceService.ts",
+    "method": "getCustomSourceList",
+    "route": "/api/custom-source/list",
+    "condition": "pathname === '/api/custom-source/list' && req.method === 'GET'",
+    "baselineDigest": "46512c3526a600f5a5d74b288e83b1dae9d0406c8e2496595ea07453b91658dd"
+  },
+  {
+    "group": "adminSource",
+    "file": "src/admin/service/SourceService.ts",
+    "method": "postCustomSourceToggle",
+    "route": "/api/custom-source/toggle",
+    "condition": "pathname === '/api/custom-source/toggle' && req.method === 'POST'",
+    "baselineDigest": "5652550a6d39af4b97383938dcaed5c36a4950c41ca22501d8a9101158d57dd1"
+  },
+  {
+    "group": "adminSource",
+    "file": "src/admin/service/SourceService.ts",
+    "method": "postCustomSourceDelete",
+    "route": "/api/custom-source/delete",
+    "condition": "pathname === '/api/custom-source/delete' && req.method === 'POST'",
+    "baselineDigest": "f4a74e7c5ed48e0e8f3420a03f23e4883b868f54f1dfb3e9038b209551f11501"
+  },
+  {
+    "group": "adminSource",
+    "file": "src/admin/service/SourceService.ts",
+    "method": "postCustomSourceReorder",
+    "route": "/api/custom-source/reorder",
+    "condition": "pathname === '/api/custom-source/reorder' && req.method === 'POST'",
+    "baselineDigest": "9c18812046eb4a671255a7e942bf215014cb4eeca628876c91ff7c23decdee7b"
+  },
+  {
+    "group": "adminSource",
+    "file": "src/admin/service/SourceService.ts",
+    "method": "postCustomSourceUpdatePlatforms",
+    "route": "/api/custom-source/update-platforms",
+    "condition": "pathname === '/api/custom-source/update-platforms' && req.method === 'POST'",
+    "baselineDigest": "da185633e293c5e52da57539354850b07136e8b2f4136ded246f049aee967d4b"
+  },
+  {
+    "group": "adminOperations",
+    "file": "src/admin/service/OperationsService.ts",
+    "method": "handleElfinderConnector",
+    "route": "/api/elfinder/connector",
+    "condition": "pathname === '/api/elfinder/connector'",
+    "baselineDigest": "1a9751fcd3fcac154a30db930f2c6aa0d551482edb7ed01a7b1606e0beb0913d"
+  },
+  {
+    "group": "adminConfiguration",
+    "file": "src/admin/service/ConfigurationService.ts",
+    "method": "handleConfig",
+    "route": "/api/config",
+    "condition": "pathname === '/api/config'",
+    "baselineDigest": "1da90ca8f37d7a9c8f8dfaeff8eb3a9567286d1b61b2e5953ed6a50491c3df3b"
+  },
+  {
+    "group": "adminConfiguration",
+    "file": "src/admin/service/ConfigurationService.ts",
+    "method": "getConfigBackups",
+    "route": "/api/config/backups",
+    "condition": "pathname === '/api/config/backups' && req.method === 'GET'",
+    "baselineDigest": "8c903e79728bb63b8832f78076b1a7c1c8162ee43d0a218493dade10519a3249"
+  },
+  {
+    "group": "adminConfiguration",
+    "file": "src/admin/service/ConfigurationService.ts",
+    "method": "postConfigBackupNow",
+    "route": "/api/config/backup-now",
+    "condition": "pathname === '/api/config/backup-now' && req.method === 'POST'",
+    "baselineDigest": "7925c163d2c3c523978df109729249f963fd8d6322e3dfa0aa20f5c55aa7ad44"
+  },
+  {
+    "group": "adminConfiguration",
+    "file": "src/admin/service/ConfigurationService.ts",
+    "method": "getConfigBackupsDownload",
+    "route": "/api/config/backups/download",
+    "condition": "pathname === '/api/config/backups/download' && req.method === 'GET'",
+    "baselineDigest": "85dd49a118d11497eb7cdaa06df092327fab8923df74ba8eb704af829c5ab8ec"
+  },
+  {
+    "group": "adminConfiguration",
+    "file": "src/admin/service/ConfigurationService.ts",
+    "method": "deleteConfigBackups",
+    "route": "/api/config/backups/",
+    "condition": "pathname.startsWith('/api/config/backups/') && req.method === 'DELETE'",
+    "baselineDigest": "96cffb2815750191ebbcbcf8505d8ed90335a49ffd0336d327a2930fbaaf3cd1"
+  },
+  {
+    "group": "adminConfiguration",
+    "file": "src/admin/service/ConfigurationService.ts",
+    "method": "postConfigBackupsRestore",
+    "route": "/api/config/backups/restore",
+    "condition": "pathname === '/api/config/backups/restore' && req.method === 'POST'",
+    "baselineDigest": "730b6b43f93d91a959e55e9def30b2c302efb89103cd9c7f51ab461e450ff9be"
+  },
+  {
+    "group": "adminConfiguration",
+    "file": "src/admin/service/ConfigurationService.ts",
+    "method": "postConfigTestProxy",
+    "route": "/api/config/test-proxy",
+    "condition": "pathname === '/api/config/test-proxy' && req.method === 'POST'",
+    "baselineDigest": "8dd0fcf4b028e3243c86b988dec5e2daa0f68a89d61eaecc41ad5cd65cdbeee3"
+  },
+  {
+    "group": "adminOperations",
+    "file": "src/admin/service/OperationsService.ts",
+    "method": "getLogs",
+    "route": "/api/logs",
+    "condition": "pathname === '/api/logs' && req.method === 'GET'",
+    "baselineDigest": "f0c68df966a3849cf9853a0273c558fce6dc01f0314315b13bb06a3298694c77"
+  },
+  {
+    "group": "adminOperations",
+    "file": "src/admin/service/OperationsService.ts",
+    "method": "getStats",
+    "route": "/api/stats",
+    "condition": "pathname === '/api/stats' && req.method === 'GET'",
+    "baselineDigest": "de001421d6526125ee5c22c33c3a4cfbe5f76de4aecb9f4fca5585d02159ae99"
+  },
+  {
+    "group": "adminBackup",
+    "file": "src/admin/service/BackupService.ts",
+    "method": "postWebdavTest",
+    "route": "/api/webdav/test",
+    "condition": "pathname === '/api/webdav/test' && req.method === 'POST'",
+    "baselineDigest": "a4660e0f7c2f8dd711edefa2002a01d625c12f844b6f4aa22a720d5606b645ab"
+  },
+  {
+    "group": "adminBackup",
+    "file": "src/admin/service/BackupService.ts",
+    "method": "postWebdavSyncFile",
+    "route": "/api/webdav/sync-file",
+    "condition": "pathname === '/api/webdav/sync-file' && req.method === 'POST'",
+    "baselineDigest": "e5cdf9cbc53f8300e082cf56e00ebc5423b7955221c17f0056d0727a9273512a"
+  },
+  {
+    "group": "adminBackup",
+    "file": "src/admin/service/BackupService.ts",
+    "method": "postWebdavBackup",
+    "route": "/api/webdav/backup",
+    "condition": "pathname === '/api/webdav/backup' && req.method === 'POST'",
+    "baselineDigest": "6a092380c4381e3924d63c32660ac280082e6285950a146b60c066138184788c"
+  },
+  {
+    "group": "adminBackup",
+    "file": "src/admin/service/BackupService.ts",
+    "method": "postWebdavSync",
+    "route": "/api/webdav/sync",
+    "condition": "pathname === '/api/webdav/sync' && req.method === 'POST'",
+    "baselineDigest": "d98e2e87adb65419b1c1bd738adc2403aa20dc71230cb604fa989001bd5ca026"
+  },
+  {
+    "group": "adminBackup",
+    "file": "src/admin/service/BackupService.ts",
+    "method": "getWebdavBackups",
+    "route": "/api/webdav/backups",
+    "condition": "pathname === '/api/webdav/backups' && req.method === 'GET'",
+    "baselineDigest": "0c745551377f83bd39d418a0be9191620622e81f461e9016258cc73b79d04ccf"
+  },
+  {
+    "group": "adminBackup",
+    "file": "src/admin/service/BackupService.ts",
+    "method": "deleteWebdavBackup",
+    "route": "/api/webdav/backup",
+    "condition": "pathname === '/api/webdav/backup' && req.method === 'DELETE'",
+    "baselineDigest": "d1f133893c5275754e6edb7b2bc3a7050395d3b13bdff7bf7ff5eaaebdeca271"
+  },
+  {
+    "group": "adminBackup",
+    "file": "src/admin/service/BackupService.ts",
+    "method": "postWebdavRestore",
+    "route": "/api/webdav/restore",
+    "condition": "pathname === '/api/webdav/restore' && req.method === 'POST'",
+    "baselineDigest": "edf6d31fd13e3a50111237510ed36589243d963947fa18d5ae949a170eb59857"
+  },
+  {
+    "group": "adminBackup",
+    "file": "src/admin/service/BackupService.ts",
+    "method": "getWebdavLogs",
+    "route": "/api/webdav/logs",
+    "condition": "pathname === '/api/webdav/logs' && req.method === 'GET'",
+    "baselineDigest": "8e77eb58637916e2100a6f705a015468a00599f1863d3d4a1378db1954eabb73"
+  },
+  {
+    "group": "adminBackup",
+    "file": "src/admin/service/BackupService.ts",
+    "method": "getWebdavProgress",
+    "route": "/api/webdav/progress",
+    "condition": "pathname === '/api/webdav/progress' && req.method === 'GET'",
+    "baselineDigest": "2da1f320bf1d2e635453669962bc821343c77ff4a9a740cfc1a3dc67c1eabc9c"
+  },
+  {
+    "group": "adminBackup",
+    "file": "src/admin/service/BackupService.ts",
+    "method": "getBackupDownload",
+    "route": "/api/backup/download",
+    "condition": "pathname === '/api/backup/download' && req.method === 'GET'",
+    "baselineDigest": "4464beda3ea4276e311202a56d51e3dd53e5ec3d6ac68cdad24dce5390fc2703"
+  },
+  {
+    "group": "adminBackup",
+    "file": "src/admin/service/BackupService.ts",
+    "method": "postBackupUpload",
+    "route": "/api/backup/upload",
+    "condition": "pathname === '/api/backup/upload' && req.method === 'POST'",
+    "baselineDigest": "f7ed4d0c1c0e81c4f561fac477a2c8a3afb90bf53457f2ffe0651a7b90762450"
+  },
+  {
+    "group": "adminOperations",
+    "file": "src/admin/service/OperationsService.ts",
+    "method": "postAdminReload",
+    "route": "/api/admin/reload",
+    "condition": "pathname === '/api/admin/reload' && req.method === 'POST'",
+    "baselineDigest": "458f9e1e0b56ded3e5341adad1ce37dccb7b9a06bc17907c66914915749840f7"
+  },
+  {
+    "group": "adminOperations",
+    "file": "src/admin/service/OperationsService.ts",
+    "method": "postRestart",
+    "route": "/api/restart",
+    "condition": "pathname === '/api/restart' && req.method === 'POST'",
+    "baselineDigest": "ce695e65fd3dea0e6a8878ed85992b501490109f3f87b8de22efc1994c1d7ee6"
+  },
+  {
+    "group": "adminOperations",
+    "file": "src/admin/service/OperationsService.ts",
+    "method": "getFiles",
+    "route": "/api/files",
+    "condition": "pathname === '/api/files' && req.method === 'GET'",
+    "baselineDigest": "17a2356ebf412e38a4949db0f10995ebc4ed5f6bcee514bdbc587a18ce8288b1"
+  },
+  {
+    "group": "adminOperations",
+    "file": "src/admin/service/OperationsService.ts",
+    "method": "getFilesDownload",
+    "route": "/api/files/download",
+    "condition": "pathname === '/api/files/download' && req.method === 'GET'",
+    "baselineDigest": "5fb10b63ef40604f4583150d6972b01d776ab780daa9d8dcb97c6093f060a761"
+  },
+  {
+    "group": "adminOperations",
+    "file": "src/admin/service/OperationsService.ts",
+    "method": "postFiles",
+    "route": "/api/files",
+    "condition": "pathname === '/api/files' && (req.method === 'POST' || req.method === 'PUT')",
+    "baselineDigest": "97fc5af3946a2a915d494ba2ad06bf25289adb07583ea5b2fb18abd959a11762"
+  },
+  {
+    "group": "adminOperations",
+    "file": "src/admin/service/OperationsService.ts",
+    "method": "deleteFiles",
+    "route": "/api/files",
+    "condition": "pathname === '/api/files' && req.method === 'DELETE'",
+    "baselineDigest": "9d3a45a8a4230cdbe865a494c595ee9b5b7d5f89d2148f108208abf10369ad37"
+  }
+]

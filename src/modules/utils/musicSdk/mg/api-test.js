@@ -1,26 +1,3 @@
-import { httpFetch } from '../../request'
-import { requestMsg } from '../../message'
-import { headers, timeout } from '../options'
-import { dnsLookup } from '../utils'
-
-const api_test = {
-  getMusicUrl(songInfo, type) {
-    const requestObj = httpFetch(`http://ts.tempmusics.tk/url/mg/${songInfo.copyrightId}/${type}`, {
-      method: 'get',
-      timeout,
-      headers,
-      lookup: dnsLookup,
-      family: 4,
-    })
-    requestObj.promise = requestObj.promise.then(({ statusCode, body }) => {
-      if (statusCode == 429) return Promise.reject(new Error(requestMsg.tooManyRequests))
-      switch (body.code) {
-        case 0: return Promise.resolve({ type, url: body.data })
-        default: return Promise.reject(new Error(requestMsg.fail))
-      }
-    })
-    return requestObj
-  },
-}
-
-export default api_test
+/** 原模块路径兼容入口。实现已按职责移动，保持调用方导出协议。 @author yahyaoo */
+export * from '../../../../integrations/music-sdk/internal/musicSdk/mg/api-test.js'
+export { default } from '../../../../integrations/music-sdk/internal/musicSdk/mg/api-test.js'

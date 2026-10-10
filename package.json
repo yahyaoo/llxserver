@@ -4,10 +4,10 @@
   "private": true,
   "scripts": {
     "prebuild": "node scripts/update-build-hash.js",
-    "build": "rimraf server && tsc --project tsconfig.json && tsc-alias -p tsconfig.json",
+    "build": "rimraf server && tsc --project tsconfig.json && tsc-alias -p tsconfig.json && node scripts/copy-sql.js",
     "test": "node --test test/*.test.cjs",
-    "test:unit": "node --test test/appUpdates.test.cjs test/downloadAuth.test.cjs test/serverDownloads.test.cjs test/settingsFrontend.test.cjs test/playerBar.test.cjs",
-    "test:system": "node --test test/serverDownloads.system.test.cjs",
+    "test:unit": "node --test test/appUpdates.test.cjs test/downloadAuth.test.cjs test/serverDownloads.test.cjs test/settingsFrontend.test.cjs test/playerBar.test.cjs test/configurationImport.test.cjs test/sqliteStorage.test.cjs test/sqliteBackup.test.cjs test/browserStorage.test.cjs test/routeRefactor.test.cjs test/sqliteFileManager.test.cjs test/sqliteConfiguration.test.cjs",
+    "test:system": "node --test test/serverDownloads.system.test.cjs test/sqliteMigration.system.test.cjs",
     "test:fpk:system": "node --test fnos/test/fpk.system.test.cjs",
     "prestart": "node scripts/update-build-hash.js",
     "download:fpcalc": "node scripts/download-binary.js",
@@ -37,8 +37,7 @@
     "url": "git+https://github.com/yahyaoo/fn-lxserver.git"
   },
   "author": {
-    "name": "XCQ",
-    "email": "2406498704@qq.com"
+    "name": "yahyaoo"
   },
   "license": "Apache-2.0",
   "bugs": {
@@ -49,6 +48,7 @@
     "@foobar404/wave": "^2.0.5",
     "@types/formidable": "^3.5.1",
     "archiver": "^8.0.0",
+    "better-sqlite3": "11.10.0",
     "brace-expansion": "^5.0.12",
     "bufferutil": "^4.0.8",
     "crypto-js": "^4.2.0",
@@ -79,6 +79,7 @@
     "@types/tunnel": "^0.0.7",
     "@types/unzipper": "^0.10.11",
     "@types/ws": "8.18.2",
+    "acorn": "8.18.0",
     "changelog-parser": "^4.1.0",
     "electron": "^43.7.5",
     "electron-builder": "^26.15.3",

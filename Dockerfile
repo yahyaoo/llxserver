@@ -13,6 +13,7 @@ RUN apk add --update \
   && (apk add --no-cache chromaprint || true) \
   && npm install --ignore-scripts --no-audit --no-fund && npm run build \
   && rm -rf node_modules && npm install --omit=dev --ignore-scripts --no-audit --no-fund \
+  && npm rebuild better-sqlite3 --no-audit --no-fund \
   && mkdir -p build-output \
   && mv server node_modules config.js index.js package.json public -t build-output
 

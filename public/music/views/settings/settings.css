@@ -69,6 +69,15 @@
 .theme-menu .theme-option .text-sm { font-size: 12px; text-align: left; }
 .theme-menu .theme-option .text-xs { font-size: 10px; text-align: left; transform: none; }
 .theme-menu-footnote { margin-top: 14px; font-size: 11px; color: var(--text-muted); }
+.settings-theme-panel h3 { margin-bottom: 16px; }
+.settings-theme-panel .appearance-option[data-active="true"],
+.settings-theme-panel .theme-option[data-active="true"] {
+    border-color: var(--c-500);
+    background: color-mix(in srgb, var(--c-500) 8%, var(--bg-panel));
+    --tw-ring-color: var(--c-500);
+}
+.settings-theme-panel .theme-grid { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+#settings-section-about > div { max-width: none; }
 #view-settings, body.player-bar-floating #view-settings {
     /* 页面铺满可用高度，浮动播放栏的补偿只加在滚动内容末尾。作者：yahyaoo */
     padding: 0 !important;

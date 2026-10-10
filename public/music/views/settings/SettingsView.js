@@ -326,6 +326,13 @@
         <!-- Sync Settings Moved inside System Panel -->
         <div id="settings-section-sync" data-settings-section="sync" class="pt-6 border-t t-border-main">
             <h3 class="font-medium text-emerald-600 mb-4">数据同步</h3>
+            <div class="space-y-3 mb-4">
+                <div class="text-sm font-bold t-text-main">迁移洛雪配置</div>
+                <p class="text-xs t-text-muted">上传 JSON，将文件中提供的设置、歌单、音效和媒体库覆盖到当前账号。未提供的部分保持原值。</p>
+                <input id="configuration-import-file" type="file" accept=".json,application/json" class="hidden" onchange="importLxConfiguration(this)">
+                <button id="configuration-import-button" type="button" class="lm-btn" onclick="selectLxConfiguration()">上传 JSON 并迁移</button>
+                <p id="configuration-import-status" class="text-xs t-text-muted" role="status" aria-live="polite"></p>
+            </div>
 
             <div class="flex gap-4 mb-4">
                 <button id="btn-mode-local" onclick="switchSyncMode('local')"
@@ -986,11 +993,6 @@
                     <span class="leading-tight">重置所有设置</span>
                 </button>
 
-                <button onclick="goToAdmin()"
-                    class="w-full py-2.5 px-4 bg-emerald-50 text-emerald-600 hover:bg-emerald-500 hover:text-white font-bold rounded-lg transition-all duration-300 border border-emerald-100 flex items-center justify-center gap-3 text-center mt-3">
-                    <i class="fas fa-tasks flex-shrink-0"></i>
-                    <span class="leading-tight">后台管理</span>
-                </button>
                 <!-- Mobile bottom spacer: ensures the last button clears the browser nav bar -->
                 <div class="pb-36 md:pb-4"></div>
             </div>
@@ -999,6 +1001,123 @@
 
     <!-- Display Settings Panel -->
     <div id="settings-panel-display" class="hidden space-y-8 animate-fade-in">
+<div id="settings-section-theme" data-settings-section="theme" class="settings-theme-panel settings-form-card hidden space-y-6">
+                            <!-- Appearance Selection -->
+                            <div>
+                                <h3 class="font-bold t-text-main text-lg mb-4 flex items-center">
+                                    <i class="fas fa-magic mr-2 text-emerald-500"></i> 外观设置
+                                </h3>
+                                <div class="grid grid-cols-3 gap-4">
+                                    <!-- Light -->
+                                    <button onclick="setAppearance('light')"
+                                        class="appearance-option flex flex-col items-center gap-2 p-3 rounded-xl border t-border-main hover:t-bg-main transition-all ring-2 ring-transparent"
+                                        data-appearance="light">
+                                        <i class="fas fa-sun text-xl"></i>
+                                        <span class="text-xs font-bold">明亮模式</span>
+                                    </button>
+                                    <!-- Dark -->
+                                    <button onclick="setAppearance('dark')"
+                                        class="appearance-option flex flex-col items-center gap-2 p-3 rounded-xl border t-border-main hover:t-bg-main transition-all ring-2 ring-transparent"
+                                        data-appearance="dark">
+                                        <i class="fas fa-moon text-xl"></i>
+                                        <span class="text-xs font-bold">暗黑模式</span>
+                                    </button>
+                                    <!-- System -->
+                                    <button onclick="setAppearance('system')"
+                                        class="appearance-option flex flex-col items-center gap-2 p-3 rounded-xl border t-border-main hover:t-bg-main transition-all ring-2 ring-transparent"
+                                        data-appearance="system">
+                                        <i class="fas fa-desktop text-xl"></i>
+                                        <span class="text-xs font-bold">跟随系统</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Theme Selection -->
+                            <div>
+                                <h3 class="font-bold t-text-main text-lg mb-4 flex items-center">
+                                    <i class="fas fa-palette mr-2 text-emerald-500"></i> 主题风格
+                                </h3>
+                                <div class="theme-grid grid grid-cols-2 gap-4">
+                                    <!-- Emerald -->
+                                    <button onclick="setTheme('emerald')"
+                                        class="theme-option group relative rounded-xl border t-border-main p-2 hover:shadow-md transition-all text-left overflow-hidden ring-2 ring-transparent ring-offset-2 data-[active=true]:ring-emerald-500"
+                                        data-theme="emerald">
+                                        <div
+                                            class="h-24 rounded-lg bg-gradient-to-br from-[#34d399] to-[#059669] mb-3 shadow-inner relative overflow-hidden">
+                                            <div
+                                                class="absolute inset-0 t-bg-panel/20 transform rotate-12 scale-150 translate-y-10 group-hover:translate-y-8 transition-transform">
+                                            </div>
+                                            <i
+                                                class="fas fa-check-circle absolute top-2 right-2 text-white/90 opacity-0 group-data-[active=true]:opacity-100 transition-opacity"></i>
+                                        </div>
+                                        <div class="font-bold t-text-main text-sm text-center">森之韵</div>
+                                        <div class="text-xs text-center t-text-muted scale-90">Emerald</div>
+                                    </button>
+                                    <!-- Blue -->
+                                    <button onclick="setTheme('blue')"
+                                        class="theme-option group relative rounded-xl border t-border-main p-2 hover:shadow-md transition-all text-left overflow-hidden ring-2 ring-transparent ring-offset-2 data-[active=true]:ring-blue-500"
+                                        data-theme="blue">
+                                        <div
+                                            class="h-24 rounded-lg bg-gradient-to-br from-blue-400 to-blue-600 mb-3 shadow-inner relative overflow-hidden">
+                                            <div
+                                                class="absolute inset-0 t-bg-panel/20 transform rotate-12 scale-150 translate-y-10 group-hover:translate-y-8 transition-transform">
+                                            </div>
+                                            <i
+                                                class="fas fa-check-circle absolute top-2 right-2 text-white/90 opacity-0 group-data-[active=true]:opacity-100 transition-opacity"></i>
+                                        </div>
+                                        <div class="font-bold t-text-main text-sm text-center">深海谧</div>
+                                        <div class="text-xs text-center t-text-muted scale-90">Deep Blue</div>
+                                    </button>
+                                    <!-- Amber -->
+                                    <button onclick="setTheme('amber')"
+                                        class="theme-option group relative rounded-xl border t-border-main p-2 hover:shadow-md transition-all text-left overflow-hidden ring-2 ring-transparent ring-offset-2 data-[active=true]:ring-amber-500"
+                                        data-theme="amber">
+                                        <div
+                                            class="h-24 rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 mb-3 shadow-inner relative overflow-hidden">
+                                            <div
+                                                class="absolute inset-0 t-bg-panel/20 transform rotate-12 scale-150 translate-y-10 group-hover:translate-y-8 transition-transform">
+                                            </div>
+                                            <i
+                                                class="fas fa-check-circle absolute top-2 right-2 text-white/90 opacity-0 group-data-[active=true]:opacity-100 transition-opacity"></i>
+                                        </div>
+                                        <div class="font-bold t-text-main text-sm text-center">暖阳愿</div>
+                                        <div class="text-xs text-center t-text-muted scale-90">Warm Sun</div>
+                                    </button>
+                                    <!-- Violet -->
+                                    <button onclick="setTheme('violet')"
+                                        class="theme-option group relative rounded-xl border t-border-main p-2 hover:shadow-md transition-all text-left overflow-hidden ring-2 ring-transparent ring-offset-2 data-[active=true]:ring-violet-500"
+                                        data-theme="violet">
+                                        <div
+                                            class="h-24 rounded-lg bg-gradient-to-br from-violet-400 to-purple-600 mb-3 shadow-inner relative overflow-hidden">
+                                            <div
+                                                class="absolute inset-0 t-bg-panel/20 transform rotate-12 scale-150 translate-y-10 group-hover:translate-y-8 transition-transform">
+                                            </div>
+                                            <i
+                                                class="fas fa-check-circle absolute top-2 right-2 text-white/90 opacity-0 group-data-[active=true]:opacity-100 transition-opacity"></i>
+                                        </div>
+                                        <div class="font-bold t-text-main text-sm text-center">紫微星</div>
+                                        <div class="text-xs text-center t-text-muted scale-90">Nebula</div>
+                                    </button>
+                                    <!-- Rose -->
+                                    <button onclick="setTheme('rose')"
+                                        class="theme-option group relative rounded-xl border t-border-main p-2 hover:shadow-md transition-all text-left overflow-hidden ring-2 ring-transparent ring-offset-2 data-[active=true]:ring-rose-500"
+                                        data-theme="rose">
+                                        <div
+                                            class="h-24 rounded-lg bg-gradient-to-br from-rose-400 to-red-500 mb-3 shadow-inner relative overflow-hidden">
+                                            <div
+                                                class="absolute inset-0 t-bg-panel/20 transform rotate-12 scale-150 translate-y-10 group-hover:translate-y-8 transition-transform">
+                                            </div>
+                                            <i
+                                                class="fas fa-check-circle absolute top-2 right-2 text-white/90 opacity-0 group-data-[active=true]:opacity-100 transition-opacity"></i>
+                                        </div>
+                                        <div class="font-bold t-text-main text-sm text-center">绯红月</div>
+                                        <div class="text-xs text-center t-text-muted scale-90">Crimson</div>
+                                    </button>
+                                </div>
+                            </div>
+
+
+</div>
         <!-- 界面与布局 -->
         <div id="settings-section-layout" data-settings-section="layout" class="col-span-full border-t t-border-main pt-6 mt-4 space-y-4">
             <h4 class="text-sm font-bold t-text-main flex items-center">
@@ -1888,6 +2007,37 @@
         <div class="pb-36 md:pb-4"></div>
     </div>
 
+
+    <div id="settings-panel-app" class="hidden space-y-6">
+        <div id="settings-section-admin" data-settings-section="admin" class="settings-form-card hidden">
+            <p class="t-text-muted mb-4">进入后台管理，管理用户、系统配置、数据同步和服务器文件。</p>
+            <button type="button" id="nav-admin-link" onclick="goToAdmin()" class="lm-btn">
+                <i class="fas fa-server" aria-hidden="true"></i> 打开后台管理
+            </button>
+        </div>
+                <div id="settings-section-about" data-settings-section="about"
+                    class="hidden">
+                    <div
+                        class="t-bg-panel rounded-2xl shadow-sm border t-border-main p-8 max-w-3xl mx-auto w-full prose prose-emerald">
+                        <div id="about-content" class="animate-pulse">
+                            <div class="h-8 bg-gray-200 rounded w-1/3 mb-4"></div>
+                            <div class="h-4 bg-gray-200 rounded w-full mb-2"></div>
+                            <div class="h-4 bg-gray-200 rounded w-full mb-2"></div>
+                            <div class="h-4 bg-gray-200 rounded w-2/3"></div>
+                        </div>
+
+                        <!-- Check for Updates Button -->
+                        <div class="mt-8 pt-8 border-t t-border-main flex flex-col items-center gap-4">
+                            <button onclick="checkForUpdates()"
+                                class="flex items-center gap-2 px-8 py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl shadow-lg shadow-emerald-100 transition-all hover:scale-105 active:scale-95 text-sm font-bold group">
+                                <i class="fas fa-sync-alt group-hover:rotate-180 transition-transform duration-500"></i>
+                                检查版本更新
+                            </button>
+                            <p class="text-xs t-text-muted">点击通过云端检查是否有新版本可用</p>
+                        </div>
+                    </div>
+                </div>
+    </div>
     <!-- Logs Settings Panel -->
     <div id="settings-panel-logs" data-settings-section="logs" class="hidden space-y-6 animate-fade-in h-96 flex flex-col">
         <div class="flex flex-wrap items-center justify-between gap-3 mb-2">

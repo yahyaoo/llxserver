@@ -1,3 +1,2 @@
-export * as sync from './sync'
-export { ListManage } from './manage'
-export { ListEvent, type ListEventType } from './event'
+/** 原模块路径兼容入口。实现已按职责移动，保持调用方导出协议。 @author yahyaoo */
+export * from '../../music/service/playlist/index'

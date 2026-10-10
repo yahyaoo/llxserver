@@ -1,5 +1,5 @@
 /* eslint-disable no-var */
-import { type ListEventType, type DislikeEventType } from '@/event'
+import { type ListEventType, type DislikeEventType } from '../event'
 
 declare global {
   interface Lx {
@@ -7,7 +7,8 @@ declare global {
     dataPath: string
     userPath: string
     config: LX.Config
-    webdavSync?: any  // WebDAVSync instance
+    /** 远程备份接口，由应用入口装配。 */
+    webdavSync?: import('../integrations/webdav/WebDavGateway').WebDavGateway
     staticPath: string
     configPath: string
     saveConfig: () => void

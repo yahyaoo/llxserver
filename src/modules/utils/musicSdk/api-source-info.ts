@@ -1,32 +1,3 @@
-// Support qualitys: 128k 320k flac flac24bit hires atmos atmos_plus master wav
-
-const sources: Array<{
-  id: string
-  name: string
-  disabled: boolean
-  supportQualitys: Partial<Record<LX.OnlineSource, LX.Quality[]>>
-}> = [
-  // {
-  //   id: 'test',
-  //   name: '测试接口',
-  //   disabled: false,
-  //   supportQualitys: {
-  //     kw: ['128k'],
-  //     kg: ['128k'],
-  //     tx: ['128k'],
-  //     wy: ['128k'],
-  //     mg: ['128k'],
-  //     // bd: ['128k'],
-  //   },
-  // },
-  // {
-  //   id: 'temp',
-  //   name: '临时接口',
-  //   disabled: false,
-  //   supportQualitys: {
-  //     kw: ['128k'],
-  //   },
-  // },
-]
-
-export default sources
+/** 原模块路径兼容入口。实现已按职责移动，保持调用方导出协议。 @author yahyaoo */
+export * from '../../../integrations/music-sdk/internal/musicSdk/api-source-info'
+export { default } from '../../../integrations/music-sdk/internal/musicSdk/api-source-info'

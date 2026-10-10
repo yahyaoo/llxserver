@@ -1582,6 +1582,12 @@ function changeQualityPreference(quality) {
 
 // Tab Switching
 function switchTab(tabId) {
+    // 兼容协议弹窗和快捷键的旧入口，统一进入设置中的关于页面。
+    if (tabId === 'about') {
+        switchTab('settings');
+        selectSettingsSection('about');
+        return;
+    }
     // Favorites is a sidebar group toggle, not a main content view.
     if (tabId === 'favorites') {
         handleFavoritesClick();
@@ -1693,11 +1699,6 @@ function switchTab(tabId) {
         if (typeof loadCustomSources === 'function') {
             loadCustomSources();
         }
-    }
-
-    if (tabId === 'about') {
-        document.getElementById('page-title').innerText = '关于';
-        loadAboutContent();
     }
 
     // Auto-exit batch mode when switching tabs (Redundant but safe)
@@ -12435,7 +12436,12 @@ async function handleRefreshList(listId, event, silent = false) {
 }
 
 function handleFavoritesClick() {
-
+    // 图标模式下先展开导航，保证收藏子树可见且可操作。
+    const sidebar = document.getElementById('main-sidebar');
+    const wasCollapsed = window.innerWidth >= 1025 && sidebar?.classList.contains('navigation-collapsed');
+    if (wasCollapsed) {
+        toggleMainNavigation();
+    }
     exitListSecondaryModes();
 
     // Highlight Header
@@ -12449,7 +12455,8 @@ function handleFavoritesClick() {
         favTab.classList.remove('t-text-muted');
     }
 
-    toggleFavorites();
+    const favorites = document.getElementById('favorites-children');
+    if (!wasCollapsed || !favorites || favorites.style.height === '0px' || favorites.style.height === '') toggleFavorites();
 }
 
 function handleDislikeFolderClick() {
@@ -16339,7 +16346,7 @@ function togglePlayerPanel() {
     // 注意: Tailwind 的 translate-y-full 等同于 transform: translateY(100%)
     const isHidden = footer.classList.contains('translate-y-[110%]');
 
-    const views = ['view-search', 'view-settings', 'view-favorites', 'view-about', 'main-sidebar', 'view-songlist', 'songlist-detail-view'];
+    const views = ['view-search', 'view-settings', 'view-favorites', 'main-sidebar', 'view-songlist', 'songlist-detail-view'];
     const playerDetail = document.getElementById('view-player-detail');
     const lyricsWrapper = document.getElementById('lyrics-wrapper');
 

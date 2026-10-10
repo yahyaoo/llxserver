@@ -1,19 +1,2 @@
-export interface TaskExecutionResult {
-  taskId: string
-  timestamp: number
-  success: boolean
-  message: string
-  details?: any
-}
-
-export interface ScheduledTask {
-  id: string
-  name: string
-  intervalMs: number
-  enabled: boolean
-  lastRunTime?: number
-  nextRunTime?: number
-  isRunning: boolean
-  lastResult?: TaskExecutionResult
-  run: () => Promise<TaskExecutionResult>
-}
+/** 原模块路径兼容入口。实现已按职责移动，保持调用方导出协议。 @author yahyaoo */
+export * from '../../music/service/task/types'

@@ -1,33 +1,3 @@
-import { apis } from '../api-source' // 现在已适配服务器端
-import leaderboard from './leaderboard'
-import songList from './songList'
-import musicSearch from './musicSearch'
-import pic from './pic'
-import lyric from './lyric'
-import hotSearch from './hotSearch'
-import comment from './comment'
-import tipSearch from './tipSearch'
-
-const mg = {
-  tipSearch,
-  songList,
-  musicSearch,
-  leaderboard,
-  hotSearch,
-  comment,
-  getMusicUrl(songInfo, type) {
-    // 使用 api-source 获取 API（优先自定义源）
-    return apis('mg').getMusicUrl(songInfo, type)
-  },
-  getLyric(songInfo) {
-    return lyric.getLyric(songInfo)
-  },
-  getPic(songInfo) {
-    return pic.getPic(songInfo)
-  },
-  getMusicDetailPageUrl(songInfo) {
-    return `http://music.migu.cn/v3/music/song/${songInfo.copyrightId}`
-  },
-}
-
-export default mg
+/** 原模块路径兼容入口。实现已按职责移动，保持调用方导出协议。 @author yahyaoo */
+export * from '../../../../integrations/music-sdk/internal/musicSdk/mg/index.js'
+export { default } from '../../../../integrations/music-sdk/internal/musicSdk/mg/index.js'
