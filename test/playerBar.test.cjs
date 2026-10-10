@@ -10,24 +10,36 @@ const appSource = read('public/music/app.js')
 
 /** 隔离浏览器环境，执行真实弹框和音量函数。 */
 function createContext() {
-  const elements = new Map(), documentEvents = {}, saved = new Map()
+  const elements = new Map(), documentEvents = {}, saved = new Map(), windowEvents = {}, observers = []
+  let footerRect = { top: 782, height: 100 }
+  class LayoutObserver {
+    constructor(callback) { this.callback = callback; observers.push(this) }
+    observe(target) { this.target = target }
+    disconnect() { this.disconnected = true }
+  }
   function get(id) {
     if (!elements.has(id)) {
       const classes = new Set()
       elements.set(id, {
-        hidden: true, attributes: {}, style: {}, events: {}, textContent: '', children: [],
+        hidden: true, attributes: {}, style: {
+          setProperty(key, value) { this[key] = value }, removeProperty(key) { delete this[key] },
+        }, events: {}, textContent: '', children: [],
         classList: { remove: value => classes.delete(value), add: value => classes.add(value), contains: value => classes.has(value) },
         setAttribute(key, value) { this.attributes[key] = value },
         focus() { this.focused = true },
         querySelector(selector) { return selector === '.player-actions' ? get('player-actions') : get(id + '-first-control') },
         addEventListener(name, callback) { this.events[name] = callback },
         removeEventListener(name, callback) { if (this.events[name] === callback) delete this.events[name] },
-        getBoundingClientRect() { return { left: 10, width: 100 } },
+        getBoundingClientRect() { return id === 'player-footer' ? footerRect : { left: 10, width: 100 } },
       })
     }
     return elements.get(id)
   }
-  const context = vm.createContext({ console, window: {}, audio: { volume: 0.75, muted: false },
+  const context = vm.createContext({ console, ResizeObserver: LayoutObserver, MutationObserver: LayoutObserver,
+    window: { innerHeight: 900,
+      addEventListener: (name, callback) => { windowEvents[name] = callback },
+      removeEventListener: (name, callback) => { if (windowEvents[name] === callback) delete windowEvents[name] },
+    }, audio: { volume: 0.75, muted: false },
     document: { body: get('body'), getElementById: get, addEventListener: (name, callback) => { documentEvents[name] = callback },
       removeEventListener: (name, callback) => { if (documentEvents[name] === callback) delete documentEvents[name] },
     },
@@ -40,7 +52,7 @@ function createContext() {
   vm.runInContext(volumeFunctions + changeVolume, context)
   get('player-actions').children = ['player-more-anchor', 'play-mode-anchor', 'player-like-btn', 'player-queue-btn', 'player-volume-anchor'].map(get)
   get('player-volume-anchor').classList.add('player-volume-anchor')
-  return { context, get, documentEvents, saved }
+  return { context, get, documentEvents, saved, windowEvents, observers, setFooterRect: rect => { footerRect = rect } }
 }
 
 test('更多与音量面板互斥，重复点击关闭，无效入口保留当前面板', () => {
@@ -119,7 +131,7 @@ test('滑块方向键只调音量，Home/End 有效且不越界', () => {
 })
 
 test('组件同步挂载，重复挂载不替换节点，卸载释放事件且不影响音频状态', () => {
-  const { context, get, documentEvents } = createContext()
+  const { context, get, documentEvents, windowEvents, observers } = createContext()
   const root = get('player-bar-root')
   assert.ok(root.innerHTML.includes('id="player-footer"'))
   assert.equal(root.classList.contains('player-bar-host'), true)
@@ -138,10 +150,35 @@ test('组件同步挂载，重复挂载不替换节点，卸载释放事件且�
   assert.equal(documentEvents.click, undefined)
   assert.equal(documentEvents.keydown, undefined)
   assert.equal(get('volume-container').events.keydown, undefined)
+  assert.equal(windowEvents.resize, undefined)
+  assert.equal(get('player-footer').events.transitionend, undefined)
+  assert.equal(get('body').style['--player-bar-clearance'], undefined)
+  assert.ok(observers.every(observer => observer.disconnected))
   assert.deepEqual({ ...context.audio }, audioState)
   context.window.playerBar.mount(root)
   assert.equal(root.innerHTML, markup)
   assert.equal(typeof documentEvents.click, 'function')
+})
+
+test('滚动末尾补偿包含栏高和底部间距，随窗口及栏高变化更新而不缩短页面', () => {
+  const { context, get, windowEvents, observers, setFooterRect } = createContext()
+  const clearance = () => get('body').style['--player-bar-clearance']
+  assert.equal(clearance(), '134px', '100px 栏高 + 18px 底部间距 + 16px 余量')
+  setFooterRect({ top: 710, height: 180 })
+  windowEvents.resize()
+  assert.equal(clearance(), '206px', '手机布局栏高变化后重新测量')
+  context.window.innerHeight = 800
+  setFooterRect({ top: 688, height: 94 })
+  observers[0].callback()
+  assert.equal(clearance(), '128px')
+  setFooterRect({ top: 820, height: 94 })
+  get('player-footer').events.transitionend()
+  assert.equal(clearance(), '0px', '浮层移出视口后不保留补偿')
+  setFooterRect({ top: 0, height: 0 })
+  observers[1].callback()
+  assert.equal(clearance(), '0px')
+  assert.equal(get('view-settings').style.bottom, undefined)
+  assert.equal(get('view-settings').style.height, undefined)
 })
 
 test('音量栏内展开时菜单退出交互，关闭和切换更多恢复菜单', () => {

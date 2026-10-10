@@ -8,6 +8,7 @@
     class PlayerBar {
         constructor() {
             this.root = null;
+            this.onLayoutChange = () => this.updateScrollClearance();
             this.onDocumentClick = event => {
                 if (!event.target.closest('[data-player-popover]')) this.closePopovers();
                 if (event.target.closest('[data-player-action]')) this.closePopovers();
@@ -39,6 +40,35 @@
             document.addEventListener('click', this.onDocumentClick);
             document.addEventListener('keydown', this.onDocumentKeydown);
             document.getElementById('volume-container')?.addEventListener('keydown', this.onVolumeKeydown);
+            this.observeLayout();
+        }
+
+        /** 同步浮层遮挡范围，只用于滚动末尾留白，不改变页面高度。 */
+        updateScrollClearance() {
+            const footer = document.getElementById('player-footer');
+            if (!this.root || !footer) return;
+            const rect = footer.getBoundingClientRect();
+            const viewportHeight = window.innerHeight;
+            const visible = rect.height > 0 && rect.top + rect.height > 0 && rect.top < viewportHeight;
+            const clearance = visible ? Math.ceil(Math.min(viewportHeight, viewportHeight - rect.top) + 16) : 0;
+            document.body.style.setProperty('--player-bar-clearance', `${clearance}px`);
+        }
+
+        /** 窗口和组件尺寸改变时重新测量，避免手机布局沿用桌面补偿值。 */
+        observeLayout() {
+            const footer = document.getElementById('player-footer');
+            if (!footer) return;
+            this.updateScrollClearance();
+            window.addEventListener('resize', this.onLayoutChange);
+            footer.addEventListener('transitionend', this.onLayoutChange);
+            if (typeof ResizeObserver !== 'undefined') {
+                this.resizeObserver = new ResizeObserver(this.onLayoutChange);
+                this.resizeObserver.observe(footer);
+            }
+            if (typeof MutationObserver !== 'undefined') {
+                this.mutationObserver = new MutationObserver(this.onLayoutChange);
+                this.mutationObserver.observe(footer, { attributes: true, attributeFilter: ['class', 'style'] });
+            }
         }
 
         /** 卸载组件并释放事件，不更改音频状态。 */
@@ -47,6 +77,13 @@
             document.removeEventListener('click', this.onDocumentClick);
             document.removeEventListener('keydown', this.onDocumentKeydown);
             document.getElementById('volume-container')?.removeEventListener('keydown', this.onVolumeKeydown);
+            window.removeEventListener('resize', this.onLayoutChange);
+            document.getElementById('player-footer')?.removeEventListener('transitionend', this.onLayoutChange);
+            this.resizeObserver?.disconnect();
+            this.mutationObserver?.disconnect();
+            this.resizeObserver = null;
+            this.mutationObserver = null;
+            document.body.style.removeProperty('--player-bar-clearance');
             this.root.innerHTML = '';
             this.root.classList.remove('player-bar-host');
             document.body.classList.remove('player-bar-floating');

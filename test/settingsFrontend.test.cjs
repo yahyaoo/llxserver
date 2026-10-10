@@ -193,24 +193,18 @@ test('顶部主题沿用原有存储、选中态与外观模式，无效主题�
   assert.equal(values.get('lx_appearance'), 'system')
 })
 
-test('设置高度随播放器实际高度、收起和窗口变化自动适配', () => {
-  const { context, get } = createMusicSettingsContext()
-  let rect = { height: 150, top: 750 }
-  let resized, transitioned
-  const footer = { getBoundingClientRect: () => rect, addEventListener: (name, callback) => { if (name === 'transitionend') transitioned = callback } }
-  const offsets = []
-  get('view-settings').style = { setProperty: (key, value) => { assert.equal(key, '--settings-player-height'); offsets.push(value) } }
-  context.document.getElementById = id => id === 'player-footer' ? footer : get(id)
-  context.window.innerHeight = 900
-  context.window.addEventListener = (name, callback) => { if (name === 'resize') resized = callback }
-  context.initSettingsHeight()
-  assert.equal(offsets.at(-1), '150px')
-  rect = { height: 100, top: 782 }; resized()
-  assert.equal(offsets.at(-1), '118px', '浮动播放器的底部间距一并预留')
-  rect = { height: 165, top: 679 }; context.window.innerHeight = 844; resized()
-  assert.equal(offsets.at(-1), '165px')
-  rect = { height: 165, top: 860 }; transitioned()
-  assert.equal(offsets.at(-1), '0px', '播放器移出屏幕后设置占满剩余高度')
+test('设置页铺满高度，补偿加在滚动区域末尾，不再扣减页面高度', () => {
+  const css = fs.readFileSync(path.join(__dirname, '../public/music/views/settings/settings.css'), 'utf8')
+  const source = fs.readFileSync(path.join(__dirname, '../public/music/views/settings/index.js'), 'utf8')
+  const playerCss = fs.readFileSync(path.join(__dirname, '../public/music/components/player-bar/player-bar.css'), 'utf8')
+  const viewRule = css.match(/#view-settings, body\.player-bar-floating #view-settings\s*\{([^}]+)\}/)[1]
+  assert.match(viewRule, /bottom:\s*0\s*!important/)
+  assert.ok(!css.includes('--settings-player-height'))
+  assert.ok(!source.includes('initSettingsHeight'), '设置页不再注册重复的播放器高度监听')
+  const scrollingRule = playerCss.match(/\.player-bar-floating :is\(#search-results[^}]+\}/)[0]
+  assert.ok(scrollingRule.includes('#settings-content'))
+  assert.ok(scrollingRule.includes('#settings-navigation'))
+  assert.match(scrollingRule, /padding-bottom:\s*var\(--player-bar-clearance/)
 })
 
 test('独立设置页面组件同步挂载，重复挂载保留控件草稿；模板和资源入口完整', () => {

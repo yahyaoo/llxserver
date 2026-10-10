@@ -103,30 +103,6 @@ function toggleHeaderDropdown(menuId) {
     document.getElementById(menu.dataset.headerTrigger)?.setAttribute('aria-expanded', String(open));
 }
 
-/**
- * 按播放器实际占用高度预留空间，适配音频可视化、窗口尺寸和播放器收起。
- * 监听现有播放器的尺寸及展示状态，不修改播放器本身的逻辑。
- */
-function initSettingsHeight() {
-    const footer = document.getElementById('player-footer');
-    const view = document.getElementById('view-settings');
-    if (!footer || !view) return;
-    const update = () => {
-        const rect = footer.getBoundingClientRect();
-        // 浮动播放器下方还有安全间距，按顶部边界预留整个占用区域。
-        const visible = rect.height > 0 && rect.top + rect.height > 0 && rect.top < window.innerHeight;
-        const height = visible ? Math.min(window.innerHeight, window.innerHeight - rect.top) : 0;
-        view.style.setProperty('--settings-player-height', `${height}px`);
-    };
-    update();
-    window.addEventListener('resize', update);
-    footer.addEventListener('transitionend', update);
-    if (typeof ResizeObserver !== 'undefined') new ResizeObserver(update).observe(footer);
-    if (typeof MutationObserver !== 'undefined') {
-        new MutationObserver(update).observe(footer, { attributes: true, attributeFilter: ['class', 'style'] });
-    }
-}
-
 /** 构建分组导航，内容仍由页面中的原有设置区域提供。 */
 function initSettingsNavigation() {
     const navigation = document.getElementById('settings-navigation');
@@ -134,7 +110,6 @@ function initSettingsNavigation() {
     settingsNavigationComponent = new window.SettingsNavigationComponent(navigation, SETTINGS_NAVIGATION, selectSettingsSection);
     settingsNavigationComponent.render();
     selectSettingsSection(activeSettingsSection);
-    initSettingsHeight();
     document.addEventListener('click', event => {
         if (!event.target.closest('[data-header-dropdown]')) closeHeaderDropdowns();
     });

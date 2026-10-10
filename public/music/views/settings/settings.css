@@ -70,14 +70,14 @@
 .theme-menu .theme-option .text-xs { font-size: 10px; text-align: left; transform: none; }
 .theme-menu-footnote { margin-top: 14px; font-size: 11px; color: var(--text-muted); }
 #view-settings, body.player-bar-floating #view-settings {
-    /* 覆盖可视化模块的固定预留值，按播放器实际占用高度布局。 */
+    /* 页面铺满可用高度，浮动播放栏的补偿只加在滚动内容末尾。作者：yahyaoo */
     padding: 0 !important;
-    bottom: var(--settings-player-height, 180px) !important;
+    bottom: 0 !important;
 }
 .settings-shell {
     display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 0;
     height: 100%; width: 100%; margin: 0;
-    /* 导航贴左，内容填满右侧；外层已避开播放器。 */
+    /* 导航贴左，内容填满右侧，播放栏覆盖在页面之上。作者：yahyaoo */
     padding: 0; overflow: hidden;
 }
 .settings-sidebar {
