@@ -1,4 +1,5 @@
 /* 普通页面共用账号面板透明度与毛玻璃强度，播放详情的根节点位于此作用域之外。作者：jingyh */
+/* 导航内按完整类名匹配面板，避免把 hover:t-bg-main 菜单悬停样式套用为常驻背景和阴影。作者：jingyh */
 :root { --surface-blur: 24px; }
 :root.music-appearance .music-shell :is([class*="t-bg-panel"], [class*="t-bg-main"], [class*="t-bg-glass"],
     .settings-sidebar, .settings-content, .settings-form-card, .settings-mobile-toggle,
@@ -6,7 +7,7 @@
     .library-search-input, .header-actions, .library-search-results, .header-dropdown-panel,
     .glass, #lb-sidebar, #lb-songs-container, [class*="bg-white/"], [class*="dark:bg-gray-800/"]),
 :root.music-appearance #main-sidebar.main-navigation,
-:root.music-appearance #main-sidebar :is([class*="t-bg-panel"], [class*="t-bg-main"]),
+:root.music-appearance #main-sidebar :is(.t-bg-panel, .t-bg-main, [class~="t-bg-main/50"]),
 :root.music-appearance body.player-bar-floating:not(.player-detail-open):not(:has(#view-player-detail:not(.hidden))) #player-footer.floating-player {
     background: color-mix(in srgb, var(--bg-panel) calc(var(--surface-opacity) * 100%), transparent) !important;
     backdrop-filter: blur(var(--surface-blur)) !important;
