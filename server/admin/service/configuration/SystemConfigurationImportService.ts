@@ -75,7 +75,7 @@ export class SystemConfigurationImportService {
     config['player.path'] = player
     this.repository.transaction(() => {
       new GlobalConfigurationService(this.repository).save(filename, config)
-      if (keys.includes('users')) this.repository.write('admin_user', path.join(this.repository.rootPath, 'users.json'), JSON.stringify(users))
+      if (keys.includes('users')) this.repository.write('server_user', path.join(this.repository.rootPath, 'users.json'), JSON.stringify(users))
     })
     return { config, result: { success: true, imported: keys.length, ignored: Object.keys(parsed).filter(key => !keys.includes(key)), restartRequired: true } }
   }

@@ -16,36 +16,42 @@
 
 | 管理表 | 原文档/用途 |
 | --- | --- |
-| `admin_server_info` | serverInfo.json |
-| `admin_user` | users.json |
-| `admin_device` | devices.json |
-| `admin_source` | sources.json，音源注册信息 |
-| `admin_source_state` | states.json，音源启用状态 |
-| `admin_source_order` | order.json，音源优先级 |
-| `admin_config` | system-configuration.json 作用域的 SQL 业务配置 |
-| `admin_task_record` | network-list-autoupdate-records.json |
-| `admin_legacy_document` | 未专门登记的管理扩展 JSON |
+| `server_server_info` | serverInfo.json |
+| `server_user` | users.json |
+| `server_device` | devices.json |
+| `server_source` | sources.json，音源注册信息 |
+| `server_source_state` | states.json，音源启用状态 |
+| `server_source_order` | order.json，音源优先级 |
+| `server_config` | system-configuration.json 作用域的 SQL 业务配置 |
+| `server_task_record` | network-list-autoupdate-records.json |
+| `server_legacy_document` | 未专门登记的管理扩展 JSON |
 
 | 播放器表 | 原文档/用途 |
 | --- | --- |
-| `music_settings` | settings.json |
-| `music_sound_effect` | soundEffects.json |
-| `music_token` | token.json |
-| `music_radio_station` | radioStations.json |
-| `music_library_artist`、`music_library_album` | artists.json、albums.json；路径区分收藏和屏蔽 |
-| `music_snapshot_info`、`music_snapshot` | snapshotInfo.json、snapshot_*；路径区分歌单和屏蔽规则 |
-| `music_sync_download` | 同步下载 data.json |
-| `music_cache_index`、`music_music_index`、`music_custom_index` | cache_index.json、music_index.json、custom_index.json |
-| `music_download_record`、`music_download_queue` | server-downloads.json、server-download-queue.json |
-| `music_subsonic_meta` | subsonic-meta.json |
-| `music_subsonic_scrobble` | subsonic-scrobbles.json |
-| `music_subsonic_play_queue` | subsonic-playqueue.json |
-| `music_subsonic_bookmark` | subsonic-bookmarks.json |
-| `music_online_song` | subsonic-online-cache.json |
-| `music_browser_state` | 账号与浏览器随机设备标识对应的歌单状态 |
-| `music_legacy_document` | 播放器扩展 JSON |
+| `client_settings` | settings.json |
+| `client_sound_effect` | soundEffects.json |
+| `client_token` | token.json |
+| `client_radio_station` | radioStations.json |
+| `client_library_artist`、`client_library_album` | artists.json、albums.json；路径区分收藏和屏蔽 |
+| `client_snapshot_info`、`client_snapshot` | snapshotInfo.json、snapshot_*；路径区分歌单和屏蔽规则 |
+| `client_sync_download` | 同步下载 data.json |
+| `client_cache_index`、`client_music_index`、`client_custom_index` | cache_index.json、music_index.json、custom_index.json |
+| `client_download_record`、`client_download_queue` | server-downloads.json、server-download-queue.json |
+| `client_subsonic_meta` | subsonic-meta.json |
+| `client_subsonic_scrobble` | subsonic-scrobbles.json |
+| `client_subsonic_play_queue` | subsonic-playqueue.json |
+| `client_subsonic_bookmark` | subsonic-bookmarks.json |
+| `client_online_song` | subsonic-online-cache.json |
+| `client_browser_state` | 账号与浏览器随机设备标识对应的歌单状态 |
+| `client_appearance` | 账号主题、颜色、图片背景位置、模糊度与面板透明度 |
+| `client_recent_setting` | 账号最近播放保存上限，独立于主题表 |
+| `client_recent_play` | 账号最近播放歌曲及时间，默认最多 100 条 |
+| `client_artist_group`、`client_album_group` | 按账号隔离的曲库分组缓存，保留稳定标识、原始名称与歌曲关系 |
+| `client_legacy_document` | 播放器扩展 JSON |
 
-每张表都有 Entity/DTO/VO，公共字段说明见 `server/common/model/entity/BaseEntity.ts`。两库均含独立 `storage_document` 表及对应模型；DDL 位于 `sql/admin/001_initial.sql` 和 `sql/music/001_initial.sql`。
+每张业务表都有 Entity/DTO/VO，公共字段说明见 `server/common/model/entity/BaseEntity.ts`。管理库与播放库分别使用 `server_storage_document`、`client_storage_document` 元数据表；DDL 位于 `sql/admin/001_initial.sql` 和 `sql/music/001_initial.sql`，所有字段均有中文注释。没有旧表名的自动重命名或兼容读取。
+
+用户数据以认证 Token 对应的用户目录生成 `document_key`；数据根内保存相对作用域，移动整个数据目录后仍可读取。主题、最近及分组通过独立表隔离，不能通过请求正文或用户名请求头切换到其他账号。图片与头像文件位于现有账号缓存目录；只搬数据库没有搬图片时，外观接口持久化回退默认主题。
 
 ## 在页面导入
 
@@ -79,6 +85,6 @@
 
 ## 浏览器离线行为
 
-在线歌单通过 `/api/music/storage/list` 保存到播放器库，按账号和随机设备标识隔离。IndexedDB 保留离线缓存及一次性旧数据迁移来源；未提交的编辑/删除在重连读取时重试，连续写入按调用顺序执行。已有 localStorage 中的凭据、主题等界面偏好保持原使用方式。浏览器随机设备标识只是作用域标识，不能代替用户认证。
+在线歌单通过 `/api/music/storage/list` 保存到播放器库，按账号和随机设备标识隔离。IndexedDB 保留离线缓存及一次性旧数据迁移来源；未提交的编辑/删除在重连读取时重试，连续写入按调用顺序执行。凭据保持原使用方式；主题以服务端 `client_appearance` 为准，localStorage 仅保留按账号分开的界面缓存。浏览器随机设备标识只是作用域标识，不能代替用户认证。
 
 浏览器数据不会同步到管理库。服务器未连接时仍可读取本地缓存；服务器库尚无当前设备的数据时才使用所属账号旧缓存补齐。

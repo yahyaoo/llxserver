@@ -7,6 +7,6 @@ export function createAdminRepository(dataPath: string, filename = path.join(dat
   const bundled = path.join(__dirname, '../../sql/admin/001_initial.sql')
   const source = path.join(__dirname, '../../../sql/admin/001_initial.sql')
   const schema = fs.readFileSync(fs.existsSync(bundled) ? bundled : source, 'utf8')
-  return new SqliteDocumentRepository(filename, schema, adminTables, dataPath)
+  return new SqliteDocumentRepository(filename, schema, adminTables, dataPath, 'server_storage_document')
 }
 

@@ -792,9 +792,11 @@ window.SongListManager = (function () {
             const target = page === 'last' ? totalPages : Math.min(totalPages, Math.max(1, Number(page) || 1));
             if (target === currentState.page) return;
             loadList(target);
-            document.getElementById('songlist-grid').scrollTo({ top: 0, behavior: 'smooth' });
+            (window.getMusicScrollContainer?.('songlist-grid') || document.getElementById('songlist-grid')).scrollTo({ top: 0, behavior: 'smooth' });
         },
         openDetail: function (id, source) {
+            // 详情覆盖在页面起点，先归零外层滚动，避免打开后落在可视区域之外。作者：jingyh
+            document.getElementById('view-songlist').scrollTop = 0;
             if (window.ListSearch) window.ListSearch.resetState();
             loadDetail(id, source);
         },

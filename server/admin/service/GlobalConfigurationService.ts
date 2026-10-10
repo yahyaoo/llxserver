@@ -7,7 +7,7 @@ export class GlobalConfigurationService {
   /** @param filename 配置作用域。 @param defaults 初始化默认值。 @returns SQL 配置。 */
   load(filename: string, defaults: LX.Config): LX.Config {
     const key = path.join(this.repository.rootPath, "system-configuration.json")
-    const saved = (this.repository.read("admin_config", key) || this.repository.read("admin_config", filename))?.value as { config: LX.Config } | undefined
+    const saved = (this.repository.read("server_config", key) || this.repository.read("server_config", filename))?.value as { config: LX.Config } | undefined
     if (saved?.config) { this.save(filename, saved.config); return saved.config }
     this.save(filename, defaults)
     return JSON.parse(JSON.stringify(defaults))
@@ -18,8 +18,8 @@ export class GlobalConfigurationService {
     delete saved["database.adminPath"]; delete saved["database.musicPath"]
     const key = path.join(this.repository.rootPath, "system-configuration.json")
     this.repository.transaction(() => {
-      this.repository.write("admin_config", key, JSON.stringify({ config: saved }))
-      if (this.repository.read("admin_config", filename)) this.repository.remove("admin_config", filename)
+      this.repository.write("server_config", key, JSON.stringify({ config: saved }))
+      if (this.repository.read("server_config", filename)) this.repository.remove("server_config", filename)
     })
   }
   /** @param config 配置对象。 @returns 可下载和导入的备份文本。 */

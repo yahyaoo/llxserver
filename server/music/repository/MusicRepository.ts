@@ -7,6 +7,6 @@ export function createMusicRepository(dataPath: string, filename = path.join(dat
   const bundled = path.join(__dirname, '../../sql/music/001_initial.sql')
   const source = path.join(__dirname, '../../../sql/music/001_initial.sql')
   const schema = fs.readFileSync(fs.existsSync(bundled) ? bundled : source, 'utf8')
-  return new SqliteDocumentRepository(filename, schema, musicTables, dataPath)
+  return new SqliteDocumentRepository(filename, schema, musicTables, dataPath, 'client_storage_document')
 }
 

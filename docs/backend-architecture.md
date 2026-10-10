@@ -58,11 +58,11 @@ SDK 内部算法与平台协议继续使用原实现。动态平台扩展能力�
 
 ## 持久化与模型
 
-管理库和播放器库默认分别位于 `DATA_PATH/database/admin.sqlite`、`DATA_PATH/database/music.sqlite`；引导文件可指定独立位置，应用层负责迁移和切换。业务配置仅存管理库，详见 [系统配置说明](./system-configuration.md)。两库各有自己的 `storage_document` 元数据表。使用 WAL、外键开关和 5 秒忙等待；所有值参数绑定，表名仅允许使用注册常量。
+管理库和播放器库默认分别位于 `DATA_PATH/database/admin.sqlite`、`DATA_PATH/database/music.sqlite`；引导文件可指定独立位置，应用层负责迁移和切换。业务配置仅存管理库，详见 [系统配置说明](./system-configuration.md)。两库各有自己的 `server_storage_document` / `client_storage_document` 元数据表。使用 WAL、外键开关和 5 秒忙等待；所有值参数绑定，表名仅允许使用注册常量。
 
 业务实体继承 `BaseEntity`：`documentKey`、`recordKey`、`sortOrder`、`valueJson`、`createdAt`、`updatedAt` 分别映射同名下划线 SQL 列。联合主键是作用域和记录键。数组按元素拆行，对象按顶层属性拆行，标量单行保存。未知平台字段、嵌套结构、重复歌曲和顺序保持原值。这里采用有序文档记录模型，避免引入歌曲去重、主键重编或关系重建改变业务含义。
 
-`storage_document` 保存顶层类型、原文本、时间、字节数和有效标记，使导出字节、快照时间、空文档及删除行为仍与原协议兼容。原文件编辑器允许保存空文本/未完成 JSON，使用 `text` 类型保留；配置上传单独严格校验。
+`server_storage_document` / `client_storage_document` 保存顶层类型、原文本、时间、字节数和有效标记，使导出字节、快照时间、空文档及删除行为仍与原协议兼容。原文件编辑器允许保存空文本/未完成 JSON，使用 `text` 类型保留；配置上传单独严格校验。
 
 内部文档键使用 `data:相对路径`，搬动整个数据目录后仍能读取。数据目录外的自定义缓存/快照保留绝对位置，不自动搬移外部音乐文件。
 

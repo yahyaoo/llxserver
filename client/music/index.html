@@ -27,6 +27,7 @@
     <link rel="icon" href="assets/logo.svg" type="image/svg+xml">
     <link rel="manifest" href="manifest.json">
     <link rel="stylesheet" href="css/theme_variables.css">
+    <link rel="stylesheet" href="views/recent/recent.css">
     <script src="assets/tailwindcss.js"></script>
     <script src="js/tailwind_setup.js"></script>
     <link rel="stylesheet" href="assets/fontawesome/css/all.min.css">
@@ -37,7 +38,9 @@
     <link rel="stylesheet" href="css/app.css">
     <link rel="stylesheet" href="views/main-navigation/main-navigation.css">
     <link rel="stylesheet" href="views/settings/settings.css">
+    <link rel="stylesheet" href="components/top-bar/top-bar.css">
     <link rel="stylesheet" href="components/player-bar/player-bar.css">
+    <link rel="stylesheet" href="components/theme-controls/appearance.css">
 </head>
 
 <body class="t-bg-main h-screen flex flex-col overflow-hidden t-text-main font-sans">
@@ -55,204 +58,18 @@
             class="main-navigation w-72 md:w-72 t-bg-panel shadow-lg flex flex-col z-[60] fixed inset-y-0 left-0 transform -translate-x-full md:relative md:translate-x-0 md:z-30 h-full pb-28 transition-all duration-300"></aside>
 
         <!-- Content Area -->
-        <main class="flex-1 flex flex-col t-bg-main relative overflow-hidden">
+        <main class="music-shell flex-1 flex flex-col relative overflow-hidden">
 
-            <!-- Header / Search Bar Helper (Top strip) -->
-            <header class="app-header h-16 t-bg-panel glass shadow-sm flex items-center justify-between px-3 md:px-6">
-                <div class="flex items-center gap-1.5 md:gap-3 min-w-0">
-                    <button onclick="toggleSidebar()"
-                        class="md:hidden t-text-muted p-2 hover:t-bg-track rounded-lg shrink-0">
-                        <i class="fas fa-bars text-xl"></i>
-                    </button>
-                    <!-- Page Title: Hide on mobile to save space -->
-                    <div class="active-tab-title text-base md:text-lg font-bold t-text-main truncate hidden sm:block"
-                        id="page-title">搜索音乐</div>
-                    <!-- Sleep Timer Trigger -->
-                    <div id="sleep-timer-trigger"
-                        class="flex items-center gap-1 px-2 md:px-3 py-1.5 rounded-full hover:t-bg-track cursor-pointer transition-all border border-transparent hover:t-border-main group shrink-0"
-                        onclick="openSleepTimerModal()" title="睡眠定时">
-                        <i class="far fa-clock t-text-muted group-hover:text-emerald-500 transition-colors text-sm"></i>
-                        <span id="sleep-timer-countdown"
-                            class="text-[10px] md:text-xs font-mono font-bold text-emerald-600 hidden">00:00</span>
-                    </div>
-                </div>
-
-                <div class="header-actions shrink-0">
-                    <button id="pwa-install-btn"
-                        class="hidden items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white px-2.5 py-1.5 rounded-lg text-sm font-medium transition-colors shadow-sm shrink-0">
-                        <i class="fas fa-download"></i><span class="hidden md:inline">安装应用</span>
-                    </button>
-                    <div class="header-dropdown" data-header-dropdown>
-                        <button type="button" id="header-theme-trigger" class="header-menu-trigger"
-                            onclick="toggleHeaderDropdown('header-theme-menu')" aria-expanded="false" aria-controls="header-theme-menu" aria-label="选择主题与外观">
-                            <i class="fas fa-palette" aria-hidden="true"></i>
-                            <span id="header-theme-label">樱花粉</span><i class="fas fa-chevron-down" aria-hidden="true"></i>
-                        </button>
-                        <div id="header-theme-menu" class="header-dropdown-panel theme-menu hidden" data-header-menu data-header-trigger="header-theme-trigger" aria-labelledby="header-theme-trigger">
-                            <p class="header-menu-title">主题与外观</p>
-                            <!-- Appearance Selection -->
-                            <div>
-                                <h3 class="font-bold t-text-main text-lg mb-4 flex items-center">
-                                    <i class="fas fa-magic mr-2 text-emerald-500"></i> 外观设置
-                                </h3>
-                                <div class="grid grid-cols-3 gap-4">
-                                    <!-- Light -->
-                                    <button onclick="setAppearance('light')"
-                                        class="appearance-option flex flex-col items-center gap-2 p-3 rounded-xl border t-border-main hover:t-bg-main transition-all ring-2 ring-transparent"
-                                        data-appearance="light">
-                                        <i class="fas fa-sun text-xl"></i>
-                                        <span class="text-xs font-bold">明亮模式</span>
-                                    </button>
-                                    <!-- Dark -->
-                                    <button onclick="setAppearance('dark')"
-                                        class="appearance-option flex flex-col items-center gap-2 p-3 rounded-xl border t-border-main hover:t-bg-main transition-all ring-2 ring-transparent"
-                                        data-appearance="dark">
-                                        <i class="fas fa-moon text-xl"></i>
-                                        <span class="text-xs font-bold">暗黑模式</span>
-                                    </button>
-                                    <!-- System -->
-                                    <button onclick="setAppearance('system')"
-                                        class="appearance-option flex flex-col items-center gap-2 p-3 rounded-xl border t-border-main hover:t-bg-main transition-all ring-2 ring-transparent"
-                                        data-appearance="system">
-                                        <i class="fas fa-desktop text-xl"></i>
-                                        <span class="text-xs font-bold">跟随系统</span>
-                                    </button>
-                                </div>
-                            </div>
-
-                            <!-- Theme Selection -->
-                            <div>
-                                <h3 class="font-bold t-text-main text-lg mb-4 flex items-center">
-                                    <i class="fas fa-palette mr-2 text-emerald-500"></i> 主题风格
-                                </h3>
-                                <div class="theme-grid grid grid-cols-2 gap-4">
-                                    <!-- 樱花粉：预览使用固定粉色，避免与绿色主题混淆。 -->
-                                    <button onclick="setTheme('pink')"
-                                        class="theme-option group relative rounded-xl border t-border-main p-2 hover:shadow-md transition-all text-left overflow-hidden ring-2 ring-transparent ring-offset-2 data-[active=true]:ring-pink-500"
-                                        data-theme="pink">
-                                        <div
-                                            class="h-24 rounded-lg bg-gradient-to-br from-[#f472b6] to-[#db2777] mb-3 shadow-inner relative overflow-hidden">
-                                            <div
-                                                class="absolute inset-0 t-bg-panel/20 transform rotate-12 scale-150 translate-y-10 group-hover:translate-y-8 transition-transform">
-                                            </div>
-                                            <i
-                                                class="fas fa-check-circle absolute top-2 right-2 text-white/90 opacity-0 group-data-[active=true]:opacity-100 transition-opacity"></i>
-                                        </div>
-                                        <div class="font-bold t-text-main text-sm text-center">樱花粉</div>
-                                        <div class="text-xs text-center t-text-muted scale-90">Cherry Pink</div>
-                                    </button>
-<button onclick="setTheme('emerald')"
-                                        class="theme-option group relative rounded-xl border t-border-main p-2 hover:shadow-md transition-all text-left overflow-hidden ring-2 ring-transparent ring-offset-2 data-[active=true]:ring-emerald-500"
-                                        data-theme="emerald">
-                                        <div
-                                            class="h-24 rounded-lg bg-gradient-to-br from-[#34d399] to-[#059669] mb-3 shadow-inner relative overflow-hidden">
-                                            <div
-                                                class="absolute inset-0 t-bg-panel/20 transform rotate-12 scale-150 translate-y-10 group-hover:translate-y-8 transition-transform">
-                                            </div>
-                                            <i
-                                                class="fas fa-check-circle absolute top-2 right-2 text-white/90 opacity-0 group-data-[active=true]:opacity-100 transition-opacity"></i>
-                                        </div>
-                                        <div class="font-bold t-text-main text-sm text-center">森之韵</div>
-                                        <div class="text-xs text-center t-text-muted scale-90">Emerald</div>
-                                    </button>
-                                    <!-- Blue -->
-                                    <button onclick="setTheme('blue')"
-                                        class="theme-option group relative rounded-xl border t-border-main p-2 hover:shadow-md transition-all text-left overflow-hidden ring-2 ring-transparent ring-offset-2 data-[active=true]:ring-blue-500"
-                                        data-theme="blue">
-                                        <div
-                                            class="h-24 rounded-lg bg-gradient-to-br from-blue-400 to-blue-600 mb-3 shadow-inner relative overflow-hidden">
-                                            <div
-                                                class="absolute inset-0 t-bg-panel/20 transform rotate-12 scale-150 translate-y-10 group-hover:translate-y-8 transition-transform">
-                                            </div>
-                                            <i
-                                                class="fas fa-check-circle absolute top-2 right-2 text-white/90 opacity-0 group-data-[active=true]:opacity-100 transition-opacity"></i>
-                                        </div>
-                                        <div class="font-bold t-text-main text-sm text-center">深海谧</div>
-                                        <div class="text-xs text-center t-text-muted scale-90">Deep Blue</div>
-                                    </button>
-                                    <!-- Amber -->
-                                    <button onclick="setTheme('amber')"
-                                        class="theme-option group relative rounded-xl border t-border-main p-2 hover:shadow-md transition-all text-left overflow-hidden ring-2 ring-transparent ring-offset-2 data-[active=true]:ring-amber-500"
-                                        data-theme="amber">
-                                        <div
-                                            class="h-24 rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 mb-3 shadow-inner relative overflow-hidden">
-                                            <div
-                                                class="absolute inset-0 t-bg-panel/20 transform rotate-12 scale-150 translate-y-10 group-hover:translate-y-8 transition-transform">
-                                            </div>
-                                            <i
-                                                class="fas fa-check-circle absolute top-2 right-2 text-white/90 opacity-0 group-data-[active=true]:opacity-100 transition-opacity"></i>
-                                        </div>
-                                        <div class="font-bold t-text-main text-sm text-center">暖阳愿</div>
-                                        <div class="text-xs text-center t-text-muted scale-90">Warm Sun</div>
-                                    </button>
-                                    <!-- Violet -->
-                                    <button onclick="setTheme('violet')"
-                                        class="theme-option group relative rounded-xl border t-border-main p-2 hover:shadow-md transition-all text-left overflow-hidden ring-2 ring-transparent ring-offset-2 data-[active=true]:ring-violet-500"
-                                        data-theme="violet">
-                                        <div
-                                            class="h-24 rounded-lg bg-gradient-to-br from-violet-400 to-purple-600 mb-3 shadow-inner relative overflow-hidden">
-                                            <div
-                                                class="absolute inset-0 t-bg-panel/20 transform rotate-12 scale-150 translate-y-10 group-hover:translate-y-8 transition-transform">
-                                            </div>
-                                            <i
-                                                class="fas fa-check-circle absolute top-2 right-2 text-white/90 opacity-0 group-data-[active=true]:opacity-100 transition-opacity"></i>
-                                        </div>
-                                        <div class="font-bold t-text-main text-sm text-center">紫微星</div>
-                                        <div class="text-xs text-center t-text-muted scale-90">Nebula</div>
-                                    </button>
-                                    <!-- Rose -->
-                                    <button onclick="setTheme('rose')"
-                                        class="theme-option group relative rounded-xl border t-border-main p-2 hover:shadow-md transition-all text-left overflow-hidden ring-2 ring-transparent ring-offset-2 data-[active=true]:ring-rose-500"
-                                        data-theme="rose">
-                                        <div
-                                            class="h-24 rounded-lg bg-gradient-to-br from-rose-400 to-red-500 mb-3 shadow-inner relative overflow-hidden">
-                                            <div
-                                                class="absolute inset-0 t-bg-panel/20 transform rotate-12 scale-150 translate-y-10 group-hover:translate-y-8 transition-transform">
-                                            </div>
-                                            <i
-                                                class="fas fa-check-circle absolute top-2 right-2 text-white/90 opacity-0 group-data-[active=true]:opacity-100 transition-opacity"></i>
-                                        </div>
-                                        <div class="font-bold t-text-main text-sm text-center">绯红月</div>
-                                        <div class="text-xs text-center t-text-muted scale-90">Crimson</div>
-                                    </button>
-                                </div>
-                            </div>
-
-
-                            <p class="theme-menu-footnote">立即生效，自动记住你的选择</p>
-                        </div>
-                    </div>
-                    <div id="header-user-info" class="header-dropdown" data-header-dropdown>
-                        <button type="button" id="header-account-trigger" class="header-menu-trigger"
-                            onclick="toggleHeaderDropdown('header-account-menu')" aria-expanded="false" aria-controls="header-account-menu" aria-label="账户菜单">
-                            <span class="header-avatar"><i class="fas fa-user" aria-hidden="true"></i></span>
-                            <span id="header-account-label">账户</span>
-                            <span id="header-user-display" class="hidden items-center">
-                                <span id="header-username" class="truncate max-w-[100px]">用户名</span>
-                            </span>
-                            <i class="fas fa-chevron-down" aria-hidden="true"></i>
-                        </button>
-                        <div id="header-account-menu" class="header-dropdown-panel account-menu hidden" data-header-menu data-header-trigger="header-account-trigger" aria-labelledby="header-account-trigger">
-                            <button type="button" disabled title="账户设置暂未开放"><i class="fas fa-user-cog" aria-hidden="true"></i>账户设置<small>暂未开放</small></button>
-                            <button type="button" disabled title="密码修改暂未开放"><i class="fas fa-key" aria-hidden="true"></i>密码修改<small>暂未开放</small></button>
-                            <button type="button" id="header-login-btn" class="hidden" onclick="closeHeaderDropdowns(); switchTab('settings'); selectSettingsSection('sync');" title="去登录">
-                                <i class="fas fa-sign-in-alt" aria-hidden="true"></i>登录同步账号
-                            </button>
-                            <div class="account-menu-divider"></div>
-                            <button type="button" id="header-sync-logout" class="hidden account-logout" onclick="closeHeaderDropdowns(); handleHeaderLogout(event)">
-                                <i class="fas fa-sign-out-alt" aria-hidden="true"></i>退出同步账号
-                            </button>
-                            <button type="button" id="logout-btn" class="hidden account-logout" onclick="closeHeaderDropdowns(); handleLogout()" title="退出登录">
-                                <i class="fas fa-power-off" aria-hidden="true"></i>退出系统
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </header>
+            <!-- 顶部由 components/top-bar 内的搜索与账户组件同步装配。 -->
+            <header id="music-top-bar" aria-label="音乐库搜索与账户操作"></header>
 
             <!-- Views Container -->
             <div class="flex-1 overflow-hidden relative">
 
+                <div id="view-recent" class="recent-view absolute inset-0 hidden opacity-0 transition-all duration-300">
+                    <div class="recent-view-header"><div><h2 id="recent-title">最近播放</h2><p id="recent-meta"></p></div><div class="recent-view-actions"><button onclick="RecentView.play()"><i class="fas fa-play mr-2"></i>播放全部</button><button id="recent-clear" onclick="RecentView.clear()">清空记录</button></div></div>
+                    <div id="recent-list"></div>
+                </div>
                 <!-- Search View -->
                 <div id="view-search"
                     class="absolute inset-0 flex flex-col px-2 pt-2 md:px-6 md:pt-6 pb-44 md:pb-32 overflow-hidden transition-all duration-300">
@@ -1117,7 +934,7 @@
                         class="grid grid-cols-[auto_1fr] md:flex md:flex-row md:items-center justify-between gap-1.5 md:gap-3 mb-1.5 md:mb-2 shrink-0 px-1">
                         <div class="contents md:flex md:items-center md:justify-start md:w-auto md:gap-2">
                             <div class="flex items-baseline gap-1 md:gap-1.5 order-1">
-                                <h2 class="text-sm md:text-base font-bold t-text-main whitespace-nowrap">本地音乐</h2>
+                                <h2 class="text-sm md:text-base font-bold t-text-main whitespace-nowrap">音乐库</h2>
                                 <span id="lm-total-count"
                                     class="text-[9px] md:text-[10px] t-text-muted opacity-60 whitespace-nowrap">共 0
                                     首</span>
@@ -1182,21 +999,6 @@
                                 <button onclick="window.LocalMusicManager.toggleBatchMode()"
                                     class="w-6 h-6 flex items-center justify-center bg-gray-100 dark:bg-gray-700/50 rounded"><i
                                         class="fas fa-list-ul text-[10px]"></i></button>
-                            </div>
-
-                            <div
-                                class="relative group flex-1 max-w-[150px] md:max-w-[200px] order-4 md:order-3 ml-auto md:ml-0">
-                                <i
-                                    class="fas fa-search absolute left-2 top-1/2 -translate-y-1/2 t-text-muted text-[10px] pointer-events-none z-10"></i>
-                                <div id="lm-quick-search" contenteditable="true"
-                                    data-placeholder="快速搜索 (加空格使用 & | ! 逻辑)..."
-                                    oninput="window.LocalMusicManager.handleQuickSearch(event)"
-                                    onkeydown="window.LocalMusicManager.handleRichKeydown(event, this)"
-                                    onpaste="window.LocalMusicManager.handleRichPaste(event, this)"
-                                    oncopy="window.LocalMusicManager.handleRichCopy(event, this)"
-                                    oncut="window.LocalMusicManager.handleRichCopy(event, this)"
-                                    class="lm-rich-search-input w-full bg-gray-100 dark:bg-gray-800 border-none rounded-lg pl-7 pr-2 py-1 md:py-1.5 text-[10px] md:text-xs focus:ring-1 focus:ring-emerald-500/30 outline-none overflow-x-auto whitespace-nowrap min-h-[26px] flex items-center">
-                                </div>
                             </div>
 
                             <div class="hidden md:flex items-center gap-1 order-5 md:order-4">
@@ -3479,6 +3281,11 @@
     <audio id="audio-player" crossorigin="anonymous"></audio>
 
     <!-- External Scripts Section (Placed at the end for performance) -->
+    <script src="components/library-artwork/index.js"></script>
+    <script src="components/theme-controls/index.js"></script>
+    <script src="components/top-bar/SearchBox.js"></script>
+    <script src="components/top-bar/AccountActions.js"></script>
+    <script src="components/top-bar/index.js"></script>
     <script src="views/main-navigation/MainNavigation.js"></script>
     <script src="views/main-navigation/index.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
@@ -3513,6 +3320,8 @@
     <script src="js/customDir.js"></script>
     <script src="js/common_ui.js"></script>
     <script src="js/sync_download.js"></script>
+    <script src="views/recent/RecentView.js"></script>
+    <script src="js/music_experience.js"></script>
     <script src="app.js"></script>
 </body>
 

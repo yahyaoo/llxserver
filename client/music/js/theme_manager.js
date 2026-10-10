@@ -4,7 +4,7 @@
  */
 
 // Available Themes
-const THEMES = ['pink', 'emerald', 'blue', 'amber', 'violet', 'rose'];
+const THEMES = ['pink', 'emerald', 'blue', 'amber', 'violet', 'rose', 'custom', 'zhulv', 'jiqing', 'xinghuang', 'zhuhong', 'shizhuhong'];
 
 // Initialize Theme & Appearance
 function initTheme() {
@@ -25,6 +25,7 @@ function setTheme(themeName, save = true) {
     // Save Preference
     if (save) {
         localStorage.setItem('lx_theme', themeName);
+        window.MusicExperience?.change({ theme: themeName });
         console.log(`[Theme] Color scheme applied: ${themeName}`);
     }
 
@@ -63,6 +64,7 @@ function setAppearance(mode, save = true) {
     // Save Preference
     if (save) {
         localStorage.setItem('lx_appearance', mode);
+        window.MusicExperience?.change({ appearance: mode });
         console.log(`[Theme] Appearance mode applied: ${mode}`);
     }
 
@@ -73,7 +75,7 @@ function setAppearance(mode, save = true) {
 function updateThemeSelectionUI(activeTheme) {
     const names = { pink: '樱花粉', emerald: '森之韵', blue: '深海谧', amber: '暖阳愿', violet: '紫微星', rose: '绯红月' };
     const label = document.getElementById('header-theme-label');
-    if (label) label.textContent = names[activeTheme] || names.pink;
+    if (label) label.textContent = window.ThemeControls?.colors.find(item => item[0] === activeTheme)?.[1] || (activeTheme === 'custom' ? '自定义' : names[activeTheme] || names.pink);
     document.querySelectorAll('.theme-option').forEach(btn => {
         const theme = btn.getAttribute('data-theme');
         btn.setAttribute('aria-pressed', String(theme === activeTheme));
@@ -102,7 +104,7 @@ function updateAppearanceUI(activeMode) {
 
 // Watch for system theme changes
 window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
-    const currentAppearance = localStorage.getItem('lx_appearance') || 'system';
+    const currentAppearance = window.MusicExperience?.value.appearance || localStorage.getItem('lx_appearance') || 'system';
     if (currentAppearance === 'system') {
         if (e.matches) {
             document.documentElement.classList.add('dark');

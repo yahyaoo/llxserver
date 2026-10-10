@@ -10,62 +10,23 @@
                 </button>
             </div>
 
-            <nav id="main-navigation" class="main-navigation-scroll flex-1 py-4 overflow-y-auto custom-scrollbar" aria-label="主导航">
-                <ul>
-                    <li>
-                        <a href="#" onclick="switchTab('search')" id="tab-search" title="搜索" aria-label="搜索"
-                            class="active-tab flex items-center px-6 py-3 hover:t-bg-main transition-colors duration-200">
-                            <i class="fas fa-search w-6 text-center"></i>
-                            <span class="ml-3 font-medium">搜索</span>
-                        </a>
-                    </li>
-                    <li>
-                        <a href="#" onclick="switchTab('songlist')" id="tab-songlist" title="歌单" aria-label="歌单"
-                            class="flex items-center px-6 py-3 t-text-muted hover:t-bg-main transition-colors duration-200">
-                            <i class="fas fa-list-ul w-6 text-center"></i>
-                            <span class="ml-3 font-medium">歌单</span>
-                        </a>
-                    </li>
-                    <li>
-                        <a href="#" onclick="switchTab('leaderboard')" id="tab-leaderboard" title="排行榜" aria-label="排行榜"
-                            class="flex items-center px-6 py-3 t-text-muted hover:t-bg-main transition-colors duration-200">
-                            <i class="fas fa-chart-bar w-6 text-center"></i>
-                            <span class="ml-3 font-medium">排行榜</span>
-                        </a>
-                    </li>
-                    <li>
-                        <!--
-                            这是「我的收藏 / 歌单」折叠面板的父级容器标题，统一叫「我的收藏」。
-                            面板内部嵌套的 ♥ 喜爱列表另命名为「我的喜爱」(见 app.js 中 id='love' 的项)，
-                            以此与外层容器区分，避免重名混淆。
-                        -->
-                        <div onclick="handleFavoritesClick()" id="tab-favorites" title="我的收藏" aria-label="我的收藏"
-                            class="flex items-center justify-between px-6 py-3 t-text-muted hover:t-bg-main transition-colors duration-200 cursor-pointer select-none">
-                            <div class="flex items-center">
-                                <i class="fas fa-folder w-6 text-center"></i>
-                                <span class="ml-3 font-medium">我的收藏</span>
+<nav id="main-navigation" class="main-navigation-scroll flex-1 py-4 overflow-y-auto custom-scrollbar" aria-label="主导航"><ul>
+        <li><a href="#" onclick="switchTab('search'); return false" id="tab-search" title="在线搜索" aria-label="在线搜索" class="flex items-center px-6 py-3 t-text-muted hover:t-bg-main"><i class="fas fa-search w-6 text-center"></i><span class="ml-3 font-medium">在线搜索</span></a></li>
+        <li><div onclick="handleFavoritesClick()" id="tab-favorites" title="收藏" aria-label="收藏" class="flex items-center justify-between px-6 py-3 t-text-muted cursor-pointer"><div class="flex items-center"><i class="far fa-heart w-6 text-center"></i><span class="ml-3 font-medium">收藏</span></div><i id="favorites-arrow" class="fas fa-chevron-down text-xs"></i></div>
+            <ul id="favorites-children" class="overflow-hidden transition-all duration-300"><li><div id="my-lists-container" class="space-y-1 px-1.5"><div class="px-3 py-2 text-sm t-text-muted">请先在设置中登录</div></div></li></ul></li>
+        <li><a href="#" onclick="switchTab('recent'); return false" id="tab-recent" title="最近" aria-label="最近" class="flex items-center px-6 py-3 t-text-muted hover:t-bg-main"><i class="far fa-clock w-6 text-center"></i><span class="ml-3 font-medium">最近</span></a></li>
+        <li><a href="#" onclick="switchTab('leaderboard'); return false" id="tab-leaderboard" title="排行榜" aria-label="排行榜" class="flex items-center px-6 py-3 t-text-muted hover:t-bg-main"><i class="fas fa-chart-bar w-6 text-center"></i><span class="ml-3 font-medium">排行榜</span></a></li>
+        <li><a href="#" onclick="switchTab('localmusic'); return false" id="tab-localmusic" title="音乐库" aria-label="音乐库" class="flex items-center justify-between px-6 py-3 t-text-muted"><div class="flex items-center"><i class="fas fa-compact-disc w-6 text-center"></i><span class="ml-3 font-medium">音乐库</span></div><div id="custom-dir-switch-container" class="hidden items-center ml-2" title="自定义歌曲目录开关"
+                                onclick="event.stopPropagation()">
+                                <label class="relative inline-flex items-center cursor-pointer scale-75 origin-right">
+                                    <input type="checkbox" id="user-custom-dir-switch" class="sr-only peer">
+                                    <div
+                                        class="w-9 h-5 bg-gray-300 dark:bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500">
+                                    </div>
+                                </label>
                             </div>
-                            <i id="favorites-arrow"
-                                class="fas fa-chevron-down text-xs transition-transform duration-200"></i>
-                        </div>
-                        <ul id="favorites-children" class="t-bg-main/50 overflow-hidden transition-all duration-300">
-                            <li class="px-1.5 py-1">
-                                <div id="my-lists-container" class="space-y-1 pb-1">
-                                    <!-- Lists will be injected here -->
-                                    <div class="px-3 py-2 text-sm t-text-muted">请先在设置中登录</div>
-                                </div>
-                            </li>
-                            <li class="px-3 pb-3">
-                                <button onclick="handleCreateList()"
-                                    class="w-full py-1.5 border border-dashed border-gray-300 dark:border-gray-700 rounded-lg text-xs text-gray-500 hover:text-emerald-500 hover:border-emerald-400 transition-colors flex items-center justify-center gap-1">
-                                    <i class="fas fa-plus"></i> 新建歌单
-                                </button>
-                            </li>
-                            <li class="my-1">
-                                <div class="mx-3 border-t t-border-main opacity-50"></div>
-                            </li>
-                            <li>
-                                <div onclick="handleDislikeFolderClick()" id="tab-dislike"
+</a></li>
+        <li><div onclick="handleDislikeFolderClick()" id="tab-dislike"
                                     class="flex items-center justify-between px-4 py-2 text-sm t-text-muted hover:t-bg-main transition-colors duration-200 cursor-pointer select-none rounded-lg mx-1.5 group">
                                     <div class="flex items-center">
                                         <i
@@ -124,41 +85,11 @@
                                             </div>
                                         </div>
                                     </li>
-                                </ul>
-                            </li>
-                            <li class="my-1">
-                                <div class="mx-3 border-t t-border-main opacity-50"></div>
-                            </li>
-                        </ul>
-                    </li>
-                    <li>
-                        <a href="#" onclick="switchTab('localmusic')" id="tab-localmusic" title="本地音乐" aria-label="本地音乐"
-                            class="flex items-center justify-between px-6 py-3 t-text-muted hover:t-bg-main transition-colors duration-200">
-                            <div class="flex items-center">
-                                <i class="fas fa-compact-disc w-6 text-center"></i>
-                                <span class="ml-3 font-medium">本地音乐</span>
-                            </div>
-                            <!-- 自定义歌曲目录开关入口（仅登录且后端启用时展现） -->
-                            <div id="custom-dir-switch-container" class="hidden items-center ml-2" title="自定义歌曲目录开关"
-                                onclick="event.stopPropagation()">
-                                <label class="relative inline-flex items-center cursor-pointer scale-75 origin-right">
-                                    <input type="checkbox" id="user-custom-dir-switch" class="sr-only peer">
-                                    <div
-                                        class="w-9 h-5 bg-gray-300 dark:bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500">
-                                    </div>
-                                </label>
-                            </div>
-                        </a>
-                    </li>
-                    <li>
-                        <a href="#" onclick="switchTab('settings')" id="tab-settings" title="设置" aria-label="设置"
-                            class="flex items-center px-6 py-3 t-text-muted hover:t-bg-main transition-colors duration-200">
-                            <i class="fas fa-cog w-6 text-center"></i>
-                            <span class="ml-3 font-medium">设置</span>
-                        </a>
-                    </li>
-                </ul>
-            </nav>
+                                </ul></li>
+        <li><a href="#" onclick="switchTab('settings'); return false" id="tab-settings" title="设置" aria-label="设置" class="flex items-center px-6 py-3 t-text-muted hover:t-bg-main"><i class="fas fa-cog w-6 text-center"></i><span class="ml-3 font-medium">设置</span></a></li>
+        <li><a href="#" onclick="switchTab('songlist'); return false" id="tab-songlist" title="在线歌单" aria-label="在线歌单" class="flex items-center px-6 py-3 t-text-muted hover:t-bg-main"><i class="fas fa-list-ul w-6 text-center"></i><span class="ml-3 font-medium">在线歌单</span></a></li>
+        <li><div class="playlist-group-heading"><span>歌单</span><button onclick="handleCreateList()" title="新建歌单" aria-label="新建歌单"><i class="fas fa-plus"></i></button></div><div id="playlist-lists-container" class="space-y-1 px-1.5"></div></li>
+        </ul></nav>
 
             <!-- Mini Player Info (Optional, cover art here) -->
             <div class="hidden md:block [@media(max-height:535px)]:!hidden sidebar-song-info-wrapper mt-auto">

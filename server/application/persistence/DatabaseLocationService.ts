@@ -43,11 +43,22 @@ export class DatabaseLocationService {
       for (const domain of ['admin', 'music'] as const) {
         const key = domain === 'admin' ? 'database.adminPath' : 'database.musicPath'
         if (same(current[key], next[key])) continue
-        if (fs.existsSync(next[key])) throw new Error('目标数据库文件已存在，请选择未使用的文件路径：' + next[key])
         fs.mkdirSync(path.dirname(next[key]), { recursive: true })
-        created.push(next[key])
-        // VACUUM INTO 复制所有已提交记录，包括仍在 WAL 中的数据。
-        pair[domain].copyTo(next[key])
+        if (fs.existsSync(next[key])) {
+          // 已有目标只在校验后打开；失败不删除或覆盖用户文件。
+          const Database = require('better-sqlite3')
+          const probe = new Database(next[key], { readonly: true, fileMustExist: true })
+          try {
+            if (probe.pragma('quick_check', { simple: true }) !== 'ok') throw new Error('目标数据库完整性检查失败')
+            const names = probe.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").all().map((row: any) => row.name)
+            const prefix = domain === 'admin' ? 'server_' : 'client_'
+            if (names.some((name: string) => !name.startsWith(prefix))) throw new Error('目标数据库类型不匹配')
+          } finally { probe.close() }
+        } else {
+          created.push(next[key])
+          // VACUUM INTO 复制所有已提交记录，包括仍在 WAL 中的数据。
+          pair[domain].copyTo(next[key])
+        }
         const candidate = domain === 'admin' ? createAdminRepository(this.root, next[key]) : createMusicRepository(this.root, next[key])
         prepared.push({ repository: pair[domain], candidate, oldPath: current[key], newPath: next[key] })
         candidate.verifyIntegrity()

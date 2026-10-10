@@ -2,22 +2,22 @@ import type { DocumentTable } from '../../common/persistence/SqliteDocumentRepos
 /** 管理服务表映射，仅依赖公共持久化契约。 @author yahyaoo */
 export const adminTables: DocumentTable[] = [
   /** 服务实例标识。 */
-  { table: 'admin_server_info', matches: filename => /serverInfo\.json$/.test(filename) },
+  { table: 'server_server_info', matches: filename => /serverInfo\.json$/.test(filename) },
   /** 管理用户。 */
-  { table: 'admin_user', matches: filename => /(?:^|\/)users\.json$/.test(filename) },
+  { table: 'server_user', matches: filename => /(?:^|\/)users\.json$/.test(filename) },
   /** 用户配对设备。 */
-  { table: 'admin_device', matches: filename => /devices\.json$/.test(filename) },
+  { table: 'server_device', matches: filename => /devices\.json$/.test(filename) },
   /** 第三方音源注册元数据。 */
-  { table: 'admin_source', matches: filename => /sources\.json$/.test(filename) },
+  { table: 'server_source', matches: filename => /sources\.json$/.test(filename) },
   /** 用户音源启用状态。 */
-  { table: 'admin_source_state', matches: filename => /states\.json$/.test(filename) },
+  { table: 'server_source_state', matches: filename => /states\.json$/.test(filename) },
   /** 用户音源优先级。 */
-  { table: 'admin_source_order', matches: filename => /order\.json$/.test(filename) },
+  { table: 'server_source_order', matches: filename => /order\.json$/.test(filename) },
   /** 全局服务配置。 */
-  { table: 'admin_config', matches: filename => /(?:__config__|system-configuration)\.json$/.test(filename) },
+  { table: 'server_config', matches: filename => /(?:__config__|system-configuration)\.json$/.test(filename) },
   /** 定时任务执行记录。 */
-  { table: 'admin_task_record', matches: filename => /network-list-autoupdate-records\.json$/.test(filename) },
+  { table: 'server_task_record', matches: filename => /network-list-autoupdate-records\.json$/.test(filename) },
   /** 管理扩展兼容数据。 */
-  { table: 'admin_legacy_document', matches: filename => /a^/.test(filename) },
+  { table: 'server_legacy_document', matches: filename => /a^/.test(filename) },
 ]
 

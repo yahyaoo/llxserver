@@ -404,7 +404,7 @@ window.LeaderboardManager = (function () {
                     renderSongs(state.songs); // 刷新视图
                     renderPagination();       // 刷新底部页码标示
                     updateSongCountAfterLoad();
-                    document.getElementById('lb-songs-container') && document.getElementById('lb-songs-container').scrollTo({ top: 0, behavior: 'smooth' });
+                    document.getElementById('lb-songs-container') && (window.getMusicScrollContainer?.('lb-songs-container') || document.getElementById('lb-songs-container')).scrollTo({ top: 0, behavior: 'smooth' });
                 });
             }
         } else if (nextLocal >= 1 && nextLocal <= totalPages) {
@@ -412,7 +412,7 @@ window.LeaderboardManager = (function () {
             state.localPage = nextLocal;
             renderSongs(state.songs);
             renderPagination();
-            document.getElementById('lb-songs-container') && document.getElementById('lb-songs-container').scrollTo({ top: 0, behavior: 'smooth' });
+            document.getElementById('lb-songs-container') && (window.getMusicScrollContainer?.('lb-songs-container') || document.getElementById('lb-songs-container')).scrollTo({ top: 0, behavior: 'smooth' });
         }
     }
 
@@ -436,7 +436,7 @@ window.LeaderboardManager = (function () {
         }
         renderSongs(state.songs);
         renderPagination();
-        document.getElementById('lb-songs-container')?.scrollTo({ top: 0, behavior: 'smooth' });
+        (window.getMusicScrollContainer?.('lb-songs-container') || document.getElementById('lb-songs-container'))?.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
     function changeSource() {

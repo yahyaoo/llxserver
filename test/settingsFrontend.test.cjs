@@ -177,12 +177,11 @@ test('顶部下拉互斥，外部点击和 Esc 关闭并恢复键盘焦点', () 
 
 test('顶部菜单由统一层级样式管理，搜索图标不能穿透菜单', () => {
   const page = fs.readFileSync(path.join(__dirname, '../client/music/index.html'), 'utf8')
-  const css = fs.readFileSync(path.join(__dirname, '../client/music/views/settings/settings.css'), 'utf8')
-  const headerClasses = page.match(/<header class="([^"]+)"/)[1].split(/\s+/)
-  assert.ok(!headerClasses.some(value => /^z-/.test(value)), '不使用工具类覆盖顶部栏层级')
-  const rule = css.match(/\.app-header\s*\{([^}]+)\}/)[1]
-  assert.match(rule, /position:\s*relative/)
-  assert.match(rule, /z-index:\s*40/)
+  const css = fs.readFileSync(path.join(__dirname, '../client/music/components/top-bar/top-bar.css'), 'utf8')
+  assert.ok(page.includes('id="music-top-bar"'))
+  const rule = css.match(/#music-top-bar\s*\{([^}]+)\}/)[1]
+  assert.match(rule, /position:\s*absolute/)
+  assert.match(rule, /z-index:\s*45/)
 })
 
 test('顶部与设置中的主题共享存储、选中态与外观模式，无效主题不改写偏好', () => {
@@ -245,8 +244,8 @@ test('独立设置页面组件同步挂载，重复挂载保留控件草稿；�
   assert.ok(container.innerHTML.includes('id="settings-navigation"'))
   assert.ok(container.innerHTML.includes('id="btn-mode-local"'))
   assert.equal([...container.innerHTML.matchAll(/data-settings-section=/g)].length, 17)
-  assert.equal([...container.innerHTML.matchAll(/data-theme=/g)].length, 6)
-  assert.equal([...container.innerHTML.matchAll(/data-appearance=/g)].length, 3)
+  assert.ok(container.innerHTML.includes('data-theme-controls'))
+  assert.ok(container.innerHTML.includes('data-experience-control="color"'))
   assert.ok(container.innerHTML.includes('id="nav-admin-link"'))
   assert.ok(container.innerHTML.includes('id="about-content"'))
   const controls = [...container.innerHTML.matchAll(/<(?:input|select|textarea)\b/g)].length

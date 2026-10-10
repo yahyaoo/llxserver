@@ -19,6 +19,7 @@ import * as musicAuthenticationController from '../../music/controller/Authentic
 import * as musicLibraryController from '../../music/controller/LibraryController'
 import * as musicDownloadController from '../../music/controller/DownloadController'
 import * as musicSettingsController from '../../music/controller/SettingsController'
+import { handleExperience } from '../../music/controller/ExperienceController'
 import * as musicDiscoveryController from '../../music/controller/DiscoveryController'
 import * as adminSourceController from '../../admin/controller/SourceController'
 import * as adminConfigurationController from '../../admin/controller/ConfigurationController'
@@ -1518,7 +1519,7 @@ const handleStartServer = async (port = 9527, ip = '0.0.0.0') => await new Promi
           afterImport: (username, sections) => {
             invalidateDislikeCache(username)
             if (sections.includes('settings')) {
-              const settings = repositories().music.read('music_settings', path.join(getUserSpace(username).dataManage.userDir, File.userSettingsJSON))?.value as any
+              const settings = repositories().music.read('client_settings', path.join(getUserSpace(username).dataManage.userDir, File.userSettingsJSON))?.value as any
               const taskConfig: { /** 执行间隔，单位毫秒。 */
 intervalMs?: number; /** 功能是否启用。 */
 enabled?: boolean } = {}
@@ -1755,6 +1756,11 @@ enabled?: boolean } = {}
       }
       // ─────────────────────────────────────────────────────────────────────
 
+
+      if (['/api/user/appearance', '/api/user/appearance/background', '/api/user/recent', '/api/music/library/search', '/api/music/library/avatar'].includes(pathname)) {
+        await handleExperience({ req, res, pathname, urlObj, ip }, serverRuntime)
+        return
+      }
 
       // [新增] Get User Settings (User Auth)
       if (pathname === '/api/user/settings' && req.method === 'GET') {

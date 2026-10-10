@@ -24,17 +24,17 @@ key: string,
 infoPath: string,
 info: unknown }): void {
     this.repository.transaction(() => {
-      if (data.settings !== undefined) this.repository.write('music_settings', path.join(userDir, 'settings.json'), JSON.stringify(data.settings))
-      if (data.soundEffects !== undefined) this.repository.write('music_sound_effect', path.join(userDir, 'soundEffects.json'), JSON.stringify(data.soundEffects))
+      if (data.settings !== undefined) this.repository.write('client_settings', path.join(userDir, 'settings.json'), JSON.stringify(data.settings))
+      if (data.soundEffects !== undefined) this.repository.write('client_sound_effect', path.join(userDir, 'soundEffects.json'), JSON.stringify(data.soundEffects))
       for (const key of ['artists', 'albums', 'dislikedArtists', 'dislikedAlbums'] as const) {
         if (data.library?.[key] === undefined) continue
         const disliked = key.startsWith('disliked')
         const kind = key.endsWith('Artists') || key === 'artists' ? 'artists' : 'albums'
-        this.repository.write(kind === 'artists' ? 'music_library_artist' : 'music_library_album', path.join(userDir, disliked ? 'dislike/library' : 'library', kind + '.json'), JSON.stringify(data.library[key]))
+        this.repository.write(kind === 'artists' ? 'client_library_artist' : 'client_library_album', path.join(userDir, disliked ? 'dislike/library' : 'library', kind + '.json'), JSON.stringify(data.library[key]))
       }
       if (data.lists && snapshot) {
-        this.repository.write('music_snapshot', snapshot.path, JSON.stringify(data.lists))
-        this.repository.write('music_snapshot_info', snapshot.infoPath, JSON.stringify(snapshot.info))
+        this.repository.write('client_snapshot', snapshot.path, JSON.stringify(data.lists))
+        this.repository.write('client_snapshot_info', snapshot.infoPath, JSON.stringify(snapshot.info))
       }
     })
   }

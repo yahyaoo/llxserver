@@ -1001,137 +1001,25 @@
 
     <!-- Display Settings Panel -->
     <div id="settings-panel-display" class="hidden space-y-8 animate-fade-in">
-<div id="settings-section-theme" data-settings-section="theme" class="settings-theme-panel settings-form-card hidden space-y-6">
-                            <!-- Appearance Selection -->
-                            <div>
-                                <h3 class="font-bold t-text-main text-lg mb-4 flex items-center">
-                                    <i class="fas fa-magic mr-2 text-emerald-500"></i> 外观设置
-                                </h3>
-                                <div class="grid grid-cols-3 gap-4">
-                                    <!-- Light -->
-                                    <button onclick="setAppearance('light')"
-                                        class="appearance-option flex flex-col items-center gap-2 p-3 rounded-xl border t-border-main hover:t-bg-main transition-all ring-2 ring-transparent"
-                                        data-appearance="light">
-                                        <i class="fas fa-sun text-xl"></i>
-                                        <span class="text-xs font-bold">明亮模式</span>
-                                    </button>
-                                    <!-- Dark -->
-                                    <button onclick="setAppearance('dark')"
-                                        class="appearance-option flex flex-col items-center gap-2 p-3 rounded-xl border t-border-main hover:t-bg-main transition-all ring-2 ring-transparent"
-                                        data-appearance="dark">
-                                        <i class="fas fa-moon text-xl"></i>
-                                        <span class="text-xs font-bold">暗黑模式</span>
-                                    </button>
-                                    <!-- System -->
-                                    <button onclick="setAppearance('system')"
-                                        class="appearance-option flex flex-col items-center gap-2 p-3 rounded-xl border t-border-main hover:t-bg-main transition-all ring-2 ring-transparent"
-                                        data-appearance="system">
-                                        <i class="fas fa-desktop text-xl"></i>
-                                        <span class="text-xs font-bold">跟随系统</span>
-                                    </button>
-                                </div>
-                            </div>
-
-                            <!-- Theme Selection -->
-                            <div>
-                                <h3 class="font-bold t-text-main text-lg mb-4 flex items-center">
-                                    <i class="fas fa-palette mr-2 text-emerald-500"></i> 主题风格
-                                </h3>
-                                <div class="theme-grid grid grid-cols-2 gap-4">
-                                    <!-- 樱花粉：预览使用固定粉色，避免与绿色主题混淆。 -->
-                                    <button onclick="setTheme('pink')"
-                                        class="theme-option group relative rounded-xl border t-border-main p-2 hover:shadow-md transition-all text-left overflow-hidden ring-2 ring-transparent ring-offset-2 data-[active=true]:ring-pink-500"
-                                        data-theme="pink">
-                                        <div
-                                            class="h-24 rounded-lg bg-gradient-to-br from-[#f472b6] to-[#db2777] mb-3 shadow-inner relative overflow-hidden">
-                                            <div
-                                                class="absolute inset-0 t-bg-panel/20 transform rotate-12 scale-150 translate-y-10 group-hover:translate-y-8 transition-transform">
-                                            </div>
-                                            <i
-                                                class="fas fa-check-circle absolute top-2 right-2 text-white/90 opacity-0 group-data-[active=true]:opacity-100 transition-opacity"></i>
-                                        </div>
-                                        <div class="font-bold t-text-main text-sm text-center">樱花粉</div>
-                                        <div class="text-xs text-center t-text-muted scale-90">Cherry Pink</div>
-                                    </button>
-<button onclick="setTheme('emerald')"
-                                        class="theme-option group relative rounded-xl border t-border-main p-2 hover:shadow-md transition-all text-left overflow-hidden ring-2 ring-transparent ring-offset-2 data-[active=true]:ring-emerald-500"
-                                        data-theme="emerald">
-                                        <div
-                                            class="h-24 rounded-lg bg-gradient-to-br from-[#34d399] to-[#059669] mb-3 shadow-inner relative overflow-hidden">
-                                            <div
-                                                class="absolute inset-0 t-bg-panel/20 transform rotate-12 scale-150 translate-y-10 group-hover:translate-y-8 transition-transform">
-                                            </div>
-                                            <i
-                                                class="fas fa-check-circle absolute top-2 right-2 text-white/90 opacity-0 group-data-[active=true]:opacity-100 transition-opacity"></i>
-                                        </div>
-                                        <div class="font-bold t-text-main text-sm text-center">森之韵</div>
-                                        <div class="text-xs text-center t-text-muted scale-90">Emerald</div>
-                                    </button>
-                                    <!-- Blue -->
-                                    <button onclick="setTheme('blue')"
-                                        class="theme-option group relative rounded-xl border t-border-main p-2 hover:shadow-md transition-all text-left overflow-hidden ring-2 ring-transparent ring-offset-2 data-[active=true]:ring-blue-500"
-                                        data-theme="blue">
-                                        <div
-                                            class="h-24 rounded-lg bg-gradient-to-br from-blue-400 to-blue-600 mb-3 shadow-inner relative overflow-hidden">
-                                            <div
-                                                class="absolute inset-0 t-bg-panel/20 transform rotate-12 scale-150 translate-y-10 group-hover:translate-y-8 transition-transform">
-                                            </div>
-                                            <i
-                                                class="fas fa-check-circle absolute top-2 right-2 text-white/90 opacity-0 group-data-[active=true]:opacity-100 transition-opacity"></i>
-                                        </div>
-                                        <div class="font-bold t-text-main text-sm text-center">深海谧</div>
-                                        <div class="text-xs text-center t-text-muted scale-90">Deep Blue</div>
-                                    </button>
-                                    <!-- Amber -->
-                                    <button onclick="setTheme('amber')"
-                                        class="theme-option group relative rounded-xl border t-border-main p-2 hover:shadow-md transition-all text-left overflow-hidden ring-2 ring-transparent ring-offset-2 data-[active=true]:ring-amber-500"
-                                        data-theme="amber">
-                                        <div
-                                            class="h-24 rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 mb-3 shadow-inner relative overflow-hidden">
-                                            <div
-                                                class="absolute inset-0 t-bg-panel/20 transform rotate-12 scale-150 translate-y-10 group-hover:translate-y-8 transition-transform">
-                                            </div>
-                                            <i
-                                                class="fas fa-check-circle absolute top-2 right-2 text-white/90 opacity-0 group-data-[active=true]:opacity-100 transition-opacity"></i>
-                                        </div>
-                                        <div class="font-bold t-text-main text-sm text-center">暖阳愿</div>
-                                        <div class="text-xs text-center t-text-muted scale-90">Warm Sun</div>
-                                    </button>
-                                    <!-- Violet -->
-                                    <button onclick="setTheme('violet')"
-                                        class="theme-option group relative rounded-xl border t-border-main p-2 hover:shadow-md transition-all text-left overflow-hidden ring-2 ring-transparent ring-offset-2 data-[active=true]:ring-violet-500"
-                                        data-theme="violet">
-                                        <div
-                                            class="h-24 rounded-lg bg-gradient-to-br from-violet-400 to-purple-600 mb-3 shadow-inner relative overflow-hidden">
-                                            <div
-                                                class="absolute inset-0 t-bg-panel/20 transform rotate-12 scale-150 translate-y-10 group-hover:translate-y-8 transition-transform">
-                                            </div>
-                                            <i
-                                                class="fas fa-check-circle absolute top-2 right-2 text-white/90 opacity-0 group-data-[active=true]:opacity-100 transition-opacity"></i>
-                                        </div>
-                                        <div class="font-bold t-text-main text-sm text-center">紫微星</div>
-                                        <div class="text-xs text-center t-text-muted scale-90">Nebula</div>
-                                    </button>
-                                    <!-- Rose -->
-                                    <button onclick="setTheme('rose')"
-                                        class="theme-option group relative rounded-xl border t-border-main p-2 hover:shadow-md transition-all text-left overflow-hidden ring-2 ring-transparent ring-offset-2 data-[active=true]:ring-rose-500"
-                                        data-theme="rose">
-                                        <div
-                                            class="h-24 rounded-lg bg-gradient-to-br from-rose-400 to-red-500 mb-3 shadow-inner relative overflow-hidden">
-                                            <div
-                                                class="absolute inset-0 t-bg-panel/20 transform rotate-12 scale-150 translate-y-10 group-hover:translate-y-8 transition-transform">
-                                            </div>
-                                            <i
-                                                class="fas fa-check-circle absolute top-2 right-2 text-white/90 opacity-0 group-data-[active=true]:opacity-100 transition-opacity"></i>
-                                        </div>
-                                        <div class="font-bold t-text-main text-sm text-center">绯红月</div>
-                                        <div class="text-xs text-center t-text-muted scale-90">Crimson</div>
-                                    </button>
-                                </div>
-                            </div>
-
-
-</div>
+<div id="settings-section-theme" data-settings-section="theme" class="settings-theme-panel settings-form-card hidden">
+        <div data-theme-controls></div>
+        <div class="theme-editor"><h3>自定义主题风格</h3><p>选择喜欢的颜色，立即应用到整个客户端。</p>
+            <label>自定义颜色<input type="color" data-experience-control="color" aria-label="自定义主题颜色"></label>
+            <label>面板透明度<input type="range" min="0" max="1" step="0.01" data-experience-control="opacity" aria-label="面板透明度"><output></output></label>
+            <p>0% 为不透明，100% 仅保留边框。统一调整各页面、左侧菜单与底部播放栏。</p>
+            <label>毛玻璃模糊度<input type="range" min="0" max="100" step="1" data-experience-control="glassBlur" aria-label="毛玻璃模糊度"><output></output></label>
+            <p>0% 不模糊。播放详情使用独立的背景效果。</p>
+        </div>
+        <div class="theme-editor"><h3>图片背景</h3><p>上传图片后拖动预览调整位置。图片保存在当前配置的缓存目录，图片丢失时自动回退默认主题。</p>
+            <div class="theme-image-actions"><label for="theme-image-upload"><i class="fas fa-upload"></i> 上传图片</label><input id="theme-image-upload" class="hidden" type="file" accept="image/png,image/jpeg,image/webp,image/gif"><button onclick="MusicExperience.change({background:null})">移除背景</button></div>
+            <div id="theme-background-preview" class="theme-background-preview"><span>上传图片后可拖动调整位置</span></div>
+            <label>水平位置<input type="range" min="0" max="100" data-experience-control="x" aria-label="背景水平位置"><output></output></label>
+            <label>垂直位置<input type="range" min="0" max="100" data-experience-control="y" aria-label="背景垂直位置"><output></output></label>
+            <label>模糊度<input type="range" min="0" max="40" data-experience-control="blur" aria-label="背景模糊度"><output></output></label>
+            <p>支持 PNG、JPEG、WebP、GIF，最大 10 MB。</p>
+        </div>
+        <p id="experience-save-status" role="status">配置自动保存到当前账号</p>
+    </div>
         <!-- 界面与布局 -->
         <div id="settings-section-layout" data-settings-section="layout" class="col-span-full border-t t-border-main pt-6 mt-4 space-y-4">
             <h4 class="text-sm font-bold t-text-main flex items-center">
@@ -1632,6 +1520,7 @@
 
                 <!-- 播放体验强化 -->
                 <div id="settings-section-playback" data-settings-section="playback" class="col-span-full border-t t-border-main pt-6 mt-4 space-y-4">
+<div class="theme-editor settings-form-card"><h3>最近播放</h3><label>最大保存记录<input type="number" min="1" max="10000" step="1" data-experience-control="recentLimit" aria-label="最近播放最大保存记录"></label><p>默认保留 100 条。减小上限后会立即裁剪当前账号的记录。</p></div>
                     <h4 class="text-sm font-bold t-text-main flex items-center">
                         <i class="fas fa-headphones-alt mr-2 text-emerald-500"></i> 播放体验强化
                     </h4>

@@ -331,7 +331,7 @@ function setListById(listId, newList) {
 
 // Pagination Functions
 function scrollToSearchResultsTop() {
-    const container = document.getElementById('search-results');
+    const container = window.getMusicScrollContainer?.('search-results') || document.getElementById('search-results');
     if (container) {
         container.scrollTo({ top: 0, behavior: 'smooth' });
     }

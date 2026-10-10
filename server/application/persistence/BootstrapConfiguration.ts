@@ -19,8 +19,8 @@ export function readDatabasePaths(root: string): DatabasePaths {
   const config = fs.existsSync(file) ? parseLegacyConfiguration(fs.readFileSync(file, 'utf8')) : {}
   const resolve = (key: string, basename: string) => {
     const variable = key === 'database.adminPath' ? 'SERVER_DATABASE_ADMIN_PATH' : 'SERVER_DATABASE_MUSIC_PATH'
-    // 旧的数据库引导键仅用于已有安装升级；业务字段仍不读取。环境变量优先。
-    const value = process.env[variable] ?? config['server.' + key] ?? config[key]
+    // 仅接受当前引导键；旧文件必须由管理员显式导入，环境变量优先。
+    const value = process.env[variable] ?? config['server.' + key]
     if (value !== undefined && (typeof value !== 'string' || !value.trim() || /[\x00-\x1f]/.test(value))) throw new Error('数据库路径格式错误：' + key)
     return path.resolve(root, value || 'database/' + basename)
   }
@@ -42,7 +42,8 @@ export function writeDatabasePaths(root: string, paths: DatabasePaths): void {
   let retained: Record<string, unknown> = {}
   if (fs.existsSync(filename)) {
     const original = fs.readFileSync(filename, 'utf8'), config = parseLegacyConfiguration(original)
-    retained = Object.fromEntries(Object.entries(config).filter(([key]) => key.startsWith('client.') || key.startsWith('server.')))
+    const connectionKeys = new Set(['client.serverUrl', 'client.port', 'client.bindIP'])
+    retained = Object.fromEntries(Object.entries(config).filter(([key]) => connectionKeys.has(key)))
     if (Object.keys(config).some(key => !key.startsWith('client.') && !key.startsWith('server.') && !['database.adminPath', 'database.musicPath'].includes(key))) {
       const backup = filename + '.legacy.js'
       if (!fs.existsSync(backup)) fs.writeFileSync(backup, original, { flag: 'wx' })

@@ -1,3 +1,4 @@
+require('tsx/cjs')
 /** 验证命名空间配置、环境覆盖、静态交接及网关传输边界。 @author yahyaoo */
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
@@ -8,7 +9,7 @@ const http = require('node:http');
 const { once } = require('node:events');
 const { WebSocketServer, WebSocket } = require('ws');
 const { createGateway, loadClientConfiguration } = require('../deploy/client/gateway.cjs');
-const { readDatabasePaths, writeDatabasePaths } = require('../dist/server/application/persistence/BootstrapConfiguration');
+const { readDatabasePaths, writeDatabasePaths } = require('../server/application/persistence/BootstrapConfiguration');
 
 test('共用引导保存保留 client.xxx，服务端环境变量优先且两库隔离', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'llx-config-'));

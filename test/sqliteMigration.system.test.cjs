@@ -100,10 +100,10 @@ test('真实系统：迁移旧 JSON、事务覆盖、库隔离、浏览器存储
     const db = new Database(path.join(data, 'database/music.sqlite'), { readonly: true })
     const adminDb = new Database(path.join(data, 'database/admin.sqlite'), { readonly: true })
     try {
-      assert.ok(db.prepare('SELECT COUNT(*) AS count FROM music_settings').get().count > 0)
-      assert.equal(adminDb.prepare("SELECT COUNT(*) AS count FROM sqlite_master WHERE name = 'music_settings'").get().count, 0)
-      assert.equal(db.prepare("SELECT COUNT(*) AS count FROM sqlite_master WHERE name = 'admin_user'").get().count, 0)
-      assert.ok(adminDb.prepare('SELECT COUNT(*) AS count FROM admin_user').get().count > 0)
+      assert.ok(db.prepare('SELECT COUNT(*) AS count FROM client_settings').get().count > 0)
+      assert.equal(adminDb.prepare("SELECT COUNT(*) AS count FROM sqlite_master WHERE name = 'client_settings'").get().count, 0)
+      assert.equal(db.prepare("SELECT COUNT(*) AS count FROM sqlite_master WHERE name = 'server_user'").get().count, 0)
+      assert.ok(adminDb.prepare('SELECT COUNT(*) AS count FROM server_user').get().count > 0)
     } finally { db.close(); adminDb.close() }
     await stop(); await start()
     assert.deepEqual(await get('/api/user/settings'), payload.settings)

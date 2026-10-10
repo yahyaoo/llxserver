@@ -1265,7 +1265,7 @@ window.LocalMusicManager = {
         if (nextPage === this.currentPage) return;
         this.currentPage = nextPage;
         this.render();
-        const container = document.getElementById('lm-list-container');
+        const container = window.getMusicScrollContainer?.('lm-list-container') || document.getElementById('lm-list-container');
         if (container) container.scrollTop = 0;
     },
 

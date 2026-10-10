@@ -1006,6 +1006,7 @@ window.fetchDownloadWithAuth = fetchDownloadWithAuth;
  * 更新顶部栏的用户状态显示 (登录按钮/用户名)
  */
 function updateUserUI() {
+    window.MusicExperience?.accountChanged();
     const loginBtn = document.getElementById('header-login-btn');
     const userDisplay = document.getElementById('header-user-display');
     const usernameEl = document.getElementById('header-username');
@@ -1581,7 +1582,8 @@ function changeQualityPreference(quality) {
 
 
 // Tab Switching
-function switchTab(tabId) {
+function switchTab(tabId, loadRecent = true) {
+    if (tabId === 'recent' && loadRecent) window.RecentView?.load();
     // 兼容协议弹窗和快捷键的旧入口，统一进入设置中的关于页面。
     if (tabId === 'about') {
         switchTab('settings');
@@ -1679,7 +1681,7 @@ function switchTab(tabId) {
     }
 
     if (tabId === 'localmusic') {
-        document.getElementById('page-title').innerText = "本地音乐";
+        document.getElementById('page-title').innerText = "音乐库";
     }
 
     // Collapse Favorites if leaving
@@ -2837,7 +2839,7 @@ function updateArtistMiniExpandButton(st) {
 }
 
 function handleArtistMiniExpandClick() {
-    const searchResults = document.getElementById('search-results');
+    const searchResults = (window.getMusicScrollContainer?.('search-results') || document.getElementById('search-results'));
     const st = searchResults ? searchResults.scrollTop : 0;
     if (st > 20) {
         searchResults.scrollTo({ top: 0, behavior: 'smooth' });
@@ -2851,8 +2853,8 @@ function handleArtistScrollEvent() {
     if (artistScrollRaf) return;
     artistScrollRaf = requestAnimationFrame(() => {
         artistScrollRaf = null;
-        const searchResults = document.getElementById('search-results');
-        const artistContent = document.getElementById('artist-detail-content');
+        const searchResults = (window.getMusicScrollContainer?.('search-results') || document.getElementById('search-results'));
+        const artistContent = (window.getMusicScrollContainer?.('artist-detail-content') || document.getElementById('artist-detail-content'));
         const header = document.getElementById('artist-detail-header');
         const miniBar = document.getElementById('artist-mini-bar');
         if (!header && !miniBar) return;
@@ -2892,7 +2894,7 @@ function handleArtistScrollEvent() {
 function expandArtistDetailHeader() {
     const header = document.getElementById('artist-detail-header');
     const miniBar = document.getElementById('artist-mini-bar');
-    const searchResults = document.getElementById('search-results');
+    const searchResults = (window.getMusicScrollContainer?.('search-results') || document.getElementById('search-results'));
 
     if (artistMiniBarHideTimeout) {
         clearTimeout(artistMiniBarHideTimeout);
@@ -2927,8 +2929,8 @@ function expandArtistDetailHeader() {
 window.expandArtistDetailHeader = expandArtistDetailHeader;
 
 function initArtistScrollListener() {
-    const searchResults = document.getElementById('search-results');
-    const artistContent = document.getElementById('artist-detail-content');
+    const searchResults = (window.getMusicScrollContainer?.('search-results') || document.getElementById('search-results'));
+    const artistContent = (window.getMusicScrollContainer?.('artist-detail-content') || document.getElementById('artist-detail-content'));
     if (searchResults) {
         searchResults.removeEventListener('scroll', handleArtistScrollEvent);
         searchResults.addEventListener('scroll', handleArtistScrollEvent, { passive: true });
@@ -2963,8 +2965,8 @@ function hideArtistDetailHeader() {
         artistHeader.style.borderBottomWidth = '';
         artistHeader.innerHTML = '';
     }
-    const searchResults = document.getElementById('search-results');
-    const artistContent = document.getElementById('artist-detail-content');
+    const searchResults = (window.getMusicScrollContainer?.('search-results') || document.getElementById('search-results'));
+    const artistContent = (window.getMusicScrollContainer?.('artist-detail-content') || document.getElementById('artist-detail-content'));
     if (searchResults) searchResults.removeEventListener('scroll', handleArtistScrollEvent);
     if (artistContent) artistContent.removeEventListener('scroll', handleArtistScrollEvent);
 }
@@ -3009,7 +3011,7 @@ function renderArtistMiniBar(info, activeTab, order) {
 
     const favd = isArtistFavorited(info.id, info.source);
     const disd = isArtistDisliked(info.id, info.source);
-    const searchResults = document.getElementById('search-results');
+    const searchResults = (window.getMusicScrollContainer?.('search-results') || document.getElementById('search-results'));
     const isAtTop = (searchResults ? searchResults.scrollTop : 0) <= 20;
 
     miniBar.innerHTML = `
@@ -3708,7 +3710,7 @@ function updateAlbumMiniExpandButton(st) {
 }
 
 function handleAlbumMiniExpandClick() {
-    const searchResults = document.getElementById('search-results');
+    const searchResults = (window.getMusicScrollContainer?.('search-results') || document.getElementById('search-results'));
     const st = searchResults ? searchResults.scrollTop : 0;
     if (st > 20) {
         searchResults.scrollTo({ top: 0, behavior: 'smooth' });
@@ -3722,7 +3724,7 @@ function handleAlbumScrollEvent() {
     if (albumScrollRaf) return;
     albumScrollRaf = requestAnimationFrame(() => {
         albumScrollRaf = null;
-        const container = document.getElementById('search-results');
+        const container = (window.getMusicScrollContainer?.('search-results') || document.getElementById('search-results'));
         const albumHeader = document.getElementById('album-detail-header');
         const miniBar = document.getElementById('album-mini-bar');
         if (!container || !window.currentAlbumInfo) return;
@@ -3760,7 +3762,7 @@ function handleAlbumScrollEvent() {
 function expandAlbumDetailHeader() {
     const albumHeader = document.getElementById('album-detail-header');
     const miniBar = document.getElementById('album-mini-bar');
-    const container = document.getElementById('search-results');
+    const container = (window.getMusicScrollContainer?.('search-results') || document.getElementById('search-results'));
 
     if (miniBarHideTimeout) {
         clearTimeout(miniBarHideTimeout);
@@ -3792,14 +3794,14 @@ function expandAlbumDetailHeader() {
 window.expandAlbumDetailHeader = expandAlbumDetailHeader;
 
 function initAlbumScrollListener() {
-    const container = document.getElementById('search-results');
+    const container = (window.getMusicScrollContainer?.('search-results') || document.getElementById('search-results'));
     if (!container || albumScrollHandlerBound) return;
     container.addEventListener('scroll', handleAlbumScrollEvent, { passive: true });
     albumScrollHandlerBound = true;
 }
 
 function cleanupAlbumScrollListener() {
-    const container = document.getElementById('search-results');
+    const container = (window.getMusicScrollContainer?.('search-results') || document.getElementById('search-results'));
     if (container && albumScrollHandlerBound) {
         container.removeEventListener('scroll', handleAlbumScrollEvent);
         albumScrollHandlerBound = false;
@@ -3882,7 +3884,7 @@ function renderAlbumMiniBar(info) {
     const sourceNames = { kw: '酷我音乐', kg: '酷狗音乐', tx: 'QQ音乐', wy: '网易云音乐', mg: '咪咕音乐' };
     const sourceLabel = sourceNames[info.source] || (info.source ? info.source.toUpperCase() : '网易云');
     const favorited = isAlbumFavorited(info.id, info.source);
-    const searchResults = document.getElementById('search-results');
+    const searchResults = (window.getMusicScrollContainer?.('search-results') || document.getElementById('search-results'));
     const isAtTop = (searchResults ? searchResults.scrollTop : 0) <= 20;
 
     miniBar.innerHTML = `
@@ -6852,18 +6854,7 @@ function setPlayerStatus(status, isPlaying = null, isLoading = false) {
 
 // 保存播放历史
 function savePlayHistory(song, quality) {
-    try {
-        const history = JSON.parse(localStorage.getItem('play_history') || '[]');
-        history.unshift({
-            ...song,
-            quality,
-            playedAt: Date.now()
-        });
-        // 只保留最近 50 条
-        localStorage.setItem('play_history', JSON.stringify(history.slice(0, 50)));
-    } catch (e) {
-        console.error('[Player] 保存播放历史失败:', e);
-    }
+    window.MusicExperience?.record(song, quality);
 }
 
 function getConfiguredAddMusicLocationType() {
@@ -10827,7 +10818,7 @@ function handleArtistLibraryClick() {
     const subItem = document.querySelector('[data-sidebar-list-id="__lib_artists__"]');
     if (subItem) { subItem.classList.add('active-sub-item'); subItem.classList.remove('t-text-muted'); }
 
-    document.getElementById('page-title').innerText = '收藏歌手';
+    document.getElementById('page-title').innerText = '歌手';
     document.getElementById('search-input').value = '';
     document.getElementById('search-input').placeholder = '搜索收藏歌手...';
     document.getElementById('search-source').classList.add('hidden');
@@ -10858,7 +10849,7 @@ function handleAlbumLibraryClick() {
     const subItem = document.querySelector('[data-sidebar-list-id="__lib_albums__"]');
     if (subItem) { subItem.classList.add('active-sub-item'); subItem.classList.remove('t-text-muted'); }
 
-    document.getElementById('page-title').innerText = '收藏专辑';
+    document.getElementById('page-title').innerText = '专辑';
     document.getElementById('search-input').value = '';
     document.getElementById('search-input').placeholder = '搜索收藏专辑...';
     document.getElementById('search-source').classList.add('hidden');
@@ -11943,6 +11934,8 @@ function initFavoriteSidebarSortable(container) {
         animation: 150,
         handle: '.favorite-sidebar-drag-handle',
         filter: '.ignore-sort',
+        draggable: '.playlist-sidebar-item:not(.ignore-sort)',
+        onMove: event => event.related?.getAttribute('data-sidebar-list-id') !== 'default',
         ghostClass: 'opacity-50',
         chosenClass: 'bg-emerald-50',
         onEnd: () => {
@@ -12051,6 +12044,8 @@ if (!window._sidebarMarqueeBound) {
 function renderMyLists(data) {
     const container = document.getElementById('my-lists-container');
     container.innerHTML = '';
+    const playlists = document.getElementById('playlist-lists-container');
+    playlists.replaceChildren();
 
     if (!data) {
         container.innerHTML = '<div class="px-6 py-2 text-sm t-text-muted">请先在设置中登录</div>';
@@ -12166,12 +12161,15 @@ function renderMyLists(data) {
     }
 
     sidebarItems.push(
-        { id: '__lib_artists__', type: 'lib', el: createLibItem('__lib_artists__', '收藏歌手', 'fa-user', 'lib-artist-count', handleArtistLibraryClick) },
-        { id: '__lib_albums__', type: 'lib', el: createLibItem('__lib_albums__', '收藏专辑', 'fa-compact-disc', 'lib-album-count', handleAlbumLibraryClick) }
+        { id: '__lib_artists__', type: 'lib', el: createLibItem('__lib_artists__', '歌手', 'fa-user', 'lib-artist-count', handleArtistLibraryClick) },
+        { id: '__lib_albums__', type: 'lib', el: createLibItem('__lib_albums__', '专辑', 'fa-compact-disc', 'lib-album-count', handleAlbumLibraryClick) }
     );
 
     if (data.defaultList) {
-        sidebarItems.push({ id: 'default', type: 'system', el: createItem('default', '默认列表', 'fa-list', data.defaultList.length) });
+        const defaultItem = createItem('default', '默认列表', 'fa-list', data.defaultList.length);
+        defaultItem.classList.add('ignore-sort');
+        defaultItem.querySelector('.favorite-sidebar-drag-handle')?.remove();
+        sidebarItems.push({ id: 'default', type: 'system', el: defaultItem });
     }
     if (data.loveList) {
         // 内层 ♥ 喜爱列表，命名为「我的喜爱」以与外层「我的收藏」折叠面板区分
@@ -12184,11 +12182,15 @@ function renderMyLists(data) {
         });
     }
 
-    getOrderedFavoriteSidebarItems(sidebarItems).forEach(item => container.appendChild(item.el));
+    const collectionItems = sidebarItems.filter(item => ['__lib_artists__', '__lib_albums__', 'love', '__public_favorites__'].includes(item.id));
+    getOrderedFavoriteSidebarItems(collectionItems).forEach(item => container.appendChild(item.el));
+    const defaultItem = sidebarItems.find(item => item.id === 'default');
+    if (defaultItem) playlists.appendChild(defaultItem.el);
+    getOrderedFavoriteSidebarItems(sidebarItems.filter(item => item.type === 'user')).forEach(item => playlists.appendChild(item.el));
 
     // Removed old dislike injection
     refreshLibrarySidebarCount();
-    initFavoriteSidebarSortable(container);
+    initFavoriteSidebarSortable(playlists);
     refreshFavoritesChildrenHeight();
 
     // [Resume] 处理本地列表的自动恢复跳转

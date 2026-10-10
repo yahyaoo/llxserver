@@ -27,8 +27,10 @@ export class SqliteDocumentRepository {
   /** @returns 业务数据根目录，与数据库物理路径无关。 @author yahyaoo */
   get rootPath(): string { return this.scopeRoot }
 
-  /** @param filename 数据库绝对路径。 @param schema SQL 初始化脚本。 @param tables 允许操作的业务表。 */
-  constructor(public filename: string, schema: string, tables: DocumentTable[], scopeRoot?: string) {
+  /** @param filename 数据库绝对路径。 @param schema SQL 初始化脚本。 @param tables 允许操作的业务表。 @param scopeRoot 业务数据根目录。 @param metadataTable 必须显式指定带 client_ 或 server_ 前缀的元数据表。 */
+  constructor(public filename: string, schema: string, tables: DocumentTable[], scopeRoot: string | undefined, private readonly metadataTable: string) {
+    // 元数据表名由应用工厂提供，禁止拼接请求输入。
+    if (!/^(client|server)_[a-z0-9_]+$/.test(metadataTable)) throw new Error('元数据表名无效')
     fs.mkdirSync(path.dirname(filename), { recursive: true })
     this.database = new Database(filename)
     try {
@@ -76,7 +78,7 @@ export class SqliteDocumentRepository {
   hasMigration(table: string, key: string): boolean {
     this.checkTable(table)
     key = this.documentKey(key)
-    return !!this.database.prepare('SELECT 1 FROM storage_document WHERE table_name = ? AND document_key = ?').get(table, key)
+    return !!this.database.prepare(`SELECT 1 FROM ${this.metadataTable} WHERE table_name = ? AND document_key = ?`).get(table, key)
   }
 
   /** @param table 业务表。 @param key 文档作用域。 @returns 文档及原始文本；不存在或已删除时返回空值。 */
@@ -85,7 +87,7 @@ text: string }) | null {
     this.checkTable(table)
     const filename = key
     key = this.documentKey(key)
-    const meta = this.database.prepare('SELECT * FROM storage_document WHERE table_name = ? AND document_key = ? AND present = 1').get(table, key)
+    const meta = this.database.prepare(`SELECT * FROM ${this.metadataTable} WHERE table_name = ? AND document_key = ? AND present = 1`).get(table, key)
     if (!meta) return null
     const records = this.database.prepare(`SELECT record_key, value_json FROM ${table} WHERE document_key = ? ORDER BY sort_order`).all(key)
     let value: unknown
@@ -121,7 +123,7 @@ text: string }) | null {
       this.database.prepare(`DELETE FROM ${table} WHERE document_key = ?`).run(key)
       const insert = this.database.prepare(`INSERT INTO ${table} (document_key, record_key, sort_order, value_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)`)
       records.forEach(([recordKey, item], index) => insert.run(key, recordKey, index, JSON.stringify(item), created.get(recordKey) ?? time, time))
-      this.database.prepare(`INSERT INTO storage_document (table_name, document_key, value_kind, original_text, modified_at, byte_length, present)
+      this.database.prepare(`INSERT INTO ${this.metadataTable} (table_name, document_key, value_kind, original_text, modified_at, byte_length, present)
         VALUES (?, ?, ?, ?, ?, ?, 1) ON CONFLICT (table_name, document_key) DO UPDATE SET
         value_kind = excluded.value_kind, original_text = excluded.original_text, modified_at = excluded.modified_at, byte_length = excluded.byte_length, present = 1`).run(table, key, kind, text, time, Buffer.byteLength(text))
     })
@@ -133,7 +135,7 @@ text: string }) | null {
     key = this.documentKey(key)
     this.transaction(() => {
       this.database.prepare(`DELETE FROM ${table} WHERE document_key = ?`).run(key)
-      this.database.prepare(`INSERT INTO storage_document (table_name, document_key, value_kind, original_text, modified_at, byte_length, present)
+      this.database.prepare(`INSERT INTO ${this.metadataTable} (table_name, document_key, value_kind, original_text, modified_at, byte_length, present)
         VALUES (?, ?, 'value', 'null', ?, 0, 0) ON CONFLICT (table_name, document_key) DO UPDATE SET present = 0`).run(table, key, Date.now())
     })
   }
@@ -148,14 +150,14 @@ document_key: string, /** 文档最近修改时间，单位毫秒。 */
 modified_at: number, /** 文档原始文本的 UTF-8 字节数。 */
 byte_length: number, /** 文档是否有效；删除后保存墓碑标记。 */
 present: number }> {
-    return this.database.prepare('SELECT table_name, document_key, modified_at, byte_length, present FROM storage_document').all().map((item: any) => ({ ...item, document_key: this.filenameFor(item.document_key) }))
+    return this.database.prepare(`SELECT table_name, document_key, modified_at, byte_length, present FROM ${this.metadataTable}`).all().map((item: any) => ({ ...item, document_key: this.filenameFor(item.document_key) }))
   }
 
   /** @param table 业务表。 @param key 文档。 @param time 快照历史时间。 */
   touch(table: string, key: string, time: number): void {
     this.checkTable(table)
     key = this.documentKey(key)
-    this.database.prepare('UPDATE storage_document SET modified_at = ? WHERE table_name = ? AND document_key = ?').run(time, table, key)
+    this.database.prepare(`UPDATE ${this.metadataTable} SET modified_at = ? WHERE table_name = ? AND document_key = ?`).run(time, table, key)
   }
 
   /** @returns 一致的数据库快照，不包含运行中的 WAL 文件。 */

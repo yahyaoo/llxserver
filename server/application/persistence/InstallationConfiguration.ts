@@ -18,7 +18,7 @@ export function initializeInstallationConfiguration(root: string, values: Partia
   const repository = createAdminRepository(root, paths['database.adminPath'])
   try {
     const filename = bootstrapFilename(root)
-    const existing = repository.read('admin_config', path.join(root, 'system-configuration.json')) || repository.read('admin_config', filename)
+    const existing = repository.read('server_config', path.join(root, 'system-configuration.json')) || repository.read('server_config', filename)
     writeDatabasePaths(root, paths)
     if (existing) return false
     new GlobalConfigurationService(repository).save(filename, { ...defaultConfig, ...values })

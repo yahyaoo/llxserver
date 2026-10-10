@@ -51,7 +51,7 @@ function selectSettingsSection(sectionId) {
     document.getElementById('settings-section-title').textContent = item.label;
     document.getElementById('settings-section-group').textContent = group.label;
     document.getElementById('settings-mobile-label').textContent = item.label;
-    document.getElementById('settings-content').scrollTop = 0;
+    (window.getMusicScrollContainer?.('settings-content') || document.getElementById('settings-content')).scrollTop = 0;
     setSettingsMobileOpen(false);
     if (sectionId === 'logs' && window.renderSystemLogs) window.renderSystemLogs();
     if (sectionId === 'about' && typeof loadAboutContent === 'function') loadAboutContent();

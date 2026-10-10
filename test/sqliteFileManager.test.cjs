@@ -43,7 +43,7 @@ test('每张 SQL 表都能找到对应实体、DTO 与 VO，公共字段映射�
     const models = ['entity', 'dto', 'vo'].map(kind => fs.readdirSync(path.join(__dirname, '../server', domain, 'model', kind)).map(file => ({ file, source: fs.readFileSync(path.join(__dirname, '../server', domain, 'model', kind, file), 'utf8') })))
     for (const match of ddl.matchAll(/CREATE TABLE IF NOT EXISTS (\w+)/g)) {
       const table = match[1]
-      if (table === 'storage_document') continue
+      if (table.endsWith('_storage_document')) continue
       const entity = models[0].find(model => model.source.includes('对应 ' + table + ' 表'))
       assert.ok(entity, table)
       const prefix = entity.file.replace('Entity.ts', '')

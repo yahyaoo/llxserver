@@ -26,8 +26,8 @@ test('系统配置：显式导入、独立迁库、失败保留、SQLite备份�
   const origin = `http://127.0.0.1:${port}`, headers = { 'x-frontend-auth': 'system-config-test', 'Content-Type': 'application/json' }
   let child, logs = ''
   const start = async () => {
-    const setup = `require(${JSON.stringify(path.join(project, 'dist/server/modules/utils/musicSdk/index.js'))}).default.init=async()=>{};require(${JSON.stringify(path.join(project, 'index.js'))});`
-    child = spawn(process.execPath, ['-e', setup], { cwd: project, windowsHide: true, env: { ...process.env, CONFIG_PATH: bootstrap, DATA_PATH: data, LOG_PATH: path.join(root, 'logs'), STATIC_PATH: path.join(project, 'client'), PORT: String(port), FRONTEND_PASSWORD: 'system-config-test', DISABLE_TELEMETRY: 'true', NODE_ENV: 'production' } })
+    const setup = `require(${JSON.stringify(path.join(project, 'server/modules/utils/musicSdk/index.js'))}).default.init=async()=>{};require(${JSON.stringify(path.join(project, 'server/index.ts'))});`
+    child = spawn(process.execPath, ['-r', 'tsx/cjs', '-e', setup], { cwd: project, windowsHide: true, env: { ...process.env, CONFIG_PATH: bootstrap, DATA_PATH: data, LOG_PATH: path.join(root, 'logs'), STATIC_PATH: path.join(project, 'client'), PORT: String(port), FRONTEND_PASSWORD: 'system-config-test', DISABLE_TELEMETRY: 'true', NODE_ENV: 'production' } })
     child.stdout.on('data', chunk => { logs += chunk }); child.stderr.on('data', chunk => { logs += chunk })
     for (let i = 0; i < 150; i++) {
       if (child.exitCode !== null) throw new Error('启动失败：' + logs.slice(-3000))
@@ -73,8 +73,8 @@ test('系统配置：显式导入、独立迁库、失败保留、SQLite备份�
     assert.equal((await get('/api/config'))['database.adminPath'], paths['database.adminPath'])
     assert.equal((await get('/api/config')).serverName, '迁移后')
     const adminDb = new Database(paths['database.adminPath'], { readonly: true }), musicDb = new Database(paths['database.musicPath'], { readonly: true })
-    assert.equal(adminDb.prepare("SELECT count(*) AS n FROM admin_config WHERE record_key LIKE 'database.%'").get().n, 0)
-    assert.ok(!musicDb.prepare("SELECT name FROM sqlite_master WHERE type='table'").all().some(table => table.name === 'admin_config'))
+    assert.equal(adminDb.prepare("SELECT count(*) AS n FROM server_config WHERE record_key LIKE 'database.%'").get().n, 0)
+    assert.ok(!musicDb.prepare("SELECT name FROM sqlite_master WHERE type='table'").all().some(table => table.name === 'server_config'))
     adminDb.close(); musicDb.close()
     response = await post('/api/config/backups/restore', { fileName: backup.filename })
     assert.equal(response.status, 200, await response.clone().text())

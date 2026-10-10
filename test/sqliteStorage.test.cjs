@@ -1,3 +1,4 @@
+require('tsx/cjs')
 /** SQLite 仓储与旧数据迁移的行为回归。 @author yahyaoo */
 const { test, before, after } = require('node:test')
 const assert = require('node:assert/strict')
@@ -5,8 +6,8 @@ const fs = require('node:fs')
 const path = require('node:path')
 const os = require('node:os')
 const Database = require('better-sqlite3')
-const { repositories, readDocument, writeDocument, closeStorage } = require('../dist/server/application/persistence/storage')
-const storageFs = require('../dist/server/application/persistence/documentFileSystem').default
+const { repositories, readDocument, writeDocument, closeStorage } = require('../server/application/persistence/storage')
+const storageFs = require('../server/application/persistence/documentFileSystem').default
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'lx-sqlite-unit-'))
 const settings = path.join(root, 'users/alice/settings.json')
 before(() => { global.lx = { dataPath: root }; fs.mkdirSync(path.dirname(settings), { recursive: true }) })
@@ -23,14 +24,14 @@ test('首次导入保留中文、数组顺序、扩展字段及时间；正常�
   assert.equal(fs.readFileSync(settings, 'utf8'), original)
   assert.deepEqual(readDocument(settings).value, { next: [], empty: {}, nil: null })
   const db = new Database(path.join(root, 'database/music.sqlite'), { readonly: true })
-  try { assert.equal(db.prepare('SELECT COUNT(*) AS count FROM music_settings WHERE document_key = ?').get(repositories().music.documentKey(settings)).count, 3) } finally { db.close() }
+  try { assert.equal(db.prepare('SELECT COUNT(*) AS count FROM client_settings WHERE document_key = ?').get(repositories().music.documentKey(settings)).count, 3) } finally { db.close() }
 })
 
 test('两库表隔离，管理库没有播放器设置；非法 JSON 与异常事务不会部分覆盖', () => {
   const pair = repositories()
-  assert.throws(() => pair.admin.read('music_settings', settings), /未注册/)
+  assert.throws(() => pair.admin.read('client_settings', settings), /未注册/)
   const before = readDocument(settings).value
-  assert.throws(() => pair.music.write('music_settings', settings, '{bad'), SyntaxError)
+  assert.throws(() => pair.music.write('client_settings', settings, '{bad'), SyntaxError)
   assert.deepEqual(readDocument(settings).value, before)
   assert.throws(() => pair.music.transaction(() => { writeDocument(settings, { changed: true }); throw new Error('回滚') }), /回滚/)
   assert.deepEqual(readDocument(settings).value, before)

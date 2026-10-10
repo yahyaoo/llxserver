@@ -1,3 +1,4 @@
+require('tsx/cjs')
 /** 设置导航、草稿和上传异常行为测试。 @author yahyaoo */
 const { test } = require('node:test')
 const assert = require('node:assert/strict')
@@ -9,8 +10,8 @@ const prototype = context.window.SystemConfigurationView.prototype
 
 test('全部默认业务配置都有管理入口，缓存命名选项与已有业务常量一致', () => {
   const path = require('node:path')
-  const defaults = require('../dist/server/defaultConfig').default
-  const fields = require('../dist/server/admin/service/configuration/SystemConfigurationFields').additionalConfigurationFields
+  const defaults = require('../server/defaultConfig').default
+  const fields = require('../server/admin/service/configuration/SystemConfigurationFields').additionalConfigurationFields
   const html = fs.readFileSync(path.join(__dirname, '../client/index.html'), 'utf8')
   const names = new Set([...html.matchAll(/name="([^"]+)"/g)].map(match => match[1]))
   const separate = new Set(['users', 'proxy.music.enabled', 'proxy.customSource.enabled', 'proxy.app.enabled'])

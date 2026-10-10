@@ -54,7 +54,7 @@ export function resolveStorage(filename: unknown): StorageTarget | null {
   // SQL 自身及临时文件由真正的文件系统处理，最终 rename 再提交数据库。
   if (!music && !admin && !(underData && normalized.endsWith('.json'))) return null
   const domain = music ? 'music' : 'admin'
-  const table = (music || admin)?.table || 'admin_legacy_document'
+  const table = (music || admin)?.table || 'server_legacy_document'
   return { repository: repositories()[domain], table, key }
 }
 

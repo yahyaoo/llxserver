@@ -82,7 +82,10 @@ test('完整接口：配置持久化、队列下载、本地播放、缓存绝�
     assert.equal(playerPage.status, 200)
     const playerHtml = await playerPage.text()
     assert.ok(playerHtml.includes('views/settings/SettingsView.js'))
-    assert.ok(playerHtml.includes('id="header-theme-menu"'))
+    assert.ok(playerHtml.includes('components/top-bar/index.js'))
+    const actions = await fetch(origin + '/music/components/top-bar/AccountActions.js', { headers: playerHeaders })
+    assert.equal(actions.status, 200)
+    assert.ok((await actions.text()).includes('id="header-theme-menu"'))
     for (const resource of ['/music/views/settings/settings.css', '/music/views/settings/SettingsNavigation.js', '/music/views/settings/SettingsView.js', '/music/views/settings/index.js']) {
       const response = await fetch(origin + resource, { headers: playerHeaders })
       assert.equal(response.status, 200, resource)

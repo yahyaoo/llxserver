@@ -49,7 +49,12 @@ test('Windows 独立桌面程序可协同运行，客户端窗口使用打包资
     assert.ok((await (await fetch(origin + '/')).text()).includes('洛洛雪音乐'));
     assert.ok((await (await fetch(origin + '/music/assets/logo.svg')).text()).includes('#ec4899'));
     const db = new Database(path.join(data, 'database/admin.sqlite'), { readonly: true });
-    assert.ok(db.prepare('SELECT COUNT(*) AS n FROM admin_config').get().n > 0); db.close();
+    // 已生成的桌面包可能早于源码表名前缀调整；此测试只验证该包自身运行能力。
+    try {
+      const table = db.prepare("SELECT name FROM sqlite_master WHERE name IN ('server_config', 'admin_config') ORDER BY name DESC").get()?.name;
+      assert.ok(table);
+      assert.ok(db.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get().n > 0);
+    } finally { db.close(); }
     assert.equal(fs.existsSync(path.join(data, 'database/music.sqlite')), true);
     const targets = await (await wait(`http://127.0.0.1:${debugPort}/json/list`, client)).json();
     const page = targets.find(target => target.type === 'page'); assert.ok(page);

@@ -72,7 +72,7 @@ test('实际整体 ZIP 和两个独立 ZIP 均可启动，鉴权、配置、资�
     const dynamic = await (await fetch(origin + '/js/config.js')).text(); assert.ok(dynamic.includes('独立部署测试')); assert.ok(dynamic.includes('/listen'));
     assert.equal((await fetch(origin + '/listen/', { headers: { Cookie: cookie } })).status, 200);
     assert.equal((await (await fetch(origin + '/listen/manifest.json')).json()).scope, '/listen/');
-    const db = new Database(path.join(data, 'database/admin.sqlite'), { readonly: true }); assert.ok(db.prepare('SELECT COUNT(*) AS n FROM admin_config').get().n > 0); db.close();
+    const db = new Database(path.join(data, 'database/admin.sqlite'), { readonly: true }); assert.ok(db.prepare('SELECT COUNT(*) AS n FROM server_config').get().n > 0); db.close();
     assert.equal(fs.existsSync(path.join(data, 'database/music.sqlite')), true);
     const combined = launch(all, ['-e', setup], { PORT: String(allPort), DATA_PATH: path.join(temp, 'all-data'), CONFIG_PATH: path.join(all, 'config.js'), LOG_PATH: path.join(temp, 'all-logs'), FRONTEND_PASSWORD: 'package-test', CLIENT_MODE: 'local' });
     const combinedOrigin = `http://127.0.0.1:${allPort}`; await wait(combinedOrigin, combined);
