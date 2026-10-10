@@ -44,9 +44,9 @@ npm run build
 npm start
 ```
 
-`--ignore-scripts` 跳过不必要的 Electron 安装；本项目的原生依赖使用平台对应的预编译包。`npm run build` 编译到 `server/`，首次构建或启动会检查歌曲识别用的 fpcalc 二进制并按需下载。仅构建飞牛载荷的 `npm run prepare:fpk` 不执行 fpcalc 下载，普通播放和服务器下载不依赖它。
+`--ignore-scripts` 跳过不必要的 Electron 安装；本项目的原生依赖使用平台对应的预编译包。`npm run build` 编译到 `server/`。构建和启动不会自动查询或下载 fpcalc，普通播放和服务器下载不依赖它。
 
-如果网络无法访问 Chromaprint 下载地址，可先运行 `npm run prepare:fpk` 编译，再运行 `node index.js` 启动服务，跳过可选识别工具的下载。需使用歌曲指纹识别时，再安装平台对应的 fpcalc。
+需使用歌曲指纹识别时，可联网执行 `npm run download:fpcalc`，或自行安装平台对应的 fpcalc 到系统 PATH 或 `public/music/bin/`。手动下载命令会查询 Chromaprint 发布并下载；只有主动执行该命令时才会运行。
 
 默认访问：播放器 `http://localhost:9527/`，后台 `http://localhost:9527/admin`。示例后台密码为 `123456`，请在自己的运行配置中修改。开发时可用 `npm run dev` 直接运行 TypeScript。
 
