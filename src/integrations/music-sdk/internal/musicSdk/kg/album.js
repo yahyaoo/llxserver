@@ -1,4 +1,4 @@
-/** album 模块：按职责组织，原业务行为保持不变。 @author yahyaoo */
+/** 酷狗音乐接口适配：专辑详情与专辑歌曲查询。 @author yahyaoo */
 import { getMusicInfosByList } from './musicInfo.js'
 import { createHttpFetch } from './util.js'
 

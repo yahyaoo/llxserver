@@ -1,4 +1,4 @@
-/** 数据访问层查询结果，控制器仍返回原有业务结构。 @author yahyaoo */
+/** 仓储还原的业务文档，附带作用域、修改时间及序列化大小，供查询和备份使用。 @author yahyaoo */
 export interface DocumentVo<T = unknown> {
   /** 文档作用域。 */
   documentKey: string

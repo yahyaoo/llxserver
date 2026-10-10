@@ -18,22 +18,42 @@ export interface DocumentTable {
  */
 export class SqliteDocumentRepository {
   /** 独立数据库连接，业务代码不能直接使用。 */
-  private readonly database: any
+  private database: any
   /** 当前数据库允许操作的表名。 */
   private readonly tables: Set<string>
   /** 数据根目录；内部作用域使用相对路径，移动数据目录后仍可读取。 */
   private readonly scopeRoot: string
 
+  /** @returns 业务数据根目录，与数据库物理路径无关。 @author yahyaoo */
+  get rootPath(): string { return this.scopeRoot }
+
   /** @param filename 数据库绝对路径。 @param schema SQL 初始化脚本。 @param tables 允许操作的业务表。 */
-  constructor(readonly filename: string, schema: string, tables: DocumentTable[]) {
+  constructor(public filename: string, schema: string, tables: DocumentTable[], scopeRoot?: string) {
     fs.mkdirSync(path.dirname(filename), { recursive: true })
     this.database = new Database(filename)
-    this.database.pragma('journal_mode = WAL')
-    this.database.pragma('busy_timeout = 5000')
-    this.database.pragma('foreign_keys = ON')
-    this.database.exec(schema)
+    try {
+      this.database.pragma('journal_mode = WAL')
+      this.database.pragma('busy_timeout = 5000')
+      this.database.pragma('foreign_keys = ON')
+      this.database.exec(schema)
+    } catch (error) { this.database.close(); throw error }
     this.tables = new Set(tables.map(item => item.table))
-    this.scopeRoot = path.dirname(path.dirname(path.resolve(filename)))
+    this.scopeRoot = path.resolve(scopeRoot || path.dirname(path.dirname(path.resolve(filename))))
+  }
+
+  /** @param filename 新目标文件。生成包含 WAL 的同步一致快照，避免切换期间继续写旧库。 @author yahyaoo */
+  copyTo(filename: string): void { this.database.prepare('VACUUM INTO ?').run(filename) }
+
+  /** @throws Error 内容损坏时拒绝启用。 @author yahyaoo */
+  verifyIntegrity(): void {
+    if (this.database.pragma('quick_check', { simple: true }) !== 'ok') throw new Error('数据库完整性检查失败：' + this.filename)
+  }
+
+  /** @param candidate 已验证的同域新仓储。交换连接保留所有调用方引用；再次调用可回滚。 @author yahyaoo */
+  swapConnection(candidate: SqliteDocumentRepository): void {
+    const database = this.database, filename = this.filename
+    this.database = candidate.database; this.filename = candidate.filename
+    candidate.database = database; candidate.filename = filename
   }
 
   /** @param filename 业务绝对路径。 @returns 可随数据目录搬移的 SQL 作用域键。 */
@@ -60,9 +80,7 @@ export class SqliteDocumentRepository {
   }
 
   /** @param table 业务表。 @param key 文档作用域。 @returns 文档及原始文本；不存在或已删除时返回空值。 */
-  read(table: string, key: string): (DocumentVo & { /**
- * text 字段，沿用原业务结构与空值约定。
- */
+  read(table: string, key: string): (DocumentVo & { /** 业务文档序列化文本。 */
 text: string }) | null {
     this.checkTable(table)
     const filename = key
@@ -124,21 +142,11 @@ text: string }) | null {
   transaction<T>(work: () => T): T { return this.database.transaction(work)() }
 
   /** @returns 已迁移文档目录，包括删除标记，用于兼容文件枚举和备份。 */
-  documents(): Array<{ /**
- * table_name 字段，沿用原业务结构与空值约定。
- */
-table_name: string, /**
- * document_key 字段，沿用原业务结构与空值约定。
- */
-document_key: string, /**
- * modified_at 字段，沿用原业务结构与空值约定。
- */
-modified_at: number, /**
- * byte_length 字段，沿用原业务结构与空值约定。
- */
-byte_length: number, /**
- * present 字段，沿用原业务结构与空值约定。
- */
+  documents(): Array<{ /** 记录所属 SQL 表名。 */
+table_name: string, /** 业务文档作用域键。 */
+document_key: string, /** 文档最近修改时间，单位毫秒。 */
+modified_at: number, /** 文档原始文本的 UTF-8 字节数。 */
+byte_length: number, /** 文档是否有效；删除后保存墓碑标记。 */
 present: number }> {
     return this.database.prepare('SELECT table_name, document_key, modified_at, byte_length, present FROM storage_document').all().map((item: any) => ({ ...item, document_key: this.filenameFor(item.document_key) }))
   }

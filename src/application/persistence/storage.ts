@@ -6,6 +6,7 @@ import { adminTables } from '../../admin/repository/catalog'
 import { createMusicRepository } from '../../music/repository/MusicRepository'
 import { musicTables } from '../../music/repository/catalog'
 import type { SqliteDocumentRepository } from '../../common/persistence/SqliteDocumentRepository'
+import { readDatabasePaths } from './BootstrapConfiguration'
 
 /** 应用装配层：只在此处选择数据库，两个业务域不导入彼此仓储。 @author yahyaoo */
 export interface StorageTarget {
@@ -18,12 +19,8 @@ export interface StorageTarget {
 }
 /** 数据变动通知用于保留音源热加载；不暴露数据库内容。 @author yahyaoo */
 export const storageEvents = new EventEmitter()
-const stores = new Map<string, { /**
- * admin 字段，沿用原业务结构与空值约定。
- */
-admin: SqliteDocumentRepository, /**
- * music 字段，沿用原业务结构与空值约定。
- */
+const stores = new Map<string, { /** 管理域 SQLite 仓储。 */
+admin: SqliteDocumentRepository,
 music: SqliteDocumentRepository }>()
 
 /** @returns 当前数据根目录，沿用原 DATA_PATH 配置优先级。 */
@@ -34,7 +31,10 @@ export function repositories(root = dataRoot()) {
   root = path.resolve(root)
   let pair = stores.get(root)
   if (!pair) {
-    pair = { admin: createAdminRepository(root), music: createMusicRepository(root) }
+    const paths = readDatabasePaths(root)
+    const admin = createAdminRepository(root, paths['database.adminPath'])
+    try { pair = { admin, music: createMusicRepository(root, paths['database.musicPath']) } }
+    catch (error) { admin.close(); throw error }
     stores.set(root, pair)
   }
   return pair

@@ -1,4 +1,4 @@
-/** CustomSourceClient 模块：按职责组织，原业务行为保持不变。 @author yahyaoo */
+/** 音源沙箱适配：加载用户脚本、提供请求接口、维护平台能力并解析歌曲链接。 @author yahyaoo */
 import storageFs from '../../application/persistence/documentFileSystem'
 import { storageEvents } from '../../application/persistence/storage'
 import { VM } from 'vm2'
@@ -17,9 +17,8 @@ const deflate = promisify(zlib.deflate)
 
 // 彻底切断与沙箱上下文的联系
 /**
- * 处理 decontextify 对应的业务能力，参数和执行顺序保持原实现。
- * @param obj obj 原业务参数。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * 将沙箱返回的数组与对象复制到宿主上下文，解除跨上下文对象包装。
+ * @param obj 待转换的沙箱对象。
  * @author yahyaoo
  */
 function decontextify(obj: any): any {
@@ -72,85 +71,45 @@ function decontextify(obj: any): any {
 }
 
 // 用户API信息接口
-/**
- * UserApiInfo 契约，按当前模块职责组织，保留原字段和扩展能力。
- * @author yahyaoo
- */
+/** 音源脚本注册信息，包含所有者、脚本内容、版本和支持平台。 @author yahyaoo */
 interface UserApiInfo {
-    /**
-     * id 字段，沿用原业务结构与空值约定。
-     */
+    /** 业务记录标识。 */
     id: string
-    /**
-     * name 字段，沿用原业务结构与空值约定。
-     */
+    /** 记录显示名称。 */
     name: string
-    /**
-     * description 字段，沿用原业务结构与空值约定。
-     */
+    /** 记录说明。 */
     description: string
-    /**
-     * version 字段，沿用原业务结构与空值约定。
-     */
+    /** 脚本或协议版本。 */
     version: number | string
-    /**
-     * author 字段，沿用原业务结构与空值约定。
-     */
+    /** 脚本作者。 */
     author: string
-    /**
-     * homepage 字段，沿用原业务结构与空值约定。
-     */
+    /** 音源或电台主页。 */
     homepage: string
-    /**
-     * script 字段，沿用原业务结构与空值约定。
-     */
+    /** 音源脚本内容。 */
     script: string
-    /**
-     * sources 字段，沿用原业务结构与空值约定。
-     */
+
     sources: Record<string, any>
-    /**
-     * enabled 字段，沿用原业务结构与空值约定。
-     */
+    /** 功能是否启用。 */
     enabled: boolean
-    /**
-     * owner 字段，沿用原业务结构与空值约定。
-     */
+    /** 音源脚本所有者。 */
     owner: string // 'open' or username
-    /**
-     * allowUnsafeVM 字段，沿用原业务结构与空值约定。
-     */
+
     allowUnsafeVM?: boolean
 }
 
-/**
- * ApiStatusInfo 契约，按当前模块职责组织，保留原字段和扩展能力。
- * @author yahyaoo
- */
+/** 音源脚本最近一次初始化状态及错误原因。 @author yahyaoo */
 export interface ApiStatusInfo {
-    /**
-     * status 字段，沿用原业务结构与空值约定。
-     */
+    /** 当前处理或任务状态。 */
     status: 'success' | 'failed'
-    /**
-     * error 字段，沿用原业务结构与空值约定。
-     */
+    /** 操作失败原因。 */
     error?: string
-    /**
-     * updateAlert 字段，沿用原业务结构与空值约定。
-     */
+
     updateAlert?: {
-        /**
-         * name 字段，沿用原业务结构与空值约定。
-         */
+        /** 记录显示名称。 */
         name?: string
-        /**
-         * log 字段，沿用原业务结构与空值约定。
-         */
+
         log?: string
-        /**
-         * updateUrl 字段，沿用原业务结构与空值约定。
-         */
+        /** 音源更新地址。 */
         updateUrl?: string
     }
 }
@@ -167,10 +126,9 @@ export function getLoadedApisCount() {
 }
 
 /**
- * 获取 getApiStatus 对应的业务能力，参数和执行顺序保持原实现。
- * @param owner owner 原业务参数。
- * @param id 原业务标识。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * 按音源所有者和脚本 ID 查询最近一次加载状态。
+ * @param owner 音源脚本所有者。
+ * @param id 当前业务对象标识。
  * @author yahyaoo
  */
 export function getApiStatus(owner: string, id: string): ApiStatusInfo | undefined {
@@ -180,9 +138,8 @@ export function getApiStatus(owner: string, id: string): ApiStatusInfo | undefin
 
 // 从脚本注释中提取元数据
 /**
- * 提取 extractMetadata 对应的业务能力，参数和执行顺序保持原实现。
- * @param script script 原业务参数。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * 解析音源脚本顶部的名称、作者、版本与更新地址声明。
+ * @param script 音源脚本文本。
  * @author yahyaoo
  */
 export function extractMetadata(script: string): Partial<UserApiInfo> {
@@ -219,21 +176,14 @@ export function extractMetadata(script: string): Partial<UserApiInfo> {
 
 // 创建 lx.request 包装器（使用 needle）
 /**
- * 创建 createLxRequest 对应的业务能力，参数和执行顺序保持原实现。
- * @param isUnsafe isUnsafe 原业务参数。
- * @param onSniffUpdate onSniffUpdate 原业务参数。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * 为音源沙箱创建网络请求适配，连接代理、超时及嗅探更新回调。
+ * @param isUnsafe 是否使用原生 VM 请求适配。
+ * @param onSniffUpdate 音源更新嗅探回调。
  * @author yahyaoo
  */
-async function createLxRequest(isUnsafe: boolean = false, onSniffUpdate?: (alert: { /**
- * name 字段，沿用原业务结构与空值约定。
- */
-name?: string, /**
- * log 字段，沿用原业务结构与空值约定。
- */
-log?: string, /**
- * updateUrl 字段，沿用原业务结构与空值约定。
- */
+async function createLxRequest(isUnsafe: boolean = false, onSniffUpdate?: (alert: { /** 条目名称。 */
+name?: string,
+log?: string, /** 音源更新地址。 */
 updateUrl?: string }) => void) {
     // 自定义音源脚本调用 lx.request 是同步的，无法在调用时 await，
     // 因此这里预先按 http/https 各建一个 agent，调用时按目标协议取用。
@@ -325,9 +275,8 @@ updateUrl?: string }) => void) {
 
 // 加载自定义源脚本
 /**
- * 加载 loadUserApi 对应的业务能力，参数和执行顺序保持原实现。
- * @param apiInfo apiInfo 原业务参数。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * 加载音源脚本到配置允许的沙箱，处理初始化事件并注册播放链接解析能力。
+ * @param apiInfo 音源脚本注册信息。
  * @author yahyaoo
  */
 export async function loadUserApi(apiInfo: UserApiInfo): Promise<any> {
@@ -474,12 +423,11 @@ export async function loadUserApi(apiInfo: UserApiInfo): Promise<any> {
 
     const sandboxConsole = new Proxy(rawSandboxConsole, {
         /**
-         * 获取 get 对应的业务能力，参数和执行顺序保持原实现。
-         * @param target 原目标位置。
-         * @param prop prop 原业务参数。
-         * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-         * @author yahyaoo
-         */
+ * 代理音源运行对象的属性访问，对未实现能力提供对应兼容处理。
+ * @param target 原目标位置。
+ * @param prop 访问的对象属性名。
+ * @author yahyaoo
+ */
         get(target, prop: string) {
             if (prop in target) {
                 return target[prop]
@@ -617,15 +565,14 @@ export async function loadUserApi(apiInfo: UserApiInfo): Promise<any> {
 
 // 调用自定义源的 getMusicUrl
 /**
- * 处理 callUserApiGetMusicUrl 对应的业务能力，参数和执行顺序保持原实现。
+ * 按用户可用音源和优先级解析歌曲链接；按配置尝试同平台候选脚本。
  * @param source 原音乐平台标识。
- * @param songInfo songInfo 原业务参数。
+ * @param songInfo 歌曲详情及平台扩展字段。
  * @param quality 原音质选择。
- * @param clientUsername clientUsername 原业务参数。
- * @param onProgress onProgress 原业务参数。
- * @param enableAutoSwitchApiSource enableAutoSwitchApiSource 原业务参数。
- * @param excludeApiSources excludeApiSources 原业务参数。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * @param clientUsername 发起请求的用户，用于音源权限和优先级选择。
+ * @param onProgress 媒体处理进度回调。
+ * @param enableAutoSwitchApiSource 是否允许尝试其他同平台音源。
+ * @param excludeApiSources 本次解析需跳过的音源 ID。
  * @author yahyaoo
  */
 export async function callUserApiGetMusicUrl(
@@ -636,24 +583,12 @@ export async function callUserApiGetMusicUrl(
     onProgress?: (attempt: any) => Promise<void> | void,
     enableAutoSwitchApiSource?: boolean,
     excludeApiSources?: string[]
-): Promise<{ /**
- * url 字段，沿用原业务结构与空值约定。
- */
-url: string, /**
- * type 字段，沿用原业务结构与空值约定。
- */
-type: string, /**
- * sourceName 字段，沿用原业务结构与空值约定。
- */
-sourceName?: string, /**
- * sourceId 字段，沿用原业务结构与空值约定。
- */
-sourceId?: string, /**
- * attempts 字段，沿用原业务结构与空值约定。
- */
-attempts?: any[], /**
- * hasMoreSources 字段，沿用原业务结构与空值约定。
- */
+): Promise<{ /** 远端资源地址。 */
+url: string, /** 记录或操作类别。 */
+type: string, /** 音源显示名称。 */
+sourceName?: string, /** 音源脚本标识。 */
+sourceId?: string, /** 当前任务已经尝试的次数。 */
+attempts?: any[],
 hasMoreSources?: boolean }> {
     // 标准化 songInfo 格式：将 meta 中的字段提升到顶层
     const normalizedSongInfo = { ...songInfo }
@@ -963,16 +898,13 @@ hasMoreSources?: boolean }> {
 
 // 辅助函数：加载指定目录下的源
 /**
- * 加载 loadSourcesFromDir 对应的业务能力，参数和执行顺序保持原实现。
- * @param dirPath dirPath 原业务参数。
- * @param owner owner 原业务参数。
- * @param stats stats 原业务参数。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * 读取指定所有者目录的音源注册记录，加载脚本并统计成功和失败数量。
+ * @param dirPath 待扫描或加载的数据目录。
+ * @param owner 音源脚本所有者。
+ * @param stats 音源加载的成功与失败计数。
  * @author yahyaoo
  */
-async function loadSourcesFromDir(dirPath: string, owner: string, stats: { /**
- * loadedCount 字段，沿用原业务结构与空值约定。
- */
+async function loadSourcesFromDir(dirPath: string, owner: string, stats: { /** 已加载条目数量。 */
 loadedCount: number }) {
     const metaPath = path.join(dirPath, 'sources.json')
     if (!storageFs.existsSync(metaPath)) {
@@ -1083,9 +1015,8 @@ const lastReloadMap = new Map<string, number>() // 记录每个用户的最后�
 
 // 启动文件监控
 /**
- * 启动 startWatcher 对应的业务能力，参数和执行顺序保持原实现。
- * @param sourceRoot sourceRoot 原业务参数。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * 监听音源文件与注册文档变化，防抖后刷新音源实例。
+ * @param sourceRoot 音源脚本根目录。
  * @author yahyaoo
  */
 function startWatcher(sourceRoot: string) {
@@ -1156,9 +1087,8 @@ function startWatcher(sourceRoot: string) {
 // 从文件系统加载所有已启用的自定义源
 // 路径变更：DATA_PATH/users/source/{username} 和 DATA_PATH/users/source/_open
 /**
- * 初始化 initUserApis 对应的业务能力，参数和执行顺序保持原实现。
- * @param targetUser targetUser 原业务参数。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * 加载公共和各用户音源，重建可用平台索引并启动文件变更监听。
+ * @param targetUser 目标用户配置。
  * @author yahyaoo
  */
 export async function initUserApis(targetUser?: string) {
@@ -1245,8 +1175,7 @@ export async function initUserApis(targetUser?: string) {
 
 // 获取所有已加载的 API
 /**
- * 获取 getLoadedApis 对应的业务能力，参数和执行顺序保持原实现。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * 返回音源运行时当前已经加载的脚本实例。
  * @author yahyaoo
  */
 export function getLoadedApis() {
@@ -1256,10 +1185,9 @@ export function getLoadedApis() {
 // 检查某个源是否被支持
 // clientUsername: 调用者的用户名。如果未提供，则只能检查 open 源
 /**
- * 判断 isSourceSupported 对应的业务能力，参数和执行顺序保持原实现。
+ * 判断已加载音源是否声明支持目标音乐平台。
  * @param source 原音乐平台标识。
- * @param clientUsername clientUsername 原业务参数。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * @param clientUsername 发起请求的用户，用于音源权限和优先级选择。
  * @author yahyaoo
  */
 export function isSourceSupported(source: string, clientUsername?: string): boolean {

@@ -1,4 +1,4 @@
-/** index 模块：按职责组织，原业务行为保持不变。 @author yahyaoo */
+/** 音乐平台 SDK 入口：初始化各平台能力并导出统一调用对象。 @author yahyaoo */
 import kw from './kw/index.js'
 import kg from './kg/index.js'
 import tx from './tx/index.js'

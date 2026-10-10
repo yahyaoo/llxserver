@@ -1,181 +1,96 @@
-/** ServerDownloadQueueService 模块：按职责组织，原业务行为保持不变。 @author yahyaoo */
+/** 服务器下载队列：任务入队、并发调度、暂停恢复和持久化下载状态。 @author yahyaoo */
 import storageFs from '../../../application/persistence/documentFileSystem'
 import fs from 'node:fs'
 import path from 'node:path'
 import * as fileCache from '../cache/FileCacheService'
 import * as serverDownloads from './ServerDownloadService'
 
-/**
- * ServerDownloadStatus 契约，按当前模块职责组织，保留原字段和扩展能力。
- * @author yahyaoo
- */
+/** 服务器下载任务的排队、执行、暂停或结束状态。 @author yahyaoo */
 export type ServerDownloadStatus = 'waiting' | 'downloading' | 'tagging' | 'paused' | 'finished' | 'exists' | 'error'
 
-/**
- * ServerDownloadTask 契约，按当前模块职责组织，保留原字段和扩展能力。
- * @author yahyaoo
- */
+/** 服务器下载队列记录，关联用户、歌曲、请求音质和执行进度。 @author yahyaoo */
 export interface ServerDownloadTask {
-  /**
-   * id 字段，沿用原业务结构与空值约定。
-   */
+  /** 业务记录标识。 */
   id: string
-  /**
-   * username 字段，沿用原业务结构与空值约定。
-   */
+  /** 数据所属用户名。 */
   username: string
-  /**
-   * songKey 字段，沿用原业务结构与空值约定。
-   */
+  /** 歌曲索引定位键。 */
   songKey: string
-  /**
-   * activeSongKey 字段，沿用原业务结构与空值约定。
-   */
+
   activeSongKey?: string
-  /**
-   * songInfo 字段，沿用原业务结构与空值约定。
-   */
+  /** 歌曲详情及平台扩展字段。 */
   songInfo: any
-  /**
-   * quality 字段，沿用原业务结构与空值约定。
-   */
+  /** 音质标识。 */
   quality: string
-  /**
-   * requestedQuality 字段，沿用原业务结构与空值约定。
-   */
+  /** 客户端请求的音质。 */
   requestedQuality: string
-  /**
-   * status 字段，沿用原业务结构与空值约定。
-   */
+  /** 当前处理或任务状态。 */
   status: ServerDownloadStatus
-  /**
-   * progress 字段，沿用原业务结构与空值约定。
-   */
+  /** 任务处理进度。 */
   progress: number
-  /**
-   * total 字段，沿用原业务结构与空值约定。
-   */
+  /** 待处理记录总数。 */
   total: number
-  /**
-   * received 字段，沿用原业务结构与空值约定。
-   */
+
   received: number
-  /**
-   * speed 字段，沿用原业务结构与空值约定。
-   */
+
   speed: number
-  /**
-   * errorMsg 字段，沿用原业务结构与空值约定。
-   */
+  /** 任务失败说明。 */
   errorMsg: string
-  /**
-   * enableOnlyDownloadMode 字段，沿用原业务结构与空值约定。
-   */
+
   enableOnlyDownloadMode: boolean
-  /**
-   * cacheLyric 字段，沿用原业务结构与空值约定。
-   */
+  /** 是否保存歌词缓存。 */
   cacheLyric: boolean
-  /**
-   * embedLyric 字段，沿用原业务结构与空值约定。
-   */
+  /** 是否将歌词内嵌到音频。 */
   embedLyric: boolean
-  /**
-   * serverDownload 字段，沿用原业务结构与空值约定。
-   */
+  /** 是否属于服务器下载任务。 */
   serverDownload?: boolean
-  /**
-   * lyricMode 字段，沿用原业务结构与空值约定。
-   */
+  /** 歌词保存方式，内嵌或外部 LRC。 */
   lyricMode?: serverDownloads.LyricMode
-  /**
-   * identitySong 字段，沿用原业务结构与空值约定。
-   */
+
   identitySong?: any
-  /**
-   * createdAt 字段，沿用原业务结构与空值约定。
-   */
+  /** 记录创建时间，单位毫秒。 */
   createdAt: number
-  /**
-   * updatedAt 字段，沿用原业务结构与空值约定。
-   */
+  /** 记录最近更新时间，单位毫秒。 */
   updatedAt: number
 }
 
-/**
- * QueueInput 契约，按当前模块职责组织，保留原字段和扩展能力。
- * @author yahyaoo
- */
+/** 入队歌曲请求及下载目的配置。 @author yahyaoo */
 interface QueueInput {
-  /**
-   * id 字段，沿用原业务结构与空值约定。
-   */
+  /** 业务记录标识。 */
   id?: string
-  /**
-   * songInfo 字段，沿用原业务结构与空值约定。
-   */
+  /** 歌曲详情及平台扩展字段。 */
   songInfo: any
-  /**
-   * quality 字段，沿用原业务结构与空值约定。
-   */
+  /** 音质标识。 */
   quality?: string
-  /**
-   * enableOnlyDownloadMode 字段，沿用原业务结构与空值约定。
-   */
+
   enableOnlyDownloadMode?: boolean
-  /**
-   * cacheLyric 字段，沿用原业务结构与空值约定。
-   */
+  /** 是否保存歌词缓存。 */
   cacheLyric?: boolean
-  /**
-   * embedLyric 字段，沿用原业务结构与空值约定。
-   */
+  /** 是否将歌词内嵌到音频。 */
   embedLyric?: boolean
-  /**
-   * serverDownload 字段，沿用原业务结构与空值约定。
-   */
+  /** 是否属于服务器下载任务。 */
   serverDownload?: boolean
-  /**
-   * lyricMode 字段，沿用原业务结构与空值约定。
-   */
+  /** 歌词保存方式，内嵌或外部 LRC。 */
   lyricMode?: serverDownloads.LyricMode
 }
 
-/**
- * ResolveResult 契约，按当前模块职责组织，保留原字段和扩展能力。
- * @author yahyaoo
- */
+/** 歌曲解析器返回的可下载地址、音质与歌曲元信息。 @author yahyaoo */
 interface ResolveResult {
-  /**
-   * url 字段，沿用原业务结构与空值约定。
-   */
+  /** 请求或资源地址。 */
   url: string
-  /**
-   * quality 字段，沿用原业务结构与空值约定。
-   */
+  /** 音质标识。 */
   quality?: string
-  /**
-   * songInfo 字段，沿用原业务结构与空值约定。
-   */
+  /** 歌曲详情及平台扩展字段。 */
   songInfo?: any
-  /**
-   * requestedSource 字段，沿用原业务结构与空值约定。
-   */
+  /** 客户端选择的音乐平台。 */
   requestedSource?: string
-  /**
-   * downloadSource 字段，沿用原业务结构与空值约定。
-   */
+  /** 最终解析到的下载平台。 */
   downloadSource?: string
-  /**
-   * sourceName 字段，沿用原业务结构与空值约定。
-   */
+  /** 音源显示名称。 */
   sourceName?: string
 }
 
-/**
- * DownloadResolver 契约，按当前模块职责组织，保留原字段和扩展能力。
- * @author yahyaoo
- */
+/** 按请求歌曲和用户解析下载地址的异步函数。 @author yahyaoo */
 type DownloadResolver = (task: ServerDownloadTask) => Promise<ResolveResult>
 
 const DEFAULT_CONCURRENT = 3
@@ -205,9 +120,8 @@ const normalizeConcurrency = (value: unknown) => {
 }
 
 /**
- * 获取 getConcurrency 对应的业务能力，参数和执行顺序保持原实现。
+ * 返回下载队列当前并发任务上限。
  * @param username 已解析的用户名称。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
  * @author yahyaoo
  */
 export const getConcurrency = (username: string) => concurrencyByUser.get(username) || DEFAULT_CONCURRENT
@@ -415,10 +329,9 @@ const processQueue = async () => {
 }
 
 /**
- * 设置 setConcurrency 对应的业务能力，参数和执行顺序保持原实现。
+ * 校验并更新下载并发上限，安排等待任务继续执行。
  * @param username 已解析的用户名称。
- * @param value 原字段值。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * @param value 请求的并发任务数量，按队列限制归一化。
  * @author yahyaoo
  */
 export const setConcurrency = (username: string, value: unknown) => {
@@ -430,9 +343,8 @@ export const setConcurrency = (username: string, value: unknown) => {
 }
 
 /**
- * 处理 initialize 对应的业务能力，参数和执行顺序保持原实现。
- * @param downloadResolver downloadResolver 原业务参数。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * 注入歌曲链接解析器，恢复队列或注册下载所需依赖。
+ * @param downloadResolver 由应用注入的歌曲下载链接解析函数。
  * @author yahyaoo
  */
 export const initialize = (downloadResolver: DownloadResolver) => {
@@ -446,10 +358,9 @@ export const initialize = (downloadResolver: DownloadResolver) => {
 }
 
 /**
- * 处理 enqueue 对应的业务能力，参数和执行顺序保持原实现。
+ * 将歌曲下载请求加入用户队列并安排执行。
  * @param username 已解析的用户名称。
- * @param inputs inputs 原业务参数。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * @param inputs 批量下载入队请求。
  * @author yahyaoo
  */
 export const enqueue = (username: string, inputs: QueueInput[]) => {
@@ -511,9 +422,8 @@ export const enqueue = (username: string, inputs: QueueInput[]) => {
 }
 
 /**
- * 列举 list 对应的业务能力，参数和执行顺序保持原实现。
+ * 返回用户下载任务与当前状态。
  * @param username 已解析的用户名称。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
  * @author yahyaoo
  */
 export const list = (username: string) => Array.from(tasks.values())
@@ -522,10 +432,9 @@ export const list = (username: string) => Array.from(tasks.values())
   .map(task => getPublicTask(task))
 
 /**
- * 处理 pause 对应的业务能力，参数和执行顺序保持原实现。
+ * 暂停用户下载队列并中止当前任务传输。
  * @param username 已解析的用户名称。
- * @param id 原业务标识。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * @param id 当前业务对象标识。
  * @author yahyaoo
  */
 export const pause = (username: string, id?: string) => {
@@ -542,10 +451,9 @@ export const pause = (username: string, id?: string) => {
 }
 
 /**
- * 处理 resume 对应的业务能力，参数和执行顺序保持原实现。
+ * 恢复用户已暂停的下载任务，并重新安排执行。
  * @param username 已解析的用户名称。
- * @param id 原业务标识。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * @param id 当前业务对象标识。
  * @author yahyaoo
  */
 export const resume = (username: string, id?: string) => {
@@ -567,21 +475,14 @@ export const resume = (username: string, id?: string) => {
 }
 
 /**
- * 移除 remove 对应的业务能力，参数和执行顺序保持原实现。
+ * 移除下载队列中的指定任务。
  * @param username 已解析的用户名称。
- * @param options 可选操作参数，沿用原默认值。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * @param options 按 id 删除任务，或通过 all/completed 删除全部或已完成任务。
  * @author yahyaoo
  */
-export const remove = (username: string, options: { /**
- * id 字段，沿用原业务结构与空值约定。
- */
-id?: string; /**
- * all 字段，沿用原业务结构与空值约定。
- */
-all?: boolean; /**
- * completed 字段，沿用原业务结构与空值约定。
- */
+export const remove = (username: string, options: { /** 条目唯一标识。 */
+id?: string;
+all?: boolean;
 completed?: boolean }) => {
   for (const [key, task] of tasks) {
     if (task.username !== username) continue

@@ -1,4 +1,4 @@
-/** quality 模块：按职责组织，原业务行为保持不变。 @author yahyaoo */
+/** QQ 音乐接口适配：可用音质查询及平台音质标识转换。 @author yahyaoo */
 import { sizeFormate } from '../../index.js'
 
 const getFirstSize = (file, keys) => {

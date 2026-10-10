@@ -1,4 +1,4 @@
-/** extendDetail 模块：按职责组织，原业务行为保持不变。 @author yahyaoo */
+/** 网易云音乐接口适配：歌手与专辑详情的扩展查询。 @author yahyaoo */
 import { weapiRequest } from './utils/index.js'
 import { formatSingerName } from '../utils.js'
 import musicDetail from './musicDetail.js'

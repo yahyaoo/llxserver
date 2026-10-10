@@ -1,4 +1,4 @@
-/** api-source-info 模块：按职责组织，原业务行为保持不变。 @author yahyaoo */
+/** 音乐平台能力声明：平台名称、可选音质及接口信息。 @author yahyaoo */
 // Support qualitys: 128k 320k flac flac24bit hires atmos atmos_plus master wav
 
 const sources: Array<{

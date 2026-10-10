@@ -1,4 +1,4 @@
 import type { DocumentVo } from '../../../common/model/vo/DocumentVo'
-/** 管理用户仓储查询结果；HTTP 层仍返回原始业务值。 @author yahyaoo */
+/** 用户名称、连接密码与高级权限设置的仓储查询结果；包含文档作用域、业务值、修改时间和序列化字节数。 @author yahyaoo */
 export interface UserVo extends DocumentVo {}
 

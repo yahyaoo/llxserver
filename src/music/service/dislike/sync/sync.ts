@@ -1,4 +1,4 @@
-/** sync 模块：按职责组织，原业务行为保持不变。 @author yahyaoo */
+/** 不喜欢规则同步协调：比较客户端与服务端快照，合并变化并确认设备版本。 @author yahyaoo */
 // import { SYNC_CLOSE_CODE } from '@/constants'
 import { SYNC_CLOSE_CODE, TRANS_MODE } from '../../../../constants'
 import { getUserSpace } from '../../../../user'
@@ -222,9 +222,8 @@ const syncDislike = async(socket: LX.Socket) => {
 }
 
 /**
- * 同步 sync 对应的业务能力，参数和执行顺序保持原实现。
- * @param socket socket 原业务参数。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * 比较服务端与客户端快照，按同步方向合并变更并更新设备游标。
+ * @param socket 同步客户端套接字。
  * @author yahyaoo
  */
 export const sync = async(socket: LX.Socket) => {

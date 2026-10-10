@@ -1,4 +1,4 @@
-/** api-temp 模块：按职责组织，原业务行为保持不变。 @author yahyaoo */
+/** 酷我音乐接口适配：备用平台接口查询。 @author yahyaoo */
 import { httpFetch } from '../../request.js'
 import { requestMsg } from '../../message.js'
 import { headers, timeout } from '../options.js'

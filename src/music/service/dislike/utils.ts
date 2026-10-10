@@ -1,4 +1,4 @@
-/** utils 模块：按职责组织，原业务行为保持不变。 @author yahyaoo */
+/** 不喜欢规则同步辅助：比较数据差异、规范字段并构造合并结果。 @author yahyaoo */
 import { SPLIT_CHAR } from '../../../constants'
 import { normalizeText } from '../discovery/songVersion'
 
@@ -24,12 +24,8 @@ export const isAlbumRule = (line: string): boolean => line.startsWith(ALBUM_RULE
  * 解析专辑规则行，非专辑规则返回 null。
  * 新格式：!<专辑名>@<歌手>（按最后一个 @ 切，歌手恒在末尾）。
  */
-export const parseAlbumRule = (line: string): { /**
- * albumName 字段，沿用原业务结构与空值约定。
- */
-albumName: string, /**
- * singer 字段，沿用原业务结构与空值约定。
- */
+export const parseAlbumRule = (line: string): { /** 歌曲所属专辑名称。 */
+albumName: string, /** 歌手名称。 */
 singer: string } | null => {
   if (!isAlbumRule(line)) return null
   const body = line.slice(1)

@@ -42,6 +42,12 @@ test('完整接口：配置持久化、队列下载、本地播放、缓存绝�
     'user.enablePublicRestriction': true, 'user.enablePublicNonAdminServerCache': false,
     disableTelemetry: true, users: [{ name: 'admin', password: 'lx-user-test', allowWriteCustomMusicDir: true }, { name: 'alice', password: 'lx-alice-test' }], 'configBackup.enable': false,
   }))
+  // 业务配置仅保存在 SQLite，旧 JS 文件不会在启动时自动导入。
+  const { createAdminRepository } = require('../server/admin/repository/AdminRepository')
+  const { GlobalConfigurationService } = require('../server/admin/service/GlobalConfigurationService')
+  const repository = createAdminRepository(data)
+  new GlobalConfigurationService(repository).save(configFile, require(configFile))
+  repository.close()
   const srcDir = path.join(data, 'users/source/_open')
   fs.mkdirSync(srcDir, { recursive: true })
   fs.writeFileSync(path.join(srcDir, 'fixture.js'), `/** @name 系统测试源 */

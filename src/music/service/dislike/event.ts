@@ -1,4 +1,4 @@
-/** event 模块：按职责组织，原业务行为保持不变。 @author yahyaoo */
+/** 不喜欢规则事件总线：处理数据变更并通知快照和同步监听者。 @author yahyaoo */
 import { getUserSpace } from '../../../user'
 import { EventEmitter } from 'events'
 // import {
@@ -21,9 +21,8 @@ const dislikeUpdated = () => {
   // return createSnapshot()
 }
 /**
- * 检查 checkUpdateDislike 对应的业务能力，参数和执行顺序保持原实现。
- * @param changedIds changedIds 原业务参数。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * 在不喜欢数据变化后生成快照并通知同步客户端。
+ * @param changedIds 本次变更涉及的记录 ID。
  * @author yahyaoo
  */
 export const checkUpdateDislike = async(changedIds: string[]) => {
@@ -33,16 +32,12 @@ export const checkUpdateDislike = async(changedIds: string[]) => {
 }
 
 
-/**
- * DislikeEvent 契约，按当前模块职责组织，保留原字段和扩展能力。
- * @author yahyaoo
- */
+/** 用户不喜欢数据事件总线，连接本地修改、快照与同步通知。 @author yahyaoo */
 export class DislikeEvent extends EventEmitter {
   /**
-   * 处理 dislike_changed 对应的业务能力，参数和执行顺序保持原实现。
-   * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-   * @author yahyaoo
-   */
+ * 标记不喜欢数据变化，触发后续快照与同步通知。
+ * @author yahyaoo
+ */
   dislike_changed() {
     this.emit('dislike_changed')
   }
@@ -93,43 +88,31 @@ export class DislikeEvent extends EventEmitter {
 }
 
 
-/**
- * EventMethods 契约，按当前模块职责组织，保留原字段和扩展能力。
- * @author yahyaoo
- */
+/** 用户数据事件的方法名及对应参数映射。 @author yahyaoo */
 type EventMethods = Omit<EventType, keyof EventEmitter>
-/**
- * EventType 契约，按当前模块职责组织，保留原字段和扩展能力。
- * @author yahyaoo
- */
+/** 数据事件名称到处理函数参数的类型映射。 @author yahyaoo */
 declare class EventType extends DislikeEvent {
   /**
-   * 处理 on 对应的业务能力，参数和执行顺序保持原实现。
-   * @param event event 原业务参数。
-   * @param dislikeener dislikeener 原业务参数。
-   * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-   * @author yahyaoo
-   */
-  on<K extends keyof EventMethods>(event: K, dislikeener: EventMethods[K]): this
-  /**
-   * 处理 once 对应的业务能力，参数和执行顺序保持原实现。
-   * @param event event 原业务参数。
-   * @param dislikeener dislikeener 原业务参数。
-   * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-   * @author yahyaoo
-   */
-  once<K extends keyof EventMethods>(event: K, dislikeener: EventMethods[K]): this
-  /**
-   * 处理 off 对应的业务能力，参数和执行顺序保持原实现。
-   * @param event event 原业务参数。
-   * @param dislikeener dislikeener 原业务参数。
-   * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-   * @author yahyaoo
-   */
-  off<K extends keyof EventMethods>(event: K, dislikeener: EventMethods[K]): this
-}
-/**
- * DislikeEventType 契约，按当前模块职责组织，保留原字段和扩展能力。
+ * 订阅用户空间的数据变动事件。
+ * @param event 数据事件名称。
+ * @param dislikeener 不喜欢数据监听函数。
  * @author yahyaoo
  */
+  on<K extends keyof EventMethods>(event: K, dislikeener: EventMethods[K]): this
+  /**
+ * 订阅一次数据变动事件，触发后自动取消监听。
+ * @param event 数据事件名称。
+ * @param dislikeener 不喜欢数据监听函数。
+ * @author yahyaoo
+ */
+  once<K extends keyof EventMethods>(event: K, dislikeener: EventMethods[K]): this
+  /**
+ * 取消指定用户空间事件监听。
+ * @param event 数据事件名称。
+ * @param dislikeener 不喜欢数据监听函数。
+ * @author yahyaoo
+ */
+  off<K extends keyof EventMethods>(event: K, dislikeener: EventMethods[K]): this
+}
+/** 不喜欢事件总线公开的订阅与通知方法集合。 @author yahyaoo */
 export type DislikeEventType = Omit<EventType, keyof Omit<EventEmitter, 'on' | 'off' | 'once'>>

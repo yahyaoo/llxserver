@@ -1,4 +1,4 @@
-/** api-test 模块：按职责组织，原业务行为保持不变。 @author yahyaoo */
+/** QQ 音乐接口适配：平台接口可用性检测。 @author yahyaoo */
 import { httpFetch } from '../../request.js'
 import { requestMsg } from '../../message.js'
 import { headers, timeout } from '../options.js'

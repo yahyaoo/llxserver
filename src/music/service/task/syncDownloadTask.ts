@@ -1,4 +1,4 @@
-/** syncDownloadTask 模块：按职责组织，原业务行为保持不变。 @author yahyaoo */
+/** 歌单自动下载任务：比较歌单与本地记录，按用户音质和存储位置下载及清理文件。 @author yahyaoo */
 import storageFs from '../../../application/persistence/documentFileSystem'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -13,217 +13,114 @@ import { ScheduledTask, TaskExecutionResult } from './types'
 // Types
 // ─────────────────────────────────────────────
 
-/**
- * SyncDownloadPlaylistConfig 契约，按当前模块职责组织，保留原字段和扩展能力。
- * @author yahyaoo
- */
+/** 自动下载歌单配置，记录启用状态、下载音质与子目录。 @author yahyaoo */
 export interface SyncDownloadPlaylistConfig {
-  /**
-   * enabled 字段，沿用原业务结构与空值约定。
-   */
+  /** 功能是否启用。 */
   enabled: boolean
-  /**
-   * lastSyncTime 字段，沿用原业务结构与空值约定。
-   */
+  /** 最近成功同步时间。 */
   lastSyncTime: number | null
-  /**
-   * failedSongs 字段，沿用原业务结构与空值约定。
-   */
+  /** 自动下载失败歌曲与错误信息。 */
   failedSongs: SyncFailedSong[]
 }
 
-/**
- * SyncFailedSong 契约，按当前模块职责组织，保留原字段和扩展能力。
- * @author yahyaoo
- */
+/** 自动下载失败歌曲与最后一次错误信息。 @author yahyaoo */
 export interface SyncFailedSong {
-  /**
-   * id 字段，沿用原业务结构与空值约定。
-   */
+  /** 业务记录标识。 */
   id: string
-  /**
-   * name 字段，沿用原业务结构与空值约定。
-   */
+  /** 记录显示名称。 */
   name: string
-  /**
-   * singer 字段，沿用原业务结构与空值约定。
-   */
+  /** 歌手名称。 */
   singer: string
-  /**
-   * reason 字段，沿用原业务结构与空值约定。
-   */
+
   reason: string
-  /**
-   * source 字段，沿用原业务结构与空值约定。
-   */
+  /** 歌曲或详情所属的音乐平台。 */
   source?: string
-  /**
-   * cover 字段，沿用原业务结构与空值约定。
-   */
+  /** 封面信息或封面地址。 */
   cover?: string
-  /**
-   * interval 字段，沿用原业务结构与空值约定。
-   */
+  /** 增量同步间隔，单位分钟。 */
   interval?: string
-  /**
-   * album 字段，沿用原业务结构与空值约定。
-   */
+  /** 歌曲专辑信息。 */
   album?: string
 }
 
-/**
- * SyncDownloadData 契约，按当前模块职责组织，保留原字段和扩展能力。
- * @author yahyaoo
- */
+/** 用户自动下载配置及历史同步结果。 @author yahyaoo */
 export interface SyncDownloadData {
-  /**
-   * enabled 字段，沿用原业务结构与空值约定。
-   */
+  /** 功能是否启用。 */
   enabled: boolean
-  /**
-   * preferredQuality 字段，沿用原业务结构与空值约定。
-   */
+  /** 用户优先音质。 */
   preferredQuality?: string // 歌单同步下载指定音质 ('128k' | '320k' | 'flac' | 'flac24bit' 等，默认 '320k')
-  /**
-   * storageLocation 字段，沿用原业务结构与空值约定。
-   */
+  /** 歌曲保存位置，使用现有目录选择规则。 */
   storageLocation?: 'root' | 'data' | 'custom' // 同步下载存储位置，默认 'data'
-  /**
-   * lastCustomMusicDir 字段，沿用原业务结构与空值约定。
-   */
+
   lastCustomMusicDir?: string // 上次记录/生效的自定义音乐目录物理路径
-  /**
-   * downloadLyric 字段，沿用原业务结构与空值约定。
-   */
+  /** 是否为下载歌曲获取歌词。 */
   downloadLyric?: boolean // 同步下载时是否下载 .lrc 歌词文件，默认 true
-  /**
-   * embedLyric 字段，沿用原业务结构与空值约定。
-   */
+  /** 是否将歌词内嵌到音频。 */
   embedLyric?: boolean   // 同步下载时是否将歌词写入音频文件的 USLT 标签，默认 true
-  /**
-   * playlists 字段，沿用原业务结构与空值约定。
-   */
+  /** 自动同步下载的歌单配置。 */
   playlists: Record<string, SyncDownloadPlaylistConfig>
-  /**
-   * lastSyncTime 字段，沿用原业务结构与空值约定。
-   */
+  /** 最近成功同步时间。 */
   lastSyncTime: number | null
-  /**
-   * lastSyncResult 字段，沿用原业务结构与空值约定。
-   */
+  /** 最近同步结果。 */
   lastSyncResult: string | null
 }
 
-/**
- * UserData 契约，按当前模块职责组织，保留原字段和扩展能力。
- * @author yahyaoo
- */
+/** 自动下载任务使用的用户配置与运行数据。 @author yahyaoo */
 export interface UserData {
-  /**
-   * syncDownload 字段，沿用原业务结构与空值约定。
-   */
+
   syncDownload?: SyncDownloadData
 }
 
-/**
- * SyncProgressLog 契约，按当前模块职责组织，保留原字段和扩展能力。
- * @author yahyaoo
- */
+/** 自动同步过程的一条歌曲或歌单处理记录。 @author yahyaoo */
 export interface SyncProgressLog {
-  /**
-   * time 字段，沿用原业务结构与空值约定。
-   */
+
   time: number
-  /**
-   * msg 字段，沿用原业务结构与空值约定。
-   */
+
   msg: string
 }
 
-/**
- * SyncProgress 契约，按当前模块职责组织，保留原字段和扩展能力。
- * @author yahyaoo
- */
+/** 用户自动同步运行进度，记录当前歌单、歌曲及累计统计。 @author yahyaoo */
 export interface SyncProgress {
-  /**
-   * isRunning 字段，沿用原业务结构与空值约定。
-   */
+  /** 任务是否正在执行。 */
   isRunning: boolean
-  /**
-   * isPaused 字段，沿用原业务结构与空值约定。
-   */
+  /** 任务是否处于暂停状态。 */
   isPaused?: boolean
-  /**
-   * startTime 字段，沿用原业务结构与空值约定。
-   */
+
   startTime: number | null
-  /**
-   * currentListId 字段，沿用原业务结构与空值约定。
-   */
+  /** 当前处理歌单标识。 */
   currentListId: string
-  /**
-   * currentListName 字段，沿用原业务结构与空值约定。
-   */
+  /** 当前处理歌单名称。 */
   currentListName: string
-  /**
-   * currentSongName 字段，沿用原业务结构与空值约定。
-   */
+  /** 当前处理歌曲的显示名称。 */
   currentSongName: string
-  /**
-   * currentSongIndex 字段，沿用原业务结构与空值约定。
-   */
+  /** 当前处理歌曲的顺序位置。 */
   currentSongIndex: number        // 当前歌单内正在下载第几首 (1-based)
-  /**
-   * currentListTotalSongs 字段，沿用原业务结构与空值约定。
-   */
+  /** 当前歌单需要处理的歌曲总数。 */
   currentListTotalSongs: number   // 当前歌单内需下载总数
-  /**
-   * totalSongs 字段，沿用原业务结构与空值约定。
-   */
+  /** 任务歌曲总数。 */
   totalSongs: number              // 总计需下载数 (整体)
-  /**
-   * overallCurrent 字段，沿用原业务结构与空值约定。
-   */
+  /** 跨歌单的累计处理进度。 */
   overallCurrent: number          // 总计已处理数 (整体)
-  /**
-   * successCount 字段，沿用原业务结构与空值约定。
-   */
+
   successCount: number            // 成功下载数
-  /**
-   * addCount 字段，沿用原业务结构与空值约定。
-   */
+
   addCount: number                // 实际新增/更新下载数
-  /**
-   * deleteCount 字段，沿用原业务结构与空值约定。
-   */
+
   deleteCount: number             // 删除移除歌曲数
-  /**
-   * failCount 字段，沿用原业务结构与空值约定。
-   */
+
   failCount: number               // 失败数
-  /**
-   * log 字段，沿用原业务结构与空值约定。
-   */
+
   log: SyncProgressLog[]          // 最新 100 条
 }
 
-/**
- * SongResolver 契约，按当前模块职责组织，保留原字段和扩展能力。
- * @author yahyaoo
- */
+/** 应用注入的歌曲下载链接和元信息解析函数。 @author yahyaoo */
 type SongResolver = (
   songInfo: any,
   quality: string,
   username: string
-) => Promise<{ /**
- * url 字段，沿用原业务结构与空值约定。
- */
-url: string; /**
- * quality 字段，沿用原业务结构与空值约定。
- */
-quality: string; /**
- * songInfo 字段，沿用原业务结构与空值约定。
- */
+) => Promise<{ /** 远端资源地址。 */
+url: string; /** 音质标识。 */
+quality: string; /** 歌曲详情及平台扩展字段。 */
 songInfo?: any }>
 
 // ─────────────────────────────────────────────
@@ -231,9 +128,8 @@ songInfo?: any }>
 // ─────────────────────────────────────────────
 let _resolver: SongResolver | null = null
 /**
- * 设置 setSongResolver 对应的业务能力，参数和执行顺序保持原实现。
- * @param fn fn 原业务参数。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * 注入同步下载的歌曲解析器，避免任务模块依赖 HTTP 服务实现。
+ * @param fn 待执行的异步操作。
  * @author yahyaoo
  */
 export const setSongResolver = (fn: SongResolver) => {
@@ -288,9 +184,8 @@ const getProgress = (username: string): SyncProgress => {
 }
 
 /**
- * 取消 cancelUserSync 对应的业务能力，参数和执行顺序保持原实现。
+ * 取消指定用户的自动同步下载任务并中止当前传输。
  * @param username 已解析的用户名称。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
  * @author yahyaoo
  */
 export const cancelUserSync = (username: string): boolean => {
@@ -317,9 +212,8 @@ const addLog = (progress: SyncProgress, msg: string) => {
 }
 
 /**
- * 获取 getUserSyncProgress 对应的业务能力，参数和执行顺序保持原实现。
+ * 查询用户当前同步下载进度和各歌单处理统计。
  * @param username 已解析的用户名称。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
  * @author yahyaoo
  */
 export const getUserSyncProgress = (username: string) => {
@@ -327,8 +221,7 @@ export const getUserSyncProgress = (username: string) => {
 }
 
 /**
- * 获取 getAllSyncProgress 对应的业务能力，参数和执行顺序保持原实现。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * 返回所有用户当前自动同步下载进度。
  * @author yahyaoo
  */
 export const getAllSyncProgress = () => {
@@ -346,9 +239,8 @@ const getUserDataPath = (username: string) => {
 }
 
 /**
- * 加载 loadUserData 对应的业务能力，参数和执行顺序保持原实现。
+ * 读取用户自动同步下载配置和历史记录，并建立运行期状态。
  * @param username 已解析的用户名称。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
  * @author yahyaoo
  */
 export const loadUserData = (username: string): UserData => {
@@ -362,9 +254,9 @@ export const loadUserData = (username: string): UserData => {
 }
 
 /**
- * 保存 saveUserData 对应的业务能力，参数和执行顺序保持原实现。
+ * 保存用户自动同步下载配置与记录到播放器数据库。
  * @param username 已解析的用户名称。
- * @param data 原业务数据，保留扩展字段。
+ * @param data 需要保存或转换的数据。
  * @author yahyaoo
  */
 export const saveUserData = (username: string, data: UserData): void => {
@@ -382,9 +274,8 @@ export const saveUserData = (username: string, data: UserData): void => {
 }
 
 /**
- * 获取 getSyncDownloadData 对应的业务能力，参数和执行顺序保持原实现。
+ * 返回用户自动下载的歌单、音质与存储位置设置。
  * @param username 已解析的用户名称。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
  * @author yahyaoo
  */
 export const getSyncDownloadData = (username: string): SyncDownloadData => {
@@ -398,9 +289,9 @@ export const getSyncDownloadData = (username: string): SyncDownloadData => {
 }
 
 /**
- * 保存 saveSyncDownloadData 对应的业务能力，参数和执行顺序保持原实现。
+ * 更新并保存用户自动下载配置，保留既有同步记录。
  * @param username 已解析的用户名称。
- * @param syncData syncData 原业务参数。
+ * @param syncData 客户端提交的同步数据与版本信息。
  * @author yahyaoo
  */
 export const saveSyncDownloadData = (username: string, syncData: SyncDownloadData): void => {
@@ -565,27 +456,15 @@ export const migrateSyncStorage = async (
   username: string,
   newLocation: 'root' | 'data' | 'custom',
   options?: {
-    /**
-     * overrideOldCustomDir 字段，沿用原业务结构与空值约定。
-     */
+
     overrideOldCustomDir?: string
-    /**
-     * overrideNewCustomDir 字段，沿用原业务结构与空值约定。
-     */
+
     overrideNewCustomDir?: string
   }
-): Promise<{ /**
- * moved 字段，沿用原业务结构与空值约定。
- */
-moved: number; /**
- * skipped 字段，沿用原业务结构与空值约定。
- */
-skipped: number; /**
- * errors 字段，沿用原业务结构与空值约定。
- */
-errors: number; /**
- * message 字段，沿用原业务结构与空值约定。
- */
+): Promise<{ /** 已经移动的文件数量。 */
+moved: number; /** 已跳过的歌曲数量。 */
+skipped: number;
+errors: number; /** 处理结果或错误说明。 */
 message: string }> => {
   const progress = getProgress(username)
   if (progress.isRunning) {
@@ -867,13 +746,12 @@ message: string }> => {
 
 
 /**
- * 下载 downloadSongToSubPath 对应的业务能力，参数和执行顺序保持原实现。
- * @param songInfo songInfo 原业务参数。
+ * 将歌曲下载到用户目标子目录，写入歌词和元信息并维护下载索引。
+ * @param songInfo 歌曲详情及平台扩展字段。
  * @param quality 原音质选择。
  * @param username 已解析的用户名称。
- * @param subPath subPath 原业务参数。
+ * @param subPath 用户歌曲根目录下的相对目录。
  * @param signal 调用方取消信号。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
  * @author yahyaoo
  */
 export const downloadSongToSubPath = async (
@@ -1065,12 +943,8 @@ const downloadWithRetry = async (
   subPath: string,
   maxRetries: number = 3,
   signal?: AbortSignal,
-): Promise<{ /**
- * status 字段，沿用原业务结构与空值约定。
- */
-status: 'ok' | 'exists' | 'failed'; /**
- * reason 字段，沿用原业务结构与空值约定。
- */
+): Promise<{ /** 当前处理状态。 */
+status: 'ok' | 'exists' | 'failed';
 reason?: string }> => {
   let lastErr: Error | undefined
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -1248,29 +1122,17 @@ const syncUserPlaylists = async (username: string, signal?: AbortSignal, targetP
   // 预扫描所有需下载和需删除的歌曲
   let overallTotal = 0
   const plans: Array<{
-    /**
-     * list 字段，沿用原业务结构与空值约定。
-     */
+    /** 记录列表。 */
     list: any
-    /**
-     * subPath 字段，沿用原业务结构与空值约定。
-     */
+
     subPath: string
-    /**
-     * remoteSongs 字段，沿用原业务结构与空值约定。
-     */
+
     remoteSongs: any[]
-    /**
-     * toDownload 字段，沿用原业务结构与空值约定。
-     */
+    /** 本次需要下载的歌曲列表。 */
     toDownload: any[]   // 真正需要下载（本地没有或音质需升级）的歌曲子集
-    /**
-     * toDelete 字段，沿用原业务结构与空值约定。
-     */
+    /** 本次需要删除的歌曲列表。 */
     toDelete: string[]
-    /**
-     * localSongsMap 字段，沿用原业务结构与空值约定。
-     */
+
     localSongsMap: Map<string, fileCache.CacheItem>
   }> = []
 
@@ -1471,25 +1333,15 @@ const syncUserPlaylists = async (username: string, signal?: AbortSignal, targetP
  * 对所有启用了自动下载的用户执行同步
  */
 export const syncDownloadForAllUsers = async (signal?: AbortSignal): Promise<{
-  /**
-   * processedUsers 字段，沿用原业务结构与空值约定。
-   */
+
   processedUsers: number
-  /**
-   * totalSuccess 字段，沿用原业务结构与空值约定。
-   */
+  /** 任务累计成功歌曲数。 */
   totalSuccess: number
-  /**
-   * totalAdded 字段，沿用原业务结构与空值约定。
-   */
+  /** 同步新增歌曲数量。 */
   totalAdded: number
-  /**
-   * totalDeleted 字段，沿用原业务结构与空值约定。
-   */
+  /** 同步删除歌曲数量。 */
   totalDeleted: number
-  /**
-   * totalFail 字段，沿用原业务结构与空值约定。
-   */
+  /** 任务累计失败歌曲数。 */
   totalFail: number
 }> => {
   const now = Date.now()
@@ -1557,12 +1409,8 @@ export const syncDownloadForAllUsers = async (signal?: AbortSignal): Promise<{
 /**
  * 手动触发单个用户的同步（前端调用，可传 playlistId 仅同步单歌单）
  */
-export const triggerUserSync = async (username: string, playlistId?: string): Promise<{ /**
- * queued 字段，沿用原业务结构与空值约定。
- */
-queued: boolean; /**
- * message 字段，沿用原业务结构与空值约定。
- */
+export const triggerUserSync = async (username: string, playlistId?: string): Promise<{ /** 已排队的任务数量。 */
+queued: boolean; /** 处理结果或错误说明。 */
 message: string }> => {
   const progress = getProgress(username)
   if (progress.isRunning) {

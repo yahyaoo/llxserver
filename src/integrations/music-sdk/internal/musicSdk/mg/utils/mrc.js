@@ -1,4 +1,4 @@
-/** mrc 模块：按职责组织，原业务行为保持不变。 @author yahyaoo */
+/** 咪咕音乐接口适配：平台逐字歌词格式转换。 @author yahyaoo */
 
 // const key = 'karakal@123Qcomyidongtiantianhaoting'
 const DELTA = 2654435769n

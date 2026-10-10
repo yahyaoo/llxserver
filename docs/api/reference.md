@@ -170,7 +170,7 @@ LX Sync Server 提供了多种 RESTful 风格的 API 接口，用于自动化获
   - **支持配置项**: 包括 `admin.path`, `player.path`, `subsonic.enableDebug`, `subsonic.onlineSearch`, `subsonic.onlineSearchMode`, `subsonic.onlineSearchSources`, `subsonic.lyricTranslation`, `artist.maxFetchPages`, `cache.namingPattern`, `system.allowUnsafeVM` 等。
   - **参数示例**: `{"admin.path": "/admin", "player.path": "", "subsonic.enableDebug": false}`
   - **路径校验规则**: `admin.path` 与 `player.path` 必须以 `/` 开头或为空字符串，两者不能冲突相同且不能以 `/api` 开头。
-- `POST /api/admin/reload`: 重新加载服务器 `config.js` 与 `users.json` 数据及用户自定义音源 API。
+- `POST /api/admin/reload`: 从 SQLite 重新加载系统配置、用户数据及用户自定义音源 API。
 - `POST /api/admin/restart`: 安全重启服务器进程。
 
 ---

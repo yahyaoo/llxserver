@@ -14,7 +14,7 @@ export const adminTables: DocumentTable[] = [
   /** 用户音源优先级。 */
   { table: 'admin_source_order', matches: filename => /order\.json$/.test(filename) },
   /** 全局服务配置。 */
-  { table: 'admin_config', matches: filename => /__config__\.json$/.test(filename) },
+  { table: 'admin_config', matches: filename => /(?:__config__|system-configuration)\.json$/.test(filename) },
   /** 定时任务执行记录。 */
   { table: 'admin_task_record', matches: filename => /network-list-autoupdate-records\.json$/.test(filename) },
   /** 管理扩展兼容数据。 */

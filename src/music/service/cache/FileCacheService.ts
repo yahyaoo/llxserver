@@ -1,4 +1,4 @@
-/** FileCacheService 模块：按职责组织，原业务行为保持不变。 @author yahyaoo */
+/** 服务器缓存服务：用户目录、歌曲与封面索引、下载、歌词、元信息和容量清理。 @author yahyaoo */
 import storageFs from '../../../application/persistence/documentFileSystem'
 
 
@@ -25,9 +25,8 @@ export const CACHE_NAMING_PATTERNS = {
 let currentNamingPattern = CACHE_NAMING_PATTERNS.SIMPLE
 
 /**
- * 规范化 normalizeNamingPattern 对应的业务能力，参数和执行顺序保持原实现。
- * @param pattern pattern 原业务参数。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * 将缓存命名模式归一为支持的规则，无效值回退默认模式。
+ * @param pattern 缓存文件命名模式。
  * @author yahyaoo
  */
 export const normalizeNamingPattern = (pattern: unknown) => {
@@ -38,9 +37,8 @@ export const normalizeNamingPattern = (pattern: unknown) => {
 }
 
 /**
- * 设置 setNamingPattern 对应的业务能力，参数和执行顺序保持原实现。
- * @param pattern pattern 原业务参数。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * 更新当前缓存文件命名规则，并返回生效值。
+ * @param pattern 缓存文件命名模式。
  * @author yahyaoo
  */
 export const setNamingPattern = (pattern: unknown) => {
@@ -56,70 +54,43 @@ export const CACHE_ROOTS = {
 
 let currentCacheLocation = CACHE_ROOTS.ROOT
 const CACHE_LIST_SYNC_TTL = 30 * 1000
-const cacheListSyncState: Map<string, { /**
- * lastSync 字段，沿用原业务结构与空值约定。
- */
-lastSync: number, /**
- * pending 字段，沿用原业务结构与空值约定。
- */
+const cacheListSyncState: Map<string, { /** 最近一次同步时间。 */
+lastSync: number,
 pending?: Promise<void> }> = new Map()
 
 // Helper to get actual directory path
 // [Unified Enhancement] Cache Progress Tracker
-export const cacheProgress: Map<string, { /**
- * progress 字段，沿用原业务结构与空值约定。
- */
-progress: number; /**
- * status 字段，沿用原业务结构与空值约定。
- */
-status: string; /**
- * total 字段，沿用原业务结构与空值约定。
- */
-total?: number; /**
- * received 字段，沿用原业务结构与空值约定。
- */
-received?: number; /**
- * speed 字段，沿用原业务结构与空值约定。
- */
-speed?: number; /**
- * updatedAt 字段，沿用原业务结构与空值约定。
- */
-updatedAt?: number; /**
- * errorMsg 字段，沿用原业务结构与空值约定。
- */
+export const cacheProgress: Map<string, { /** 任务处理进度。 */
+progress: number; /** 当前处理或任务状态。 */
+status: string; /** 待处理记录总数。 */
+total?: number;
+received?: number;
+speed?: number; /** 记录最近更新时间，单位毫秒。 */
+updatedAt?: number; /** 任务失败说明。 */
 errorMsg?: string }> = new Map()
 
 // [New] Active Cache Tasks Tracker: username -> [ { songKey, controller } ]
-export const activeTasks: Map<string, Array<{ /**
- * songKey 字段，沿用原业务结构与空值约定。
- */
-songKey: string, /**
- * controller 字段，沿用原业务结构与空值约定。
- */
+export const activeTasks: Map<string, Array<{ /** 歌曲索引键。 */
+songKey: string, /** 用于取消当前异步任务的控制器。 */
 controller: AbortController }>> = new Map()
 
 // [新增] 歌词获取钩子：由 server.ts 在启动时注入，避免 fileCache 直接依赖 musicSdk
 // 调用时会通过 /api/music/lyric 接口逻辑（先查本地 .lrc 缓存，再去源站）获取歌词文本
-/**
- * LyricFetcher 契约，按当前模块职责组织，保留原字段和扩展能力。
- * @author yahyaoo
- */
+/** 由应用注入的歌曲歌词异步查询函数。 @author yahyaoo */
 type LyricFetcher = (songInfo: any) => Promise<string | null>
 let _lyricFetcher: LyricFetcher | null = null
 /**
- * 设置 setLyricFetcher 对应的业务能力，参数和执行顺序保持原实现。
- * @param fn fn 原业务参数。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * 注入按歌曲获取歌词的异步解析器，供缓存与下载共用。
+ * @param fn 待执行的异步操作。
  * @author yahyaoo
  */
 export const setLyricFetcher = (fn: LyricFetcher) => { _lyricFetcher = fn }
 
 /**
- * 获取 getCacheDir 对应的业务能力，参数和执行顺序保持原实现。
+ * 根据用户、缓存位置和目录用途计算缓存或下载目录。
  * @param username 已解析的用户名称。
- * @param isOnlyDownload isOnlyDownload 原业务参数。
- * @param location location 原业务参数。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * @param isOnlyDownload 是否仅保存到下载目录。
+ * @param location 缓存根目录选择或绝对路径。
  * @author yahyaoo
  */
 export const getCacheDir = (username?: string, isOnlyDownload?: boolean, location?: string) => {
@@ -145,9 +116,8 @@ export const getCacheDir = (username?: string, isOnlyDownload?: boolean, locatio
 }
 
 /**
- * 获取 getCoverCacheDir 对应的业务能力，参数和执行顺序保持原实现。
+ * 计算用户封面缓存目录，并按需创建目录。
  * @param username 已解析的用户名称。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
  * @author yahyaoo
  */
 export const getCoverCacheDir = (username: string) => {
@@ -161,207 +131,111 @@ export const getCoverCacheDir = (username: string) => {
 }
 
 // --- Cache Index Manager ---
-/**
- * CacheItem 契约，按当前模块职责组织，保留原字段和扩展能力。
- * @author yahyaoo
- */
+/** 缓存音频索引记录，关联歌曲信息、物理文件和音质。 @author yahyaoo */
 export interface CacheItem {
-    /**
-     * id 字段，沿用原业务结构与空值约定。
-     */
+    /** 业务记录标识。 */
     id: string
-    /**
-     * songmid 字段，沿用原业务结构与空值约定。
-     */
+    /** 音乐平台歌曲标识。 */
     songmid?: string
-    /**
-     * name 字段，沿用原业务结构与空值约定。
-     */
+    /** 记录显示名称。 */
     name: string
-    /**
-     * singer 字段，沿用原业务结构与空值约定。
-     */
+    /** 歌手名称。 */
     singer: string
-    /**
-     * album 字段，沿用原业务结构与空值约定。
-     */
+    /** 歌曲专辑信息。 */
     album: string
-    /**
-     * albumId 字段，沿用原业务结构与空值约定。
-     */
+    /** 平台专辑标识。 */
     albumId?: string
-    /**
-     * img 字段，沿用原业务结构与空值约定。
-     */
+
     img?: string
-    /**
-     * interval 字段，沿用原业务结构与空值约定。
-     */
+    /** 增量同步间隔，单位分钟。 */
     interval?: string
-    /**
-     * source 字段，沿用原业务结构与空值约定。
-     */
+    /** 歌曲或详情所属的音乐平台。 */
     source: string
-    /**
-     * requestedSource 字段，沿用原业务结构与空值约定。
-     */
+    /** 客户端选择的音乐平台。 */
     requestedSource?: string
-    /**
-     * downloadSource 字段，沿用原业务结构与空值约定。
-     */
+    /** 最终解析到的下载平台。 */
     downloadSource?: string
-    /**
-     * sourceName 字段，沿用原业务结构与空值约定。
-     */
+    /** 音源显示名称。 */
     sourceName?: string
-    /**
-     * quality 字段，沿用原业务结构与空值约定。
-     */
+    /** 音质标识。 */
     quality: string
-    /**
-     * filename 字段，沿用原业务结构与空值约定。
-     */
+    /** 关联音频或业务文件名。 */
     filename: string
-    /**
-     * folder 字段，沿用原业务结构与空值约定。
-     */
+    /** 缓存或下载目录类别。 */
     folder: string // 'cache' or 'music'
-    /**
-     * subPath 字段，沿用原业务结构与空值约定。
-     */
+
     subPath?: string // [New] Relative path within the folder (e.g. 'Pop/2024')
-    /**
-     * mtime 字段，沿用原业务结构与空值约定。
-     */
+
     mtime: number
-    /**
-     * size 字段，沿用原业务结构与空值约定。
-     */
+    /** 文件字节数或记录数量。 */
     size: number
-    /**
-     * lyricFilename 字段，沿用原业务结构与空值约定。
-     */
+
     lyricFilename?: string
-    /**
-     * ext 字段，沿用原业务结构与空值约定。
-     */
+    /** 文件扩展名。 */
     ext: string
-    /**
-     * hasCover 字段，沿用原业务结构与空值约定。
-     */
+    /** 是否已获取封面。 */
     hasCover?: boolean
-    /**
-     * coverType 字段，沿用原业务结构与空值约定。
-     */
+
     coverType?: 'embedded' | 'cached' | 'remote' | 'none'
-    /**
-     * hasLyric 字段，沿用原业务结构与空值约定。
-     */
+    /** 是否存在歌词。 */
     hasLyric?: boolean
-    /**
-     * hasEmbedLyric 字段，沿用原业务结构与空值约定。
-     */
+    /** 是否已将歌词内嵌到音频。 */
     hasEmbedLyric?: boolean
-    /**
-     * audioContainer 字段，沿用原业务结构与空值约定。
-     */
+
     audioContainer?: string
-    /**
-     * metadataWritable 字段，沿用原业务结构与空值约定。
-     */
+
     metadataWritable?: boolean
-    /**
-     * metadataError 字段，沿用原业务结构与空值约定。
-     */
+
     metadataError?: string
-    /**
-     * embedLyricError 字段，沿用原业务结构与空值约定。
-     */
+    /** 内嵌歌词失败的原因。 */
     embedLyricError?: string
-    /**
-     * coverCheckedVersion 字段，沿用原业务结构与空值约定。
-     */
+    /** 封面检查使用的索引版本。 */
     coverCheckedVersion?: number
-    /**
-     * coverCheckedMtime 字段，沿用原业务结构与空值约定。
-     */
+    /** 封面检查时的文件修改时间。 */
     coverCheckedMtime?: number
-    /**
-     * coverCheckedSize 字段，沿用原业务结构与空值约定。
-     */
+    /** 封面检查时的文件大小。 */
     coverCheckedSize?: number
-    /**
-     * bitrate 字段，沿用原业务结构与空值约定。
-     */
+    /** 音频码率。 */
     bitrate?: number
-    /**
-     * sampleRate 字段，沿用原业务结构与空值约定。
-     */
+    /** 音频采样率。 */
     sampleRate?: number
-    /**
-     * bitDepth 字段，沿用原业务结构与空值约定。
-     */
+    /** 音频采样位深。 */
     bitDepth?: number
 }
 
-/**
- * CacheFolder 契约，按当前模块职责组织，保留原字段和扩展能力。
- * @author yahyaoo
- */
+/** 缓存与下载两类本地音频目录标识。 @author yahyaoo */
 export type CacheFolder = 'cache' | 'music'
 
-/**
- * RemoveCacheFileResult 契约，按当前模块职责组织，保留原字段和扩展能力。
- * @author yahyaoo
- */
+/** 本地歌曲删除结果，记录是否成功及失败原因。 @author yahyaoo */
 export interface RemoveCacheFileResult {
-    /**
-     * deleted 字段，沿用原业务结构与空值约定。
-     */
+
     deleted: boolean
-    /**
-     * folder 字段，沿用原业务结构与空值约定。
-     */
+    /** 缓存或下载目录类别。 */
     folder?: CacheFolder
 }
 
-/**
- * DownloadProvenance 契约，按当前模块职责组织，保留原字段和扩展能力。
- * @author yahyaoo
- */
+/** 下载来源信息，区分请求平台和实际解析平台。 @author yahyaoo */
 export interface DownloadProvenance {
-    /**
-     * requestedSource 字段，沿用原业务结构与空值约定。
-     */
+    /** 客户端选择的音乐平台。 */
     requestedSource?: string
-    /**
-     * downloadSource 字段，沿用原业务结构与空值约定。
-     */
+    /** 最终解析到的下载平台。 */
     downloadSource?: string
-    /**
-     * sourceName 字段，沿用原业务结构与空值约定。
-     */
+    /** 音源显示名称。 */
     sourceName?: string
 }
 
-/**
- * CacheIndexManager 契约，按当前模块职责组织，保留原字段和扩展能力。
- * @author yahyaoo
- */
+/** 按用户、目录类别和存储位置维护缓存索引，持久化到 SQL 文档。 @author yahyaoo */
 class CacheIndexManager {
-    /**
-     * indexes 字段，沿用原业务结构与空值约定。
-     */
+    /** 按用户和存储位置分组的内存索引。 */
     private indexes: Map<string, Map<string, CacheItem>> = new Map() // "location:username:folder" -> (songId -> CacheItem)
 
     /**
-     * 获取 getIndexFile 对应的业务能力，参数和执行顺序保持原实现。
-     * @param username 已解析的用户名称。
-     * @param folder folder 原业务参数。
-     * @param location location 原业务参数。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 计算用户及缓存目录对应的 SQL 索引文档路径。
+ * @param username 已解析的用户名称。
+ * @param folder 缓存或下载目录类别。
+ * @param location 缓存根目录选择或绝对路径。
+ * @author yahyaoo
+ */
     private getIndexFile(username: string, folder: 'cache' | 'music', location?: string) {
         const userDir = getCacheDir(username, folder === 'music', location)
         const fileName = folder === 'music' ? 'music_index.json' : 'cache_index.json'
@@ -369,25 +243,23 @@ class CacheIndexManager {
     }
 
     /**
-     * 获取 getKey 对应的业务能力，参数和执行顺序保持原实现。
-     * @param username 已解析的用户名称。
-     * @param folder folder 原业务参数。
-     * @param location location 原业务参数。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 组合用户、目录类别和存储位置，形成内存索引缓存键。
+ * @param username 已解析的用户名称。
+ * @param folder 缓存或下载目录类别。
+ * @param location 缓存根目录选择或绝对路径。
+ * @author yahyaoo
+ */
     private getKey(username: string, folder: 'cache' | 'music', location?: string) {
         return `${location || currentCacheLocation}:${username}:${folder}`
     }
 
     /**
-     * 加载 load 对应的业务能力，参数和执行顺序保持原实现。
-     * @param username 已解析的用户名称。
-     * @param folder folder 原业务参数。
-     * @param location location 原业务参数。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 读取并缓存用户缓存或下载索引，缺失文档时初始化空索引。
+ * @param username 已解析的用户名称。
+ * @param folder 缓存或下载目录类别。
+ * @param location 缓存根目录选择或绝对路径。
+ * @author yahyaoo
+ */
     load(username: string, folder: 'cache' | 'music', location?: string) {
         const key = this.getKey(username, folder, location)
         const file = this.getIndexFile(username, folder, location)
@@ -405,13 +277,12 @@ class CacheIndexManager {
     }
 
     /**
-     * 保存 save 对应的业务能力，参数和执行顺序保持原实现。
-     * @param username 已解析的用户名称。
-     * @param folder folder 原业务参数。
-     * @param location location 原业务参数。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 将用户缓存或下载索引保存到 SQLite 文档。
+ * @param username 已解析的用户名称。
+ * @param folder 缓存或下载目录类别。
+ * @param location 缓存根目录选择或绝对路径。
+ * @author yahyaoo
+ */
     save(username: string, folder: 'cache' | 'music', location?: string) {
         const loc = location || currentCacheLocation
         const key = this.getKey(username, folder, loc)
@@ -428,16 +299,15 @@ class CacheIndexManager {
     }
 
     /**
-     * 获取 get 对应的业务能力，参数和执行顺序保持原实现。
-     * @param username 已解析的用户名称。
-     * @param songId songId 原业务参数。
-     * @param folder folder 原业务参数。
-     * @param quality 原音质选择。
-     * @param exact exact 原业务参数。
-     * @param location location 原业务参数。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 按歌曲标识和可选音质查询用户缓存或下载索引。
+ * @param username 已解析的用户名称。
+ * @param songId 歌曲标识。
+ * @param folder 缓存或下载目录类别。
+ * @param quality 原音质选择。
+ * @param exact 是否严格匹配指定音质。
+ * @param location 缓存根目录选择或绝对路径。
+ * @author yahyaoo
+ */
     get(username: string, songId: string, folder: 'cache' | 'music', quality?: string, exact: boolean = false, location?: string) {
         const key = this.getKey(username, folder, location)
         const index = this.indexes.get(key) || this.load(username, folder, location)
@@ -456,14 +326,13 @@ class CacheIndexManager {
     }
 
     /**
-     * 更新 update 对应的业务能力，参数和执行顺序保持原实现。
-     * @param username 已解析的用户名称。
-     * @param item item 原业务参数。
-     * @param folder folder 原业务参数。
-     * @param location location 原业务参数。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 更新用户缓存或下载索引中的歌曲记录并保存。
+ * @param username 已解析的用户名称。
+ * @param item 待处理索引记录。
+ * @param folder 缓存或下载目录类别。
+ * @param location 缓存根目录选择或绝对路径。
+ * @author yahyaoo
+ */
     update(username: string, item: CacheItem, folder: 'cache' | 'music', location?: string) {
         const key = this.getKey(username, folder, location)
         const index = this.indexes.get(key) || this.load(username, folder, location)
@@ -474,15 +343,14 @@ class CacheIndexManager {
     }
 
     /**
-     * 移除 remove 对应的业务能力，参数和执行顺序保持原实现。
-     * @param username 已解析的用户名称。
-     * @param songId songId 原业务参数。
-     * @param folder folder 原业务参数。
-     * @param quality 原音质选择。
-     * @param location location 原业务参数。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 从用户缓存或下载索引删除对应歌曲记录。
+ * @param username 已解析的用户名称。
+ * @param songId 歌曲标识。
+ * @param folder 缓存或下载目录类别。
+ * @param quality 原音质选择。
+ * @param location 缓存根目录选择或绝对路径。
+ * @author yahyaoo
+ */
     remove(username: string, songId: string, folder: 'cache' | 'music', quality?: string, location?: string) {
         const key = this.getKey(username, folder, location)
         const index = this.indexes.get(key) || this.load(username, folder, location)
@@ -506,25 +374,23 @@ class CacheIndexManager {
     }
 
     /**
-     * 获取 getAll 对应的业务能力，参数和执行顺序保持原实现。
-     * @param username 已解析的用户名称。
-     * @param folder folder 原业务参数。
-     * @param location location 原业务参数。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 返回用户缓存或下载索引中的全部歌曲记录。
+ * @param username 已解析的用户名称。
+ * @param folder 缓存或下载目录类别。
+ * @param location 缓存根目录选择或绝对路径。
+ * @author yahyaoo
+ */
     getAll(username: string, folder: 'cache' | 'music', location?: string) {
         return Array.from((this.indexes.get(this.getKey(username, folder, location)) || this.load(username, folder, location)).values())
     }
 
     /**
-     * 处理 discard 对应的业务能力，参数和执行顺序保持原实现。
-     * @param username 已解析的用户名称。
-     * @param folder folder 原业务参数。
-     * @param location location 原业务参数。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 释放用户缓存或下载索引的内存副本，使后续操作重新读取 SQL。
+ * @param username 已解析的用户名称。
+ * @param folder 缓存或下载目录类别。
+ * @param location 缓存根目录选择或绝对路径。
+ * @author yahyaoo
+ */
     discard(username: string, folder: 'cache' | 'music', location?: string) {
         this.indexes.delete(this.getKey(username, folder, location))
     }
@@ -657,9 +523,8 @@ const getMetadataUnsupportedMessage = (container: string) => (
 )
 
 /**
- * 获取 getAudioMetadataUnsupportedStatus 对应的业务能力，参数和执行顺序保持原实现。
+ * 识别音频容器，判断是否支持原生元信息与歌词写入。
  * @param filePath 文件或文档定位路径。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
  * @author yahyaoo
  */
 export const getAudioMetadataUnsupportedStatus = (filePath: string) => {
@@ -685,10 +550,9 @@ const readEmbeddedCoverState = (filePath: string) => {
 }
 
 /**
- * 处理 embedLyricsIntoFile 对应的业务能力，参数和执行顺序保持原实现。
+ * 按实际音频容器将歌词写入文件，返回成功状态或不支持原因。
  * @param filePath 文件或文档定位路径。
- * @param lyricText lyricText 原业务参数。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * @param lyricText LRC 歌词文本。
  * @author yahyaoo
  */
 export const embedLyricsIntoFile = (filePath: string, lyricText: string) => {
@@ -775,9 +639,8 @@ export const normalizeSongId = (songInfo: any): string => {
 }
 
 /**
- * 提取 extractSongMetadata 对应的业务能力，参数和执行顺序保持原实现。
- * @param songInfo songInfo 原业务参数。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * 从歌曲及平台扩展字段中提取 ID、歌手、专辑与封面信息。
+ * @param songInfo 歌曲详情及平台扩展字段。
  * @author yahyaoo
  */
 export const extractSongMetadata = (songInfo: any) => {
@@ -871,10 +734,9 @@ const inspectAudioFile = (filePath: string, requestedQuality?: string) => {
 }
 
 /**
- * 处理 detectDownloadSource 对应的业务能力，参数和执行顺序保持原实现。
- * @param rawUrl rawUrl 原业务参数。
- * @param fallbackSource fallbackSource 原业务参数。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * 根据下载地址识别实际音乐平台，识别失败时使用候选平台。
+ * @param rawUrl 未处理的歌曲下载地址。
+ * @param fallbackSource 无法识别地址时使用的平台代码。
  * @author yahyaoo
  */
 export const detectDownloadSource = (rawUrl: string, fallbackSource?: string) => {
@@ -896,12 +758,11 @@ export const detectDownloadSource = (rawUrl: string, fallbackSource?: string) =>
 
 // Generate consistent filename based on pattern with collision handling
 /**
- * 获取 getFileName 对应的业务能力，参数和执行顺序保持原实现。
- * @param songInfo songInfo 原业务参数。
+ * 按当前命名规则和音质生成歌曲文件名，并清理文件名非法字符。
+ * @param songInfo 歌曲详情及平台扩展字段。
  * @param quality 原音质选择。
- * @param isOnlyDownload isOnlyDownload 原业务参数。
+ * @param isOnlyDownload 是否仅保存到下载目录。
  * @param username 已解析的用户名称。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
  * @author yahyaoo
  */
 export const getFileName = (songInfo: any, quality?: string, isOnlyDownload?: boolean, username?: string) => {
@@ -982,10 +843,9 @@ const sanitize = (str: any) => String(str || '').replace(/[\\/:*?"<>|]/g, '_')
 // --- Public APIs ---
 
 /**
- * 同步 syncCacheIndex 对应的业务能力，参数和执行顺序保持原实现。
+ * 扫描用户缓存或下载目录，补齐索引并移除失效文件记录。
  * @param username 已解析的用户名称。
- * @param roots roots 原业务参数。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * @param roots 需要扫描的缓存与下载目录集合。
  * @author yahyaoo
  */
 export const syncCacheIndex = async (username?: string, roots: Array<'cache' | 'music'> = ['cache', 'music']) => {
@@ -1001,12 +861,8 @@ export const syncCacheIndex = async (username?: string, roots: Array<'cache' | '
         const foundKeysOnDisk = new Set<string>()
 
         // Pre-build a filename to Item map within this folder for fast lookup
-        const filenameToItemMap = new Map<string, { /**
- * key 字段，沿用原业务结构与空值约定。
- */
-key: string, /**
- * item 字段，沿用原业务结构与空值约定。
- */
+        const filenameToItemMap = new Map<string, {
+key: string,
 item: CacheItem }>()
         for (const [key, item] of index.entries()) {
             filenameToItemMap.set(item.filename, { key, item })
@@ -1301,9 +1157,8 @@ item: CacheItem }>()
 }
 
 /**
- * 获取 getCacheList 对应的业务能力，参数和执行顺序保持原实现。
+ * 同步用户缓存索引后返回可展示的歌曲文件列表。
  * @param username 已解析的用户名称。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
  * @author yahyaoo
  */
 export const getCacheList = async (username?: string) => {
@@ -1356,9 +1211,8 @@ export const getCacheList = async (username?: string) => {
 }
 
 /**
- * 处理 batchRenameCacheFiles 对应的业务能力，参数和执行顺序保持原实现。
+ * 按当前命名模式重命名用户缓存文件，并同步索引中的文件名。
  * @param username 已解析的用户名称。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
  * @author yahyaoo
  */
 export const batchRenameCacheFiles = async (username: string | undefined) => {
@@ -1446,10 +1300,9 @@ export const batchRenameCacheFiles = async (username: string | undefined) => {
 }
 
 /**
- * 处理 batchUpdateMetadata 对应的业务能力，参数和执行顺序保持原实现。
- * @param filenames filenames 原业务参数。
+ * 批量写入歌曲元信息，汇总成功、跳过和失败结果。
+ * @param filenames 待处理文件名集合。
  * @param username 已解析的用户名称。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
  * @author yahyaoo
  */
 export const batchUpdateMetadata = async (filenames: string[], username: string | undefined) => {
@@ -1552,11 +1405,10 @@ export const batchUpdateMetadata = async (filenames: string[], username: string 
 }
 
 /**
- * 处理 linkLocalFile 对应的业务能力，参数和执行顺序保持原实现。
- * @param oldFilename oldFilename 原业务参数。
- * @param songInfo songInfo 原业务参数。
+ * 将本地文件关联到选定歌曲信息，并更新缓存索引。
+ * @param oldFilename 原音频文件名。
+ * @param songInfo 歌曲详情及平台扩展字段。
  * @param username 已解析的用户名称。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
  * @author yahyaoo
  */
 export const linkLocalFile = async (oldFilename: string, songInfo: any, username: string | undefined) => {
@@ -1638,12 +1490,8 @@ export const linkLocalFile = async (oldFilename: string, songInfo: any, username
 }
 
 
-const downloadCoverImage = async (imageUrl: string, redirects = 0): Promise<{ /**
- * data 字段，沿用原业务结构与空值约定。
- */
-data: Buffer; /**
- * mime 字段，沿用原业务结构与空值约定。
- */
+const downloadCoverImage = async (imageUrl: string, redirects = 0): Promise<{
+data: Buffer; /** 音频媒体类型。 */
 mime: string } | null> => {
     if (!hasUsableRemoteCover(imageUrl) || redirects > 3) return null
     return await new Promise((resolve) => {
@@ -1705,10 +1553,9 @@ const setIndexCoverState = (filename: string, username: string, coverType: Cache
 }
 
 /**
- * 获取 getCacheCover 对应的业务能力，参数和执行顺序保持原实现。
+ * 读取缓存歌曲封面，优先使用已提取封面，必要时从音频元信息提取。
  * @param filename 文件或文档定位路径。
  * @param username 已解析的用户名称。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
  * @author yahyaoo
  */
 export const getCacheCover = async (filename: string, username?: string) => {
@@ -1811,11 +1658,10 @@ export const cleanEmptyParentDirs = (filePath: string, baseDir: string) => {
 }
 
 /**
- * 移除 removeCacheFile 对应的业务能力，参数和执行顺序保持原实现。
+ * 删除选定缓存或下载文件及相关索引记录，返回删除结果。
  * @param filename 文件或文档定位路径。
  * @param username 已解析的用户名称。
- * @param requestedFolder requestedFolder 原业务参数。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * @param requestedFolder 调用方指定的删除目录类别。
  * @author yahyaoo
  */
 export const removeCacheFile = (filename: string, username?: string, requestedFolder?: CacheFolder): RemoveCacheFileResult => {
@@ -1828,15 +1674,9 @@ export const removeCacheFile = (filename: string, username?: string, requestedFo
         const dir = getCacheDir(normalizedUsername, folder === 'music')
         const filePath = resolveCacheRelativePath(dir, filename)
         return filePath && storageFs.existsSync(filePath) ? { folder, dir, filePath } : null
-    }).filter((entry): entry is { /**
- * folder 字段，沿用原业务结构与空值约定。
- */
-folder: CacheFolder; /**
- * dir 字段，沿用原业务结构与空值约定。
- */
-dir: string; /**
- * filePath 字段，沿用原业务结构与空值约定。
- */
+    }).filter((entry): entry is { /** 歌曲分类目录。 */
+folder: CacheFolder;
+dir: string; /** 关联文件绝对路径。 */
 filePath: string } => entry !== null)
 
     // Older clients only sent a filename. Keep that format safe when the file has
@@ -1903,9 +1743,8 @@ filePath: string } => entry !== null)
 }
 
 /**
- * 设置 setCacheLocation 对应的业务能力，参数和执行顺序保持原实现。
- * @param location location 原业务参数。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * 更新当前缓存根目录选择，支持预设位置与管理员绝对路径。
+ * @param location 缓存根目录选择或绝对路径。
  * @author yahyaoo
  */
 export const setCacheLocation = (location: string) => {
@@ -1916,18 +1755,16 @@ export const setCacheLocation = (location: string) => {
 }
 
 /**
- * 获取 getCacheLocation 对应的业务能力，参数和执行顺序保持原实现。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * 返回当前生效的服务器缓存根目录设置。
  * @author yahyaoo
  */
 export const getCacheLocation = () => currentCacheLocation
 
 /**
- * 检查 checkCache 对应的业务能力，参数和执行顺序保持原实现。
- * @param songInfo songInfo 原业务参数。
+ * 按歌曲 ID 与用户目录查找缓存文件，校验文件存在性并返回命中信息。
+ * @param songInfo 歌曲详情及平台扩展字段。
  * @param username 已解析的用户名称。
- * @param isLyricCheck isLyricCheck 原业务参数。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * @param isLyricCheck 是否只检查歌词缓存。
  * @author yahyaoo
  */
 export const checkCache = (songInfo: any, username?: string, isLyricCheck: boolean = false) => {
@@ -2025,10 +1862,9 @@ export const checkCache = (songInfo: any, username?: string, isLyricCheck: boole
 }
 
 /**
- * 检查 checkLyricCache 对应的业务能力，参数和执行顺序保持原实现。
- * @param songInfo songInfo 原业务参数。
+ * 查找歌曲歌词缓存，返回保存的歌词内容与命中状态。
+ * @param songInfo 歌曲详情及平台扩展字段。
  * @param username 已解析的用户名称。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
  * @author yahyaoo
  */
 export const checkLyricCache = (songInfo: any, username?: string) => {
@@ -2128,12 +1964,11 @@ export const checkLyricCache = (songInfo: any, username?: string) => {
 }
 
 /**
- * 保存 saveLyricCache 对应的业务能力，参数和执行顺序保持原实现。
- * @param songInfo songInfo 原业务参数。
- * @param lyricsObj lyricsObj 原业务参数。
+ * 按歌曲和用户作用域保存歌词内容到对应缓存或下载目录。
+ * @param songInfo 歌曲详情及平台扩展字段。
+ * @param lyricsObj 歌词及翻译等扩展内容。
  * @param username 已解析的用户名称。
- * @param isOnlyDownload isOnlyDownload 原业务参数。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * @param isOnlyDownload 是否仅保存到下载目录。
  * @author yahyaoo
  */
 export const saveLyricCache = (songInfo: any, lyricsObj: any, username?: string, isOnlyDownload?: boolean) => {
@@ -2316,41 +2151,29 @@ const ensureCachedLyrics = async (
     }
 }
 
-/**
- * DownloadProvenance 契约，按当前模块职责组织，保留原字段和扩展能力。
- * @author yahyaoo
- */
+/** 下载来源信息，区分请求平台和实际解析平台。 @author yahyaoo */
 export interface DownloadProvenance {
-    /**
-     * requestedSource 字段，沿用原业务结构与空值约定。
-     */
+    /** 客户端选择的音乐平台。 */
     requestedSource?: string
-    /**
-     * downloadSource 字段，沿用原业务结构与空值约定。
-     */
+    /** 最终解析到的下载平台。 */
     downloadSource?: string
-    /**
-     * sourceName 字段，沿用原业务结构与空值约定。
-     */
+    /** 音源显示名称。 */
     sourceName?: string
-    /**
-     * customTargetDir 字段，沿用原业务结构与空值约定。
-     */
+
     customTargetDir?: string
 }
 
 /**
- * 下载 downloadAndCache 对应的业务能力，参数和执行顺序保持原实现。
- * @param songInfo songInfo 原业务参数。
- * @param url url 原业务参数。
+ * 下载歌曲到用户目标目录，处理取消、元信息及歌词写入并更新文件索引。
+ * @param songInfo 歌曲详情及平台扩展字段。
+ * @param url 请求或播放地址。
  * @param quality 原音质选择。
  * @param username 已解析的用户名称。
  * @param signal 调用方取消信号。
- * @param isOnlyDownload isOnlyDownload 原业务参数。
- * @param shouldCacheLyric shouldCacheLyric 原业务参数。
- * @param shouldEmbedLyric shouldEmbedLyric 原业务参数。
- * @param provenance provenance 原业务参数。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * @param isOnlyDownload 是否仅保存到下载目录。
+ * @param shouldCacheLyric 是否保存歌词缓存。
+ * @param shouldEmbedLyric 是否内嵌歌词。
+ * @param provenance 请求平台与实际下载平台记录。
  * @author yahyaoo
  */
 export const downloadAndCache = async (songInfo: any, url: string, quality?: string, username?: string, signal?: AbortSignal, isOnlyDownload?: boolean, shouldCacheLyric: boolean = true, shouldEmbedLyric: boolean = true, provenance: DownloadProvenance = {}) => {
@@ -2773,9 +2596,8 @@ const getAvailableRemasterTarget = (
 }
 
 /**
- * 获取 getDownloadedMusicItems 对应的业务能力，参数和执行顺序保持原实现。
+ * 返回用户下载目录中已经建立索引的歌曲记录。
  * @param username 已解析的用户名称。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
  * @author yahyaoo
  */
 export const getDownloadedMusicItems = async (username?: string) => {
@@ -2785,14 +2607,13 @@ export const getDownloadedMusicItems = async (username?: string) => {
 }
 
 /**
- * 处理 replaceDownloadedMusicItem 对应的业务能力，参数和执行顺序保持原实现。
+ * 使用新下载结果替换原歌曲文件，保持索引与元信息一致。
  * @param username 已解析的用户名称。
- * @param originalItem originalItem 原业务参数。
- * @param songInfo songInfo 原业务参数。
- * @param url url 原业务参数。
+ * @param originalItem 替换前的本地歌曲索引记录。
+ * @param songInfo 歌曲详情及平台扩展字段。
+ * @param url 请求或播放地址。
  * @param quality 原音质选择。
  * @param signal 调用方取消信号。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
  * @author yahyaoo
  */
 export const replaceDownloadedMusicItem = async (
@@ -3000,10 +2821,9 @@ export const replaceDownloadedMusicItem = async (
 }
 
 /**
- * 停止 stopUserTasks 对应的业务能力，参数和执行顺序保持原实现。
+ * 取消指定用户当前正在执行的缓存下载任务。
  * @param username 已解析的用户名称。
- * @param songKey songKey 原业务参数。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * @param songKey 歌曲的索引键。
  * @author yahyaoo
  */
 export const stopUserTasks = (username: string, songKey?: string) => {
@@ -3020,10 +2840,9 @@ export const stopUserTasks = (username: string, songKey?: string) => {
 
 // [新增] 根据文件名从索引中查找对应条目（跨 cache/music 两个目录）
 /**
- * 获取 getIndexItemByFilename 对应的业务能力，参数和执行顺序保持原实现。
+ * 从用户缓存索引中按文件名查找记录。
  * @param filename 文件或文档定位路径。
  * @param username 已解析的用户名称。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
  * @author yahyaoo
  */
 export const getIndexItemByFilename = (filename: string, username: string) => {
@@ -3038,20 +2857,18 @@ export const getIndexItemByFilename = (filename: string, username: string) => {
 
 // [新增] 暴露 lyricFetcher 引用，供外部接口（如 embedLyric）使用
 /**
- * 获取 getLyricFetcher 对应的业务能力，参数和执行顺序保持原实现。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * 返回应用装配时注入的歌词解析器。
  * @author yahyaoo
  */
 export const getLyricFetcher = () => _lyricFetcher
 
 // [新增] 更新索引中指定文件的 hasEmbedLyric 状态（由 embedLyric 接口成功写入后调用）
 /**
- * 设置 setIndexEmbedLyric 对应的业务能力，参数和执行顺序保持原实现。
+ * 更新索引中歌曲的内嵌歌词标记及失败原因。
  * @param filename 文件或文档定位路径。
  * @param username 已解析的用户名称。
- * @param value 原字段值。
- * @param metadata metadata 原业务参数。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * @param value 是否已经写入内嵌歌词。
+ * @param metadata 解析得到的歌曲或音源元信息。
  * @author yahyaoo
  */
 export const setIndexEmbedLyric = (
@@ -3075,12 +2892,11 @@ export const setIndexEmbedLyric = (
 }
 
 /**
- * 响应 serveCacheFile 对应的业务能力，参数和执行顺序保持原实现。
- * @param req 原 HTTP 请求。
- * @param res 原 HTTP 响应。
+ * 向 HTTP 响应传输用户缓存音频，处理 Range 范围和内容类型。
+ * @param req HTTP 请求，包含认证头、查询参数和上传正文。
+ * @param res HTTP 响应，用于写入状态码、数据或媒体流。
  * @param filename 文件或文档定位路径。
  * @param username 已解析的用户名称。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
  * @author yahyaoo
  */
 export const serveCacheFile = (req: http.IncomingMessage, res: http.ServerResponse, filename: string, username?: string) => {
@@ -3124,9 +2940,8 @@ export const serveCacheFile = (req: http.IncomingMessage, res: http.ServerRespon
 }
 
 /**
- * 获取 getCacheStats 对应的业务能力，参数和执行顺序保持原实现。
+ * 统计用户缓存和下载目录的文件数量与占用容量。
  * @param username 已解析的用户名称。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
  * @author yahyaoo
  */
 export const getCacheStats = (username?: string) => {
@@ -3154,9 +2969,8 @@ export const getCacheStats = (username?: string) => {
 }
 
 /**
- * 清理 clearAllCache 对应的业务能力，参数和执行顺序保持原实现。
+ * 删除用户缓存文件并重建索引，返回清理数量与占用统计。
  * @param username 已解析的用户名称。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
  * @author yahyaoo
  */
 export const clearAllCache = (username?: string) => {
@@ -3182,9 +2996,8 @@ export const clearAllCache = (username?: string) => {
 }
 
 /**
- * 清理 clearLyricCache 对应的业务能力，参数和执行顺序保持原实现。
+ * 清理用户歌词缓存，同时维护相关索引标记。
  * @param username 已解析的用户名称。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
  * @author yahyaoo
  */
 export const clearLyricCache = (username?: string) => {
@@ -3257,9 +3070,8 @@ export const cleanupStaleTempFiles = async (username?: string, maxAgeMs: number 
 }
 
 /**
- * 检查 checkAndCleanupCache 对应的业务能力，参数和执行顺序保持原实现。
+ * 检查用户缓存容量上限，超额时按最近使用顺序清理文件。
  * @param username 已解析的用户名称。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
  * @author yahyaoo
  */
 export const checkAndCleanupCache = async (username?: string) => {
@@ -3270,15 +3082,9 @@ export const checkAndCleanupCache = async (username?: string) => {
     const limitBytes = (config['user.cacheSizeLimit'] || 2000) * 1024 * 1024
     if (totalSize <= limitBytes) return
     const roots: Array<'cache' | 'music'> = ['cache', 'music']
-    const allFiles: Array<{ /**
- * path 字段，沿用原业务结构与空值约定。
- */
-path: string, /**
- * size 字段，沿用原业务结构与空值约定。
- */
-size: number, /**
- * mtime 字段，沿用原业务结构与空值约定。
- */
+    const allFiles: Array<{ /** 本地文件或目录路径。 */
+path: string, /** 文件字节数或记录数量。 */
+size: number,
 mtime: number }> = []
     const normalizedUsername = (username && username !== '_open' && username !== 'default') ? username : '_open'
     for (const folder of roots) {
@@ -3311,10 +3117,9 @@ setTimeout(() => {
     } catch { }
 }, 5000)
 /**
- * 处理 switchFolder 对应的业务能力，参数和执行顺序保持原实现。
- * @param filenames filenames 原业务参数。
+ * 在缓存和下载目录之间移动选定文件，并同步两侧索引。
+ * @param filenames 待处理文件名集合。
  * @param username 已解析的用户名称。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
  * @author yahyaoo
  */
 export const switchFolder = async (filenames: string[], username: string | undefined) => {
@@ -3441,10 +3246,9 @@ export const switchFolder = async (filenames: string[], username: string | undef
 }
 
 /**
- * 处理 switchBaseLocation 对应的业务能力，参数和执行顺序保持原实现。
- * @param filenames filenames 原业务参数。
+ * 迁移缓存根目录下的文件，更新当前存储位置和索引缓存。
+ * @param filenames 待处理文件名集合。
  * @param username 已解析的用户名称。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
  * @author yahyaoo
  */
 export const switchBaseLocation = async (filenames: string[], username: string | undefined) => {
@@ -3539,10 +3343,9 @@ export const switchBaseLocation = async (filenames: string[], username: string |
 }
 
 /**
- * 获取 getSubDirectories 对应的业务能力，参数和执行顺序保持原实现。
+ * 枚举用户歌曲目录下可用的子目录。
  * @param username 已解析的用户名称。
- * @param folder folder 原业务参数。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * @param folder 缓存或下载目录类别。
  * @author yahyaoo
  */
 export const getSubDirectories = (username: string | undefined, folder: 'cache' | 'music') => {
@@ -3574,11 +3377,10 @@ export const getSubDirectories = (username: string | undefined, folder: 'cache' 
 }
 
 /**
- * 创建 createSubDirectory 对应的业务能力，参数和执行顺序保持原实现。
+ * 在用户歌曲根目录中创建选定子目录。
  * @param username 已解析的用户名称。
- * @param folder folder 原业务参数。
- * @param subPath subPath 原业务参数。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * @param folder 缓存或下载目录类别。
+ * @param subPath 用户歌曲根目录下的相对目录。
  * @author yahyaoo
  */
 export const createSubDirectory = (username: string | undefined, folder: 'cache' | 'music', subPath: string) => {
@@ -3592,11 +3394,10 @@ export const createSubDirectory = (username: string | undefined, folder: 'cache'
 }
 
 /**
- * 处理 categorizeFiles 对应的业务能力，参数和执行顺序保持原实现。
- * @param filenames filenames 原业务参数。
- * @param targetSubPath targetSubPath 原业务参数。
+ * 将选定歌曲文件移到指定子目录，并维护目录索引。
+ * @param filenames 待处理文件名集合。
+ * @param targetSubPath 接收歌曲的目标子目录。
  * @param username 已解析的用户名称。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
  * @author yahyaoo
  */
 export const categorizeFiles = async (filenames: string[], targetSubPath: string, username: string | undefined) => {
@@ -3668,12 +3469,11 @@ export const categorizeFiles = async (filenames: string[], targetSubPath: string
 }
 
 /**
- * 处理 renameSubDirectory 对应的业务能力，参数和执行顺序保持原实现。
+ * 重命名用户歌曲子目录，更新受影响文件路径和索引。
  * @param username 已解析的用户名称。
- * @param folder folder 原业务参数。
- * @param oldSubPath oldSubPath 原业务参数。
- * @param newSubPath newSubPath 原业务参数。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * @param folder 缓存或下载目录类别。
+ * @param oldSubPath 原歌曲子目录。
+ * @param newSubPath 调整后的目标子目录。
  * @author yahyaoo
  */
 export const renameSubDirectory = (username: string | undefined, folder: 'cache' | 'music', oldSubPath: string, newSubPath: string) => {
@@ -3717,12 +3517,11 @@ export const renameSubDirectory = (username: string | undefined, folder: 'cache'
 }
 
 /**
- * 删除 deleteSubDirectory 对应的业务能力，参数和执行顺序保持原实现。
+ * 删除选定歌曲子目录，并按请求决定是否删除其中歌曲。
  * @param username 已解析的用户名称。
- * @param folder folder 原业务参数。
- * @param subPath subPath 原业务参数。
- * @param deleteSongs deleteSongs 原业务参数。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * @param folder 缓存或下载目录类别。
+ * @param subPath 用户歌曲根目录下的相对目录。
+ * @param deleteSongs 是否删除目录中的歌曲。
  * @author yahyaoo
  */
 export const deleteSubDirectory = (username: string | undefined, folder: 'cache' | 'music', subPath: string, deleteSongs: boolean) => {

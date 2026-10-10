@@ -1,4 +1,4 @@
-/** musicDetail 模块：按职责组织，原业务行为保持不变。 @author yahyaoo */
+/** 网易云音乐接口适配：歌曲详情批量查询。 @author yahyaoo */
 import { httpFetch } from '../../request.js'
 import { weapi } from './utils/crypto.js'
 import { formatPlayTime } from '../../index.js'

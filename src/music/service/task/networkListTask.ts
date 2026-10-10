@@ -1,4 +1,4 @@
-/** networkListTask 模块：按职责组织，原业务行为保持不变。 @author yahyaoo */
+/** 网络歌单定时更新：检查远端歌单变化、写回用户数据并记录更新红点。 @author yahyaoo */
 import storageFs from '../../../application/persistence/documentFileSystem'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -21,18 +21,17 @@ export const TASK_NAME = '网络歌单自动同步更新'
 const updatedListMap = new Map<string, Set<string>>()
 
 /**
- * 获取 getUpdatedListIds 对应的业务能力，参数和执行顺序保持原实现。
+ * 返回用户自动更新后尚未确认的歌单标识，用于显示更新红点。
  * @param username 已解析的用户名称。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
  * @author yahyaoo
  */
 export const getUpdatedListIds = (username: string): string[] =>
   Array.from(updatedListMap.get(username) ?? [])
 
 /**
- * 添加 addUpdatedListId 对应的业务能力，参数和执行顺序保持原实现。
+ * 标记指定歌单已自动更新，需要在前端显示红点。
  * @param username 已解析的用户名称。
- * @param listId listId 原业务参数。
+ * @param listId 目标歌单标识。
  * @author yahyaoo
  */
 export const addUpdatedListId = (username: string, listId: string): void => {
@@ -41,9 +40,9 @@ export const addUpdatedListId = (username: string, listId: string): void => {
 }
 
 /**
- * 移除 removeUpdatedListId 对应的业务能力，参数和执行顺序保持原实现。
+ * 移除用户已经查看或确认的歌单更新标记。
  * @param username 已解析的用户名称。
- * @param listId listId 原业务参数。
+ * @param listId 目标歌单标识。
  * @author yahyaoo
  */
 export const removeUpdatedListId = (username: string, listId: string): void => {
@@ -105,27 +104,15 @@ const formatSongItem = (song: any, defaultSource: string) => {
  * 执行网络歌单对比检测
  */
 export const checkAllUsersNetworkLists = async (): Promise<{
-  /**
-   * checkedUsersCount 字段，沿用原业务结构与空值约定。
-   */
+
   checkedUsersCount: number
-  /**
-   * totalNetworkLists 字段，沿用原业务结构与空值约定。
-   */
+
   totalNetworkLists: number
-  /**
-   * updatedListsCount 字段，沿用原业务结构与空值约定。
-   */
+
   updatedListsCount: number
-  /**
-   * details 字段，沿用原业务结构与空值约定。
-   */
-  details: Record<string, { /**
- * changed 字段，沿用原业务结构与空值约定。
- */
-changed: string[]; /**
- * failed 字段，沿用原业务结构与空值约定。
- */
+
+  details: Record<string, { /** 是否发生数据变化。 */
+changed: string[]; /** 失败数量或失败状态。 */
 failed: string[] }>
 }> => {
   const allUsernames: string[] = []
@@ -140,12 +127,8 @@ failed: string[] }>
 
   let totalNetworkLists = 0
   let updatedListsCount = 0
-  const details: Record<string, { /**
- * changed 字段，沿用原业务结构与空值约定。
- */
-changed: string[]; /**
- * failed 字段，沿用原业务结构与空值约定。
- */
+  const details: Record<string, { /** 是否发生数据变化。 */
+changed: string[]; /** 失败数量或失败状态。 */
 failed: string[] }> = {}
 
   for (const username of allUsernames) {
@@ -252,12 +235,8 @@ failed: string[] }> = {}
 /**
  * 从各用户的 settings.json 中读取网络歌单自动更新的配置
  */
-export const loadNetworkListTaskConfig = (): { /**
- * intervalMs 字段，沿用原业务结构与空值约定。
- */
-intervalMs: number; /**
- * enabled 字段，沿用原业务结构与空值约定。
- */
+export const loadNetworkListTaskConfig = (): { /** 执行间隔，单位毫秒。 */
+intervalMs: number; /** 功能是否启用。 */
 enabled: boolean } => {
   let intervalMs = 6 * 60 * 60 * 1000 // 默认 6 小时
   let enabled = true

@@ -1,13 +1,13 @@
 import type { RequestContext, ServerRuntime } from '../../common/http/RequestContext'
-/** User 服务所需能力，仅允许访问本模块使用的依赖。 @author yahyaoo */
+/** 管理用户维护、用户空间迁移与同步连接处理所需的应用依赖契约。 @author yahyaoo */
 export type UserServiceRuntime = Pick<ServerRuntime, 'readBody' | 'path' | 'checkAndCreateDir' | 'saveUsers' | 'storageFs' | 'getSyncDownloadData' | 'migrateSyncStorage' | 'wss' | 'SYNC_CLOSE_CODE' | 'renameUserSpace' | 'migrateUserData' | 'finishRenameUserSpace'>
-/** User 业务服务，原路由处理顺序与错误响应保持不变。 @author yahyaoo */
+/** 管理用户维护、用户空间迁移与同步连接处理服务。 @author yahyaoo */
 
 /**
- * 处理 /api/users 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 查询、创建、修改或删除管理用户，并维护用户数据目录与连接。
+ * @param context /api/users 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 管理用户维护、用户空间迁移与同步连接处理的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function handleUsers(context: RequestContext, runtime: UserServiceRuntime) {
@@ -226,12 +226,8 @@ export async function handleUsers(context: RequestContext, runtime: UserServiceR
               }
 
               let deletedCount = 0
-              const deletedUsers: { /**
- * name 字段，沿用原业务结构与空值约定。
- */
-name: string, /**
- * dataPath 字段，沿用原业务结构与空值约定。
- */
+              const deletedUsers: { /** 条目名称。 */
+name: string, /** 用户或服务的数据根目录。 */
 dataPath: string }[] = []
 
               for (const targetName of targets) {

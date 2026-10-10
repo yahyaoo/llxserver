@@ -1,4 +1,4 @@
-/** zhConvert 模块：按职责组织，原业务行为保持不变。 @author yahyaoo */
+/** 简繁搜索辅助：使用内置字符对照表生成查询变体，改善平台搜索匹配。 @author yahyaoo */
 /**
  * 轻量简繁转换（内置高频对照表，零依赖）
  *
@@ -58,18 +58,16 @@ const S2T_MAP: Record<string, string> = (() => {
 })()
 
 /**
- * 判断 hasTraditionalChars 对应的业务能力，参数和执行顺序保持原实现。
+ * 检查文本是否包含内置对照表可识别的繁体字符。
  * @param text 原文本内容。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
  * @author yahyaoo
  */
 export const hasTraditionalChars = (text: string): boolean =>
     Array.from(String(text || '')).some(ch => Object.prototype.hasOwnProperty.call(T2S_MAP, ch))
 
 /**
- * 判断 hasSimplifiedChars 对应的业务能力，参数和执行顺序保持原实现。
+ * 检查文本是否包含内置对照表可识别的简体字符。
  * @param text 原文本内容。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
  * @author yahyaoo
  */
 export const hasSimplifiedChars = (text: string): boolean =>

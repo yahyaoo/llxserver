@@ -1,4 +1,4 @@
-/** RemasterQueueService 模块：按职责组织，原业务行为保持不变。 @author yahyaoo */
+/** 歌曲洗版队列：按目标音质解析并替换本地文件，跟踪逐首结果与取消状态。 @author yahyaoo */
 import crypto from 'node:crypto'
 import * as fileCache from '../cache/FileCacheService'
 import * as customMusicManager from '../library/CustomMusicService'
@@ -7,158 +7,81 @@ const MAX_REMASTER_ATTEMPTS = 3
 const QUALITY_ORDER = ['128k', '192k', '320k', 'flac', 'flac24bit', 'hires', 'atmos', 'atmos_plus', 'master'] as const
 const QUALITY_SET = new Set<string>(QUALITY_ORDER)
 
-/**
- * RemasterStatus 契约，按当前模块职责组织，保留原字段和扩展能力。
- * @author yahyaoo
- */
+/** 洗版任务整体状态，包括等待、执行、完成和取消。 @author yahyaoo */
 type RemasterStatus = 'running' | 'completed' | 'cancelled' | 'error'
-/**
- * RemasterResultStatus 契约，按当前模块职责组织，保留原字段和扩展能力。
- * @author yahyaoo
- */
+/** 单首歌曲洗版结果状态。 @author yahyaoo */
 type RemasterResultStatus = 'replaced' | 'downgraded' | 'skipped' | 'failed'
 
-/**
- * RemasterableItem 契约，按当前模块职责组织，保留原字段和扩展能力。
- * @author yahyaoo
- */
-type RemasterableItem = (fileCache.CacheItem | customMusicManager.CustomCacheItem) & { /**
- * folder 字段，沿用原业务结构与空值约定。
- */
+/** 可洗版的本地歌曲，包含文件定位和原音质。 @author yahyaoo */
+type RemasterableItem = (fileCache.CacheItem | customMusicManager.CustomCacheItem) & { /** 歌曲分类目录。 */
 folder: string }
 
-/**
- * ResolveResult 契约，按当前模块职责组织，保留原字段和扩展能力。
- * @author yahyaoo
- */
+/** 歌曲解析器返回的可下载地址、音质与歌曲元信息。 @author yahyaoo */
 interface ResolveResult {
-  /**
-   * url 字段，沿用原业务结构与空值约定。
-   */
+  /** 请求或资源地址。 */
   url: string
-  /**
-   * quality 字段，沿用原业务结构与空值约定。
-   */
+  /** 音质标识。 */
   quality: string
 }
 
-/**
- * RemasterResolver 契约，按当前模块职责组织，保留原字段和扩展能力。
- * @author yahyaoo
- */
+/** 按目标音质解析洗版歌曲的异步函数。 @author yahyaoo */
 type RemasterResolver = (songInfo: any, requestedQuality: string, username: string) => Promise<ResolveResult>
 
-/**
- * RemasterResult 契约，按当前模块职责组织，保留原字段和扩展能力。
- * @author yahyaoo
- */
+/** 单首洗版处理结果，记录替换、降级、跳过及错误。 @author yahyaoo */
 interface RemasterResult {
-  /**
-   * index 字段，沿用原业务结构与空值约定。
-   */
+  /** 索引位置或索引记录。 */
   index: number
-  /**
-   * filename 字段，沿用原业务结构与空值约定。
-   */
+  /** 关联音频或业务文件名。 */
   filename: string
-  /**
-   * name 字段，沿用原业务结构与空值约定。
-   */
+  /** 记录显示名称。 */
   name: string
-  /**
-   * singer 字段，沿用原业务结构与空值约定。
-   */
+  /** 歌手名称。 */
   singer: string
-  /**
-   * originalQuality 字段，沿用原业务结构与空值约定。
-   */
+  /** 原本地音频音质。 */
   originalQuality: string
-  /**
-   * targetQuality 字段，沿用原业务结构与空值约定。
-   */
+  /** 期望替换后的音质。 */
   targetQuality: string
-  /**
-   * actualQuality 字段，沿用原业务结构与空值约定。
-   */
+  /** 最终解析或下载的音质。 */
   actualQuality?: string
-  /**
-   * status 字段，沿用原业务结构与空值约定。
-   */
+  /** 当前处理或任务状态。 */
   status: RemasterResultStatus
-  /**
-   * message 字段，沿用原业务结构与空值约定。
-   */
+  /** 处理结果或错误说明。 */
   message: string
 }
 
-/**
- * RemasterTask 契约，按当前模块职责组织，保留原字段和扩展能力。
- * @author yahyaoo
- */
+/** 用户洗版任务，包含取消信号、进度和逐首处理结果。 @author yahyaoo */
 interface RemasterTask {
-  /**
-   * id 字段，沿用原业务结构与空值约定。
-   */
+  /** 业务记录标识。 */
   id: string
-  /**
-   * username 字段，沿用原业务结构与空值约定。
-   */
+  /** 数据所属用户名。 */
   username: string
-  /**
-   * targetQuality 字段，沿用原业务结构与空值约定。
-   */
+  /** 期望替换后的音质。 */
   targetQuality: string
-  /**
-   * isCustomDir 字段，沿用原业务结构与空值约定。
-   */
+  /** 是否使用用户自定义音乐目录。 */
   isCustomDir: boolean
-  /**
-   * status 字段，沿用原业务结构与空值约定。
-   */
+  /** 当前处理或任务状态。 */
   status: RemasterStatus
-  /**
-   * total 字段，沿用原业务结构与空值约定。
-   */
+  /** 待处理记录总数。 */
   total: number
-  /**
-   * processed 字段，沿用原业务结构与空值约定。
-   */
+  /** 已处理记录数量。 */
   processed: number
-  /**
-   * replaced 字段，沿用原业务结构与空值约定。
-   */
+  /** 已经完成替换的歌曲数量。 */
   replaced: number
-  /**
-   * downgraded 字段，沿用原业务结构与空值约定。
-   */
+  /** 使用较低音质完成替换的歌曲数量。 */
   downgraded: number
-  /**
-   * skipped 字段，沿用原业务结构与空值约定。
-   */
+  /** 已跳过的歌曲数量。 */
   skipped: number
-  /**
-   * failed 字段，沿用原业务结构与空值约定。
-   */
+  /** 失败数量或失败状态。 */
   failed: number
-  /**
-   * results 字段，沿用原业务结构与空值约定。
-   */
+  /** 逐项处理结果。 */
   results: RemasterResult[]
-  /**
-   * errorMsg 字段，沿用原业务结构与空值约定。
-   */
+  /** 任务失败说明。 */
   errorMsg: string
-  /**
-   * createdAt 字段，沿用原业务结构与空值约定。
-   */
+  /** 记录创建时间，单位毫秒。 */
   createdAt: number
-  /**
-   * updatedAt 字段，沿用原业务结构与空值约定。
-   */
+  /** 记录最近更新时间，单位毫秒。 */
   updatedAt: number
-  /**
-   * controller 字段，沿用原业务结构与空值约定。
-   */
+  /** 用于取消当前异步任务的控制器。 */
   controller: AbortController
 }
 
@@ -166,9 +89,8 @@ const tasks = new Map<string, RemasterTask>()
 let resolver: RemasterResolver | null = null
 
 /**
- * 处理 initialize 对应的业务能力，参数和执行顺序保持原实现。
- * @param downloadResolver downloadResolver 原业务参数。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * 注入歌曲链接解析器，恢复队列或注册下载所需依赖。
+ * @param downloadResolver 由应用注入的歌曲下载链接解析函数。
  * @author yahyaoo
  */
 export const initialize = (downloadResolver: RemasterResolver) => {
@@ -368,12 +290,11 @@ const runTask = async (task: RemasterTask, items: RemasterableItem[], allItems: 
 }
 
 /**
- * 启动 start 对应的业务能力，参数和执行顺序保持原实现。
+ * 创建歌曲洗版任务，按目标音质逐项解析和替换本地文件。
  * @param username 已解析的用户名称。
- * @param targetQuality targetQuality 原业务参数。
- * @param filenames filenames 原业务参数。
- * @param explicitIsCustomDir explicitIsCustomDir 原业务参数。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * @param targetQuality 本地歌曲期望达到的音质。
+ * @param filenames 待处理文件名集合。
+ * @param explicitIsCustomDir 是否明确指定自定义音乐目录。
  * @author yahyaoo
  */
 export const start = async (username: string, targetQuality: string, filenames: unknown, explicitIsCustomDir?: boolean) => {
@@ -453,9 +374,8 @@ export const start = async (username: string, targetQuality: string, filenames: 
 }
 
 /**
- * 取消 cancel 对应的业务能力，参数和执行顺序保持原实现。
+ * 取消用户洗版任务，并向正在执行的下载发送中止信号。
  * @param username 已解析的用户名称。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
  * @author yahyaoo
  */
 export const cancel = (username: string) => {
@@ -467,11 +387,10 @@ export const cancel = (username: string) => {
 }
 
 /**
- * 获取 getStatus 对应的业务能力，参数和执行顺序保持原实现。
- * @param username 已解析的用户名称。
- * @param offset offset 原业务参数。
- * @param limit limit 原业务参数。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * 查询服务器资源用量、用户和同步连接状态。
+ * @param context 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 当前服务的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export const getStatus = (username: string, offset = 0, limit = 200) => {

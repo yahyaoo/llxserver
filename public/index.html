@@ -886,7 +886,7 @@
                                     </ul>
                                     <div
                                         style="padding: 0.5rem 0.75rem; background: rgba(255, 255, 255, 0.05); border-radius: 8px; border: 1px dashed rgba(255, 255, 255, 0.15); word-break: break-all;">
-                                        配置文件参考路径 (config.js): <br />
+                                        数据库引导文件路径 (config.js): <br />
                                         <code id="config-js-path-ref" style="color: #38bdf8;">--</code>
                                     </div>
                                 </div>
@@ -1044,7 +1044,7 @@
                                 <div class="config-toggle-row">
                                     <div class="config-toggle-info">
                                         <span class="config-toggle-label">启用本地配置备份</span>
-                                        <span class="config-toggle-desc">每日生成一份 config.js 副本，按保留天数自动清理</span>
+                                        <span class="config-toggle-desc">每日导出一份 SQLite 业务配置，按保留天数自动清理</span>
                                     </div>
                                     <label class="toggle-switch">
                                         <input type="checkbox" name="configBackup.enable" />
@@ -1096,7 +1096,7 @@
                                     </div>
                                     <div
                                         style="padding-top: 0.4rem; border-top: 1px dashed rgba(255, 255, 255, 0.1); word-break: break-all;">
-                                        当前服务器数据目录位置：<br />
+                                        当前数据库引导文件位置：<br />
                                         <code id="config-backup-js-path-ref" style="color: #38bdf8;">--</code>
                                     </div>
                                 </div>
@@ -2665,6 +2665,8 @@
         </div>
     </div>
 
+    <link rel="stylesheet" href="views/system-configuration/system-configuration.css">
+    <script src="views/system-configuration/SystemConfigurationView.js"></script>
     <script src="app.js"></script>
 </body>
 

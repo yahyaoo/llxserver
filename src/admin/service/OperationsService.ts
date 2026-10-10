@@ -1,13 +1,13 @@
 import type { RequestContext, ServerRuntime } from '../../common/http/RequestContext'
-/** Operations 服务所需能力，仅允许访问本模块使用的依赖。 @author yahyaoo */
+/** 管理认证、运行监控、日志、数据重载和文件管理所需的应用依赖契约。 @author yahyaoo */
 export type OperationsServiceRuntime = Pick<ServerRuntime, 'readBody' | 'loginLog' | 'os' | 'wss' | 'getLoadedApisCount' | 'storageFs' | 'path' | 'appUpdates' | 'ElFinderConnector' | 'getSystemRoot' | 'getMime' | 'formidable' | 'status' | 'reloadServerData'>
-/** Operations 业务服务，原路由处理顺序与错误响应保持不变。 @author yahyaoo */
+/** 管理认证、运行监控、日志、数据重载和文件管理服务。 @author yahyaoo */
 
 /**
- * 处理 /api/login 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 验证管理员密码并返回登录结果。
+ * @param context /api/login 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 管理认证、运行监控、日志、数据重载和文件管理的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postLogin(context: RequestContext, runtime: OperationsServiceRuntime) {
@@ -36,10 +36,10 @@ export async function postLogin(context: RequestContext, runtime: OperationsServ
 }
 
 /**
- * 处理 /api/status 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 查询服务器资源用量、用户和同步连接状态。
+ * @param context /api/status 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 管理认证、运行监控、日志、数据重载和文件管理的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function getStatus(context: RequestContext, runtime: OperationsServiceRuntime) {
@@ -119,10 +119,10 @@ export async function getStatus(context: RequestContext, runtime: OperationsServ
 }
 
 /**
- * 处理 /api/app/update/check 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 向更新服务器查询可用发布版本。
+ * @param context /api/app/update/check 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 管理认证、运行监控、日志、数据重载和文件管理的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function getAppUpdateCheck(context: RequestContext, runtime: OperationsServiceRuntime) {
@@ -144,10 +144,10 @@ export async function getAppUpdateCheck(context: RequestContext, runtime: Operat
 }
 
 /**
- * 处理 /api/admin/verify 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 校验请求中的管理员凭据。
+ * @param context /api/admin/verify 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 管理认证、运行监控、日志、数据重载和文件管理的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postAdminVerify(context: RequestContext, runtime: OperationsServiceRuntime) {
@@ -166,10 +166,10 @@ export async function postAdminVerify(context: RequestContext, runtime: Operatio
 }
 
 /**
- * 处理 /api/elfinder/connector 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 处理文件管理器操作并校验允许访问的目录。
+ * @param context /api/elfinder/connector 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 管理认证、运行监控、日志、数据重载和文件管理的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function handleElfinderConnector(context: RequestContext, runtime: OperationsServiceRuntime) {
@@ -335,10 +335,10 @@ export async function handleElfinderConnector(context: RequestContext, runtime: 
 }
 
 /**
- * 处理 /api/logs 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 读取系统日志，支持筛选和分页。
+ * @param context /api/logs 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 管理认证、运行监控、日志、数据重载和文件管理的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function getLogs(context: RequestContext, runtime: OperationsServiceRuntime) {
@@ -374,10 +374,10 @@ export async function getLogs(context: RequestContext, runtime: OperationsServic
 }
 
 /**
- * 处理 /api/stats 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 统计用户歌曲、列表及存储信息。
+ * @param context /api/stats 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 管理认证、运行监控、日志、数据重载和文件管理的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function getStats(context: RequestContext, runtime: OperationsServiceRuntime) {
@@ -408,10 +408,10 @@ export async function getStats(context: RequestContext, runtime: OperationsServi
 }
 
 /**
- * 处理 /api/admin/reload 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 从数据库刷新配置、用户和音源数据。
+ * @param context /api/admin/reload 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 管理认证、运行监控、日志、数据重载和文件管理的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postAdminReload(context: RequestContext, runtime: OperationsServiceRuntime) {
@@ -435,10 +435,10 @@ export async function postAdminReload(context: RequestContext, runtime: Operatio
 }
 
 /**
- * 处理 /api/restart 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 响应重启请求并终止当前服务进程。
+ * @param context /api/restart 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 管理认证、运行监控、日志、数据重载和文件管理的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postRestart(context: RequestContext, runtime: OperationsServiceRuntime) {
@@ -478,10 +478,10 @@ export async function postRestart(context: RequestContext, runtime: OperationsSe
 }
 
 /**
- * 处理 /api/files 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 列出指定数据目录中的文件。
+ * @param context /api/files 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 管理认证、运行监控、日志、数据重载和文件管理的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function getFiles(context: RequestContext, runtime: OperationsServiceRuntime) {
@@ -531,10 +531,10 @@ export async function getFiles(context: RequestContext, runtime: OperationsServi
 }
 
 /**
- * 处理 /api/files/download 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 返回指定数据文件的下载内容。
+ * @param context /api/files/download 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 管理认证、运行监控、日志、数据重载和文件管理的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function getFilesDownload(context: RequestContext, runtime: OperationsServiceRuntime) {
@@ -573,10 +573,10 @@ export async function getFilesDownload(context: RequestContext, runtime: Operati
 }
 
 /**
- * 处理 /api/files 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 向指定数据路径写入上传文件。
+ * @param context /api/files 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 管理认证、运行监控、日志、数据重载和文件管理的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postFiles(context: RequestContext, runtime: OperationsServiceRuntime) {
@@ -623,10 +623,10 @@ export async function postFiles(context: RequestContext, runtime: OperationsServ
 }
 
 /**
- * 处理 /api/files 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 删除指定的数据文件。
+ * @param context /api/files 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 管理认证、运行监控、日志、数据重载和文件管理的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function deleteFiles(context: RequestContext, runtime: OperationsServiceRuntime) {

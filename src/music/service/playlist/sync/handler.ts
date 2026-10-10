@@ -1,4 +1,4 @@
-/** handler 模块：按职责组织，原业务行为保持不变。 @author yahyaoo */
+/** 歌单同步动作处理：分派远程增删改动作并更新用户数据。 @author yahyaoo */
 // 这个文件导出的方法将暴露给客户端调用，第一个参数固定为当前 socket 对象
 
 // import { sendSyncActionList } from '@main/modules/winMain'
@@ -194,12 +194,10 @@ const handleListAction = async(userName: string, { action, data }: LX.Sync.List.
 
 const handler: LX.Sync.ServerSyncHandlerListActions<LX.Socket> = {
   /**
-   * 处理 onListSyncAction 对应的业务能力，参数和执行顺序保持原实现。
-   * @param socket socket 原业务参数。
-   * @param action action 原业务参数。
-   * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-   * @author yahyaoo
-   */
+ * 分派客户端歌单同步动作，处理歌单和歌曲的增删改及快照。
+ * @param socket 同步客户端套接字。
+ * @author yahyaoo
+ */
   async onListSyncAction(socket, action) {
     if (!socket.moduleReadys?.list) return
     const key = await handleListAction(socket.userInfo.name, action)

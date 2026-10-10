@@ -1,4 +1,4 @@
-/** songList 模块：按职责组织，原业务行为保持不变。 @author yahyaoo */
+/** 百度音乐接口适配：歌单分类、列表、详情和歌曲分页查询。 @author yahyaoo */
 import { httpFetch } from '../../request.js'
 import { formatPlayTime } from '../../index.js'
 // [修复] toMD5 由 musicSdk/utils 导出（kw/kg/mg 等音源都从这里导入）；

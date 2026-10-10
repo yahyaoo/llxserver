@@ -1,4 +1,4 @@
-/** RadioStationService 模块：按职责组织，原业务行为保持不变。 @author yahyaoo */
+/** 用户网络电台服务：校验电台流地址并读写独立用户的电台列表。 @author yahyaoo */
 import storageFs from '../../../application/persistence/documentFileSystem'
 /**
  * 用户自建网络电台（Internet Radio Station）分用户隔离持久化。
@@ -15,35 +15,23 @@ import crypto from 'crypto'
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { getUserDirname } = require('../../../user')
 
-/**
- * RadioStation 契约，按当前模块职责组织，保留原字段和扩展能力。
- * @author yahyaoo
- */
+/** 用户创建的网络电台，包含标识、名称、流地址和主页。 @author yahyaoo */
 export interface RadioStation {
-  /**
-   * id 字段，沿用原业务结构与空值约定。
-   */
+  /** 业务记录标识。 */
   id: string
-  /**
-   * name 字段，沿用原业务结构与空值约定。
-   */
+  /** 记录显示名称。 */
   name: string
-  /**
-   * streamUrl 字段，沿用原业务结构与空值约定。
-   */
+  /** 网络电台音频流地址。 */
   streamUrl: string
-  /**
-   * homepageUrl 字段，沿用原业务结构与空值约定。
-   */
+  /** 网络电台主页地址。 */
   homepageUrl?: string
 }
 
 const userCaches = new Map<string, RadioStation[]>()
 
 /**
- * 获取 getUserStoreFile 对应的业务能力，参数和执行顺序保持原实现。
+ * 计算用户自建网络电台的 SQL 文档路径。
  * @param username 已解析的用户名称。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
  * @author yahyaoo
  */
 function getUserStoreFile(username: string): string {
@@ -53,9 +41,8 @@ function getUserStoreFile(username: string): string {
 }
 
 /**
- * 加载 load 对应的业务能力，参数和执行顺序保持原实现。
+ * 读取并缓存用户自建电台文档，缺少文档时返回空列表。
  * @param username 已解析的用户名称。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
  * @author yahyaoo
  */
 function load(username: string): RadioStation[] {
@@ -78,7 +65,7 @@ function load(username: string): RadioStation[] {
 }
 
 /**
- * 持久化 persist 对应的业务能力，参数和执行顺序保持原实现。
+ * 保存用户网络电台列表到播放器数据库。
  * @param username 已解析的用户名称。
  * @author yahyaoo
  */
@@ -90,9 +77,8 @@ function persist(username: string): void {
 }
 
 /**
- * 列举 listRadioStations 对应的业务能力，参数和执行顺序保持原实现。
+ * 返回指定用户保存的自建网络电台列表。
  * @param username 已解析的用户名称。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
  * @author yahyaoo
  */
 export function listRadioStations(username: string): RadioStation[] {
@@ -100,10 +86,9 @@ export function listRadioStations(username: string): RadioStation[] {
 }
 
 /**
- * 获取 getRadioStation 对应的业务能力，参数和执行顺序保持原实现。
+ * 按电台标识查询用户电台记录。
  * @param username 已解析的用户名称。
- * @param id 原业务标识。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * @param id 当前业务对象标识。
  * @author yahyaoo
  */
 export function getRadioStation(username: string, id: string): RadioStation | null {
@@ -112,12 +97,11 @@ export function getRadioStation(username: string, id: string): RadioStation | nu
 }
 
 /**
- * 添加 addRadioStation 对应的业务能力，参数和执行顺序保持原实现。
+ * 为用户创建电台，保存流地址和可选主页信息。
  * @param username 已解析的用户名称。
- * @param name 原名称或查询词。
- * @param streamUrl streamUrl 原业务参数。
- * @param homepageUrl homepageUrl 原业务参数。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * @param name 对象名称或归档内相对名称。
+ * @param streamUrl 电台音频流地址。
+ * @param homepageUrl 电台可选主页地址。
  * @author yahyaoo
  */
 export function addRadioStation(username: string, name: string, streamUrl: string, homepageUrl?: string): RadioStation {
@@ -134,13 +118,12 @@ export function addRadioStation(username: string, name: string, streamUrl: strin
 }
 
 /**
- * 更新 updateRadioStation 对应的业务能力，参数和执行顺序保持原实现。
+ * 更新指定用户电台的名称、流地址及主页信息。
  * @param username 已解析的用户名称。
- * @param id 原业务标识。
- * @param name 原名称或查询词。
- * @param streamUrl streamUrl 原业务参数。
- * @param homepageUrl homepageUrl 原业务参数。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * @param id 当前业务对象标识。
+ * @param name 对象名称或归档内相对名称。
+ * @param streamUrl 电台音频流地址。
+ * @param homepageUrl 电台可选主页地址。
  * @author yahyaoo
  */
 export function updateRadioStation(
@@ -161,10 +144,9 @@ export function updateRadioStation(
 }
 
 /**
- * 移除 removeRadioStation 对应的业务能力，参数和执行顺序保持原实现。
+ * 删除用户选定的网络电台记录。
  * @param username 已解析的用户名称。
- * @param id 原业务标识。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * @param id 当前业务对象标识。
  * @author yahyaoo
  */
 export function removeRadioStation(username: string, id: string): boolean {

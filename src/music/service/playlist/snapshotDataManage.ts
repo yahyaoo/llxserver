@@ -1,4 +1,4 @@
-/** snapshotDataManage 模块：按职责组织，原业务行为保持不变。 @author yahyaoo */
+/** 歌单快照存储：读写版本数据、设备游标并按数量清理历史。 @author yahyaoo */
 import storageFs from '../../../application/persistence/documentFileSystem'
 import { throttle } from '../../../utils/common'
 import fs from 'node:fs'
@@ -8,77 +8,47 @@ import { checkAndCreateDirSync } from '../../../utils'
 import { getUserConfig, type UserDataManage } from '../../../user/data'
 import { File } from '../../../constants'
 
-/**
- * SnapshotInfo 契约，按当前模块职责组织，保留原字段和扩展能力。
- * @author yahyaoo
- */
+/** 快照元数据，记录最新快照、历史列表和设备确认游标。 @author yahyaoo */
 interface SnapshotInfo {
-  /**
-   * latest 字段，沿用原业务结构与空值约定。
-   */
+  /** 最新数据快照标识。 */
   latest: string | null
-  /**
-   * time 字段，沿用原业务结构与空值约定。
-   */
+
   time: number
-  /**
-   * list 字段，沿用原业务结构与空值约定。
-   */
+  /** 记录列表。 */
   list: string[]
-  /**
-   * clients 字段，沿用原业务结构与空值约定。
-   */
+  /** 设备到已确认快照的映射。 */
   clients: Record<string, LX.Sync.List.ListInfo>
 }
-/**
- * SnapshotDataManage 契约，按当前模块职责组织，保留原字段和扩展能力。
- * @author yahyaoo
- */
+/** 管理用户数据快照的读取、写入、保留数量和设备游标。 @author yahyaoo */
 export class SnapshotDataManage {
-  /**
-   * userDataManage 字段，沿用原业务结构与空值约定。
-   */
+
   userDataManage: UserDataManage
-  /**
-   * listDir 字段，沿用原业务结构与空值约定。
-   */
+  /** 用户歌单持久化目录。 */
   listDir: string
-  /**
-   * snapshotDir 字段，沿用原业务结构与空值约定。
-   */
+  /** 用户历史快照目录。 */
   snapshotDir!: string
-  /**
-   * snapshotInfoFilePath 字段，沿用原业务结构与空值约定。
-   */
+  /** 快照元数据文档路径。 */
   snapshotInfoFilePath!: string
-  /**
-   * snapshotInfo 字段，沿用原业务结构与空值约定。
-   */
+  /** 快照时间、历史列表和设备游标。 */
   snapshotInfo: SnapshotInfo
-  /**
-   * clientSnapshotKeys 字段，沿用原业务结构与空值约定。
-   */
+  /** 设备同步快照游标。 */
   clientSnapshotKeys: string[]
-  /**
-   * saveSnapshotInfoThrottle 字段，沿用原业务结构与空值约定。
-   */
+  /** 快照元数据的节流写入函数。 */
   private readonly saveSnapshotInfoThrottle: () => void
 
   /**
-   * 判断 isIncluedsDevice 对应的业务能力，参数和执行顺序保持原实现。
-   * @param key 业务作用域或缓存键。
-   * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-   * @author yahyaoo
-   */
+ * 判断快照设备游标中是否存在指定客户端。
+ * @param key 业务作用域或缓存键。
+ * @author yahyaoo
+ */
   isIncluedsDevice = (key: string) => {
     return this.clientSnapshotKeys.includes(key)
   }
 
   /**
-   * 清理 clearOldSnapshot 对应的业务能力，参数和执行顺序保持原实现。
-   * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-   * @author yahyaoo
-   */
+ * 按快照保留数量清理旧快照，保留最新快照及设备引用信息。
+ * @author yahyaoo
+ */
   clearOldSnapshot = async () => {
     if (!this.snapshotInfo) return
     const snapshotList = this.snapshotInfo.list.filter(key => !this.isIncluedsDevice(key))
@@ -96,12 +66,11 @@ export class SnapshotDataManage {
   }
 
   /**
-   * 更新 updateDeviceSnapshotKey 对应的业务能力，参数和执行顺序保持原实现。
-   * @param clientId 配对客户端标识。
-   * @param key 业务作用域或缓存键。
-   * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-   * @author yahyaoo
-   */
+ * 更新设备同步游标，并保存设备到快照的对应关系。
+ * @param clientId 配对客户端标识。
+ * @param key 业务作用域或缓存键。
+ * @author yahyaoo
+ */
   updateDeviceSnapshotKey = async (clientId: string, key: string) => {
     // console.log('updateDeviceSnapshotKey', key)
     let client = this.snapshotInfo.clients[clientId]
@@ -114,11 +83,10 @@ export class SnapshotDataManage {
   }
 
   /**
-   * 获取 getDeviceCurrentSnapshotKey 对应的业务能力，参数和执行顺序保持原实现。
-   * @param clientId 配对客户端标识。
-   * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-   * @author yahyaoo
-   */
+ * 读取设备已确认同步到的快照标识。
+ * @param clientId 配对客户端标识。
+ * @author yahyaoo
+ */
   getDeviceCurrentSnapshotKey = async (clientId: string) => {
     // console.log('updateDeviceSnapshotKey', key)
     const client = this.snapshotInfo.clients[clientId]
@@ -126,31 +94,28 @@ export class SnapshotDataManage {
   }
 
   /**
-   * 获取 getSnapshotInfo 对应的业务能力，参数和执行顺序保持原实现。
-   * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-   * @author yahyaoo
-   */
+ * 读取快照元数据，包含最新标识、生成时间和设备游标。
+ * @author yahyaoo
+ */
   getSnapshotInfo = async (): Promise<SnapshotInfo> => {
     return this.snapshotInfo
   }
 
   /**
-   * 保存 saveSnapshotInfo 对应的业务能力，参数和执行顺序保持原实现。
-   * @param info 原业务元信息。
-   * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-   * @author yahyaoo
-   */
+ * 保存快照元数据，合并当前设备游标与快照列表。
+ * @param info 待保存业务条目。
+ * @author yahyaoo
+ */
   saveSnapshotInfo = (info: SnapshotInfo) => {
     this.snapshotInfo = info
     this.saveSnapshotInfoThrottle()
   }
 
   /**
-   * 移除 removeSnapshotInfo 对应的业务能力，参数和执行顺序保持原实现。
-   * @param clientId 配对客户端标识。
-   * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-   * @author yahyaoo
-   */
+ * 从快照元数据中删除指定快照标识。
+ * @param clientId 配对客户端标识。
+ * @author yahyaoo
+ */
   removeSnapshotInfo = (clientId: string) => {
     let client = this.snapshotInfo.clients[clientId]
     if (!client) return
@@ -161,11 +126,10 @@ export class SnapshotDataManage {
   }
 
   /**
-   * 获取 getSnapshot 对应的业务能力，参数和执行顺序保持原实现。
-   * @param name 原名称或查询词。
-   * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-   * @author yahyaoo
-   */
+ * 读取指定快照中的完整用户数据。
+ * @param name 对象名称或归档内相对名称。
+ * @author yahyaoo
+ */
   getSnapshot = async (name: string) => {
     const filePath = path.join(this.snapshotDir, `snapshot_${name}`)
     let listData: LX.Sync.List.ListData
@@ -179,12 +143,11 @@ export class SnapshotDataManage {
   }
 
   /**
-   * 保存 saveSnapshot 对应的业务能力，参数和执行顺序保持原实现。
-   * @param name 原名称或查询词。
-   * @param data 原业务数据，保留扩展字段。
-   * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-   * @author yahyaoo
-   */
+ * 保存完整数据快照并更新最新标识。
+ * @param name 对象名称或归档内相对名称。
+ * @param data 需要保存或转换的数据。
+ * @author yahyaoo
+ */
   saveSnapshot = async (name: string, data: string) => {
     syncLog.info('saveSnapshot', this.userDataManage.userName, name)
     const filePath = path.join(this.snapshotDir, `snapshot_${name}`)
@@ -197,13 +160,12 @@ export class SnapshotDataManage {
   }
 
   /**
-   * 保存 saveSnapshotWithTime 对应的业务能力，参数和执行顺序保持原实现。
-   * @param name 原名称或查询词。
-   * @param data 原业务数据，保留扩展字段。
-   * @param time time 原业务参数。
-   * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-   * @author yahyaoo
-   */
+ * 按指定历史时间保存快照，用于导入和恢复历史版本。
+ * @param name 对象名称或归档内相对名称。
+ * @param data 需要保存或转换的数据。
+ * @param time 快照或记录时间，单位毫秒。
+ * @author yahyaoo
+ */
   saveSnapshotWithTime = async (name: string, data: string, time: number) => {
     syncLog.info('saveSnapshotWithTime', this.userDataManage.userName, name, time)
     const filePath = path.join(this.snapshotDir, `snapshot_${name}`)
@@ -220,11 +182,10 @@ export class SnapshotDataManage {
   }
 
   /**
-   * 移除 removeSnapshot 对应的业务能力，参数和执行顺序保持原实现。
-   * @param name 原名称或查询词。
-   * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-   * @author yahyaoo
-   */
+ * 删除选定快照数据并维护快照元数据。
+ * @param name 对象名称或归档内相对名称。
+ * @author yahyaoo
+ */
   removeSnapshot = async (name: string) => {
     syncLog.info('removeSnapshot', this.userDataManage.userName, name)
     const filePath = path.join(this.snapshotDir, `snapshot_${name}`)
@@ -236,10 +197,9 @@ export class SnapshotDataManage {
   }
 
   /**
-   * 获取 getSnapshotListWithMeta 对应的业务能力，参数和执行顺序保持原实现。
-   * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-   * @author yahyaoo
-   */
+ * 列出快照标识、生成时间及相关元信息。
+ * @author yahyaoo
+ */
   getSnapshotListWithMeta = async () => {
     const list = []
     try {
@@ -267,10 +227,9 @@ export class SnapshotDataManage {
   }
 
   /**
-   * 清理 clearClients 对应的业务能力，参数和执行顺序保持原实现。
-   * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-   * @author yahyaoo
-   */
+ * 清空设备快照游标，使设备下次重新比较同步基线。
+ * @author yahyaoo
+ */
   clearClients = () => {
     this.snapshotInfo.clients = {}
     this.clientSnapshotKeys = []
@@ -278,11 +237,10 @@ export class SnapshotDataManage {
   }
 
   /**
-   * 设置 setLatest 对应的业务能力，参数和执行顺序保持原实现。
-   * @param name 原名称或查询词。
-   * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-   * @author yahyaoo
-   */
+ * 更新当前数据使用的最新快照标识。
+ * @param name 对象名称或归档内相对名称。
+ * @author yahyaoo
+ */
   setLatest = (name: string) => {
     this.snapshotInfo.latest = name
     this.saveSnapshotInfoThrottle()
@@ -369,10 +327,10 @@ export class SnapshotDataManage {
   }
 
   /**
-   * 构造实例 constructor 对应的业务能力，参数和执行顺序保持原实现。
-   * @param userDataManage userDataManage 原业务参数。
-   * @author yahyaoo
-   */
+ * 绑定用户快照目录，载入或初始化最新版本与设备游标。
+ * @param userDataManage 当前用户空间的数据与快照管理器。
+ * @author yahyaoo
+ */
   constructor(userDataManage: UserDataManage) {
     this.userDataManage = userDataManage
 

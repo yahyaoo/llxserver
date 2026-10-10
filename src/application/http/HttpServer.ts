@@ -1,9 +1,11 @@
+import { DatabaseLocationService } from '../persistence/DatabaseLocationService'
 import { reloadActiveUserSpaces } from '../../user'
 import type { UserToken } from '../../common/model/dto/UserTokenDto'
 import { GlobalConfigurationService } from '../../admin/service/GlobalConfigurationService'
+import defaultConfig from '../../defaultConfig'
 import { BrowserStorageService } from '../../music/service/configuration/BrowserStorageService'
 import { BrowserStorageRepository } from '../../music/repository/BrowserStorageRepository'
-/** HttpServer 模块：按职责组织，原业务行为保持不变。 @author yahyaoo */
+/** 服务装配与 HTTP 路由：初始化依赖、同步 WebSocket、播放器鉴权和媒体响应。 @author yahyaoo */
 import * as adminOperationsController from '../../admin/controller/OperationsController'
 import { importConfiguration } from '../../music/controller/ConfigurationImportController'
 import { MusicConfigurationRepository } from '../../music/repository/MusicConfigurationRepository'
@@ -124,9 +126,7 @@ const serializeDislikeRules = (rules: string, username?: string) => {
 }
 
 // ===== Player Session Store =====
-const playerSessions = new Map<string, { /**
- * createdAt 字段，沿用原业务结构与空值约定。
- */
+const playerSessions = new Map<string, { /** 记录创建时间。 */
 createdAt: number }>()
 const SESSION_TTL = 24 * 60 * 60 * 1000 // 24小时
 const SESSION_COOKIE_NAME = 'lx_player_session'
@@ -135,9 +135,8 @@ const SESSION_COOKIE_NAME = 'lx_player_session'
 const artistPicCache = new Map<string, string>()
 const artistPicInFlight = new Map<string, Promise<string | null>>()
 /**
- * 提取 extractArtistPic 对应的业务能力，参数和执行顺序保持原实现。
- * @param d d 原业务参数。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * 从歌手详情的候选图片字段中提取可用图片地址。
+ * @param d 待格式化日期。
  * @author yahyaoo
  */
 function extractArtistPic(d: any): string | null {
@@ -149,9 +148,8 @@ function extractArtistPic(d: any): string | null {
 const albumPicCache = new Map<string, string>()
 const albumPicInFlight = new Map<string, Promise<string | null>>()
 /**
- * 提取 extractAlbumPic 对应的业务能力，参数和执行顺序保持原实现。
- * @param d d 原业务参数。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * 从专辑详情中提取封面地址，兼容不同音乐平台字段。
+ * @param d 待格式化日期。
  * @author yahyaoo
  */
 function extractAlbumPic(d: any): string | null {
@@ -167,8 +165,7 @@ let activeMediaMetadataFetches = 0
 const mediaMetadataWaiters: Array<() => void> = []
 
 /**
- * 处理 acquireMediaMetadataSlot 对应的业务能力，参数和执行顺序保持原实现。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * 等待媒体元信息操作的并发名额，避免同时启动过多原生处理任务。
  * @author yahyaoo
  */
 function acquireMediaMetadataSlot(): Promise<void> {
@@ -183,8 +180,7 @@ function acquireMediaMetadataSlot(): Promise<void> {
 }
 
 /**
- * 处理 releaseMediaMetadataSlot 对应的业务能力，参数和执行顺序保持原实现。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * 归还元信息处理名额，并唤醒等待队列中的下一项操作。
  * @author yahyaoo
  */
 function releaseMediaMetadataSlot() {
@@ -297,28 +293,17 @@ setInterval(() => {
 // ===== User Session Token Store =====
 export type { UserToken } from '../../common/model/dto/UserTokenDto'
 
-/**
- * UserTokenConfig 契约，按当前模块职责组织，保留原字段和扩展能力。
- * @author yahyaoo
- */
+/** 播放器用户令牌的有效期与保存数据结构。 @author yahyaoo */
 interface UserTokenConfig {
-  /**
-   * enabled 字段，沿用原业务结构与空值约定。
-   */
+  /** 功能是否启用。 */
   enabled: boolean
-  /**
-   * tokens 字段，沿用原业务结构与空值约定。
-   */
+
   tokens: UserToken[]
 }
 
 /** 用户 Token 存储：token → { username, createdAt } */
-const userSessions = new Map<string, { /**
- * username 字段，沿用原业务结构与空值约定。
- */
-username: string; /**
- * createdAt 字段，沿用原业务结构与空值约定。
- */
+const userSessions = new Map<string, { /** 用户名称，用于隔离用户数据。 */
+username: string; /** 记录创建时间，单位毫秒。 */
 createdAt: number }>()
 const USER_SESSION_TTL = 7 * 24 * 60 * 60 * 1000 // 7天
 
@@ -326,21 +311,11 @@ const USER_SESSION_TTL = 7 * 24 * 60 * 60 * 1000 // 7天
 const persistentTokens = new Map<string, string>()
 
 /** 持久化 Token 元数据缓存：token → token 对象（含 disabled/expiresAt/lastUsed）*/
-const persistentTokenMeta = new Map<string, { /**
- * name 字段，沿用原业务结构与空值约定。
- */
-name: string; /**
- * token 字段，沿用原业务结构与空值约定。
- */
-token: string; /**
- * disabled 字段，沿用原业务结构与空值约定。
- */
-disabled?: boolean; /**
- * expiresAt 字段，沿用原业务结构与空值约定。
- */
-expiresAt?: number; /**
- * lastUsed 字段，沿用原业务结构与空值约定。
- */
+const persistentTokenMeta = new Map<string, { /** 条目名称。 */
+name: string; /** 认证令牌。 */
+token: string;
+disabled?: boolean;
+expiresAt?: number;
 lastUsed?: number }>()
 
 /** lastUsed 防抖写盘队列：username → debounce timer */
@@ -724,15 +699,13 @@ const authConnection = (req: http.IncomingMessage, callback: (err: string | null
 let wss: LX.SocketServer | null
 
 /**
- * 处理 noop 对应的业务能力，参数和执行顺序保持原实现。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * 提供无需处理结果的空回调。
  * @author yahyaoo
  */
 function noop() { }
 /**
- * 处理 onSocketError 对应的业务能力，参数和执行顺序保持原实现。
- * @param err err 原业务参数。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * 记录同步连接的底层套接字错误。
+ * @param err 捕获的运行错误。
  * @author yahyaoo
  */
 function onSocketError(err: Error) {
@@ -789,10 +762,9 @@ const reloadServerData = async () => {
 
   // 1. 重新加载配置文件 (必须先加载基础配置)
   const configPath = global.lx.configPath || process.env.CONFIG_PATH || path.join(global.lx.dataPath, 'config.js')
-  if (storageFs.existsSync(configPath)) {
+  {
     try {
-      delete require.cache[require.resolve(configPath)]
-      const rootConfig = new GlobalConfigurationService(repositories().admin).load(configPath, () => require(configPath))
+      const rootConfig = new GlobalConfigurationService(repositories().admin).load(configPath, defaultConfig)
 
       // 合并除 users 以外的配置项
       for (const key of Object.keys(rootConfig)) {
@@ -948,12 +920,8 @@ const getAudioRemoteSize = async (audioUrl: string): Promise<number | null> => {
 
 const AUTO_SOURCE_ORDER = ['wy', 'tx', 'kw', 'kg', 'mg']
 const SOURCE_MATCH_CACHE_TTL = 60_000
-const sourceMatchCache = new Map<string, { /**
- * expiresAt 字段，沿用原业务结构与空值约定。
- */
-expiresAt: number, /**
- * promise 字段，沿用原业务结构与空值约定。
- */
+const sourceMatchCache = new Map<string, { /** 缓存或票据失效时间。 */
+expiresAt: number,
 promise: Promise<any[]> }>()
 
 const normalizeSongMatchText = (value: unknown) => String(value || '')
@@ -1068,34 +1036,19 @@ const findServerSourceMatches = async (songInfo: any, username: string) => {
   return promise
 }
 
-/**
- * ServerSongResolveResult 契约，按当前模块职责组织，保留原字段和扩展能力。
- * @author yahyaoo
- */
+/** 歌曲链接解析结果，包含实际音源、音质和歌曲元信息。 @author yahyaoo */
 interface ServerSongResolveResult {
-  /**
-   * url 字段，沿用原业务结构与空值约定。
-   */
+  /** 请求或资源地址。 */
   url: string
-  /**
-   * quality 字段，沿用原业务结构与空值约定。
-   */
+  /** 音质标识。 */
   quality: string
-  /**
-   * songInfo 字段，沿用原业务结构与空值约定。
-   */
+  /** 歌曲详情及平台扩展字段。 */
   songInfo: any
-  /**
-   * requestedSource 字段，沿用原业务结构与空值约定。
-   */
+  /** 客户端选择的音乐平台。 */
   requestedSource?: string
-  /**
-   * downloadSource 字段，沿用原业务结构与空值约定。
-   */
+  /** 最终解析到的下载平台。 */
   downloadSource?: string
-  /**
-   * sourceName 字段，沿用原业务结构与空值约定。
-   */
+  /** 音源显示名称。 */
   sourceName?: string
 }
 
@@ -1217,6 +1170,7 @@ const serveStatic = (req: IncomingMessage, res: http.ServerResponse, filePath: s
 /** 应用能力装配，状态通过 getter 保留热更新，避免两个域直接依赖。 @author yahyaoo */
 export function createServerRuntime() {
   return {
+    get databaseLocation() { return new DatabaseLocationService() },
     get ElFinderConnector() { return ElFinderConnector },
     get File() { return File },
     get MetaPicture() { return MetaPicture },
@@ -1555,12 +1509,8 @@ const handleStartServer = async (port = 9527, ip = '0.0.0.0') => await new Promi
             invalidateDislikeCache(username)
             if (sections.includes('settings')) {
               const settings = repositories().music.read('music_settings', path.join(getUserSpace(username).dataManage.userDir, File.userSettingsJSON))?.value as any
-              const taskConfig: { /**
- * intervalMs 字段，沿用原业务结构与空值约定。
- */
-intervalMs?: number; /**
- * enabled 字段，沿用原业务结构与空值约定。
- */
+              const taskConfig: { /** 执行间隔，单位毫秒。 */
+intervalMs?: number; /** 功能是否启用。 */
 enabled?: boolean } = {}
               const interval = scheduler.parseIntervalMs(settings?.networkListAutoCheckInterval)
               if (interval) taskConfig.intervalMs = interval
@@ -2411,6 +2361,10 @@ enabled?: boolean } = {}
 
 
       // Configuration API
+      if (pathname === '/api/config/import' && req.method === 'POST') {
+        await adminConfigurationController.postConfigurationImport({ req, res, pathname, urlObj, ip }, serverRuntime)
+        return
+      }
       if (pathname === '/api/config') {
         await adminConfigurationController.handleConfig({ req, res, pathname, urlObj, ip }, serverRuntime)
         return
@@ -2723,11 +2677,10 @@ enabled?: boolean } = {}
       funcsObj: callObj,
       timeout: 120 * 1000,
       /**
-       * 发送 sendMessage 对应的业务能力，参数和执行顺序保持原实现。
-       * @param data 原业务数据，保留扩展字段。
-       * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-       * @author yahyaoo
-       */
+ * 向同步 WebSocket 客户端发送序列化消息。
+ * @param data 需要保存或转换的数据。
+ * @author yahyaoo
+ */
       sendMessage(data: any) {
         if (disconnected) throw new Error('disconnected')
         void encryptMsg(socket.keyInfo, JSON.stringify(data)).then((data: string) => {
@@ -2740,22 +2693,20 @@ enabled?: boolean } = {}
         })
       },
       /**
-       * 处理 onCallBeforeParams 对应的业务能力，参数和执行顺序保持原实现。
-       * @param rawArgs rawArgs 原业务参数。
-       * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-       * @author yahyaoo
-       */
+ * 在远程调用执行前校验或补充同步协议参数。
+ * @param rawArgs 远程调用的原始参数。
+ * @author yahyaoo
+ */
       onCallBeforeParams(rawArgs: any[]) {
         return [socket, ...rawArgs]
       },
       /**
-       * 处理 onError 对应的业务能力，参数和执行顺序保持原实现。
-       * @param error error 原业务参数。
-       * @param path 原资源路径。
-       * @param groupName groupName 原业务参数。
-       * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-       * @author yahyaoo
-       */
+ * 记录同步远程调用发生的异常。
+ * @param error 错误原因。
+ * @param path 原资源路径。
+ * @param groupName 歌曲目录分类名称。
+ * @author yahyaoo
+ */
       onError(error: Error, path: string[], groupName: string | null) {
         const name = groupName ?? ''
         const userName = socket.userInfo?.name ?? ''
@@ -2989,10 +2940,9 @@ const startSubsonicStandaloneServer = () => {
 // }
 
 /**
- * 启动 startServer 对应的业务能力，参数和执行顺序保持原实现。
- * @param port port 原业务参数。
- * @param ip ip 原业务参数。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * 初始化音乐 SDK、音源、缓存与下载解析器，启动 HTTP 和可选 Subsonic 监听，再启动任务调度。
+ * @param port HTTP 监听端口。
+ * @param ip 服务绑定地址。
  * @author yahyaoo
  */
 export const startServer = async (port: number, ip: string) => {
@@ -3157,8 +3107,10 @@ export const startServer = async (port: number, ip: string) => {
 }
 
 /**
- * 获取 getStatus 对应的业务能力，参数和执行顺序保持原实现。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * 查询服务器资源用量、用户和同步连接状态。
+ * @param context 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 当前服务的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export const getStatus = (): LX.Sync.Status => status
@@ -3170,9 +3122,8 @@ export const getStatus = (): LX.Sync.Status => status
 // }
 
 /**
- * 获取 getDevices 对应的业务能力，参数和执行顺序保持原实现。
+ * 查询指定用户空间中已配对的同步设备。
  * @param userName 用户名称。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
  * @author yahyaoo
  */
 export const getDevices = async (userName: string) => {
@@ -3181,10 +3132,9 @@ export const getDevices = async (userName: string) => {
 }
 
 /**
- * 移除 removeDevice 对应的业务能力，参数和执行顺序保持原实现。
+ * 关闭指定设备的在线连接，并删除用户空间中的设备记录。
  * @param userName 用户名称。
  * @param clientId 配对客户端标识。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
  * @author yahyaoo
  */
 export const removeDevice = async (userName: string, clientId: string) => {

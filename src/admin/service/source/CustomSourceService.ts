@@ -1,4 +1,4 @@
-/** CustomSourceService 模块：按职责组织，原业务行为保持不变。 @author yahyaoo */
+/** 音源管理服务：校验、上传、远程导入、启用、排序与删除音源脚本。 @author yahyaoo */
 import storageFs from '../../../application/persistence/documentFileSystem'
 import * as fs from 'fs'
 import * as path from 'path'
@@ -9,9 +9,8 @@ import { getProxyAgent } from '../../../integrations/music-sdk/NetworkGateway'
 
 // 读取请求体
 /**
- * 读取 readBody 对应的业务能力，参数和执行顺序保持原实现。
- * @param req 原 HTTP 请求。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * 汇集请求数据块，读取完整 UTF-8 请求正文；读取错误通过 Promise 拒绝返回。
+ * @param req HTTP 请求，包含认证头、查询参数和上传正文。
  * @author yahyaoo
  */
 async function readBody(req: IncomingMessage): Promise<string> {
@@ -28,10 +27,9 @@ async function readBody(req: IncomingMessage): Promise<string> {
 
 // 验证脚本
 /**
- * 处理 handleValidate 对应的业务能力，参数和执行顺序保持原实现。
- * @param req 原 HTTP 请求。
- * @param res 原 HTTP 响应。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * 校验上传音源脚本，提取名称、版本及支持平台并返回检测结果。
+ * @param req HTTP 请求，包含认证头、查询参数和上传正文。
+ * @param res HTTP 响应，用于写入状态码、数据或媒体流。
  * @author yahyaoo
  */
 export async function handleValidate(req: IncomingMessage, res: ServerResponse) {
@@ -101,10 +99,9 @@ export async function handleValidate(req: IncomingMessage, res: ServerResponse) 
 
 // 辅助函数：获取脚本信息（元数据和支持的源）
 /**
- * 获取 getScriptInfo 对应的业务能力，参数和执行顺序保持原实现。
- * @param scriptContent scriptContent 原业务参数。
- * @param allowUnsafeVM allowUnsafeVM 原业务参数。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * 读取脚本元数据，并检测脚本声明的音乐平台与能力。
+ * @param scriptContent 上传音源脚本文本。
+ * @param allowUnsafeVM 是否允许使用原生 VM 执行脚本。
  * @author yahyaoo
  */
 async function getScriptInfo(scriptContent: string, allowUnsafeVM: boolean = false) {
@@ -137,9 +134,8 @@ async function getScriptInfo(scriptContent: string, allowUnsafeVM: boolean = fal
 
 // 辅助函数：获取源存储目录
 /**
- * 获取 getSourceDir 对应的业务能力，参数和执行顺序保持原实现。
+ * 计算用户音源目录；未指定用户时使用公共音源目录。
  * @param username 已解析的用户名称。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
  * @author yahyaoo
  */
 function getSourceDir(username?: string) {
@@ -152,10 +148,9 @@ function getSourceDir(username?: string) {
 
 // 辅助函数：生成可读且唯一的 ID/文件名
 /**
- * 生成 generateId 对应的业务能力，参数和执行顺序保持原实现。
- * @param name 原名称或查询词。
- * @param fallbackFilename fallbackFilename 原业务参数。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * 将音源名称转为可用文件标识，缺少名称时使用上传文件名。
+ * @param name 对象名称或归档内相对名称。
+ * @param fallbackFilename 缺少名称时采用的上传文件名。
  * @author yahyaoo
  */
 function generateId(name?: string, fallbackFilename?: string): string {
@@ -184,10 +179,9 @@ function generateId(name?: string, fallbackFilename?: string): string {
 
 // 上传脚本
 /**
- * 处理 handleUpload 对应的业务能力，参数和执行顺序保持原实现。
- * @param req 原 HTTP 请求。
- * @param res 原 HTTP 响应。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * 保存上传音源脚本，写入音源注册信息并触发重新加载。
+ * @param req HTTP 请求，包含认证头、查询参数和上传正文。
+ * @param res HTTP 响应，用于写入状态码、数据或媒体流。
  * @author yahyaoo
  */
 export async function handleUpload(req: IncomingMessage, res: ServerResponse) {
@@ -297,10 +291,9 @@ export async function handleUpload(req: IncomingMessage, res: ServerResponse) {
 
 // 从远程URL导入脚本
 /**
- * 处理 handleImport 对应的业务能力，参数和执行顺序保持原实现。
- * @param req 原 HTTP 请求。
- * @param res 原 HTTP 响应。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * 从远程地址获取音源脚本，并复用上传流程注册该音源。
+ * @param req HTTP 请求，包含认证头、查询参数和上传正文。
+ * @param res HTTP 响应，用于写入状态码、数据或媒体流。
  * @author yahyaoo
  */
 export async function handleImport(req: IncomingMessage, res: ServerResponse) {
@@ -467,11 +460,10 @@ export async function handleImport(req: IncomingMessage, res: ServerResponse) {
 // 如果提供了 username，返回 open + username 的源
 // 如果没提供，只返回 open 的源
 /**
- * 处理 handleList 对应的业务能力，参数和执行顺序保持原实现。
- * @param req 原 HTTP 请求。
- * @param res 原 HTTP 响应。
+ * 汇总公共音源与用户音源，合并该用户的启用状态和排序。
+ * @param req HTTP 请求，包含认证头、查询参数和上传正文。
+ * @param res HTTP 响应，用于写入状态码、数据或媒体流。
  * @param username 已解析的用户名称。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
  * @author yahyaoo
  */
 export async function handleList(req: IncomingMessage, res: ServerResponse, username: string) {
@@ -604,10 +596,9 @@ export async function handleList(req: IncomingMessage, res: ServerResponse, user
 // 启用/禁用
 // 启用/禁用
 /**
- * 处理 handleToggle 对应的业务能力，参数和执行顺序保持原实现。
- * @param req 原 HTTP 请求。
- * @param res 原 HTTP 响应。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * 修改用户音源启用状态，并通知音源运行时重新加载。
+ * @param req HTTP 请求，包含认证头、查询参数和上传正文。
+ * @param res HTTP 响应，用于写入状态码、数据或媒体流。
  * @author yahyaoo
  */
 export async function handleToggle(req: IncomingMessage, res: ServerResponse) {
@@ -769,10 +760,9 @@ export async function handleToggle(req: IncomingMessage, res: ServerResponse) {
 
 // 拖拽排序，更新 sources.json 中源的顺序
 /**
- * 处理 handleReorder 对应的业务能力，参数和执行顺序保持原实现。
- * @param req 原 HTTP 请求。
- * @param res 原 HTTP 响应。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * 保存用户的音源优先级顺序，供播放地址解析选择音源。
+ * @param req HTTP 请求，包含认证头、查询参数和上传正文。
+ * @param res HTTP 响应，用于写入状态码、数据或媒体流。
  * @author yahyaoo
  */
 export async function handleReorder(req: IncomingMessage, res: ServerResponse) {
@@ -869,10 +859,9 @@ export async function handleReorder(req: IncomingMessage, res: ServerResponse) {
 
 // 删除
 /**
- * 处理 handleDelete 对应的业务能力，参数和执行顺序保持原实现。
- * @param req 原 HTTP 请求。
- * @param res 原 HTTP 响应。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * 删除指定音源脚本及注册记录，并更新当前运行时。
+ * @param req HTTP 请求，包含认证头、查询参数和上传正文。
+ * @param res HTTP 响应，用于写入状态码、数据或媒体流。
  * @author yahyaoo
  */
 export async function handleDelete(req: IncomingMessage, res: ServerResponse) {
@@ -962,10 +951,9 @@ export async function handleDelete(req: IncomingMessage, res: ServerResponse) {
 
 // 更新音源的平台配置 (关闭/开启部分平台)
 /**
- * 处理 handleUpdatePlatforms 对应的业务能力，参数和执行顺序保持原实现。
- * @param req 原 HTTP 请求。
- * @param res 原 HTTP 响应。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * 更新音源平台声明，使平台选择与脚本支持范围一致。
+ * @param req HTTP 请求，包含认证头、查询参数和上传正文。
+ * @param res HTTP 响应，用于写入状态码、数据或媒体流。
  * @author yahyaoo
  */
 export async function handleUpdatePlatforms(req: IncomingMessage, res: ServerResponse) {

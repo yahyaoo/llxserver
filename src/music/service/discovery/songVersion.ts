@@ -1,4 +1,4 @@
-/** songVersion 模块：按职责组织，原业务行为保持不变。 @author yahyaoo */
+/** 歌曲名称归一化：移除版本后缀、拆分歌手并缓存用于匹配的标准名称。 @author yahyaoo */
 import { SPLIT_CHAR } from '../../../constants'
 
 /**

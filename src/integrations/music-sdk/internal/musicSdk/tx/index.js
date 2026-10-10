@@ -1,4 +1,4 @@
-/** index 模块：按职责组织，原业务行为保持不变。 @author yahyaoo */
+/** QQ 音乐接口适配：汇总平台搜索、歌词、歌单和播放能力。 @author yahyaoo */
 import leaderboard from './leaderboard.js'
 import lyric from './lyric.js'
 import songList from './songList.js'

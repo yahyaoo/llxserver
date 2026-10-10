@@ -1,4 +1,4 @@
-/** dislikeCache 模块：按职责组织，原业务行为保持不变。 @author yahyaoo */
+/** 用户不喜欢规则缓存：解析并复用规则集合，配置或数据变化时失效。 @author yahyaoo */
 import storageFs from '../../../application/persistence/documentFileSystem'
 import type { DislikeRuleSet } from '../dislike/match'
 import { parseDislikeRules } from '../dislike/match'
@@ -13,15 +13,9 @@ import { parseDislikeRules } from '../dislike/match'
  *   - 并以 TTL 兜底外部（如 lx-music 客户端同步）对规则的变更。
  */
 
-const cache = new Map<string, { /**
- * ts 字段，沿用原业务结构与空值约定。
- */
-ts: number, /**
- * mutatedAt 字段，沿用原业务结构与空值约定。
- */
-mutatedAt: number, /**
- * set 字段，沿用原业务结构与空值约定。
- */
+const cache = new Map<string, { /** 缓存数据取得时间，用于判断过期。 */
+ts: number,
+mutatedAt: number,
 set: DislikeRuleSet | null }>()
 const mutatedAt = new Map<string, number>()
 const TTL = 30 * 1000

@@ -1,4 +1,4 @@
-/** discovery 模块：按职责组织，原业务行为保持不变。 @author yahyaoo */
+/** 发现页查询：获取音乐平台流派分类及官方电台列表。 @author yahyaoo */
 import { httpFetch } from '../../../integrations/music-sdk/NetworkGateway'
 
 /**

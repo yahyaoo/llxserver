@@ -1,4 +1,4 @@
-/** songList 模块：按职责组织，原业务行为保持不变。 @author yahyaoo */
+/** 咪咕音乐接口适配：歌单分类、列表、详情和歌曲分页查询。 @author yahyaoo */
 import { httpFetch } from '../../request.js'
 import { formatPlayCount } from '../../index.js'
 import { filterMusicInfoListV5 } from './musicInfo.js'

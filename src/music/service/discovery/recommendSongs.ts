@@ -1,4 +1,4 @@
-/** recommendSongs 模块：按职责组织，原业务行为保持不变。 @author yahyaoo */
+/** 每日推荐歌曲：展开推荐专辑歌曲、去重并按日期种子洗牌。 @author yahyaoo */
 import musicSdkRaw from '../../../integrations/music-sdk/MusicGateway'
 import { fetchRecommendedAlbums } from './recommendAlbums'
 
@@ -6,12 +6,8 @@ const musicSdk = musicSdkRaw as any
 
 // 每日推荐歌曲缓存：按「自然日」刷新一次，当天内稳定（同一天多次请求共享结果），
 // 次日自动换一批。QQ 抓取失败时回退到上次成功结果（即便已跨天），避免每日推荐空白。
-const recommendSongsCache = new Map<string, { /**
- * date 字段，沿用原业务结构与空值约定。
- */
-date: string, /**
- * songs 字段，沿用原业务结构与空值约定。
- */
+const recommendSongsCache = new Map<string, { /** 记录日期。 */
+date: string, /** 歌曲列表。 */
 songs: any[] }>()
 const ALBUM_POOL = 8 // 每天从推荐专辑里取前 N 张，汇聚其歌曲
 

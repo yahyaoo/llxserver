@@ -1,4 +1,4 @@
-/** options 模块：按职责组织，原业务行为保持不变。 @author yahyaoo */
+/** 音乐 SDK 请求选项与统一配置。 @author yahyaoo */
 export const bHh = '624868746c'
 
 export const headers = {

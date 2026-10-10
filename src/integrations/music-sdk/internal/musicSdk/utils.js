@@ -1,4 +1,4 @@
-/** utils 模块：按职责组织，原业务行为保持不变。 @author yahyaoo */
+/** 音乐 SDK 字段整理：歌手、音质、歌名与歌曲标识转换。 @author yahyaoo */
 import crypto from 'crypto'
 import dns from 'dns'
 import { decodeName } from '../../../../modules/utils'

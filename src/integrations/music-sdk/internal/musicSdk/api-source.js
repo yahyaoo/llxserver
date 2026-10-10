@@ -1,4 +1,4 @@
-/** api-source 模块：按职责组织，原业务行为保持不变。 @author yahyaoo */
+/** 音乐 SDK 音源配置及平台能力选择。 @author yahyaoo */
 // ========================================
 // 服务器端版本的 api-source.js
 // 移除了对 @renderer/store 的依赖

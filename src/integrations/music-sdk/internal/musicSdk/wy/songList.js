@@ -1,4 +1,4 @@
-/** songList 模块：按职责组织，原业务行为保持不变。 @author yahyaoo */
+/** 网易云音乐接口适配：歌单分类、列表、详情和歌曲分页查询。 @author yahyaoo */
 // https://github.com/Binaryify/NeteaseCloudMusicApi/blob/master/module/playlist_catlist.js
 // https://github.com/Binaryify/NeteaseCloudMusicApi/blob/master/module/playlist_hot.js
 // https://github.com/Binaryify/NeteaseCloudMusicApi/blob/master/module/top_playlist.js

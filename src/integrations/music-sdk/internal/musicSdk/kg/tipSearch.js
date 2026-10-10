@@ -1,4 +1,4 @@
-/** tipSearch 模块：按职责组织，原业务行为保持不变。 @author yahyaoo */
+/** 酷狗音乐接口适配：搜索输入建议查询。 @author yahyaoo */
 import { createHttpFetch } from './util.js'
 
 export default {

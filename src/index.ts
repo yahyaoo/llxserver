@@ -5,7 +5,7 @@ import { GlobalConfigurationService } from './admin/service/GlobalConfigurationS
 
 import fs from 'fs'
 import path from 'path'
-import crypto from 'crypto'
+import { readDatabasePaths, writeDatabasePaths } from './application/persistence/BootstrapConfiguration'
 import moduleAlias from 'module-alias'
 // @ts-ignore
 moduleAlias.addAliases({
@@ -81,17 +81,6 @@ const setBoolConfig = <K extends keyof LX.Config>(key: K, val?: string) => {
       }),
   ].map(([e, v]) => `${e}: ${v as string}`)
   if (envLog.length) console.log(`Load env: \n  ${envLog.join('\n  ')}`)
-}
-
-let lastConfigHash = ''
-const getConfigHash = (filePath: string) => {
-  try {
-    if (!storageFs.existsSync(filePath)) return ''
-    const content = storageFs.readFileSync(filePath)
-    return crypto.createHash('md5').update(content).digest('hex')
-  } catch {
-    return ''
-  }
 }
 
 const dataPath = envParams.DATA_PATH ?? path.join(__dirname, '../data')
@@ -178,9 +167,8 @@ const backupConfig = () => {
   const dateStr = getTodayStr()
   if (dateStr === lastBackupDate) return
   try {
-    if (!global.lx?.configPath || !storageFs.existsSync(global.lx.configPath)) return
     storageFs.mkdirSync(backupDir, { recursive: true })
-    storageFs.copyFileSync(global.lx.configPath, path.join(backupDir, `config-${dateStr}.js`))
+    storageFs.writeFileSync(path.join(backupDir, `config-${dateStr}.js`), new GlobalConfigurationService(repositories().admin).export(global.lx.config))
     lastBackupDate = dateStr
     console.log(`[Config] Local backup saved to ${backupDir}/config-${dateStr}.js`)
   } catch (err) {
@@ -193,12 +181,12 @@ const backupConfig = () => {
 const backupConfigNow = (): { success: boolean, filename?: string, error?: string } => {
   const backupDir = getConfigBackupDir()
   try {
-    if (!global.lx?.configPath || !storageFs.existsSync(global.lx.configPath)) {
-      return { success: false, error: 'Config file not found' }
-    }
     storageFs.mkdirSync(backupDir, { recursive: true })
-    const filename = `config-manual-${getTimestampStr()}.js`
-    storageFs.copyFileSync(global.lx.configPath, path.join(backupDir, filename))
+    // 同秒多次备份不能覆盖待还原文件，依次追加序号保留每个完整版本。
+    const basename = `config-manual-${getTimestampStr()}`
+    let filename = `${basename}.js`, sequence = 1
+    while (storageFs.existsSync(path.join(backupDir, filename))) filename = `${basename}-${sequence++}.js`
+    storageFs.writeFileSync(path.join(backupDir, filename), new GlobalConfigurationService(repositories().admin).export(global.lx.config))
     console.log(`[Config] Manual backup saved to ${backupDir}/${filename}`)
     return { success: true, filename }
   } catch (err: any) {
@@ -207,21 +195,10 @@ const backupConfigNow = (): { success: boolean, filename?: string, error?: strin
   }
 }
 
+/** 保存完整业务配置到 SQLite，失败直接返回调用方，禁止误报成功。 @author yahyaoo */
 const saveConfigToFile = () => {
-  const content = `module.exports = ${JSON.stringify(global.lx.config, null, 2)}`
-  try {
-    new GlobalConfigurationService(repositories().admin).save(global.lx.configPath, global.lx.config, content)
-    const targetDir = path.dirname(global.lx.configPath)
-    if (!storageFs.existsSync(targetDir)) {
-      storageFs.mkdirSync(targetDir, { recursive: true })
-    }
-    storageFs.writeFileSync(global.lx.configPath, content)
-    lastConfigHash = crypto.createHash('md5').update(content).digest('hex')
-    // console.log('Current memory config saved to ' + global.lx.configPath)
-    backupConfig()
-  } catch (err) {
-    console.error('Failed to save config file:', err)
-  }
+  new GlobalConfigurationService(repositories().admin).save(global.lx.configPath, global.lx.config)
+  backupConfig()
 }
 
 global.lx = {
@@ -236,97 +213,15 @@ global.lx = {
   getConfigBackupDir,
 }
 
-const mergeConfigFileEnv = (config: Partial<Record<ENV_PARAMS_Value_Type, string>>) => {
-  const envLog = []
-  for (const [k, v] of Object.entries(config).filter(([k]) => k.startsWith('env.'))) {
-    const envKey = k.replace('env.', '') as keyof typeof envParams
-    let value = String(v)
-    if (envParamKeys.includes(envKey)) {
-      if (envParams[envKey] == null) {
-        envLog.push(`${envKey}: ${value}`)
-        envParams[envKey] = value
-      }
-    } else if (envKey.startsWith('LX_USER_') && value) {
-      const name = k.replace('LX_USER_', '')
-      if (name) {
-        envUsers.push({
-          name,
-          password: value,
-        })
-        envLog.push(`${envKey}: ${value}`)
-      }
-    }
-  }
-  if (envLog.length) console.log(`Load config file env:\n  ${envLog.join('\n  ')}`)
-}
-
-const margeConfig = (p: string) => {
-  let config
-  try {
-    config = new GlobalConfigurationService(repositories().admin).load(p, () => path.extname(p) == '.js'
-      ? require(p)
-      : JSON.parse(fs.readFileSync(p).toString()) as LX.Config)
-  } catch (err: any) {
-    console.warn('Read config error: ' + (err.message as string))
-    return false
-  }
-  const newConfig = { ...global.lx.config }
-  for (const key of Object.keys(defaultConfig) as Array<keyof LX.Config>) {
-    // @ts-expect-error
-    if (config[key] !== undefined) newConfig[key] = config[key]
-  }
-
-  console.log('[配置] 加载配置文件: ' + p)
-  if (newConfig.users.length) {
-    const users: LX.UserConfig[] = []
-    for (const user of newConfig.users) {
-      users.push({
-        ...user,
-        dataPath: '',
-      })
-    }
-    newConfig.users = users
-  }
-  global.lx.config = newConfig
-
-  mergeConfigFileEnv(config as unknown as Partial<Record<ENV_PARAMS_Value_Type, string>>)
+/** SQLite 是业务配置唯一来源；环境变量继续在下方按原顺序覆盖。 @author yahyaoo */
+const margeConfig = (_filename: string) => {
+  const config = new GlobalConfigurationService(repositories().admin).load(global.lx.configPath, defaultConfig)
+  global.lx.config = { ...defaultConfig, ...config, users: (config.users || []).map(user => ({ ...user, dataPath: '' })) }
   return true
 }
+writeDatabasePaths(dataPath, readDatabasePaths(dataPath))
+margeConfig(global.lx.configPath)
 
-// 配置文件加载与平滑迁移
-const activeConfigPath = global.lx.configPath
-const rootLegacyConfigPath = path.join(process.cwd(), 'config.js')
-const bundledConfigPath = path.join(__dirname, '../config.js')
-
-if (storageFs.existsSync(activeConfigPath) || repositories().admin.hasMigration('admin_config', activeConfigPath)) {
-  margeConfig(activeConfigPath)
-} else {
-  // 如果当前目标配置文件尚不存在（例如首次启动或从旧版升级）
-  // 优先尝试从根目录的旧 config.js 迁移过来
-  const candidateLegacy = storageFs.existsSync(rootLegacyConfigPath)
-    ? rootLegacyConfigPath
-    : (storageFs.existsSync(bundledConfigPath) ? bundledConfigPath : null)
-
-  if (candidateLegacy && path.resolve(candidateLegacy) !== path.resolve(activeConfigPath)) {
-    try {
-      const targetDir = path.dirname(activeConfigPath)
-      if (!storageFs.existsSync(targetDir)) {
-        storageFs.mkdirSync(targetDir, { recursive: true })
-      }
-      storageFs.copyFileSync(candidateLegacy, activeConfigPath)
-      console.log(`[Config] Initialized config in data dir: copied ${candidateLegacy} -> ${activeConfigPath}`)
-      margeConfig(activeConfigPath)
-    } catch (e: any) {
-      console.warn(`[Config] Failed to copy legacy config to ${activeConfigPath}:`, e.message)
-      margeConfig(candidateLegacy)
-    }
-  }
-}
-
-// 显式指定的 CONFIG_PATH 具有最高配置文件优先级
-if (envParams.CONFIG_PATH && storageFs.existsSync(envParams.CONFIG_PATH) && path.resolve(envParams.CONFIG_PATH) !== path.resolve(activeConfigPath)) {
-  margeConfig(envParams.CONFIG_PATH)
-}
 if (envParams.PROXY_HEADER) {
   global.lx.config['proxy.enabled'] = true
   global.lx.config['proxy.header'] = envParams.PROXY_HEADER
@@ -795,18 +690,9 @@ if (webdavSync.isConfigured()) {
     if (success) {
       console.log('[WebDAV] 数据已成功从 WebDAV 恢复')
 
-      // 1. 重新从磁盘加载最新的 config.js 到内存 (解决实时生效问题)
-      const configPath = global.lx.configPath
-      if (storageFs.existsSync(configPath)) {
-        console.log('[WebDAV] 恢复完成后重新加载配置文件: ' + configPath)
-        // 清除 node require 缓存以强制重载
-        try {
-          delete require.cache[require.resolve(configPath)]
-          margeConfig(configPath)
-        } catch (e) {
-          console.error('[WebDAV] 热重载配置文件失败:', e)
-        }
-      }
+      // 云端恢复写回 SQL 文档后，再从管理库刷新运行配置。
+      try { margeConfig(global.lx.configPath) }
+      catch (error) { console.error('[WebDAV] 恢复后加载 SQL 配置失败:', error) }
 
       // 2. 重新加载 users.json
       const usersJsonPath = path.join(global.lx.dataPath, 'users.json')
@@ -854,7 +740,7 @@ if (!storageFs.existsSync(openLibDir)) {
   storageFs.mkdirSync(openLibDir, { recursive: true })
 }
 
-// 启动前最后保存一次合并后的配置，确保环境变量被固化到 config.js 中
+// 启动前保存合并后的配置到 SQLite，环境变量优先级保持原顺序
 saveConfigToFile()
 
 // 每日清理过期本地配置备份（保留最近 7 天）
@@ -864,41 +750,4 @@ if (typeof configBackupTimer.unref === 'function') configBackupTimer.unref()
 
 startServer(global.lx.config.port, '0.0.0.0')
 
-// 监控配置文件变动以实现热重载 (由于 nodemon 已忽略该文件)
-const activeWatcherConfigPath = global.lx.configPath
-if (storageFs.existsSync(activeWatcherConfigPath)) {
-  lastConfigHash = getConfigHash(activeWatcherConfigPath)
-  let debounceTimer: NodeJS.Timeout | null = null
-  storageFs.watch(activeWatcherConfigPath, (event) => {
-    if (event === 'change') {
-      if (debounceTimer) clearTimeout(debounceTimer)
-      debounceTimer = setTimeout(() => {
-        const currentHash = getConfigHash(activeWatcherConfigPath)
-        // 如果内容未发生实质改变（如内部写配置触发的 fs.watch 事件），跳过热重载
-        if (currentHash && currentHash === lastConfigHash) return
-        lastConfigHash = currentHash
-
-        console.log(`Detected external config file change (${activeWatcherConfigPath}), hot-reloading...`)
-        try {
-          delete require.cache[require.resolve(activeWatcherConfigPath)]
-          margeConfig(activeWatcherConfigPath)
-          // 重新初始化各模块以使用新配置（如果需要）
-          if (global.lx.webdavSync) {
-            global.lx.webdavSync.updateConfig({
-              url: global.lx.config['webdav.url'],
-              username: global.lx.config['webdav.username'],
-              password: global.lx.config['webdav.password'],
-              syncPath: global.lx.config['webdav.syncPath'],
-              backupPath: global.lx.config['webdav.backupPath'],
-              interval: global.lx.config['sync.interval'],
-              backupInterval: global.lx.config['sync.backupInterval'],
-            })
-          }
-        } catch (e) {
-          console.error('Hot-reload config file failed:', e)
-        }
-      }, 500)
-    }
-  })
-}
-
+// 业务配置通过后台保存到 SQLite；不监听旧配置文件。

@@ -1,13 +1,13 @@
 import type { RequestContext, ServerRuntime } from '../../common/http/RequestContext'
-/** Backup 服务所需能力，仅允许访问本模块使用的依赖。 @author yahyaoo */
+/** WebDAV 同步、远端备份恢复和本地 ZIP 数据备份所需的应用依赖契约。 @author yahyaoo */
 export type BackupServiceRuntime = Pick<ServerRuntime, 'readBody' | 'reloadServerData' | 'sseClients' | 'path' | 'storageFs' | 'formidable' | 'os'>
-/** Backup 业务服务，原路由处理顺序与错误响应保持不变。 @author yahyaoo */
+/** WebDAV 同步、远端备份恢复和本地 ZIP 数据备份服务。 @author yahyaoo */
 
 /**
- * 处理 /api/webdav/test 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 使用提交的 WebDAV 地址和凭据测试连接。
+ * @param context /api/webdav/test 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime WebDAV 同步、远端备份恢复和本地 ZIP 数据备份的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postWebdavTest(context: RequestContext, runtime: BackupServiceRuntime) {
@@ -36,10 +36,10 @@ export async function postWebdavTest(context: RequestContext, runtime: BackupSer
 }
 
 /**
- * 处理 /api/webdav/sync-file 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 同步指定业务文件到 WebDAV。
+ * @param context /api/webdav/sync-file 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime WebDAV 同步、远端备份恢复和本地 ZIP 数据备份的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postWebdavSyncFile(context: RequestContext, runtime: BackupServiceRuntime) {
@@ -83,10 +83,10 @@ export async function postWebdavSyncFile(context: RequestContext, runtime: Backu
 }
 
 /**
- * 处理 /api/webdav/backup 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 创建完整业务数据备份并上传 WebDAV。
+ * @param context /api/webdav/backup 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime WebDAV 同步、远端备份恢复和本地 ZIP 数据备份的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postWebdavBackup(context: RequestContext, runtime: BackupServiceRuntime) {
@@ -119,10 +119,10 @@ export async function postWebdavBackup(context: RequestContext, runtime: BackupS
 }
 
 /**
- * 处理 /api/webdav/sync 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 触发 WebDAV 数据同步。
+ * @param context /api/webdav/sync 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime WebDAV 同步、远端备份恢复和本地 ZIP 数据备份的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postWebdavSync(context: RequestContext, runtime: BackupServiceRuntime) {
@@ -151,10 +151,10 @@ export async function postWebdavSync(context: RequestContext, runtime: BackupSer
 }
 
 /**
- * 处理 /api/webdav/backups 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 列出 WebDAV 远端完整备份。
+ * @param context /api/webdav/backups 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime WebDAV 同步、远端备份恢复和本地 ZIP 数据备份的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function getWebdavBackups(context: RequestContext, runtime: BackupServiceRuntime) {
@@ -189,10 +189,10 @@ export async function getWebdavBackups(context: RequestContext, runtime: BackupS
 }
 
 /**
- * 处理 /api/webdav/backup 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 删除指定 WebDAV 远端备份。
+ * @param context /api/webdav/backup 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime WebDAV 同步、远端备份恢复和本地 ZIP 数据备份的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function deleteWebdavBackup(context: RequestContext, runtime: BackupServiceRuntime) {
@@ -243,10 +243,10 @@ export async function deleteWebdavBackup(context: RequestContext, runtime: Backu
 }
 
 /**
- * 处理 /api/webdav/restore 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 从选定 WebDAV 备份还原业务数据。
+ * @param context /api/webdav/restore 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime WebDAV 同步、远端备份恢复和本地 ZIP 数据备份的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postWebdavRestore(context: RequestContext, runtime: BackupServiceRuntime) {
@@ -292,10 +292,10 @@ export async function postWebdavRestore(context: RequestContext, runtime: Backup
 }
 
 /**
- * 处理 /api/webdav/logs 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 查询 WebDAV 同步日志。
+ * @param context /api/webdav/logs 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime WebDAV 同步、远端备份恢复和本地 ZIP 数据备份的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function getWebdavLogs(context: RequestContext, runtime: BackupServiceRuntime) {
@@ -326,10 +326,10 @@ export async function getWebdavLogs(context: RequestContext, runtime: BackupServ
 }
 
 /**
- * 处理 /api/webdav/progress 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 查询 WebDAV 同步和备份进度。
+ * @param context /api/webdav/progress 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime WebDAV 同步、远端备份恢复和本地 ZIP 数据备份的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function getWebdavProgress(context: RequestContext, runtime: BackupServiceRuntime) {
@@ -371,10 +371,10 @@ export async function getWebdavProgress(context: RequestContext, runtime: Backup
 }
 
 /**
- * 处理 /api/backup/download 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 打包业务数据并返回 ZIP 下载。
+ * @param context /api/backup/download 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime WebDAV 同步、远端备份恢复和本地 ZIP 数据备份的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function getBackupDownload(context: RequestContext, runtime: BackupServiceRuntime) {
@@ -416,10 +416,10 @@ export async function getBackupDownload(context: RequestContext, runtime: Backup
 }
 
 /**
- * 处理 /api/backup/upload 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 上传并解压业务数据备份以恢复用户数据。
+ * @param context /api/backup/upload 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime WebDAV 同步、远端备份恢复和本地 ZIP 数据备份的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postBackupUpload(context: RequestContext, runtime: BackupServiceRuntime) {

@@ -1,4 +1,4 @@
-/** songList 模块：按职责组织，原业务行为保持不变。 @author yahyaoo */
+/** QQ 音乐接口适配：歌单分类、列表、详情和歌曲分页查询。 @author yahyaoo */
 import { httpFetch } from '../../request.js'
 import { decodeName, formatPlayTime, dateFormat, formatPlayCount } from '../../index.js'
 import { formatSingerName } from '../utils.js'

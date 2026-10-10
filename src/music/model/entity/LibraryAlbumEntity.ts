@@ -1,4 +1,4 @@
 import type { BaseEntity } from '../../../common/model/entity/BaseEntity'
-/** 收藏与屏蔽专辑实体，对应 music_library_album 表。扩展数据保持原业务格式。 @author yahyaoo */
+/** 收藏与屏蔽专辑实体，对应 music_library_album 表。valueJson 保存收藏或屏蔽的专辑条目，定位、排序与时间字段继承 BaseEntity。 @author yahyaoo */
 export interface LibraryAlbumEntity extends BaseEntity {}
 

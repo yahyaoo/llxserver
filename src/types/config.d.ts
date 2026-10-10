@@ -211,7 +211,7 @@ declare namespace LX {
     'webdav.excludeMusic'?: boolean
 
     /**
-     * 是否启用本地配置备份（每日一份 config.js 副本，保留指定天数）
+     * 是否启用本地配置备份（每日导出 SQL 业务配置，保留指定天数）
      */
     'configBackup.enable'?: boolean
 

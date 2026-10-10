@@ -1,4 +1,4 @@
-/** pic 模块：按职责组织，原业务行为保持不变。 @author yahyaoo */
+/** 咪咕音乐接口适配：歌曲封面地址解析。 @author yahyaoo */
 import { httpFetch } from '../../request.js'
 import getSongId from './songId.js'
 

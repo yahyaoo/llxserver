@@ -1,4 +1,4 @@
-/** proxy 模块：按职责组织，原业务行为保持不变。 @author yahyaoo */
+/** 出站代理分类路由：分别处理音乐平台、用户音源及应用功能的代理继承规则。 @author yahyaoo */
 import * as tunnel from 'tunnel'
 
 /**

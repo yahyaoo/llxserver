@@ -1,14 +1,14 @@
 import type { RequestContext, ServerRuntime } from '../../common/http/RequestContext'
-/** Authentication 服务所需能力，仅允许访问本模块使用的依赖。 @author yahyaoo */
+/** 用户会话、播放器访问密码和持久访问令牌所需的应用依赖契约。 @author yahyaoo */
 export type AuthenticationServiceRuntime = Pick<ServerRuntime, 'readBody' | 'loginLog' | 'generateSessionId' | 'userSessions' | 'verifyUserAuth' | 'getUserTokenConfig' | 'saveUserTokenConfig' | 'tokenLog' | 'crypto' | 'path' | 'storageFs' | 'playerSessions' | 'SESSION_COOKIE_NAME' | 'SESSION_TTL' | 'parseCookies' | 'checkPlayerAuth'>
 import type { UserToken } from '../../common/model/dto/UserTokenDto'
-/** Authentication 业务服务，原路由处理顺序与错误响应保持不变。 @author yahyaoo */
+/** 用户会话、播放器访问密码和持久访问令牌服务。 @author yahyaoo */
 
 /**
- * 处理 /api/user/verify 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 验证用户名与连接密码，记录认证结果。
+ * @param context /api/user/verify 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 用户会话、播放器访问密码和持久访问令牌的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postUserVerify(context: RequestContext, runtime: AuthenticationServiceRuntime) {
@@ -43,10 +43,10 @@ export async function postUserVerify(context: RequestContext, runtime: Authentic
 }
 
 /**
- * 处理 /api/user/login 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 校验用户凭据并创建登录会话。
+ * @param context /api/user/login 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 用户会话、播放器访问密码和持久访问令牌的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postUserLogin(context: RequestContext, runtime: AuthenticationServiceRuntime) {
@@ -83,10 +83,10 @@ export async function postUserLogin(context: RequestContext, runtime: Authentica
 }
 
 /**
- * 处理 /api/user/logout 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 注销用户会话并清除会话 Cookie。
+ * @param context /api/user/logout 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 用户会话、播放器访问密码和持久访问令牌的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postUserLogout(context: RequestContext, runtime: AuthenticationServiceRuntime) {
@@ -102,10 +102,10 @@ export async function postUserLogout(context: RequestContext, runtime: Authentic
 }
 
 /**
- * 处理 /api/user/auth/verify 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 检查用户会话并返回当前认证状态。
+ * @param context /api/user/auth/verify 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 用户会话、播放器访问密码和持久访问令牌的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function getUserAuthVerify(context: RequestContext, runtime: AuthenticationServiceRuntime) {
@@ -136,10 +136,10 @@ export async function getUserAuthVerify(context: RequestContext, runtime: Authen
 }
 
 /**
- * 处理 /api/user/token/config 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 查询或保存用户持久令牌功能配置。
+ * @param context /api/user/token/config 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 用户会话、播放器访问密码和持久访问令牌的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function handleUserTokenConfig(context: RequestContext, runtime: AuthenticationServiceRuntime) {
@@ -190,10 +190,10 @@ export async function handleUserTokenConfig(context: RequestContext, runtime: Au
 }
 
 /**
- * 处理 /api/user/token/add 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 为当前用户创建访问令牌。
+ * @param context /api/user/token/add 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 用户会话、播放器访问密码和持久访问令牌的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postUserTokenAdd(context: RequestContext, runtime: AuthenticationServiceRuntime) {
@@ -234,10 +234,10 @@ export async function postUserTokenAdd(context: RequestContext, runtime: Authent
 }
 
 /**
- * 处理 /api/user/token/remove 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 删除当前用户的指定访问令牌。
+ * @param context /api/user/token/remove 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 用户会话、播放器访问密码和持久访问令牌的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postUserTokenRemove(context: RequestContext, runtime: AuthenticationServiceRuntime) {
@@ -294,10 +294,10 @@ export async function postUserTokenRemove(context: RequestContext, runtime: Auth
 }
 
 /**
- * 处理 /api/user/token/update 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 修改指定访问令牌的名称等配置。
+ * @param context /api/user/token/update 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 用户会话、播放器访问密码和持久访问令牌的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postUserTokenUpdate(context: RequestContext, runtime: AuthenticationServiceRuntime) {
@@ -345,10 +345,10 @@ export async function postUserTokenUpdate(context: RequestContext, runtime: Auth
 }
 
 /**
- * 处理 /api/user/token/toggle 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 切换指定访问令牌的启用状态。
+ * @param context /api/user/token/toggle 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 用户会话、播放器访问密码和持久访问令牌的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postUserTokenToggle(context: RequestContext, runtime: AuthenticationServiceRuntime) {
@@ -391,10 +391,10 @@ export async function postUserTokenToggle(context: RequestContext, runtime: Auth
 }
 
 /**
- * 处理 /api/user/token/logs 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 查询用户令牌访问日志。
+ * @param context /api/user/token/logs 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 用户会话、播放器访问密码和持久访问令牌的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function getUserTokenLogs(context: RequestContext, runtime: AuthenticationServiceRuntime) {
@@ -439,10 +439,10 @@ export async function getUserTokenLogs(context: RequestContext, runtime: Authent
 }
 
 /**
- * 处理 /api/music/config 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 向播放器返回认证开关等公开配置。
+ * @param context /api/music/config 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 用户会话、播放器访问密码和持久访问令牌的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function getMusicConfig(context: RequestContext, runtime: AuthenticationServiceRuntime) {
@@ -466,10 +466,10 @@ export async function getMusicConfig(context: RequestContext, runtime: Authentic
 }
 
 /**
- * 处理 /api/music/auth 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 校验播放器访问密码并创建访问会话。
+ * @param context /api/music/auth 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 用户会话、播放器访问密码和持久访问令牌的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postMusicAuth(context: RequestContext, runtime: AuthenticationServiceRuntime) {
@@ -505,10 +505,10 @@ export async function postMusicAuth(context: RequestContext, runtime: Authentica
 }
 
 /**
- * 处理 /api/music/auth/logout 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 删除播放器访问会话并清除 Cookie。
+ * @param context /api/music/auth/logout 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 用户会话、播放器访问密码和持久访问令牌的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postMusicAuthLogout(context: RequestContext, runtime: AuthenticationServiceRuntime) {
@@ -528,10 +528,10 @@ export async function postMusicAuthLogout(context: RequestContext, runtime: Auth
 }
 
 /**
- * 处理 /api/music/auth/verify 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 检查播放器访问会话是否有效。
+ * @param context /api/music/auth/verify 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 用户会话、播放器访问密码和持久访问令牌的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function getMusicAuthVerify(context: RequestContext, runtime: AuthenticationServiceRuntime) {

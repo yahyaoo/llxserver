@@ -1,13 +1,13 @@
 import type { RequestContext, ServerRuntime } from '../../common/http/RequestContext'
-/** Playlist 服务所需能力，仅允许访问本模块使用的依赖。 @author yahyaoo */
+/** 用户歌单、历史快照、缓存列表和平台歌单查询所需的应用依赖契约。 @author yahyaoo */
 export type PlaylistServiceRuntime = Pick<ServerRuntime, 'verifyUserAuth' | 'getUserSpace' | 'getUserDirname' | 'path' | 'storageFs' | 'readBody' | 'getUserConfig' | 'startupLog' | 'fileCache' | 'customMusicManager' | 'musicSdk' | 'normalizeSongInfo'>
-/** Playlist 业务服务，原路由处理顺序与错误响应保持不变。 @author yahyaoo */
+/** 用户歌单、历史快照、缓存列表和平台歌单查询服务。 @author yahyaoo */
 
 /**
- * 处理 /api/data 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 查询指定用户的歌单与歌曲数据。
+ * @param context /api/data 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 用户歌单、历史快照、缓存列表和平台歌单查询的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function getData(context: RequestContext, runtime: PlaylistServiceRuntime) {
@@ -77,10 +77,10 @@ export async function getData(context: RequestContext, runtime: PlaylistServiceR
 }
 
 /**
- * 处理 /api/data/snapshots 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 查询用户歌单历史快照列表。
+ * @param context /api/data/snapshots 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 用户歌单、历史快照、缓存列表和平台歌单查询的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function getDataSnapshots(context: RequestContext, runtime: PlaylistServiceRuntime) {
@@ -129,10 +129,10 @@ export async function getDataSnapshots(context: RequestContext, runtime: Playlis
 }
 
 /**
- * 处理 /api/data/snapshot 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 读取指定用户与快照标识对应的歌单数据。
+ * @param context /api/data/snapshot 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 用户歌单、历史快照、缓存列表和平台歌单查询的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function getDataSnapshot(context: RequestContext, runtime: PlaylistServiceRuntime) {
@@ -191,10 +191,10 @@ export async function getDataSnapshot(context: RequestContext, runtime: Playlist
 }
 
 /**
- * 处理 /api/data/restore-snapshot 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 使用选定快照恢复用户歌单数据。
+ * @param context /api/data/restore-snapshot 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 用户歌单、历史快照、缓存列表和平台歌单查询的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postDataRestoreSnapshot(context: RequestContext, runtime: PlaylistServiceRuntime) {
@@ -244,10 +244,10 @@ export async function postDataRestoreSnapshot(context: RequestContext, runtime: 
 }
 
 /**
- * 处理 /api/music/user/list/remove 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 删除用户的指定歌单。
+ * @param context /api/music/user/list/remove 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 用户歌单、历史快照、缓存列表和平台歌单查询的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postMusicUserListRemove(context: RequestContext, runtime: PlaylistServiceRuntime) {
@@ -305,10 +305,10 @@ export async function postMusicUserListRemove(context: RequestContext, runtime: 
 }
 
 /**
- * 处理 /api/music/user/list/reorder 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 调整用户歌单排列顺序。
+ * @param context /api/music/user/list/reorder 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 用户歌单、历史快照、缓存列表和平台歌单查询的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postMusicUserListReorder(context: RequestContext, runtime: PlaylistServiceRuntime) {
@@ -372,10 +372,10 @@ export async function postMusicUserListReorder(context: RequestContext, runtime:
 }
 
 /**
- * 处理 /api/music/user/list/add 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 向用户歌单添加歌曲。
+ * @param context /api/music/user/list/add 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 用户歌单、历史快照、缓存列表和平台歌单查询的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postMusicUserListAdd(context: RequestContext, runtime: PlaylistServiceRuntime) {
@@ -426,10 +426,10 @@ export async function postMusicUserListAdd(context: RequestContext, runtime: Pla
 }
 
 /**
- * 处理 /api/data/delete-snapshot 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 删除用户指定的历史快照。
+ * @param context /api/data/delete-snapshot 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 用户歌单、历史快照、缓存列表和平台歌单查询的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postDataDeleteSnapshot(context: RequestContext, runtime: PlaylistServiceRuntime) {
@@ -480,10 +480,10 @@ export async function postDataDeleteSnapshot(context: RequestContext, runtime: P
 }
 
 /**
- * 处理 /api/data/upload-snapshot 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 上传歌单快照并保存到用户空间。
+ * @param context /api/data/upload-snapshot 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 用户歌单、历史快照、缓存列表和平台歌单查询的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postDataUploadSnapshot(context: RequestContext, runtime: PlaylistServiceRuntime) {
@@ -577,10 +577,10 @@ export async function postDataUploadSnapshot(context: RequestContext, runtime: P
 }
 
 /**
- * 处理 /api/user/list 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 查询用户列表设置。
+ * @param context /api/user/list 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 用户歌单、历史快照、缓存列表和平台歌单查询的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function getUserList(context: RequestContext, runtime: PlaylistServiceRuntime) {
@@ -631,10 +631,10 @@ export async function getUserList(context: RequestContext, runtime: PlaylistServ
 }
 
 /**
- * 处理 /api/user/list 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 保存用户列表设置。
+ * @param context /api/user/list 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 用户歌单、历史快照、缓存列表和平台歌单查询的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postUserList(context: RequestContext, runtime: PlaylistServiceRuntime) {
@@ -698,10 +698,10 @@ export async function postUserList(context: RequestContext, runtime: PlaylistSer
 }
 
 /**
- * 处理 /api/music/cache/list 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 查询用户服务器缓存歌曲列表。
+ * @param context /api/music/cache/list 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 用户歌单、历史快照、缓存列表和平台歌单查询的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function getMusicCacheList(context: RequestContext, runtime: PlaylistServiceRuntime) {
@@ -754,10 +754,10 @@ export async function getMusicCacheList(context: RequestContext, runtime: Playli
 }
 
 /**
- * 处理 /api/music/custom/list 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 查询用户自定义音乐目录歌曲列表。
+ * @param context /api/music/custom/list 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 用户歌单、历史快照、缓存列表和平台歌单查询的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function getMusicCustomList(context: RequestContext, runtime: PlaylistServiceRuntime) {
@@ -791,10 +791,10 @@ export async function getMusicCustomList(context: RequestContext, runtime: Playl
 }
 
 /**
- * 处理 /api/data/delete-playlist 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 删除指定歌单并更新用户数据。
+ * @param context /api/data/delete-playlist 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 用户歌单、历史快照、缓存列表和平台歌单查询的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postDataDeletePlaylist(context: RequestContext, runtime: PlaylistServiceRuntime) {
@@ -840,10 +840,10 @@ export async function postDataDeletePlaylist(context: RequestContext, runtime: P
 }
 
 /**
- * 处理 /api/data/delete-song 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 删除指定歌单中的歌曲。
+ * @param context /api/data/delete-song 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 用户歌单、历史快照、缓存列表和平台歌单查询的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postDataDeleteSong(context: RequestContext, runtime: PlaylistServiceRuntime) {
@@ -905,10 +905,10 @@ export async function postDataDeleteSong(context: RequestContext, runtime: Playl
 }
 
 /**
- * 处理 /api/data/rename-playlist 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 重命名指定歌单。
+ * @param context /api/data/rename-playlist 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 用户歌单、历史快照、缓存列表和平台歌单查询的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postDataRenamePlaylist(context: RequestContext, runtime: PlaylistServiceRuntime) {
@@ -969,10 +969,10 @@ export async function postDataRenamePlaylist(context: RequestContext, runtime: P
 }
 
 /**
- * 处理 /api/data/batch-delete-songs 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 批量删除指定歌单中的歌曲。
+ * @param context /api/data/batch-delete-songs 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 用户歌单、历史快照、缓存列表和平台歌单查询的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postDataBatchDeleteSongs(context: RequestContext, runtime: PlaylistServiceRuntime) {
@@ -1042,10 +1042,10 @@ export async function postDataBatchDeleteSongs(context: RequestContext, runtime:
 }
 
 /**
- * 处理 /api/music/songList/list 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 分页查询平台推荐歌单。
+ * @param context /api/music/songList/list 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 用户歌单、历史快照、缓存列表和平台歌单查询的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function getMusicSongListList(context: RequestContext, runtime: PlaylistServiceRuntime) {
@@ -1073,10 +1073,10 @@ export async function getMusicSongListList(context: RequestContext, runtime: Pla
 }
 
 /**
- * 处理 /api/music/leaderboard/list 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 查询指定平台排行榜歌曲。
+ * @param context /api/music/leaderboard/list 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 用户歌单、历史快照、缓存列表和平台歌单查询的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function getMusicLeaderboardList(context: RequestContext, runtime: PlaylistServiceRuntime) {

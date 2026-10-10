@@ -1,14 +1,14 @@
 import type { RequestContext, ServerRuntime } from '../../common/http/RequestContext'
-/** Download 服务所需能力，仅允许访问本模块使用的依赖。 @author yahyaoo */
+/** 自动下载、缓存目录维护、媒体文件响应与歌曲洗版所需的应用依赖契约。 @author yahyaoo */
 export type DownloadServiceRuntime = Pick<ServerRuntime, 'verifyUserAuth' | 'getUserSpace' | 'getSyncDownloadData' | 'getUserSyncProgress' | 'path' | 'File' | 'storageFs' | 'scheduler' | 'getUserSyncStorageLocation' | 'triggerUserSync' | 'cancelUserSync' | 'readBody' | 'isUserSyncRunning' | 'migrateSyncStorage' | 'saveSyncDownloadData' | 'getUpdatedListIds' | 'removeUpdatedListId' | 'getCacheRequestUsername' | 'getUserConfig' | 'remasterQueue' | 'fileCache' | 'serverDownloads' | 'url' | 'serverDownloadQueue' | 'accessLog' | 'customMusicManager' | 'os' | 'crypto' | 'MusicTagger' | 'MetaPicture' | 'musicSdk'>
 import type * as cacheTypes from './cache/FileCacheService'
-/** Download 业务服务，原路由处理顺序与错误响应保持不变。 @author yahyaoo */
+/** 自动下载、缓存目录维护、媒体文件响应与歌曲洗版服务。 @author yahyaoo */
 
 /**
- * 处理 /api/user/sync-download/status 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 查询用户歌单自动下载状态。
+ * @param context /api/user/sync-download/status 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 自动下载、缓存目录维护、媒体文件响应与歌曲洗版的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function getUserSyncDownloadStatus(context: RequestContext, runtime: DownloadServiceRuntime) {
@@ -115,10 +115,10 @@ export async function getUserSyncDownloadStatus(context: RequestContext, runtime
 }
 
 /**
- * 处理 /api/user/sync-download/trigger 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 立即执行用户歌单自动下载任务。
+ * @param context /api/user/sync-download/trigger 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 自动下载、缓存目录维护、媒体文件响应与歌曲洗版的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postUserSyncDownloadTrigger(context: RequestContext, runtime: DownloadServiceRuntime) {
@@ -157,10 +157,10 @@ export async function postUserSyncDownloadTrigger(context: RequestContext, runti
 }
 
 /**
- * 处理 /api/user/sync-download/cancel 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 取消用户当前自动下载任务。
+ * @param context /api/user/sync-download/cancel 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 自动下载、缓存目录维护、媒体文件响应与歌曲洗版的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postUserSyncDownloadCancel(context: RequestContext, runtime: DownloadServiceRuntime) {
@@ -188,10 +188,10 @@ export async function postUserSyncDownloadCancel(context: RequestContext, runtim
 }
 
 /**
- * 处理 /api/user/sync-download/progress 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 查询自动下载任务进度与处理日志。
+ * @param context /api/user/sync-download/progress 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 自动下载、缓存目录维护、媒体文件响应与歌曲洗版的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function getUserSyncDownloadProgress(context: RequestContext, runtime: DownloadServiceRuntime) {
@@ -218,10 +218,10 @@ export async function getUserSyncDownloadProgress(context: RequestContext, runti
 }
 
 /**
- * 处理 /api/user/sync-download/migrate-storage 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 将同步下载歌曲迁移到指定存储位置。
+ * @param context /api/user/sync-download/migrate-storage 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 自动下载、缓存目录维护、媒体文件响应与歌曲洗版的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postUserSyncDownloadMigrateStorage(context: RequestContext, runtime: DownloadServiceRuntime) {
@@ -267,18 +267,10 @@ export async function postUserSyncDownloadMigrateStorage(context: RequestContext
               }
             }
 
-            let migrateResult: { /**
- * moved 字段，沿用原业务结构与空值约定。
- */
-moved: number; /**
- * skipped 字段，沿用原业务结构与空值约定。
- */
-skipped: number; /**
- * errors 字段，沿用原业务结构与空值约定。
- */
-errors: number; /**
- * message 字段，沿用原业务结构与空值约定。
- */
+            let migrateResult: { /** 已经移动的文件数量。 */
+moved: number; /** 已跳过的歌曲数量。 */
+skipped: number;
+errors: number; /** 处理结果或错误说明。 */
 message: string }
 
             // migrateSyncStorage 已支持全部三种方向（root↔data、root/data↔custom）
@@ -301,10 +293,10 @@ message: string }
 }
 
 /**
- * 处理 /api/tasks/status 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 查询后台调度任务状态。
+ * @param context /api/tasks/status 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 自动下载、缓存目录维护、媒体文件响应与歌曲洗版的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function getTasksStatus(context: RequestContext, runtime: DownloadServiceRuntime) {
@@ -328,10 +320,10 @@ export async function getTasksStatus(context: RequestContext, runtime: DownloadS
 }
 
 /**
- * 处理 /api/tasks/trigger 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 手动执行指定调度任务。
+ * @param context /api/tasks/trigger 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 自动下载、缓存目录维护、媒体文件响应与歌曲洗版的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postTasksTrigger(context: RequestContext, runtime: DownloadServiceRuntime) {
@@ -372,10 +364,10 @@ export async function postTasksTrigger(context: RequestContext, runtime: Downloa
 }
 
 /**
- * 处理 /api/tasks/user-data 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 查询用户定时任务相关配置和数据。
+ * @param context /api/tasks/user-data 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 自动下载、缓存目录维护、媒体文件响应与歌曲洗版的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function getTasksUserData(context: RequestContext, runtime: DownloadServiceRuntime) {
@@ -465,10 +457,10 @@ export async function getTasksUserData(context: RequestContext, runtime: Downloa
 }
 
 /**
- * 处理 /api/music/remaster/ 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 创建、查询或取消本地歌曲洗版任务。
+ * @param context /api/music/remaster/ 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 自动下载、缓存目录维护、媒体文件响应与歌曲洗版的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function handleMusicRemaster(context: RequestContext, runtime: DownloadServiceRuntime) {
@@ -528,10 +520,10 @@ export async function handleMusicRemaster(context: RequestContext, runtime: Down
 }
 
 /**
- * 处理 /api/music/cache/config 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 保存用户服务器缓存配置。
+ * @param context /api/music/cache/config 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 自动下载、缓存目录维护、媒体文件响应与歌曲洗版的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postMusicCacheConfig(context: RequestContext, runtime: DownloadServiceRuntime) {
@@ -598,10 +590,10 @@ export async function postMusicCacheConfig(context: RequestContext, runtime: Dow
 }
 
 /**
- * 处理 /api/music/cache/directories 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 列出当前用户可用的缓存目录。
+ * @param context /api/music/cache/directories 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 自动下载、缓存目录维护、媒体文件响应与歌曲洗版的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function getMusicCacheDirectories(context: RequestContext, runtime: DownloadServiceRuntime) {
@@ -650,10 +642,10 @@ export async function getMusicCacheDirectories(context: RequestContext, runtime:
 }
 
 /**
- * 处理 /api/music/cache/sync 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 扫描缓存目录并同步歌曲索引。
+ * @param context /api/music/cache/sync 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 自动下载、缓存目录维护、媒体文件响应与歌曲洗版的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postMusicCacheSync(context: RequestContext, runtime: DownloadServiceRuntime) {
@@ -687,10 +679,10 @@ export async function postMusicCacheSync(context: RequestContext, runtime: Downl
 }
 
 /**
- * 处理 /api/music/cache/subdirs 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 查询缓存目录下的歌曲分类子目录。
+ * @param context /api/music/cache/subdirs 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 自动下载、缓存目录维护、媒体文件响应与歌曲洗版的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function getMusicCacheSubdirs(context: RequestContext, runtime: DownloadServiceRuntime) {
@@ -719,10 +711,10 @@ export async function getMusicCacheSubdirs(context: RequestContext, runtime: Dow
 }
 
 /**
- * 处理 /api/music/cache/mkdir 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 创建缓存子目录。
+ * @param context /api/music/cache/mkdir 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 自动下载、缓存目录维护、媒体文件响应与歌曲洗版的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postMusicCacheMkdir(context: RequestContext, runtime: DownloadServiceRuntime) {
@@ -763,10 +755,10 @@ export async function postMusicCacheMkdir(context: RequestContext, runtime: Down
 }
 
 /**
- * 处理 /api/music/cache/categorize 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 将缓存歌曲归入指定分类目录。
+ * @param context /api/music/cache/categorize 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 自动下载、缓存目录维护、媒体文件响应与歌曲洗版的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postMusicCacheCategorize(context: RequestContext, runtime: DownloadServiceRuntime) {
@@ -807,10 +799,10 @@ export async function postMusicCacheCategorize(context: RequestContext, runtime:
 }
 
 /**
- * 处理 /api/music/cache/subdirs/rename 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 重命名缓存分类子目录。
+ * @param context /api/music/cache/subdirs/rename 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 自动下载、缓存目录维护、媒体文件响应与歌曲洗版的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postMusicCacheSubdirsRename(context: RequestContext, runtime: DownloadServiceRuntime) {
@@ -860,10 +852,10 @@ export async function postMusicCacheSubdirsRename(context: RequestContext, runti
 }
 
 /**
- * 处理 /api/utils/check-dir 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 检查目录是否存在及可访问。
+ * @param context /api/utils/check-dir 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 自动下载、缓存目录维护、媒体文件响应与歌曲洗版的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postUtilsCheckDir(context: RequestContext, runtime: DownloadServiceRuntime) {
@@ -908,10 +900,10 @@ export async function postUtilsCheckDir(context: RequestContext, runtime: Downlo
 }
 
 /**
- * 处理 /api/music/cache/subdirs/delete 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 删除缓存分类子目录及相关索引。
+ * @param context /api/music/cache/subdirs/delete 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 自动下载、缓存目录维护、媒体文件响应与歌曲洗版的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postMusicCacheSubdirsDelete(context: RequestContext, runtime: DownloadServiceRuntime) {
@@ -961,10 +953,10 @@ export async function postMusicCacheSubdirsDelete(context: RequestContext, runti
 }
 
 /**
- * 处理 /api/music/cache/rename 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 重命名缓存歌曲文件。
+ * @param context /api/music/cache/rename 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 自动下载、缓存目录维护、媒体文件响应与歌曲洗版的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postMusicCacheRename(context: RequestContext, runtime: DownloadServiceRuntime) {
@@ -998,10 +990,10 @@ export async function postMusicCacheRename(context: RequestContext, runtime: Dow
 }
 
 /**
- * 处理 /api/music/server-download/check 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 检查歌曲是否已下载到服务器。
+ * @param context /api/music/server-download/check 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 自动下载、缓存目录维护、媒体文件响应与歌曲洗版的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function getMusicServerDownloadCheck(context: RequestContext, runtime: DownloadServiceRuntime) {
@@ -1027,10 +1019,10 @@ export async function getMusicServerDownloadCheck(context: RequestContext, runti
 }
 
 /**
- * 处理 /api/music/server-download/file/ 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 返回服务器已下载音频文件，支持范围请求。
+ * @param context /api/music/server-download/file/ 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 自动下载、缓存目录维护、媒体文件响应与歌曲洗版的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function handleMusicServerDownloadFile(context: RequestContext, runtime: DownloadServiceRuntime) {
@@ -1050,10 +1042,10 @@ export async function handleMusicServerDownloadFile(context: RequestContext, run
 }
 
 /**
- * 处理 /api/music/cache/check 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 检查歌曲是否已存在于缓存。
+ * @param context /api/music/cache/check 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 自动下载、缓存目录维护、媒体文件响应与歌曲洗版的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function getMusicCacheCheck(context: RequestContext, runtime: DownloadServiceRuntime) {
@@ -1102,10 +1094,10 @@ export async function getMusicCacheCheck(context: RequestContext, runtime: Downl
 }
 
 /**
- * 处理 /api/music/cache/queue 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 查询用户缓存下载队列。
+ * @param context /api/music/cache/queue 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 自动下载、缓存目录维护、媒体文件响应与歌曲洗版的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function getMusicCacheQueue(context: RequestContext, runtime: DownloadServiceRuntime) {
@@ -1125,10 +1117,10 @@ export async function getMusicCacheQueue(context: RequestContext, runtime: Downl
 }
 
 /**
- * 处理 /api/music/cache/queue 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 将歌曲加入服务器缓存下载队列。
+ * @param context /api/music/cache/queue 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 自动下载、缓存目录维护、媒体文件响应与歌曲洗版的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postMusicCacheQueue(context: RequestContext, runtime: DownloadServiceRuntime) {
@@ -1187,10 +1179,10 @@ export async function postMusicCacheQueue(context: RequestContext, runtime: Down
 }
 
 /**
- * 处理 /api/music/cache/queue/concurrency 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 修改缓存下载队列并发数。
+ * @param context /api/music/cache/queue/concurrency 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 自动下载、缓存目录维护、媒体文件响应与歌曲洗版的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postMusicCacheQueueConcurrency(context: RequestContext, runtime: DownloadServiceRuntime) {
@@ -1219,10 +1211,10 @@ export async function postMusicCacheQueueConcurrency(context: RequestContext, ru
 }
 
 /**
- * 处理 /api/music/cache/queue/resume 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 恢复缓存下载队列执行。
+ * @param context /api/music/cache/queue/resume 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 自动下载、缓存目录维护、媒体文件响应与歌曲洗版的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postMusicCacheQueueResume(context: RequestContext, runtime: DownloadServiceRuntime) {
@@ -1252,10 +1244,10 @@ export async function postMusicCacheQueueResume(context: RequestContext, runtime
 }
 
 /**
- * 处理 /api/music/cache/queue/remove 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 移除指定缓存下载排队任务。
+ * @param context /api/music/cache/queue/remove 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 自动下载、缓存目录维护、媒体文件响应与歌曲洗版的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postMusicCacheQueueRemove(context: RequestContext, runtime: DownloadServiceRuntime) {
@@ -1285,10 +1277,10 @@ export async function postMusicCacheQueueRemove(context: RequestContext, runtime
 }
 
 /**
- * 处理 /api/music/cache/download 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 下载歌曲并写入服务器缓存。
+ * @param context /api/music/cache/download 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 自动下载、缓存目录维护、媒体文件响应与歌曲洗版的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postMusicCacheDownload(context: RequestContext, runtime: DownloadServiceRuntime) {
@@ -1385,10 +1377,10 @@ export async function postMusicCacheDownload(context: RequestContext, runtime: D
 }
 
 /**
- * 处理 /api/music/cache/stop 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 停止指定缓存下载任务。
+ * @param context /api/music/cache/stop 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 自动下载、缓存目录维护、媒体文件响应与歌曲洗版的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postMusicCacheStop(context: RequestContext, runtime: DownloadServiceRuntime) {
@@ -1434,10 +1426,10 @@ export async function postMusicCacheStop(context: RequestContext, runtime: Downl
 }
 
 /**
- * 处理 /api/music/cache/file/ 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 返回服务器缓存音频，支持范围请求。
+ * @param context /api/music/cache/file/ 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 自动下载、缓存目录维护、媒体文件响应与歌曲洗版的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function handleMusicCacheFile(context: RequestContext, runtime: DownloadServiceRuntime) {
@@ -1475,10 +1467,10 @@ export async function handleMusicCacheFile(context: RequestContext, runtime: Dow
 }
 
 /**
- * 处理 /api/music/cache/stats 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 统计缓存歌曲数量与占用空间。
+ * @param context /api/music/cache/stats 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 自动下载、缓存目录维护、媒体文件响应与歌曲洗版的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function getMusicCacheStats(context: RequestContext, runtime: DownloadServiceRuntime) {
@@ -1511,10 +1503,10 @@ export async function getMusicCacheStats(context: RequestContext, runtime: Downl
 }
 
 /**
- * 处理 /api/music/cache/clear 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 清理用户缓存歌曲及索引。
+ * @param context /api/music/cache/clear 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 自动下载、缓存目录维护、媒体文件响应与歌曲洗版的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postMusicCacheClear(context: RequestContext, runtime: DownloadServiceRuntime) {
@@ -1547,10 +1539,10 @@ export async function postMusicCacheClear(context: RequestContext, runtime: Down
 }
 
 /**
- * 处理 /api/music/cache/lyric/clear 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 清理用户缓存歌词。
+ * @param context /api/music/cache/lyric/clear 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 自动下载、缓存目录维护、媒体文件响应与歌曲洗版的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postMusicCacheLyricClear(context: RequestContext, runtime: DownloadServiceRuntime) {
@@ -1583,10 +1575,10 @@ export async function postMusicCacheLyricClear(context: RequestContext, runtime:
 }
 
 /**
- * 处理 /api/music/cache/progress 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 查询缓存下载处理进度。
+ * @param context /api/music/cache/progress 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 自动下载、缓存目录维护、媒体文件响应与歌曲洗版的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function getMusicCacheProgress(context: RequestContext, runtime: DownloadServiceRuntime) {
@@ -1607,10 +1599,10 @@ export async function getMusicCacheProgress(context: RequestContext, runtime: Do
 }
 
 /**
- * 处理 /api/music/cache/cover 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 返回缓存歌曲封面。
+ * @param context /api/music/cache/cover 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 自动下载、缓存目录维护、媒体文件响应与歌曲洗版的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function getMusicCacheCover(context: RequestContext, runtime: DownloadServiceRuntime) {
@@ -1658,10 +1650,10 @@ export async function getMusicCacheCover(context: RequestContext, runtime: Downl
 }
 
 /**
- * 处理 /api/music/cache/remove 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 删除指定缓存歌曲文件及索引。
+ * @param context /api/music/cache/remove 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 自动下载、缓存目录维护、媒体文件响应与歌曲洗版的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postMusicCacheRemove(context: RequestContext, runtime: DownloadServiceRuntime) {
@@ -1698,12 +1690,8 @@ export async function postMusicCacheRemove(context: RequestContext, runtime: Dow
               : (legacyFilenames ? (Array.isArray(legacyFilenames) ? legacyFilenames : [legacyFilenames]) : [])
             if (rawItems.length === 0) throw new Error('Missing items')
 
-            const deleteItems: Array<{ /**
- * filename 字段，沿用原业务结构与空值约定。
- */
-filename: string; /**
- * folder 字段，沿用原业务结构与空值约定。
- */
+            const deleteItems: Array<{ /** 文件名称或完整路径。 */
+filename: string; /** 缓存或下载目录类别。 */
 folder?: cacheTypes.CacheFolder }> = rawItems.map((item: any) => {
               if (typeof item === 'string') return { filename: item }
               if (!item || typeof item.filename !== 'string') throw new Error('Invalid delete item')
@@ -1714,15 +1702,9 @@ folder?: cacheTypes.CacheFolder }> = rawItems.map((item: any) => {
             })
 
             let deletedCount = 0
-            const failures: Array<{ /**
- * filename 字段，沿用原业务结构与空值约定。
- */
-filename: string; /**
- * folder 字段，沿用原业务结构与空值约定。
- */
-folder?: cacheTypes.CacheFolder; /**
- * message 字段，沿用原业务结构与空值约定。
- */
+            const failures: Array<{ /** 文件名称或完整路径。 */
+filename: string; /** 缓存或下载目录类别。 */
+folder?: cacheTypes.CacheFolder; /** 处理结果或错误说明。 */
 message: string }> = []
             for (const item of deleteItems) {
               try {
@@ -1759,10 +1741,10 @@ message: string }> = []
 }
 
 /**
- * 处理 /api/music/cache/move 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 在缓存子目录之间移动歌曲。
+ * @param context /api/music/cache/move 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 自动下载、缓存目录维护、媒体文件响应与歌曲洗版的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postMusicCacheMove(context: RequestContext, runtime: DownloadServiceRuntime) {
@@ -1803,10 +1785,10 @@ export async function postMusicCacheMove(context: RequestContext, runtime: Downl
 }
 
 /**
- * 处理 /api/music/cache/switch-base 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 迁移用户缓存到指定基础存储位置。
+ * @param context /api/music/cache/switch-base 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 自动下载、缓存目录维护、媒体文件响应与歌曲洗版的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postMusicCacheSwitchBase(context: RequestContext, runtime: DownloadServiceRuntime) {
@@ -1847,10 +1829,10 @@ export async function postMusicCacheSwitchBase(context: RequestContext, runtime:
 }
 
 /**
- * 处理 /api/music/cache/updateMetadata 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 更新缓存歌曲的文件元信息。
+ * @param context /api/music/cache/updateMetadata 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 自动下载、缓存目录维护、媒体文件响应与歌曲洗版的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postMusicCacheUpdateMetadata(context: RequestContext, runtime: DownloadServiceRuntime) {
@@ -1890,10 +1872,10 @@ export async function postMusicCacheUpdateMetadata(context: RequestContext, runt
 }
 
 /**
- * 处理 /api/music/cache/embedLyric 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 读取缓存歌曲内嵌歌词。
+ * @param context /api/music/cache/embedLyric 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 自动下载、缓存目录维护、媒体文件响应与歌曲洗版的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function getMusicCacheEmbedLyric(context: RequestContext, runtime: DownloadServiceRuntime) {
@@ -1943,10 +1925,10 @@ export async function getMusicCacheEmbedLyric(context: RequestContext, runtime: 
 }
 
 /**
- * 处理 /api/music/cache/embedLyric 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 向缓存歌曲文件写入内嵌歌词。
+ * @param context /api/music/cache/embedLyric 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 自动下载、缓存目录维护、媒体文件响应与歌曲洗版的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postMusicCacheEmbedLyric(context: RequestContext, runtime: DownloadServiceRuntime) {
@@ -2101,10 +2083,10 @@ export async function postMusicCacheEmbedLyric(context: RequestContext, runtime:
 }
 
 /**
- * 处理 /api/music/cache/link 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 为缓存歌曲关联平台元信息。
+ * @param context /api/music/cache/link 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 自动下载、缓存目录维护、媒体文件响应与歌曲洗版的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postMusicCacheLink(context: RequestContext, runtime: DownloadServiceRuntime) {
@@ -2140,10 +2122,10 @@ export async function postMusicCacheLink(context: RequestContext, runtime: Downl
 }
 
 /**
- * 处理 /api/music/cache/lyric 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 读取用户歌曲的缓存歌词。
+ * @param context /api/music/cache/lyric 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 自动下载、缓存目录维护、媒体文件响应与歌曲洗版的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function getMusicCacheLyric(context: RequestContext, runtime: DownloadServiceRuntime) {
@@ -2189,10 +2171,10 @@ export async function getMusicCacheLyric(context: RequestContext, runtime: Downl
 }
 
 /**
- * 处理 /api/music/cache/lyric 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 保存用户歌曲的缓存歌词。
+ * @param context /api/music/cache/lyric 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 自动下载、缓存目录维护、媒体文件响应与歌曲洗版的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postMusicCacheLyric(context: RequestContext, runtime: DownloadServiceRuntime) {
@@ -2244,10 +2226,10 @@ export async function postMusicCacheLyric(context: RequestContext, runtime: Down
 }
 
 /**
- * 处理 /api/music/download 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 代理下载远端音频，可按请求写入标签并返回文件。
+ * @param context /api/music/download 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 自动下载、缓存目录维护、媒体文件响应与歌曲洗版的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function getMusicDownload(context: RequestContext, runtime: DownloadServiceRuntime) {

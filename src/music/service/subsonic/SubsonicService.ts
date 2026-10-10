@@ -1,4 +1,4 @@
-/** SubsonicService 模块：按职责组织，原业务行为保持不变。 @author yahyaoo */
+/** Subsonic 协议服务：鉴权、媒体库、在线搜索、收藏评分、歌词与音频流转发。 @author yahyaoo */
 import storageFs from '../../../application/persistence/documentFileSystem'
 import http from 'http'
 import crypto from 'crypto'
@@ -23,12 +23,8 @@ import { fetchGenres, fetchRadios, fetchPlaylistsByGenre, fetchRadioSongs, fetch
 import { listRadioStations, getRadioStation, addRadioStation, updateRadioStation, removeRadioStation } from '../radio/RadioStationService'
 
 // 音乐源歌单 → 电台 列表缓存（避免每次 getInternetRadioStations 都枚举全部音源实拉）
-let playlistRadioCache: { /**
- * ts 字段，沿用原业务结构与空值约定。
- */
-ts: number; /**
- * stations 字段，沿用原业务结构与空值约定。
- */
+let playlistRadioCache: { /** 缓存数据取得时间，用于判断过期。 */
+ts: number;
 stations: any[] } | null = null
 const PLAYLIST_RADIO_TTL = 10 * 60 * 1000
 
@@ -36,12 +32,8 @@ const PLAYLIST_RADIO_TTL = 10 * 60 * 1000
 // QQ 的 GetRadioSong 接口已返回 500003、旧接口直接 404（上游失效），官方电台点了必然失败。
 // 与其把一堆「点了没反应」的电台暴露给客户端，不如在上游恢复前不返回它们；
 // 每 OFFICIAL_RADIO_TTL 用一首歌探测一次，上游恢复后自动重新出现（自愈）。
-let officialRadioAvailability: { /**
- * ts 字段，沿用原业务结构与空值约定。
- */
-ts: number; /**
- * available 字段，沿用原业务结构与空值约定。
- */
+let officialRadioAvailability: { /** 缓存数据取得时间，用于判断过期。 */
+ts: number;
 available: boolean } | null = null
 const OFFICIAL_RADIO_TTL = 10 * 60 * 1000
 const OFFICIAL_RADIO_PROBE_TIMEOUT = 6000
@@ -58,20 +50,14 @@ const musicSdk = musicSdkRaw as any
 // 进程级随机密钥备选（当未设置 frontend.password 时使用，避免硬编码常数字符串）
 const processRandomSecret = crypto.randomBytes(32).toString('hex')
 
-/**
- * 处理 serverTicketSecret 对应的业务能力，参数和执行顺序保持原实现。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
- * @author yahyaoo
- */
+
+/** 获取音频转码票据的 HMAC 密钥；优先使用管理密码，否则使用进程随机密钥。 @returns 签名密钥。 @author yahyaoo */
 function serverTicketSecret(): string {
     return String((global.lx.config as any)?.['frontend.password'] || processRandomSecret)
 }
 
-/**
- * 处理 radioTicketSecret 对应的业务能力，参数和执行顺序保持原实现。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
- * @author yahyaoo
- */
+
+/** 获取电台流票据的 HMAC 密钥，与管理密码变化或进程重启后的验证规则一致。 @returns 签名密钥。 @author yahyaoo */
 function radioTicketSecret(): string {
     return String((global.lx.config as any)?.['frontend.password'] || processRandomSecret)
 }
@@ -91,9 +77,8 @@ function briefErrorText(err: any, max = 200): string {
 const TRANSCODE_PARAM_TTL = 30 * 60 * 1000
 
 /**
- * 处理 signTranscodeParams 对应的业务能力，参数和执行顺序保持原实现。
- * @param payload payload 原业务参数。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * 签名内部转码请求参数，防止客户端绕过协议鉴权调用转码。
+ * @param payload 待发送的同步数据包。
  * @author yahyaoo
  */
 function signTranscodeParams(payload: Record<string, any>): string {
@@ -103,9 +88,8 @@ function signTranscodeParams(payload: Record<string, any>): string {
 }
 
 /**
- * 验证 verifyTranscodeParams 对应的业务能力，参数和执行顺序保持原实现。
- * @param token token 原业务参数。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * 校验内部转码参数签名与有效期。
+ * @param token 客户端认证或内部转发票据。
  * @author yahyaoo
  */
 function verifyTranscodeParams(token: string): Record<string, any> | null {
@@ -124,12 +108,8 @@ function verifyTranscodeParams(token: string): Record<string, any> | null {
 }
 
 // 排行榜列表封面缓存：getBoards 接口不带封面，按需抓取榜单首歌封面并按榜单缓存，避免每次 getPlaylists 都实拉
-const leaderboardCoverCache = new Map<string, { /**
- * ts 字段，沿用原业务结构与空值约定。
- */
-ts: number; /**
- * url 字段，沿用原业务结构与空值约定。
- */
+const leaderboardCoverCache = new Map<string, { /** 缓存数据取得时间，用于判断过期。 */
+ts: number; /** 请求或资源地址。 */
 url: string }>()
 const leaderboardCoverInflight = new Map<string, Promise<string>>()
 const LEADERBOARD_COVER_TTL = 30 * 60 * 1000
@@ -172,8 +152,7 @@ function interleaveBySource<T>(groups: T[][], max: number): T[] {
 let ffmpegProbeDone = false
 let ffmpegAvailable = false
 /**
- * 探测 probeFfmpeg 对应的业务能力，参数和执行顺序保持原实现。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * 探测 ffmpeg 可执行程序，缓存可用状态供转码请求使用。
  * @author yahyaoo
  */
 async function probeFfmpeg(): Promise<boolean> {
@@ -192,39 +171,31 @@ async function probeFfmpeg(): Promise<boolean> {
     return ffmpegAvailable
 }
 
-/**
- * TranscodeSemaphore 契约，按当前模块职责组织，保留原字段和扩展能力。
- * @author yahyaoo
- */
+/** 转码并发信号量，管理可用名额和等待任务。 @author yahyaoo */
 class TranscodeSemaphore {
-    /**
-     * active 字段，沿用原业务结构与空值约定。
-     */
+    /** 当前活动任务或启用状态。 */
     private active = 0
-    /**
-     * queue 字段，沿用原业务结构与空值约定。
-     */
+    /** 等待执行的任务队列。 */
     private queue: Array<() => void> = []
     /**
-     * 构造实例 constructor 对应的业务能力，参数和执行顺序保持原实现。
-     * @param max max 原业务参数。
-     * @author yahyaoo
-     */
+ * 设置转码并发上限与等待任务队列。
+ * @param max 允许同时处理的最大任务数。
+ * @author yahyaoo
+ */
     constructor(private max: number) {}
     /**
-     * 处理 acquire 对应的业务能力，参数和执行顺序保持原实现。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 等待并获取一个转码并发名额。
+ * @author yahyaoo
+ */
     async acquire(): Promise<void> {
         if (this.active < this.max) { this.active++; return }
         await new Promise<void>((resolve) => this.queue.push(resolve))
         this.active++
     }
     /**
-     * 处理 release 对应的业务能力，参数和执行顺序保持原实现。
-     * @author yahyaoo
-     */
+ * 归还转码并发名额，唤醒等待任务。
+ * @author yahyaoo
+ */
     release(): void {
         this.active--
         const next = this.queue.shift()
@@ -233,9 +204,8 @@ class TranscodeSemaphore {
 }
 let transcodeSemaphore: TranscodeSemaphore | null = null
 /**
- * 获取 getTranscodeSemaphore 对应的业务能力，参数和执行顺序保持原实现。
- * @param max max 原业务参数。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * 按配置并发上限获取或创建转码信号量。
+ * @param max 允许同时处理的最大任务数。
  * @author yahyaoo
  */
 function getTranscodeSemaphore(max: number): TranscodeSemaphore {
@@ -247,10 +217,9 @@ function getTranscodeSemaphore(max: number): TranscodeSemaphore {
 // 电台流「无状态短 Token」
 // ─────────────────────────────────────────────
 /**
- * 处理 signRadioToken 对应的业务能力，参数和执行顺序保持原实现。
- * @param id 原业务标识。
- * @param user user 原业务参数。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * 签名电台流转发票据，使内部转发链接带有有效期。
+ * @param id 当前业务对象标识。
+ * @param user 用户配置与数据目录。
  * @author yahyaoo
  */
 function signRadioToken(id: string, user: string): string {
@@ -269,14 +238,13 @@ function signRadioToken(id: string, user: string): string {
 const ICY_META_INTERVAL = 16000 // 标准 ICY 元数据间隔 16KB
 
 /**
- * 处理 pipeIcyAudioStream 对应的业务能力，参数和执行顺序保持原实现。
- * @param targetUrl targetUrl 原业务参数。
- * @param streamTitle streamTitle 原业务参数。
- * @param stationName stationName 原业务参数。
- * @param req 原 HTTP 请求。
- * @param res 原 HTTP 响应。
- * @param onFinish onFinish 原业务参数。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * 转发电台音频流，剥离 ICY 元数据并更新当前广播信息。
+ * @param targetUrl 请求目标地址。
+ * @param streamTitle 电台显示名称。
+ * @param stationName 电台显示名称。
+ * @param req HTTP 请求，包含认证头、查询参数和上传正文。
+ * @param res HTTP 响应，用于写入状态码、数据或媒体流。
+ * @param onFinish 处理完成回调。
  * @author yahyaoo
  */
 function pipeIcyAudioStream(
@@ -388,19 +356,14 @@ function pipeIcyAudioStream(
 // 推荐结果缓存：同一类型短时间内共享一次 QQ 抓取结果，避免客户端并发请求（启动瞬间
 // newest/recent/random 同时打来）重复访问。缓存成功后保留较长时间，并在 QQ 失败时
 // 回退到上次成功结果，确保刷新/限流时每日推荐不消失。
-const recommendCache = new Map<string, { /**
- * ts 字段，沿用原业务结构与空值约定。
- */
-ts: number, /**
- * data 字段，沿用原业务结构与空值约定。
- */
+const recommendCache = new Map<string, { /** 缓存数据取得时间，用于判断过期。 */
+ts: number,
 data: any[] }>()
 const RECOMMEND_CACHE_TTL = 60 * 60 * 1000
 /**
- * 处理 cachedRecommend 对应的业务能力，参数和执行顺序保持原实现。
- * @param type type 原业务参数。
- * @param size size 原业务参数。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * 缓存推荐请求结果并复用未过期内容，避免重复抓取远端推荐。
+ * @param type 业务操作或结果类别。
+ * @param size 分页大小。
  * @author yahyaoo
  */
 async function cachedRecommend(type: string, size: number): Promise<any[]> {
@@ -454,33 +417,21 @@ function extractAlbumImage(data: any): string {
 // 实现「音流星标 ↔ 网页前端原生收藏」双向互通。
 // ─────────────────────────────────────────────
 
-/**
- * SubsonicMeta 契约，按当前模块职责组织，保留原字段和扩展能力。
- * @author yahyaoo
- */
+/** 用户协议元数据，包括收藏、评分及其他扩展记录。 @author yahyaoo */
 export interface SubsonicMeta {
-    /**
-     * starredAlbums 字段，沿用原业务结构与空值约定。
-     */
+    /** 用户收藏的专辑标识。 */
     starredAlbums: string[]
-    /**
-     * starredArtists 字段，沿用原业务结构与空值约定。
-     */
+    /** 用户收藏的歌手标识。 */
     starredArtists: string[]
-    /**
-     * starredArtistNames 字段，沿用原业务结构与空值约定。
-     */
+    /** 用户收藏歌手的名称映射。 */
     starredArtistNames: string[]
-    /**
-     * ratings 字段，沿用原业务结构与空值约定。
-     */
+    /** 用户歌曲评分映射。 */
     ratings: Record<string, number>
 }
 
 /**
- * 规范化 normalizeSubsonicName 对应的业务能力，参数和执行顺序保持原实现。
- * @param name 原名称或查询词。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * 规范化歌曲或歌手名称，供 Subsonic 搜索和匹配使用。
+ * @param name 对象名称或归档内相对名称。
  * @author yahyaoo
  */
 function normalizeSubsonicName(name: string): string {
@@ -488,9 +439,8 @@ function normalizeSubsonicName(name: string): string {
 }
 
 /**
- * 获取 getSubsonicMetaFilePath 对应的业务能力，参数和执行顺序保持原实现。
+ * 计算用户收藏、评分等 Subsonic 元数据的 SQL 文档路径。
  * @param username 已解析的用户名称。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
  * @author yahyaoo
  */
 export function getSubsonicMetaFilePath(username: string): string {
@@ -498,9 +448,8 @@ export function getSubsonicMetaFilePath(username: string): string {
 }
 
 /**
- * 读取 readSubsonicMeta 对应的业务能力，参数和执行顺序保持原实现。
+ * 读取用户收藏、评分与扩展元数据，缺失时初始化默认结构。
  * @param username 已解析的用户名称。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
  * @author yahyaoo
  */
 export function readSubsonicMeta(username: string): SubsonicMeta {
@@ -523,10 +472,9 @@ export function readSubsonicMeta(username: string): SubsonicMeta {
 }
 
 /**
- * 写入 writeSubsonicMeta 对应的业务能力，参数和执行顺序保持原实现。
+ * 保存用户 Subsonic 收藏、评分与扩展元数据。
  * @param username 已解析的用户名称。
- * @param meta meta 原业务参数。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * @param meta 用户收藏、评分等协议元数据。
  * @author yahyaoo
  */
 export function writeSubsonicMeta(username: string, meta: SubsonicMeta) {
@@ -546,57 +494,37 @@ export function writeSubsonicMeta(username: string, meta: SubsonicMeta) {
  * 若写入时还要回源解析歌名会显著拖慢，歌名留给读取时按需解析。
  */
 export interface ScrobbleEntry {
-    /**
-     * id 字段，沿用原业务结构与空值约定。
-     */
+    /** 业务记录标识。 */
     id: string
-    /**
-     * time 字段，沿用原业务结构与空值约定。
-     */
+
     time: number
 }
 
 /** 播放队列状态（savePlayQueue / getPlayQueue 跨设备续播用） */
 export interface PlayQueueState {
-    /**
-     * ids 字段，沿用原业务结构与空值约定。
-     */
+
     ids: string[]
-    /**
-     * current 字段，沿用原业务结构与空值约定。
-     */
+
     current?: string
     /** [indexBasedQueue] 当前曲目的 0 基索引（按索引保存/读取队列时使用） */
     currentIndex?: number
-    /**
-     * position 字段，沿用原业务结构与空值约定。
-     */
+
     position?: number
-    /**
-     * changed 字段，沿用原业务结构与空值约定。
-     */
+
     changed: number
-    /**
-     * changedBy 字段，沿用原业务结构与空值约定。
-     */
+
     changedBy?: string
 }
 
 /** 书签条目（getBookmarks / createBookmark / deleteBookmark）：某首歌 + 播放位置 */
 export interface BookmarkEntry {
-    /**
-     * id 字段，沿用原业务结构与空值约定。
-     */
+    /** 业务记录标识。 */
     id: string
     /** 播放位置（毫秒） */
     position: number
-    /**
-     * comment 字段，沿用原业务结构与空值约定。
-     */
+
     comment: string
-    /**
-     * created 字段，沿用原业务结构与空值约定。
-     */
+
     created: number
 }
 
@@ -604,9 +532,8 @@ const MAX_SCROBBLES = 2000
 const MAX_QUEUE_IDS = 1000
 
 /**
- * 获取 getScrobbleFilePath 对应的业务能力，参数和执行顺序保持原实现。
+ * 计算用户播放记录 SQL 文档路径。
  * @param username 已解析的用户名称。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
  * @author yahyaoo
  */
 function getScrobbleFilePath(username: string): string {
@@ -614,9 +541,8 @@ function getScrobbleFilePath(username: string): string {
 }
 
 /**
- * 获取 getPlayQueueFilePath 对应的业务能力，参数和执行顺序保持原实现。
+ * 计算用户 Subsonic 播放队列 SQL 文档路径。
  * @param username 已解析的用户名称。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
  * @author yahyaoo
  */
 function getPlayQueueFilePath(username: string): string {
@@ -624,9 +550,8 @@ function getPlayQueueFilePath(username: string): string {
 }
 
 /**
- * 读取 readScrobbles 对应的业务能力，参数和执行顺序保持原实现。
+ * 读取用户 Subsonic 播放历史记录。
  * @param username 已解析的用户名称。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
  * @author yahyaoo
  */
 export function readScrobbles(username: string): ScrobbleEntry[] {
@@ -643,10 +568,9 @@ export function readScrobbles(username: string): ScrobbleEntry[] {
 }
 
 /**
- * 写入 writeScrobbles 对应的业务能力，参数和执行顺序保持原实现。
+ * 保存用户播放历史记录到播放器数据库。
  * @param username 已解析的用户名称。
- * @param list list 原业务参数。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * @param list 目标歌单或条目集合。
  * @author yahyaoo
  */
 export function writeScrobbles(username: string, list: ScrobbleEntry[]) {
@@ -663,9 +587,8 @@ export function writeScrobbles(username: string, list: ScrobbleEntry[]) {
 }
 
 /**
- * 读取 readPlayQueue 对应的业务能力，参数和执行顺序保持原实现。
+ * 读取用户保存的播放队列、当前位置与客户端信息。
  * @param username 已解析的用户名称。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
  * @author yahyaoo
  */
 export function readPlayQueue(username: string): PlayQueueState | null {
@@ -682,10 +605,9 @@ export function readPlayQueue(username: string): PlayQueueState | null {
 }
 
 /**
- * 写入 writePlayQueue 对应的业务能力，参数和执行顺序保持原实现。
+ * 保存播放队列及当前播放位置。
  * @param username 已解析的用户名称。
- * @param state state 原业务参数。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * @param state 当前操作状态。
  * @author yahyaoo
  */
 export function writePlayQueue(username: string, state: PlayQueueState) {
@@ -700,9 +622,8 @@ export function writePlayQueue(username: string, state: PlayQueueState) {
 }
 
 /**
- * 获取 getBookmarkFilePath 对应的业务能力，参数和执行顺序保持原实现。
+ * 计算用户播放书签 SQL 文档路径。
  * @param username 已解析的用户名称。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
  * @author yahyaoo
  */
 function getBookmarkFilePath(username: string): string {
@@ -710,9 +631,8 @@ function getBookmarkFilePath(username: string): string {
 }
 
 /**
- * 读取 readBookmarks 对应的业务能力，参数和执行顺序保持原实现。
+ * 读取用户的歌曲播放书签。
  * @param username 已解析的用户名称。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
  * @author yahyaoo
  */
 export function readBookmarks(username: string): BookmarkEntry[] {
@@ -738,10 +658,9 @@ export function readBookmarks(username: string): BookmarkEntry[] {
 }
 
 /**
- * 写入 writeBookmarks 对应的业务能力，参数和执行顺序保持原实现。
+ * 保存歌曲书签、位置和备注。
  * @param username 已解析的用户名称。
- * @param list list 原业务参数。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * @param list 目标歌单或条目集合。
  * @author yahyaoo
  */
 export function writeBookmarks(username: string, list: BookmarkEntry[]) {
@@ -761,25 +680,15 @@ export function writeBookmarks(username: string, list: BookmarkEntry[]) {
  * 仅当 state=stopped 且 ignoreScrobble≠true 时才额外落一条播放历史。
  */
 interface PlaybackReportState {
-    /**
-     * id 字段，沿用原业务结构与空值约定。
-     */
+    /** 业务记录标识。 */
     id: string
-    /**
-     * positionMs 字段，沿用原业务结构与空值约定。
-     */
+    /** 播放位置，单位毫秒。 */
     positionMs: number
-    /**
-     * state 字段，沿用原业务结构与空值约定。
-     */
+
     state: string
-    /**
-     * playbackRate 字段，沿用原业务结构与空值约定。
-     */
+
     playbackRate: number
-    /**
-     * updatedAt 字段，沿用原业务结构与空值约定。
-     */
+    /** 记录最近更新时间，单位毫秒。 */
     updatedAt: number
 }
 const playbackReportState = new Map<string, PlaybackReportState>()
@@ -822,9 +731,8 @@ export function downscaleAvatarUrl(url: string, size = 300): string {
 }
 
 /**
- * 获取 getArtistIndexKey 对应的业务能力，参数和执行顺序保持原实现。
- * @param name 原名称或查询词。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * 生成歌手索引键，供媒体库分组和查询使用。
+ * @param name 对象名称或归档内相对名称。
  * @author yahyaoo
  */
 export function getArtistIndexKey(name: string): string {
@@ -847,25 +755,13 @@ export function getArtistIndexKey(name: string): string {
 export function syncNativeLibraryToSubsonic(
     username: string,
     type: 'artists' | 'albums',
-    added: { /**
- * id 字段，沿用原业务结构与空值约定。
- */
-id: string, /**
- * source 字段，沿用原业务结构与空值约定。
- */
-source: string, /**
- * name 字段，沿用原业务结构与空值约定。
- */
+    added: { /** 条目唯一标识。 */
+id: string, /** 歌曲或详情所属的音乐平台。 */
+source: string, /** 记录显示名称。 */
 name?: string }[],
-    removed: { /**
- * id 字段，沿用原业务结构与空值约定。
- */
-id: string, /**
- * source 字段，沿用原业务结构与空值约定。
- */
-source: string, /**
- * name 字段，沿用原业务结构与空值约定。
- */
+    removed: { /** 条目唯一标识。 */
+id: string, /** 歌曲或详情所属的音乐平台。 */
+source: string, /** 记录显示名称。 */
 name?: string }[],
 ) {
     const meta = readSubsonicMeta(username)
@@ -956,37 +852,26 @@ export async function syncDislikeToRating(username: string, id: string, rating: 
  *  - XML (默认)：数据函数返回 {attrs, children} 嵌套结构，toXml 负责渲染
  */
 class SubsonicHandler {
-    /**
-     * VERSION 字段，沿用原业务结构与空值约定。
-     */
+
     private readonly VERSION = '1.16.1'
-    /**
-     * SERVER_VERSION 字段，沿用原业务结构与空值约定。
-     */
+
     private readonly SERVER_VERSION = '1.0.0'
 
     // 预缓存歌曲 ID -> 封面 URL，避免 getCoverArt 重新请求 SDK
-    /**
-     * MAX_SONG_PIC_CACHE 字段，沿用原业务结构与空值约定。
-     */
+
     private static readonly MAX_SONG_PIC_CACHE = 5000
-    /**
-     * songPicUrlCache 字段，沿用原业务结构与空值约定。
-     */
+
     private songPicUrlCache = new Map<string, string>()
     // In-flight Promise 复用：避免客户端并发请求同一未缓存专辑封面时重复调用 SDK
-    /**
-     * albumSongFetchInFlight 字段，沿用原业务结构与空值约定。
-     */
+
     private albumSongFetchInFlight = new Map<string, Promise<string | null>>()
 
     /**
-     * 设置 setSongPicUrl 对应的业务能力，参数和执行顺序保持原实现。
-     * @param id 原业务标识。
-     * @param url url 原业务参数。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 缓存歌曲封面地址，供封面接口复用。
+ * @param id 当前业务对象标识。
+ * @param url 请求或播放地址。
+ * @author yahyaoo
+ */
     private setSongPicUrl(id: string, url: string) {
         if (this.songPicUrlCache.size >= SubsonicHandler.MAX_SONG_PIC_CACHE) {
             const firstKey = this.songPicUrlCache.keys().next().value
@@ -996,84 +881,49 @@ class SubsonicHandler {
     }
 
     // 在线全网搜索歌曲缓存 (ID -> MusicInfo)，确保后续 getSong / getCoverArt / getLyrics 能精准查到歌曲元数据
-    /**
-     * onlineSongCache 字段，沿用原业务结构与空值约定。
-     */
+
     private onlineSongCache = new Map<string, LX.Music.MusicInfo>()
     // [修复] onlineSongCache 真正落盘持久化：之前只是内存 Map，重启即丢，导致 kw 等回源结果无法复用
-    /**
-     * onlineSongCacheLoaded 字段，沿用原业务结构与空值约定。
-     */
+
     private onlineSongCacheLoaded = false
 
     // Subsonic 播放缓存后台任务跟踪：username -> { songKey, controller }，用于切歌时自动取消上一首未完成的下载
-    /**
-     * subsonicActiveTasks 字段，沿用原业务结构与空值约定。
-     */
-    private subsonicActiveTasks = new Map<string, { /**
- * songKey 字段，沿用原业务结构与空值约定。
- */
-songKey: string, /**
- * controller 字段，沿用原业务结构与空值约定。
- */
+
+    private subsonicActiveTasks = new Map<string, { /** 歌曲索引键。 */
+songKey: string, /** 用于取消当前异步任务的控制器。 */
 controller: AbortController }>()
 
     // [修复] resolveStreamUrl In-flight 去重：同一歌曲并发 stream 请求（音流预加载多首）共享同一次解析 Promise，
     // 避免短时间内重复调用自定义源接口（终端里大量重复 [自定义源] 日志的根因）。
     // key = `${source}_${songmid}_${maxBitrate}_${username}`，值生命周期与解析 Promise 相同。
-    /**
-     * resolveStreamInFlight 字段，沿用原业务结构与空值约定。
-     */
-    private resolveStreamInFlight = new Map<string, Promise<{ /**
- * url 字段，沿用原业务结构与空值约定。
- */
-url: string, /**
- * quality 字段，沿用原业务结构与空值约定。
- */
-quality: string, /**
- * selected 字段，沿用原业务结构与空值约定。
- */
+
+    private resolveStreamInFlight = new Map<string, Promise<{ /** 远端资源地址。 */
+url: string, /** 音质标识。 */
+quality: string,
 selected?: string }>>()
 
     // 固定同一关键词的在线结果顺序，避免客户端翻页时出现重复或跳项。
-    /**
-     * onlineSearchCache 字段，沿用原业务结构与空值约定。
-     */
-    private onlineSearchCache = new Map<string, { /**
- * expiresAt 字段，沿用原业务结构与空值约定。
- */
-expiresAt: number, /**
- * results 字段，沿用原业务结构与空值约定。
- */
-results: { /**
- * music 字段，沿用原业务结构与空值约定。
- */
-music: LX.Music.MusicInfo, /**
- * listId 字段，沿用原业务结构与空值约定。
- */
+
+    private onlineSearchCache = new Map<string, { /** 缓存或票据失效时间。 */
+expiresAt: number, /** 逐项处理结果。 */
+results: { /** 播放域 SQLite 仓储。 */
+music: LX.Music.MusicInfo, /** 歌单标识。 */
 listId: string }[] }>()
 
     // 当前用户 love 列表歌曲 id 集合缓存，用于歌曲序列化时标记 starred（按用户名隔离，避免并发串号）
-    /**
-     * loveIdSets 字段，沿用原业务结构与空值约定。
-     */
+
     private loveIdSets = new Map<string, Set<string>>()
     // [修复] 每请求缓存当前用户的评星 map(id -> 1~5)，供歌曲序列化返回 userRating，
     // 否则客户端重载后看不到星标。与 loveIdSets 同源，避免每首歌读盘。
-    /**
-     * userRatingsCache 字段，沿用原业务结构与空值约定。
-     */
+
     private userRatingsCache = new Map<string, Record<string, number>>()
-    /**
-     * currentUsername 字段，沿用原业务结构与空值约定。
-     */
+    /** 当前任务所属用户。 */
     private currentUsername = ''
 
     /**
-     * 获取 getRuntimeDir 对应的业务能力，参数和执行顺序保持原实现。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 返回服务运行期缓存和日志目录。
+ * @author yahyaoo
+ */
     private getRuntimeDir(): string {
         const dir = path.join(global.lx.dataPath, 'runtime')
         if (!storageFs.existsSync(dir)) storageFs.mkdirSync(dir, { recursive: true })
@@ -1081,31 +931,28 @@ listId: string }[] }>()
     }
 
     /**
-     * 获取 getOnlineSongCachePath 对应的业务能力，参数和执行顺序保持原实现。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 计算在线歌曲信息缓存 SQL 文档路径。
+ * @author yahyaoo
+ */
     private getOnlineSongCachePath(): string {
         return path.join(this.getRuntimeDir(), 'subsonic-online-cache.json')
     }
 
     /**
-     * 获取 getSourceErrorLogPath 对应的业务能力，参数和执行顺序保持原实现。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 计算音源解析错误日志文件路径。
+ * @author yahyaoo
+ */
     private getSourceErrorLogPath(): string {
         return path.join(this.getRuntimeDir(), 'subsonic-source-errors.log')
     }
 
     /**
-     * 处理 logSourceError 对应的业务能力，参数和执行顺序保持原实现。
-     * @param tag tag 原业务参数。
-     * @param detail detail 原业务参数。
-     * @param err err 原业务参数。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 记录音源错误并裁剪敏感参数，便于排查解析失败。
+ * @param tag 记录或资源类别标识。
+ * @param detail 平台返回的详情数据。
+ * @param err 捕获的运行错误。
+ * @author yahyaoo
+ */
     private logSourceError(tag: string, detail: string, err?: any) {
         const ts = new Date().toISOString()
         const errMsg = err?.message ?? String(err ?? '')
@@ -1119,10 +966,9 @@ listId: string }[] }>()
     }
 
     /**
-     * 加载 loadOnlineSongCache 对应的业务能力，参数和执行顺序保持原实现。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 加载已保存的在线歌曲信息到内存缓存。
+ * @author yahyaoo
+ */
     private loadOnlineSongCache() {
         if (this.onlineSongCacheLoaded) return
         this.onlineSongCacheLoaded = true
@@ -1140,18 +986,15 @@ listId: string }[] }>()
         }
     }
 
-    /**
-     * saveOnlineSongCacheTimer 字段，沿用原业务结构与空值约定。
-     */
+
     private saveOnlineSongCacheTimer: NodeJS.Timeout | null = null
 
     // 磁盘持久化：使用 1 秒防抖批量落盘，避免搜索/加载大专辑时并发重复写盘
     // 采用「临时文件 + rename」做原子写：避免进程在写入中途被强杀导致文件损坏
     /**
-     * 保存 saveOnlineSongCache 对应的业务能力，参数和执行顺序保持原实现。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 将当前在线歌曲信息缓存写入播放器数据库。
+ * @author yahyaoo
+ */
     private saveOnlineSongCache() {
         if (this.saveOnlineSongCacheTimer) return
         this.saveOnlineSongCacheTimer = setTimeout(() => {
@@ -1171,11 +1014,10 @@ listId: string }[] }>()
     }
 
     /**
-     * 处理 cacheOnlineSong 对应的业务能力，参数和执行顺序保持原实现。
-     * @param music music 原业务参数。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 将搜索或推荐得到的歌曲加入在线信息缓存。
+ * @param music 歌曲或歌曲集合。
+ * @author yahyaoo
+ */
     private cacheOnlineSong(music: LX.Music.MusicInfo) {
         if (!music || !music.id) return
         this.loadOnlineSongCache()
@@ -1192,11 +1034,10 @@ listId: string }[] }>()
     // ─────────────────────────────────────────────
 
     /**
-     * 验证 verifyAuth 对应的业务能力，参数和执行顺序保持原实现。
-     * @param params params 原业务参数。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 校验 Subsonic 用户密码或盐值令牌，返回鉴权用户与错误信息。
+ * @param params 协议参数集合。
+ * @author yahyaoo
+ */
     private verifyAuth(params: URLSearchParams): string | null {
         const u = params.get('u')
         if (!u) return null
@@ -1340,11 +1181,10 @@ listId: string }[] }>()
     }
 
     /**
-     * 处理 renderAttrs 对应的业务能力，参数和执行顺序保持原实现。
-     * @param attrs attrs 原业务参数。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 将响应字段序列化为 XML 属性并转义特殊字符。
+ * @param attrs 待写入 XML 或 JSON 的属性集合。
+ * @author yahyaoo
+ */
     private renderAttrs(attrs: any): string {
         if (!attrs) return ''
         let str = ''
@@ -1360,14 +1200,13 @@ listId: string }[] }>()
     }
 
     /**
-     * 发送 sendError 对应的业务能力，参数和执行顺序保持原实现。
-     * @param res 原 HTTP 响应。
-     * @param code code 原业务参数。
-     * @param message message 原业务参数。
-     * @param format format 原业务参数。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 按客户端请求格式输出 Subsonic 错误响应。
+ * @param res HTTP 响应，用于写入状态码、数据或媒体流。
+ * @param code 协议错误代码。
+ * @param message 返回客户端的错误说明。
+ * @param format 目标音频格式。
+ * @author yahyaoo
+ */
     private sendError(res: http.ServerResponse, code: number, message: string, format: string) {
         if (format === 'json') {
             res.setHeader('Content-Type', 'application/json; charset=utf-8')
@@ -1393,11 +1232,10 @@ listId: string }[] }>()
     }
 
     /**
-     * 处理 escapeXml 对应的业务能力，参数和执行顺序保持原实现。
-     * @param str str 原业务参数。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 转义 XML 文本中的特殊字符。
+ * @param str 待转换文本。
+ * @author yahyaoo
+ */
     private escapeXml(str: string): string {
         return str.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     }
@@ -1407,13 +1245,12 @@ listId: string }[] }>()
     // ─────────────────────────────────────────────
 
     /**
-     * 处理 handleRequest 对应的业务能力，参数和执行顺序保持原实现。
-     * @param req 原 HTTP 请求。
-     * @param res 原 HTTP 响应。
-     * @param urlObj urlObj 原业务参数。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 鉴权后分派 Subsonic 方法，选择 JSON 或 XML 响应格式。
+ * @param req HTTP 请求，包含认证头、查询参数和上传正文。
+ * @param res HTTP 响应，用于写入状态码、数据或媒体流。
+ * @param urlObj 已解析的请求 URL。
+ * @author yahyaoo
+ */
     async handleRequest(req: http.IncomingMessage, res: http.ServerResponse, urlObj: URL) {
         let params = urlObj.searchParams
 
@@ -1689,12 +1526,11 @@ listId: string }[] }>()
     // ─────────────────────────────────────────────
 
     /**
-     * 获取 getLibraryData 对应的业务能力，参数和执行顺序保持原实现。
-     * @param username 已解析的用户名称。
-     * @param type type 原业务参数。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 汇总用户可访问的本地、下载和缓存歌曲，构建协议媒体库。
+ * @param username 已解析的用户名称。
+ * @param type 业务操作或结果类别。
+ * @author yahyaoo
+ */
     private async getLibraryData(username: string, type: 'artists' | 'albums'): Promise<any[]> {
         const userDir = path.join(global.lx.userPath, getUserDirname(username))
         const libPath = path.join(userDir, 'library', `${type}.json`)
@@ -1718,12 +1554,8 @@ listId: string }[] }>()
     }
 
     /** 解析专辑信息（Subsonic 星标写回原生收藏时填充名称与封面；失败返回 name:null 不阻断星标） */
-    private async resolveAlbumInfo(source: string, realId: string): Promise<{ /**
- * name 字段，沿用原业务结构与空值约定。
- */
-name: string | null, /**
- * picUrl 字段，沿用原业务结构与空值约定。
- */
+    private async resolveAlbumInfo(source: string, realId: string): Promise<{ /** 条目名称。 */
+name: string | null, /** 歌曲封面地址。 */
 picUrl: string }> {
         try {
             const sdk = (musicSdk as any)[source]
@@ -1750,11 +1582,10 @@ picUrl: string }> {
     }
 
     /**
-     * 解析 parseDuration 对应的业务能力，参数和执行顺序保持原实现。
-     * @param interval 原任务间隔。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 将歌曲时长字符串或数字转换为秒数。
+ * @param interval 原任务间隔。
+ * @author yahyaoo
+ */
     private parseDuration(interval: any): number {
         if (!interval) return 0
         if (typeof interval === 'number') return interval
@@ -1850,15 +1681,9 @@ picUrl: string }> {
         const meta = (music as any).meta || {}
         const qualitys = (music as any).types || (music as any)._types || meta.qualitys || meta.types || meta._types || (music as any)._qualitys || meta._qualitys || []
 
-        const qMap: Record<string, { /**
- * bitRate 字段，沿用原业务结构与空值约定。
- */
-bitRate: number, /**
- * suffix 字段，沿用原业务结构与空值约定。
- */
-suffix: string, /**
- * contentType 字段，沿用原业务结构与空值约定。
- */
+        const qMap: Record<string, { /** 音频码率。 */
+bitRate: number,
+suffix: string, /** HTTP 响应内容类型。 */
 contentType: string }> = {
             'master': { bitRate: 2304, suffix: 'Master', contentType: 'audio/flac' },
             'atmos_plus': { bitRate: 1500, suffix: 'Atmos+', contentType: 'audio/mp4' },
@@ -1904,12 +1729,8 @@ contentType: string }> = {
     }
 
     /** 查找某个用户下所有列表中的某首歌 */
-    private async findMusicById(username: string, id: string): Promise<{ /**
- * music 字段，沿用原业务结构与空值约定。
- */
-music: LX.Music.MusicInfo, /**
- * listId 字段，沿用原业务结构与空值约定。
- */
+    private async findMusicById(username: string, id: string): Promise<{ /** 播放域 SQLite 仓储。 */
+music: LX.Music.MusicInfo, /** 歌单标识。 */
 listId: string } | null> {
         // [修复] 读取前确保磁盘上的 onlineSongCache 已加载（之前只在 cacheOnlineSong 写入时触发，
         // 导致重启后首次读取发生在任何写入之前，落盘数据永远读不进来 -> 重启即丢）
@@ -1968,12 +1789,11 @@ listId: string } | null> {
     }
 
     /**
-     * 获取 getListParams 对应的业务能力，参数和执行顺序保持原实现。
-     * @param params params 原业务参数。
-     * @param name 原名称或查询词。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 解析歌单相关分页与筛选参数。
+ * @param params 协议参数集合。
+ * @param name 对象名称或归档内相对名称。
+ * @author yahyaoo
+ */
     private getListParams(params: URLSearchParams, name: string): string[] {
         return params.getAll(name)
             .flatMap(value => value.split(','))
@@ -1982,12 +1802,11 @@ listId: string } | null> {
     }
 
     /**
-     * 解析 resolveMusicIds 对应的业务能力，参数和执行顺序保持原实现。
-     * @param username 已解析的用户名称。
-     * @param ids ids 原业务参数。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 将协议歌曲标识解析为可读取的本地或在线歌曲记录。
+ * @param username 已解析的用户名称。
+ * @param ids 待处理标识集合。
+ * @author yahyaoo
+ */
     private async resolveMusicIds(username: string, ids: string[]): Promise<LX.Music.MusicInfo[] | null> {
         const musics: LX.Music.MusicInfo[] = []
         for (const id of ids) {
@@ -2003,12 +1822,11 @@ listId: string } | null> {
     // ─────────────────────────────────────────────
 
     /**
-     * 处理 handleGetLicense 对应的业务能力，参数和执行顺序保持原实现。
-     * @param res 原 HTTP 响应。
-     * @param format format 原业务参数。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 返回协议许可证信息，按请求格式写入 Subsonic 响应。
+ * @param res HTTP 响应，用于写入状态码、数据或媒体流。
+ * @param format 目标音频格式。
+ * @author yahyaoo
+ */
     private handleGetLicense(res: http.ServerResponse, format: string) {
         if (format === 'json') {
             return this.sendResponse(res, {
@@ -2021,12 +1839,11 @@ listId: string } | null> {
     }
 
     /**
-     * 处理 handleGetMusicFolders 对应的业务能力，参数和执行顺序保持原实现。
-     * @param res 原 HTTP 响应。
-     * @param format format 原业务参数。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 返回用户可见音乐目录，按请求格式写入 Subsonic 响应。
+ * @param res HTTP 响应，用于写入状态码、数据或媒体流。
+ * @param format 目标音频格式。
+ * @author yahyaoo
+ */
     private handleGetMusicFolders(res: http.ServerResponse, format: string) {
         const folders = [
             { id: '1', name: 'LX Music（按服务器设置）' },
@@ -2049,13 +1866,12 @@ listId: string } | null> {
     }
 
     /**
-     * 处理 handleGetPlaylists 对应的业务能力，参数和执行顺序保持原实现。
-     * @param res 原 HTTP 响应。
-     * @param username 已解析的用户名称。
-     * @param format format 原业务参数。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 列出用户和公开只读歌单，按请求格式写入 Subsonic 响应。
+ * @param res HTTP 响应，用于写入状态码、数据或媒体流。
+ * @param username 已解析的用户名称。
+ * @param format 目标音频格式。
+ * @author yahyaoo
+ */
     private async handleGetPlaylists(res: http.ServerResponse, username: string, format: string) {
         const userSpace = getUserSpace(username)
         const listData = await userSpace.listManage.getListData()
@@ -2133,14 +1949,13 @@ listId: string } | null> {
     }
 
     /**
-     * 处理 handleGetPlaylist 对应的业务能力，参数和执行顺序保持原实现。
-     * @param res 原 HTTP 响应。
-     * @param username 已解析的用户名称。
-     * @param params params 原业务参数。
-     * @param format format 原业务参数。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 返回指定歌单详情与歌曲，按请求格式写入 Subsonic 响应。
+ * @param res HTTP 响应，用于写入状态码、数据或媒体流。
+ * @param username 已解析的用户名称。
+ * @param params 协议参数集合。
+ * @param format 目标音频格式。
+ * @author yahyaoo
+ */
     private async handleGetPlaylist(res: http.ServerResponse, username: string, params: URLSearchParams, format: string) {
         const id = params.get('id')
         if (!id) return this.sendError(res, 10, 'Required parameter is missing: id', format)
@@ -2216,14 +2031,13 @@ listId: string } | null> {
     }
 
     /**
-     * 处理 handleUpdatePlaylist 对应的业务能力，参数和执行顺序保持原实现。
-     * @param res 原 HTTP 响应。
-     * @param username 已解析的用户名称。
-     * @param params params 原业务参数。
-     * @param format format 原业务参数。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 更新用户歌单名称和歌曲内容，按请求格式写入 Subsonic 响应。
+ * @param res HTTP 响应，用于写入状态码、数据或媒体流。
+ * @param username 已解析的用户名称。
+ * @param params 协议参数集合。
+ * @param format 目标音频格式。
+ * @author yahyaoo
+ */
     private async handleUpdatePlaylist(res: http.ServerResponse, username: string, params: URLSearchParams, format: string) {
         const playlistId = params.get('playlistId')
         if (!playlistId) return this.sendError(res, 10, 'Required parameter is missing: playlistId', format)
@@ -2301,14 +2115,13 @@ listId: string } | null> {
     }
 
     /**
-     * 处理 handleCreatePlaylist 对应的业务能力，参数和执行顺序保持原实现。
-     * @param res 原 HTTP 响应。
-     * @param username 已解析的用户名称。
-     * @param params params 原业务参数。
-     * @param format format 原业务参数。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 创建或覆盖用户歌单，按请求格式写入 Subsonic 响应。
+ * @param res HTTP 响应，用于写入状态码、数据或媒体流。
+ * @param username 已解析的用户名称。
+ * @param params 协议参数集合。
+ * @param format 目标音频格式。
+ * @author yahyaoo
+ */
     private async handleCreatePlaylist(res: http.ServerResponse, username: string, params: URLSearchParams, format: string) {
         const name = params.get('name')?.trim()
         if (!name) return this.sendError(res, 10, 'Required parameter is missing: name', format)
@@ -2340,14 +2153,13 @@ listId: string } | null> {
     }
 
     /**
-     * 处理 handleDeletePlaylist 对应的业务能力，参数和执行顺序保持原实现。
-     * @param res 原 HTTP 响应。
-     * @param username 已解析的用户名称。
-     * @param params params 原业务参数。
-     * @param format format 原业务参数。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 删除用户自定义歌单，按请求格式写入 Subsonic 响应。
+ * @param res HTTP 响应，用于写入状态码、数据或媒体流。
+ * @param username 已解析的用户名称。
+ * @param params 协议参数集合。
+ * @param format 目标音频格式。
+ * @author yahyaoo
+ */
     private async handleDeletePlaylist(res: http.ServerResponse, username: string, params: URLSearchParams, format: string) {
         const id = params.get('id')
         if (!id) return this.sendError(res, 10, 'Required parameter is missing: id', format)
@@ -2378,19 +2190,17 @@ listId: string } | null> {
     // 音流等客户端无需 web 页面即可浏览/播放榜单。榜单为只读，不可增删改。
     // ─────────────────────────────────────────────
     /**
-     * 获取 getLeaderboardSource 对应的业务能力，参数和执行顺序保持原实现。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 读取公开排行榜使用的音乐平台设置。
+ * @author yahyaoo
+ */
     private getLeaderboardSource(): string {
         return global.lx.config['subsonic.leaderboardSource'] || 'tx'
     }
 
     /**
-     * 获取 getLeaderboardPlaylists 对应的业务能力，参数和执行顺序保持原实现。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 获取平台排行榜并映射为只读协议歌单。
+ * @author yahyaoo
+ */
     private async getLeaderboardPlaylists(): Promise<any[]> {
         const source = this.getLeaderboardSource()
         // 系统级 owner：不属于任何具体用户，使其在音流「我的歌单」(owner==我) 过滤中被排除，
@@ -2462,14 +2272,13 @@ listId: string } | null> {
     }
 
     /**
-     * 处理 handleGetLeaderboardPlaylist 对应的业务能力，参数和执行顺序保持原实现。
-     * @param res 原 HTTP 响应。
-     * @param username 已解析的用户名称。
-     * @param id 原业务标识。
-     * @param format format 原业务参数。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 查询公开排行榜歌单的歌曲，按请求格式写入 Subsonic 响应。
+ * @param res HTTP 响应，用于写入状态码、数据或媒体流。
+ * @param username 已解析的用户名称。
+ * @param id 当前业务对象标识。
+ * @param format 目标音频格式。
+ * @author yahyaoo
+ */
     private async handleGetLeaderboardPlaylist(res: http.ServerResponse, username: string, id: string, format: string) {
         const parts = id.split('_') // ['lb', source, bangid...]
         const source = parts[1]
@@ -2580,14 +2389,13 @@ listId: string } | null> {
     }
 
     /**
-     * 处理 handleGetSharedPlaylist 对应的业务能力，参数和执行顺序保持原实现。
-     * @param res 原 HTTP 响应。
-     * @param username 已解析的用户名称。
-     * @param id 原业务标识。
-     * @param format format 原业务参数。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 查询公开共享歌单的歌曲，按请求格式写入 Subsonic 响应。
+ * @param res HTTP 响应，用于写入状态码、数据或媒体流。
+ * @param username 已解析的用户名称。
+ * @param id 当前业务对象标识。
+ * @param format 目标音频格式。
+ * @author yahyaoo
+ */
     private async handleGetSharedPlaylist(res: http.ServerResponse, username: string, id: string, format: string) {
         const parts = id.split('_') // ['pl', source, plId...]
         const source = parts[1]
@@ -2710,14 +2518,13 @@ listId: string } | null> {
 
     // getAlbum: 返回 album + song[] 格式（音流等客户端期望的格式）
     /**
-     * 处理 handleGetAlbum 对应的业务能力，参数和执行顺序保持原实现。
-     * @param res 原 HTTP 响应。
-     * @param username 已解析的用户名称。
-     * @param params params 原业务参数。
-     * @param format format 原业务参数。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 返回专辑详情与歌曲，按请求格式写入 Subsonic 响应。
+ * @param res HTTP 响应，用于写入状态码、数据或媒体流。
+ * @param username 已解析的用户名称。
+ * @param params 协议参数集合。
+ * @param format 目标音频格式。
+ * @author yahyaoo
+ */
     private async handleGetAlbum(res: http.ServerResponse, username: string, params: URLSearchParams, format: string) {
         const id = params.get('id')
         if (!id) return this.sendError(res, 10, 'Required parameter is missing: id', format)
@@ -2885,12 +2692,8 @@ listId: string } | null> {
             }
         } else if (id.startsWith('album_')) {
             // 聚合专辑 ID（由 getAlbumList/getAlbumList2 生成）
-            const allMusicsMap = new Map<string, { /**
- * music 字段，沿用原业务结构与空值约定。
- */
-music: LX.Music.MusicInfo, /**
- * listId 字段，沿用原业务结构与空值约定。
- */
+            const allMusicsMap = new Map<string, { /** 播放域 SQLite 仓储。 */
+music: LX.Music.MusicInfo, /** 歌单标识。 */
 listId: string }[]>()
             const collectInto = (songs: LX.Music.MusicInfo[], listId: string) => {
                 for (const m of songs) {
@@ -3001,14 +2804,13 @@ listId: string }[]>()
     }
 
     /**
-     * 处理 handleGetSong 对应的业务能力，参数和执行顺序保持原实现。
-     * @param res 原 HTTP 响应。
-     * @param username 已解析的用户名称。
-     * @param params params 原业务参数。
-     * @param format format 原业务参数。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 返回单首歌曲信息，按请求格式写入 Subsonic 响应。
+ * @param res HTTP 响应，用于写入状态码、数据或媒体流。
+ * @param username 已解析的用户名称。
+ * @param params 协议参数集合。
+ * @param format 目标音频格式。
+ * @author yahyaoo
+ */
     private async handleGetSong(res: http.ServerResponse, username: string, params: URLSearchParams, format: string) {
         const id = params.get('id')
         if (!id) return this.sendError(res, 10, 'Required parameter is missing: id', format)
@@ -3049,14 +2851,13 @@ listId: string }[]>()
     }
 
     /**
-     * 处理 handleGetMusicDirectory 对应的业务能力，参数和执行顺序保持原实现。
-     * @param res 原 HTTP 响应。
-     * @param username 已解析的用户名称。
-     * @param params params 原业务参数。
-     * @param format format 原业务参数。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 按目录标识查询歌手、专辑或歌曲，按请求格式写入 Subsonic 响应。
+ * @param res HTTP 响应，用于写入状态码、数据或媒体流。
+ * @param username 已解析的用户名称。
+ * @param params 协议参数集合。
+ * @param format 目标音频格式。
+ * @author yahyaoo
+ */
     private async handleGetMusicDirectory(res: http.ServerResponse, username: string, params: URLSearchParams, format: string) {
         const id = params.get('id')
         const userSpace = getUserSpace(username)
@@ -3270,15 +3071,14 @@ listId: string }[]>()
     }
 
     /**
-     * 处理 handleGetAlbumList 对应的业务能力，参数和执行顺序保持原实现。
-     * @param res 原 HTTP 响应。
-     * @param username 已解析的用户名称。
-     * @param params params 原业务参数。
-     * @param format format 原业务参数。
-     * @param isV2 isV2 原业务参数。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 按分类与分页查询专辑列表，按请求格式写入 Subsonic 响应。
+ * @param res HTTP 响应，用于写入状态码、数据或媒体流。
+ * @param username 已解析的用户名称。
+ * @param params 协议参数集合。
+ * @param format 目标音频格式。
+ * @param isV2 是否按 v2 协议结构处理数据。
+ * @author yahyaoo
+ */
     private async handleGetAlbumList(
         res: http.ServerResponse,
         username: string,
@@ -3532,41 +3332,23 @@ listId: string }[]>()
 
         // 2. 聚合歌手
         const artistsMap = new Map<string, {
-            /**
-             * id 字段，沿用原业务结构与空值约定。
-             */
+            /** 业务记录标识。 */
             id: string
-            /**
-             * name 字段，沿用原业务结构与空值约定。
-             */
+            /** 记录显示名称。 */
             name: string
-            /**
-             * source 字段，沿用原业务结构与空值约定。
-             */
+            /** 歌曲或详情所属的音乐平台。 */
             source: string
-            /**
-             * singerId 字段，沿用原业务结构与空值约定。
-             */
+
             singerId: string
-            /**
-             * picUrl 字段，沿用原业务结构与空值约定。
-             */
+            /** 歌曲封面地址。 */
             picUrl: string
-            /**
-             * albumKeys 字段，沿用原业务结构与空值约定。
-             */
+
             albumKeys: Set<string>
-            /**
-             * songCount 字段，沿用原业务结构与空值约定。
-             */
+
             songCount: number
-            /**
-             * starred 字段，沿用原业务结构与空值约定。
-             */
+            /** 用户收藏的歌曲标识集合。 */
             starred: boolean
-            /**
-             * songs 字段，沿用原业务结构与空值约定。
-             */
+            /** 歌曲列表。 */
             songs: LX.Music.MusicInfo[]
         }>()
 
@@ -3723,14 +3505,13 @@ listId: string }[]>()
 
 
     /**
-     * 处理 handleGetArtist 对应的业务能力，参数和执行顺序保持原实现。
-     * @param res 原 HTTP 响应。
-     * @param username 已解析的用户名称。
-     * @param params params 原业务参数。
-     * @param format format 原业务参数。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 返回歌手及其专辑列表，按请求格式写入 Subsonic 响应。
+ * @param res HTTP 响应，用于写入状态码、数据或媒体流。
+ * @param username 已解析的用户名称。
+ * @param params 协议参数集合。
+ * @param format 目标音频格式。
+ * @author yahyaoo
+ */
     private async handleGetArtist(res: http.ServerResponse, username: string, params: URLSearchParams, format: string) {
         const id = params.get('id')
         if (!id) return this.sendError(res, 10, 'Required parameter is missing: id', format)
@@ -3804,12 +3585,8 @@ listId: string }[]>()
         // 2) singer.sourcePriority 配了多个源时，按歌手名到其它平台再寻址一轮，
         //    把那些平台的专辑/歌曲也合并进来——各平台 mid 不通用，必须各自寻址。
         //    只配了 1 个源时行为不变（单源）。
-        const sourceTargets: Array<{ /**
- * source 字段，沿用原业务结构与空值约定。
- */
-source: string, /**
- * id 字段，沿用原业务结构与空值约定。
- */
+        const sourceTargets: Array<{ /** 歌曲所属音乐平台标识。 */
+source: string, /** 业务记录标识。 */
 id: string }> = []
         if (artistId && artistId !== singerName) sourceTargets.push({ source, id: artistId })
         if (singerName && singerName !== 'Unknown' && getOrderedSingerSources().length > 1) {
@@ -4025,15 +3802,14 @@ id: string }> = []
 
 
     /**
-     * 处理 handleGetArtistInfo 对应的业务能力，参数和执行顺序保持原实现。
-     * @param res 原 HTTP 响应。
-     * @param username 已解析的用户名称。
-     * @param params params 原业务参数。
-     * @param format format 原业务参数。
-     * @param method method 原业务参数。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 查询歌手简介、头像和关联信息，按请求格式写入 Subsonic 响应。
+ * @param res HTTP 响应，用于写入状态码、数据或媒体流。
+ * @param username 已解析的用户名称。
+ * @param params 协议参数集合。
+ * @param format 目标音频格式。
+ * @param method Subsonic 协议方法名。
+ * @author yahyaoo
+ */
     private async handleGetArtistInfo(res: http.ServerResponse, username: string, params: URLSearchParams, format: string, method?: string) {
         const id = params.get('id') || ''
         const artistName = params.get('artist') || ''
@@ -4066,13 +3842,12 @@ id: string }> = []
     }
 
     /**
-     * 处理 handleGetGenres 对应的业务能力，参数和执行顺序保持原实现。
-     * @param res 原 HTTP 响应。
-     * @param username 已解析的用户名称。
-     * @param format format 原业务参数。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 返回音乐流派分类，按请求格式写入 Subsonic 响应。
+ * @param res HTTP 响应，用于写入状态码、数据或媒体流。
+ * @param username 已解析的用户名称。
+ * @param format 目标音频格式。
+ * @author yahyaoo
+ */
     private async handleGetGenres(res: http.ServerResponse, username: string, format: string) {
         const genres = await fetchGenres()
         // subsonicLog.debug(`[Subsonic] handleGetGenres found ${genres.length} genres`)
@@ -4089,12 +3864,11 @@ id: string }> = []
     }
 
     /**
-     * 构造 buildRadioStationAttrs 对应的业务能力，参数和执行顺序保持原实现。
-     * @param station station 原业务参数。
-     * @param format format 原业务参数。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 将用户电台记录转换为 Subsonic 响应属性。
+ * @param station 电台记录。
+ * @param format 目标音频格式。
+ * @author yahyaoo
+ */
     private buildRadioStationAttrs(station: any, format: string) {
         return format === 'json'
             ? { internetRadioStation: station }
@@ -4184,14 +3958,13 @@ id: string }> = []
     }
 
     /**
-     * 处理 handleGetInternetRadioStations 对应的业务能力，参数和执行顺序保持原实现。
-     * @param res 原 HTTP 响应。
-     * @param username 已解析的用户名称。
-     * @param params params 原业务参数。
-     * @param format format 原业务参数。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 返回用户自建网络电台，按请求格式写入 Subsonic 响应。
+ * @param res HTTP 响应，用于写入状态码、数据或媒体流。
+ * @param username 已解析的用户名称。
+ * @param params 协议参数集合。
+ * @param format 目标音频格式。
+ * @author yahyaoo
+ */
     private async handleGetInternetRadioStations(res: http.ServerResponse, username: string, params: URLSearchParams, format: string) {
         try {
             const official = await fetchRadios()           // QQ 官方电台：streamUrl 指向本服 /rest/stream?id=radio_tx_*
@@ -4266,14 +4039,13 @@ id: string }> = []
     }
 
     /**
-     * 处理 handleCreateInternetRadioStation 对应的业务能力，参数和执行顺序保持原实现。
-     * @param res 原 HTTP 响应。
-     * @param username 已解析的用户名称。
-     * @param params params 原业务参数。
-     * @param format format 原业务参数。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 创建用户网络电台，按请求格式写入 Subsonic 响应。
+ * @param res HTTP 响应，用于写入状态码、数据或媒体流。
+ * @param username 已解析的用户名称。
+ * @param params 协议参数集合。
+ * @param format 目标音频格式。
+ * @author yahyaoo
+ */
     private async handleCreateInternetRadioStation(res: http.ServerResponse, username: string, params: URLSearchParams, format: string) {
         const name = params.get('name')
         const streamUrl = params.get('streamUrl')
@@ -4291,14 +4063,13 @@ id: string }> = []
     }
 
     /**
-     * 处理 handleUpdateInternetRadioStation 对应的业务能力，参数和执行顺序保持原实现。
-     * @param res 原 HTTP 响应。
-     * @param username 已解析的用户名称。
-     * @param params params 原业务参数。
-     * @param format format 原业务参数。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 修改用户网络电台，按请求格式写入 Subsonic 响应。
+ * @param res HTTP 响应，用于写入状态码、数据或媒体流。
+ * @param username 已解析的用户名称。
+ * @param params 协议参数集合。
+ * @param format 目标音频格式。
+ * @author yahyaoo
+ */
     private async handleUpdateInternetRadioStation(res: http.ServerResponse, username: string, params: URLSearchParams, format: string) {
         const id = params.get('id')
         const name = params.get('name')
@@ -4316,14 +4087,13 @@ id: string }> = []
     }
 
     /**
-     * 处理 handleDeleteInternetRadioStations 对应的业务能力，参数和执行顺序保持原实现。
-     * @param res 原 HTTP 响应。
-     * @param username 已解析的用户名称。
-     * @param params params 原业务参数。
-     * @param format format 原业务参数。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 删除用户网络电台，按请求格式写入 Subsonic 响应。
+ * @param res HTTP 响应，用于写入状态码、数据或媒体流。
+ * @param username 已解析的用户名称。
+ * @param params 协议参数集合。
+ * @param format 目标音频格式。
+ * @author yahyaoo
+ */
     private async handleDeleteInternetRadioStations(res: http.ServerResponse, username: string, params: URLSearchParams, format: string) {
         const ids = params.getAll('id')
         if (!ids.length) return this.sendError(res, 10, 'Required parameter missing: id', format)
@@ -4337,19 +4107,14 @@ id: string }> = []
     }
 
     /**
-     * 请求 fetchOnlineSearchSongs 对应的业务能力，参数和执行顺序保持原实现。
-     * @param cleanQuery cleanQuery 原业务参数。
-     * @param sources sources 原业务参数。
-     * @param limit limit 原业务参数。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
-    private async fetchOnlineSearchSongs(cleanQuery: string, sources: string[], limit: number = 30): Promise<{ /**
- * music 字段，沿用原业务结构与空值约定。
+ * 按配置平台执行在线歌曲搜索并汇总匹配结果。
+ * @param cleanQuery 归一化后的搜索关键词。
+ * @param sources 允许查询的音乐平台集合。
+ * @param limit 本次最大返回数量。
+ * @author yahyaoo
  */
-music: LX.Music.MusicInfo, /**
- * listId 字段，沿用原业务结构与空值约定。
- */
+    private async fetchOnlineSearchSongs(cleanQuery: string, sources: string[], limit: number = 30): Promise<{ /** 播放域 SQLite 仓储。 */
+music: LX.Music.MusicInfo, /** 歌单标识。 */
 listId: string }[]> {
         if (!cleanQuery) return []
         const validSources = sources.filter(s => ['wy', 'tx', 'kw', 'kg', 'mg'].includes(s) && musicSdk[s]?.musicSearch?.search)
@@ -4357,23 +4122,15 @@ listId: string }[]> {
         const cached = this.onlineSearchCache.get(cacheKey)
         if (cached && cached.expiresAt > Date.now()) return cached.results
 
-        const sourceResults = new Map<string, { /**
- * music 字段，沿用原业务结构与空值约定。
- */
-music: LX.Music.MusicInfo, /**
- * listId 字段，沿用原业务结构与空值约定。
- */
+        const sourceResults = new Map<string, { /** 播放域 SQLite 仓储。 */
+music: LX.Music.MusicInfo, /** 歌单标识。 */
 listId: string }[]>()
         // 每个平台一次取足上限，后续 songOffset 分页复用同一批稳定结果。
         const targetLimit = 50
 
         await Promise.all(validSources.map(async source => {
-            const results: { /**
- * music 字段，沿用原业务结构与空值约定。
- */
-music: LX.Music.MusicInfo, /**
- * listId 字段，沿用原业务结构与空值约定。
- */
+            const results: { /** 播放域 SQLite 仓储。 */
+music: LX.Music.MusicInfo, /** 歌单标识。 */
 listId: string }[] = []
             sourceResults.set(source, results)
             try {
@@ -4438,12 +4195,8 @@ listId: string }[] = []
             }
         }))
 
-        const interleaved: { /**
- * music 字段，沿用原业务结构与空值约定。
- */
-music: LX.Music.MusicInfo, /**
- * listId 字段，沿用原业务结构与空值约定。
- */
+        const interleaved: { /** 播放域 SQLite 仓储。 */
+music: LX.Music.MusicInfo, /** 歌单标识。 */
 listId: string }[] = []
         const maxLength = Math.max(0, ...validSources.map(source => sourceResults.get(source)?.length || 0))
         for (let index = 0; index < maxLength; index++) {
@@ -4477,13 +4230,12 @@ listId: string }[] = []
     }
 
     /**
-     * 请求 fetchOnlineSearchArtists 对应的业务能力，参数和执行顺序保持原实现。
-     * @param query 原查询参数。
-     * @param sources sources 原业务参数。
-     * @param limit limit 原业务参数。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 按配置平台执行在线歌手搜索。
+ * @param query Subsonic 查询参数，包含接口选项及认证信息。
+ * @param sources 允许查询的音乐平台集合。
+ * @param limit 本次最大返回数量。
+ * @author yahyaoo
+ */
     private async fetchOnlineSearchArtists(query: string, sources: string[], limit: number): Promise<any[]> {
         const max = Math.max(1, Math.min(limit || 20, 50))
         // 跨源合并与否由 singer.sourcePriority 决定：只配了 1 个源时保持单源行为
@@ -4609,15 +4361,14 @@ listId: string }[] = []
     }
 
     /**
-     * 处理 handleSearch 对应的业务能力，参数和执行顺序保持原实现。
-     * @param res 原 HTTP 响应。
-     * @param username 已解析的用户名称。
-     * @param params params 原业务参数。
-     * @param format format 原业务参数。
-     * @param method method 原业务参数。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 查询本地媒体库，并按配置补充在线搜索结果，按请求格式写入 Subsonic 响应。
+ * @param res HTTP 响应，用于写入状态码、数据或媒体流。
+ * @param username 已解析的用户名称。
+ * @param params 协议参数集合。
+ * @param format 目标音频格式。
+ * @param method Subsonic 协议方法名。
+ * @author yahyaoo
+ */
     private async handleSearch(res: http.ServerResponse, username: string, params: URLSearchParams, format: string, method: string = 'search3') {
         let rawQuery = (params.get('query') || '').trim()
         if (rawQuery === '""' || rawQuery === "''") rawQuery = '' // 处理某些客户端发送的空占位符
@@ -4681,12 +4432,8 @@ listId: string }[] = []
         const userSpace = getUserSpace(username)
         const listData = await userSpace.listManage.getListData()
 
-        const allSongsMap = new Map<string, { /**
- * music 字段，沿用原业务结构与空值约定。
- */
-music: LX.Music.MusicInfo, /**
- * listId 字段，沿用原业务结构与空值约定。
- */
+        const allSongsMap = new Map<string, { /** 播放域 SQLite 仓储。 */
+music: LX.Music.MusicInfo, /** 歌单标识。 */
 listId: string }>()
         const collectSongs = (list: LX.Music.MusicInfo[], listId: string) => {
             for (const m of list) {
@@ -4907,12 +4654,8 @@ listId: string }>()
                 const i = priority.indexOf(src)
                 return i < 0 ? priority.length : i
             }
-            const picked = new Map<string, { /**
- * item 字段，沿用原业务结构与空值约定。
- */
-item: any, /**
- * rank 字段，沿用原业务结构与空值约定。
- */
+            const picked = new Map<string, {
+item: any,
 rank: number }>()
             const order: string[] = []
             for (const it of matchedSongs as any[]) {
@@ -4939,12 +4682,8 @@ rank: number }>()
         // [dislike] 命中不喜欢规则的歌曲从搜索结果中剔除（放在分页之前，避免过滤后每页数量不足）
         // matchedSongs 的元素是 { music, listId }，需取出 music 过滤后再映射回去
         if (global.lx.config['subsonic.hideDisliked']) {
-            const entries = matchedSongs as Array<{ /**
- * music 字段，沿用原业务结构与空值约定。
- */
-music: LX.Music.MusicInfo, /**
- * listId 字段，沿用原业务结构与空值约定。
- */
+            const entries = matchedSongs as Array<{ /** 播放域 SQLite 仓储。 */
+music: LX.Music.MusicInfo, /** 歌单标识。 */
 listId: string }>
             const kept = await this.filterDislikedSongs(username, entries.map(e => e.music))
             if (kept.length !== entries.length) {
@@ -5102,12 +4841,8 @@ listId: string }>
     }
 
     /** 统一元数据解析原语：本地/缓存 -> 在线回源；命中即回写 onlineSongCache */
-    private async resolveSongMeta(username: string, id: string): Promise<{ /**
- * music 字段，沿用原业务结构与空值约定。
- */
-music: LX.Music.MusicInfo, /**
- * listId 字段，沿用原业务结构与空值约定。
- */
+    private async resolveSongMeta(username: string, id: string): Promise<{ /** 播放域 SQLite 仓储。 */
+music: LX.Music.MusicInfo, /** 歌单标识。 */
 listId: string } | null> {
         const debug = !!global.lx.config['subsonic.enableDebug']
         if (debug) subsonicLog.debug(`[Subsonic][trace] resolveSongMeta ${id}: 第1步 查持久化(歌单/专辑库) + 内存/磁盘 onlineSongCache`)
@@ -5133,41 +4868,24 @@ listId: string } | null> {
      * （github/dev 移植自 feat/subsonic：歌曲经 resolveSongMeta 解析，支持在线回源）
      */
     /** 用户维度 Subsonic 扩展元数据：星标专辑 / 星标歌手（委托模块级函数，便于 server.ts 反向同步共用） */
-    private async getUserSubsonicMeta(username: string): Promise<{ /**
- * starredAlbums 字段，沿用原业务结构与空值约定。
- */
-starredAlbums: string[], /**
- * starredArtists 字段，沿用原业务结构与空值约定。
- */
-starredArtists: string[], /**
- * starredArtistNames 字段，沿用原业务结构与空值约定。
- */
-starredArtistNames: string[], /**
- * ratings 字段，沿用原业务结构与空值约定。
- */
+    private async getUserSubsonicMeta(username: string): Promise<{ /** 收藏专辑记录。 */
+starredAlbums: string[], /** 用户收藏的歌手标识。 */
+starredArtists: string[], /** 用户收藏歌手的名称映射。 */
+starredArtistNames: string[], /** 用户歌曲评分映射。 */
 ratings: Record<string, number> }> {
         return readSubsonicMeta(username)
     }
 
     /**
-     * 保存 saveUserSubsonicMeta 对应的业务能力，参数和执行顺序保持原实现。
-     * @param username 已解析的用户名称。
-     * @param meta meta 原业务参数。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
-    private async saveUserSubsonicMeta(username: string, meta: { /**
- * starredAlbums 字段，沿用原业务结构与空值约定。
+ * 保存用户 Subsonic 元数据，并维护内存评分缓存。
+ * @param username 已解析的用户名称。
+ * @param meta 用户收藏、评分等协议元数据。
+ * @author yahyaoo
  */
-starredAlbums: string[], /**
- * starredArtists 字段，沿用原业务结构与空值约定。
- */
-starredArtists: string[], /**
- * starredArtistNames 字段，沿用原业务结构与空值约定。
- */
-starredArtistNames: string[], /**
- * ratings 字段，沿用原业务结构与空值约定。
- */
+    private async saveUserSubsonicMeta(username: string, meta: { /** 收藏专辑记录。 */
+starredAlbums: string[], /** 用户收藏的歌手标识。 */
+starredArtists: string[], /** 用户收藏歌手的名称映射。 */
+starredArtistNames: string[], /** 用户歌曲评分映射。 */
 ratings: Record<string, number> }) {
         writeSubsonicMeta(username, meta)
     }
@@ -5183,12 +4901,8 @@ ratings: Record<string, number> }) {
      * - artist_名字：兜底 id（歌曲/专辑映射在无 singerId 时生成），用 getSingerMid 寻址归一为 art_tx_mid；
      *   寻址失败时退回原名（artist_名字），仍按名字匹配。
      */
-    private async resolveArtistKey(username: string, id: string): Promise<{ /**
- * canonical 字段，沿用原业务结构与空值约定。
- */
-canonical: string | null, /**
- * name 字段，沿用原业务结构与空值约定。
- */
+    private async resolveArtistKey(username: string, id: string): Promise<{ /** 归一化后用于匹配的标识。 */
+canonical: string | null, /** 记录显示名称。 */
 name?: string }> {
         if (id.startsWith('art_')) {
             let name: string | undefined
@@ -5211,15 +4925,14 @@ name?: string }> {
     }
 
     /**
-     * 处理 handleStar 对应的业务能力，参数和执行顺序保持原实现。
-     * @param res 原 HTTP 响应。
-     * @param username 已解析的用户名称。
-     * @param params params 原业务参数。
-     * @param format format 原业务参数。
-     * @param isStar isStar 原业务参数。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 新增或移除用户的歌曲、专辑和歌手收藏，按请求格式写入 Subsonic 响应。
+ * @param res HTTP 响应，用于写入状态码、数据或媒体流。
+ * @param username 已解析的用户名称。
+ * @param params 协议参数集合。
+ * @param format 目标音频格式。
+ * @param isStar 是否设为收藏。
+ * @author yahyaoo
+ */
     private async handleStar(res: http.ServerResponse, username: string, params: URLSearchParams, format: string, isStar: boolean) {
         // 收集 id / albumId / artistId（均允许逗号分隔的多个值）
         const ids: string[] = []
@@ -5423,12 +5136,8 @@ name?: string }> {
     }
 
     /** 写入专辑维度的 dislike 规则（!<专辑名>@<歌手>，按歌手拆多条） */
-    private async addDislikeAlbum(username: string, album: { /**
- * albumName 字段，沿用原业务结构与空值约定。
- */
-albumName: string, /**
- * singers 字段，沿用原业务结构与空值约定。
- */
+    private async addDislikeAlbum(username: string, album: { /** 歌曲所属专辑名称。 */
+albumName: string, /** 歌手名称集合。 */
 singers: string[] }): Promise<number> {
         try {
             const userSpace = getUserSpace(username) as any
@@ -5485,22 +5194,12 @@ singers: string[] }): Promise<number> {
     private async resolveSingerIdentity(
         username: string,
         name: string,
-        preset?: { /**
- * source 字段，沿用原业务结构与空值约定。
- */
-source: string, /**
- * id 字段，沿用原业务结构与空值约定。
- */
+        preset?: { /** 歌曲所属音乐平台标识。 */
+source: string, /** 业务记录标识。 */
 id: string },
-    ): Promise<{ /**
- * name 字段，沿用原业务结构与空值约定。
- */
-name: string, /**
- * source 字段，沿用原业务结构与空值约定。
- */
-source: string, /**
- * singerId 字段，沿用原业务结构与空值约定。
- */
+    ): Promise<{ /** 条目名称。 */
+name: string, /** 歌曲或详情所属的音乐平台。 */
+source: string,
 singerId: string }> {
         if (preset?.id) return { name, source: preset.source, singerId: preset.id }
         if (!name) return { name, source: '', singerId: '' }
@@ -5525,53 +5224,27 @@ singerId: string }> {
      * 根据 Subsonic 歌曲 id 解析出对应的「歌名 / 歌手 / 规则 key」，供写回 dislike 使用。
      */
     private async resolveDislikeTarget(username: string, id: string): Promise<{
-        /**
-         * infos 字段，沿用原业务结构与空值约定。
-         */
-        infos: Array<{ /**
- * name 字段，沿用原业务结构与空值约定。
- */
-name: string, /**
- * singer 字段，沿用原业务结构与空值约定。
- */
+
+        infos: Array<{ /** 条目名称。 */
+name: string, /** 歌手名称。 */
 singer: string }>
-        /**
-         * album 字段，沿用原业务结构与空值约定。
-         */
-        album?: { /**
- * albumName 字段，沿用原业务结构与空值约定。
- */
-albumName: string, /**
- * singers 字段，沿用原业务结构与空值约定。
- */
+        /** 歌曲专辑信息。 */
+        album?: { /** 歌曲所属专辑名称。 */
+albumName: string, /** 歌手名称集合。 */
 singers: string[] }
-        /**
-         * singer 字段，沿用原业务结构与空值约定。
-         */
-        singer?: { /**
- * name 字段，沿用原业务结构与空值约定。
- */
-name: string, /**
- * source 字段，沿用原业务结构与空值约定。
- */
-source: string, /**
- * singerId 字段，沿用原业务结构与空值约定。
- */
+        /** 歌手名称。 */
+        singer?: { /** 条目名称。 */
+name: string, /** 歌曲或详情所属的音乐平台。 */
+source: string,
 singerId: string }
-        /**
-         * keys 字段，沿用原业务结构与空值约定。
-         */
+
         keys: Set<string>
     }> {
         // 歌手维度
         if (id.startsWith('art_') || id.startsWith('artist_')) {
             let name = ''
-            let preset: { /**
- * source 字段，沿用原业务结构与空值约定。
- */
-source: string, /**
- * id 字段，沿用原业务结构与空值约定。
- */
+            let preset: { /** 歌曲所属音乐平台标识。 */
+source: string, /** 业务记录标识。 */
 id: string } | undefined
 
             if (id.startsWith('artist_')) {
@@ -5632,15 +5305,9 @@ id: string } | undefined
             interval: hit.music.interval,
             pic: (hit.music as any).img || (hit.music as any).meta?.picUrl || undefined,
         }] : []
-        let singerIdentity: { /**
- * name 字段，沿用原业务结构与空值约定。
- */
-name: string, /**
- * source 字段，沿用原业务结构与空值约定。
- */
-source: string, /**
- * singerId 字段，沿用原业务结构与空值约定。
- */
+        let singerIdentity: { /** 条目名称。 */
+name: string, /** 歌曲或详情所属的音乐平台。 */
+source: string,
 singerId: string } | undefined
         if (hit?.music) {
             const rawSingerId = (hit.music as any).singerId
@@ -5676,12 +5343,8 @@ singerId: string } | undefined
     }
 
     /** 按 dislike 规则过滤 { music, listId } 形式的列表（随机 / 搜索 / 相似等入口） */
-    private async filterDislikedEntries(username: string, entries: Array<{ /**
- * music 字段，沿用原业务结构与空值约定。
- */
-music: LX.Music.MusicInfo, /**
- * listId 字段，沿用原业务结构与空值约定。
- */
+    private async filterDislikedEntries(username: string, entries: Array<{ /** 播放域 SQLite 仓储。 */
+music: LX.Music.MusicInfo, /** 歌单标识。 */
 listId: string }>) {
         if (!entries || entries.length === 0) return entries
         const kept = await this.filterDislikedSongs(username, entries.map(e => e.music))
@@ -5749,14 +5412,13 @@ listId: string }>) {
     }
 
     /**
-     * 处理 handleGetStarred 对应的业务能力，参数和执行顺序保持原实现。
-     * @param res 原 HTTP 响应。
-     * @param username 已解析的用户名称。
-     * @param format format 原业务参数。
-     * @param isV2 isV2 原业务参数。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 返回用户收藏歌曲、歌手和专辑，按请求格式写入 Subsonic 响应。
+ * @param res HTTP 响应，用于写入状态码、数据或媒体流。
+ * @param username 已解析的用户名称。
+ * @param format 目标音频格式。
+ * @param isV2 是否按 v2 协议结构处理数据。
+ * @author yahyaoo
+ */
     private async handleGetStarred(res: http.ServerResponse, username: string, format: string, isV2 = true) {
         const userSpace = getUserSpace(username)
         const listData = await userSpace.listManage.getListData()
@@ -5766,12 +5428,8 @@ listId: string }>) {
         const starredArtistNameSet = new Set(meta.starredArtistNames)
 
         // [汇总所有歌单歌曲]
-        const allSongsMap = new Map<string, { /**
- * music 字段，沿用原业务结构与空值约定。
- */
-music: LX.Music.MusicInfo, /**
- * listId 字段，沿用原业务结构与空值约定。
- */
+        const allSongsMap = new Map<string, { /** 播放域 SQLite 仓储。 */
+music: LX.Music.MusicInfo, /** 歌单标识。 */
 listId: string }>()
         const collect = (list: LX.Music.MusicInfo[], listId: string) => {
             for (const m of list) {
@@ -5790,15 +5448,9 @@ listId: string }>()
 
         // [已星标歌手] 优先来自本地歌手库匹配；库为空或歌手不在库中时，用已存名字兜底合成条目
         const seenArtistNames = new Set<string>()
-        const mappedArtists: Array<{ /**
- * id 字段，沿用原业务结构与空值约定。
- */
-id: string, /**
- * name 字段，沿用原业务结构与空值约定。
- */
-name: string, /**
- * coverArt 字段，沿用原业务结构与空值约定。
- */
+        const mappedArtists: Array<{ /** 条目唯一标识。 */
+id: string, /** 记录显示名称。 */
+name: string,
 coverArt: string }> = []
         const pushArtist = (id: string, name: string) => {
             const nk = this.normalizeArtistName(name)
@@ -5863,14 +5515,13 @@ coverArt: string }> = []
     }
 
     /**
-     * 处理 handleGetRandomSongs 对应的业务能力，参数和执行顺序保持原实现。
-     * @param res 原 HTTP 响应。
-     * @param username 已解析的用户名称。
-     * @param params params 原业务参数。
-     * @param format format 原业务参数。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 从可用媒体库和推荐候选中返回随机歌曲，按请求格式写入 Subsonic 响应。
+ * @param res HTTP 响应，用于写入状态码、数据或媒体流。
+ * @param username 已解析的用户名称。
+ * @param params 协议参数集合。
+ * @param format 目标音频格式。
+ * @author yahyaoo
+ */
     private async handleGetRandomSongs(
         res: http.ServerResponse,
         username: string,
@@ -5917,12 +5568,8 @@ coverArt: string }> = []
         }
 
         // 汇聚所有歌曲
-        const all: { /**
- * music 字段，沿用原业务结构与空值约定。
- */
-music: LX.Music.MusicInfo, /**
- * listId 字段，沿用原业务结构与空值约定。
- */
+        const all: { /** 播放域 SQLite 仓储。 */
+music: LX.Music.MusicInfo, /** 歌单标识。 */
 listId: string }[] = []
         const addAll = (musics: LX.Music.MusicInfo[], listId: string) => {
             for (const m of musics) all.push({ music: m, listId })
@@ -5941,21 +5588,16 @@ listId: string }[] = []
     }
 
     /**
-     * 处理 renderRandomSongs 对应的业务能力，参数和执行顺序保持原实现。
-     * @param res 原 HTTP 响应。
-     * @param picked picked 原业务参数。
-     * @param format format 原业务参数。
-     * @param rootKey rootKey 原业务参数。
-     * @param username 已解析的用户名称。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
-    private async renderRandomSongs(res: http.ServerResponse, picked: { /**
- * music 字段，沿用原业务结构与空值约定。
+ * 将随机歌曲集合写入协议响应结构。
+ * @param res HTTP 响应，用于写入状态码、数据或媒体流。
+ * @param picked 解析阶段选择的候选歌曲。
+ * @param format 目标音频格式。
+ * @param rootKey 缓存目录类型。
+ * @param username 已解析的用户名称。
+ * @author yahyaoo
  */
-music: LX.Music.MusicInfo, /**
- * listId 字段，沿用原业务结构与空值约定。
- */
+    private async renderRandomSongs(res: http.ServerResponse, picked: { /** 播放域 SQLite 仓储。 */
+music: LX.Music.MusicInfo, /** 歌单标识。 */
 listId: string }[], format: string, rootKey: string = 'randomSongs', username?: string) {
         // [dislike] 随机歌曲 / 流派歌曲 / 每日推荐等入口共用此渲染。
         // 这里受 dislikeNoRecommend 控制（与列表剔除 hideDisliked 相互独立）：
@@ -6016,23 +5658,15 @@ listId: string }[], format: string, rootKey: string = 'randomSongs', username?: 
      * 挑「相似歌曲」候选：同歌手(3 分) + 同专辑(2 分) 分层排序、层内随机；目标歌不在库时退化为随机。
      * getSimilarSongs/2 与 getSonicSimilarTracks 共用同一套挑选逻辑，避免两处漂移。
      */
-    private async pickSimilarEntries(username: string, id: string | null, count: number): Promise<Array<{ /**
- * music 字段，沿用原业务结构与空值约定。
- */
-music: LX.Music.MusicInfo, /**
- * listId 字段，沿用原业务结构与空值约定。
- */
+    private async pickSimilarEntries(username: string, id: string | null, count: number): Promise<Array<{ /** 播放域 SQLite 仓储。 */
+music: LX.Music.MusicInfo, /** 歌单标识。 */
 listId: string }>> {
         const userSpace = getUserSpace(username)
         const listData = await userSpace.listManage.getListData()
 
         // 找到目标歌曲，优先从同一列表里挑相似（同歌手），找不到则随机
-        const all: { /**
- * music 字段，沿用原业务结构与空值约定。
- */
-music: LX.Music.MusicInfo, /**
- * listId 字段，沿用原业务结构与空值约定。
- */
+        const all: { /** 播放域 SQLite 仓储。 */
+music: LX.Music.MusicInfo, /** 歌单标识。 */
 listId: string }[] = []
         const addAll = (musics: LX.Music.MusicInfo[], listId: string) => {
             for (const m of musics) all.push({ music: m, listId })
@@ -6058,12 +5692,8 @@ listId: string }[] = []
             return a
         }
 
-        let picked: { /**
- * music 字段，沿用原业务结构与空值约定。
- */
-music: LX.Music.MusicInfo, /**
- * listId 字段，沿用原业务结构与空值约定。
- */
+        let picked: { /** 播放域 SQLite 仓储。 */
+music: LX.Music.MusicInfo, /** 歌单标识。 */
 listId: string }[] = []
         if (target) {
             const singerKey = (s: string) => normalizeSingerName(toSimplified(s || ''))
@@ -6073,12 +5703,8 @@ listId: string }[] = []
             // [修复] 之前先排「同歌手优先」再整体打乱，优先顺序被洗掉，
             // 导致返回歌与目标毫无关系（搜「孙尚香」回来「青花」）。
             // 改为分层：同歌手(3) + 同专辑(2) 计分，层内随机、层间按分排序。
-            const layers = new Map<number, { /**
- * music 字段，沿用原业务结构与空值约定。
- */
-music: LX.Music.MusicInfo, /**
- * listId 字段，沿用原业务结构与空值约定。
- */
+            const layers = new Map<number, { /** 播放域 SQLite 仓储。 */
+music: LX.Music.MusicInfo, /** 歌单标识。 */
 listId: string }[]>()
             for (const c of candidates) {
                 const singers = splitSingers(c.music.singer || '').map(singerKey)
@@ -6136,15 +5762,14 @@ listId: string }[]>()
     }
 
     /**
-     * 处理 handleGetSimilarSongs 对应的业务能力，参数和执行顺序保持原实现。
-     * @param res 原 HTTP 响应。
-     * @param username 已解析的用户名称。
-     * @param params params 原业务参数。
-     * @param format format 原业务参数。
-     * @param method method 原业务参数。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 查询相似歌曲并过滤不喜欢记录，按请求格式写入 Subsonic 响应。
+ * @param res HTTP 响应，用于写入状态码、数据或媒体流。
+ * @param username 已解析的用户名称。
+ * @param params 协议参数集合。
+ * @param format 目标音频格式。
+ * @param method Subsonic 协议方法名。
+ * @author yahyaoo
+ */
     private async handleGetSimilarSongs(
         res: http.ServerResponse,
         username: string,
@@ -6216,17 +5841,16 @@ listId: string }[]>()
     }
 
     /**
-     * 解析 resolveStreamUrl 对应的业务能力，参数和执行顺序保持原实现。
-     * @param source 原音乐平台标识。
-     * @param songmid songmid 原业务参数。
-     * @param id 原业务标识。
-     * @param musicInfo 原歌曲元信息。
-     * @param requestedQuality requestedQuality 原业务参数。
-     * @param maxBitrate maxBitrate 原业务参数。
-     * @param username 已解析的用户名称。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 解析歌曲播放地址并复用相同请求的处理中结果。
+ * @param source 原音乐平台标识。
+ * @param songmid 音乐平台歌曲标识。
+ * @param id 当前业务对象标识。
+ * @param musicInfo 原歌曲元信息。
+ * @param requestedQuality 客户端请求音质。
+ * @param maxBitrate 客户端允许的最大码率，单位 kbps。
+ * @param username 已解析的用户名称。
+ * @author yahyaoo
+ */
     private resolveStreamUrl(
         source: string,
         songmid: string,
@@ -6235,15 +5859,9 @@ listId: string }[]>()
         requestedQuality: string,
         maxBitrate: number,
         username: string,
-    ): Promise<{ /**
- * url 字段，沿用原业务结构与空值约定。
- */
-url: string, /**
- * quality 字段，沿用原业务结构与空值约定。
- */
-quality: string, /**
- * selected 字段，沿用原业务结构与空值约定。
- */
+    ): Promise<{ /** 远端资源地址。 */
+url: string, /** 音质标识。 */
+quality: string,
 selected?: string }> {
         // [修复] In-flight 去重：同一首歌的并发解析请求共享同一个 Promise，
         // 解决音流客户端预加载多首歌时日志里大量重复 [自定义源] 的问题。
@@ -6257,17 +5875,16 @@ selected?: string }> {
     }
 
     /**
-     * 处理 _resolveStreamUrl 对应的业务能力，参数和执行顺序保持原实现。
-     * @param source 原音乐平台标识。
-     * @param songmid songmid 原业务参数。
-     * @param id 原业务标识。
-     * @param musicInfo 原歌曲元信息。
-     * @param requestedQuality requestedQuality 原业务参数。
-     * @param maxBitrate maxBitrate 原业务参数。
-     * @param username 已解析的用户名称。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 依次尝试可用音质和音源，按配置进行跨平台替换或转码选择。
+ * @param source 原音乐平台标识。
+ * @param songmid 音乐平台歌曲标识。
+ * @param id 当前业务对象标识。
+ * @param musicInfo 原歌曲元信息。
+ * @param requestedQuality 客户端请求音质。
+ * @param maxBitrate 客户端允许的最大码率，单位 kbps。
+ * @param username 已解析的用户名称。
+ * @author yahyaoo
+ */
     private async _resolveStreamUrl(
         source: string,
         songmid: string,
@@ -6276,15 +5893,9 @@ selected?: string }> {
         requestedQuality: string,
         maxBitrate: number,
         username: string,
-    ): Promise<{ /**
- * url 字段，沿用原业务结构与空值约定。
- */
-url: string, /**
- * quality 字段，沿用原业务结构与空值约定。
- */
-quality: string, /**
- * selected 字段，沿用原业务结构与空值约定。
- */
+    ): Promise<{ /** 远端资源地址。 */
+url: string, /** 音质标识。 */
+quality: string,
 selected?: string }> {
         const cfg = global.lx.config
         // 总开关关闭 → 退化为单次解析（服务端硬策略，客户端无法 override 打开）
@@ -6311,9 +5922,7 @@ selected?: string }> {
             const excludeApiSources: string[] = []
 
             // 跨平台时按歌名+歌手搜索替身；同源直接用原 songmid
-            let candidates: { /**
- * music 字段，沿用原业务结构与空值约定。
- */
+            let candidates: { /** 播放域 SQLite 仓储。 */
 music: any }[]
             if (trySource === source) {
                 candidates = [{ music: musicInfo }]
@@ -6490,12 +6099,8 @@ music: any }[]
         const songmid = String(musicInfo.songmid || musicInfo.meta?.songId || '')
         if (!source || !songmid) return this.sendError(res, 0, 'Could not resolve media', format)
 
-        let result: { /**
- * url 字段，沿用原业务结构与空值约定。
- */
-url: string, /**
- * quality 字段，沿用原业务结构与空值约定。
- */
+        let result: { /** 远端资源地址。 */
+url: string, /** 音质标识。 */
 quality: string } | null = null
         try {
             result = await this.resolveStreamUrl(source, songmid, mediaId, musicInfo, 'flac', 0, username)
@@ -6509,15 +6114,14 @@ quality: string } | null = null
     }
 
     /**
-     * 处理 handleStream 对应的业务能力，参数和执行顺序保持原实现。
-     * @param req 原 HTTP 请求。
-     * @param res 原 HTTP 响应。
-     * @param username 已解析的用户名称。
-     * @param params params 原业务参数。
-     * @param format format 原业务参数。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 解析本地文件或在线地址，转发音频流并处理转码与客户端 Range，按请求格式写入 Subsonic 响应。
+ * @param req HTTP 请求，包含认证头、查询参数和上传正文。
+ * @param res HTTP 响应，用于写入状态码、数据或媒体流。
+ * @param username 已解析的用户名称。
+ * @param params 协议参数集合。
+ * @param format 目标音频格式。
+ * @author yahyaoo
+ */
     private async handleStream(
         req: http.IncomingMessage,
         res: http.ServerResponse,
@@ -6754,15 +6358,9 @@ quality: string } | null = null
             // 仅当客户端设了上限(maxBitrate>0)且音源缺对应低音质时,才走服务端转码兜底(默认关,需手动开启)
             const wantTranscode = !!transcodeEnabled && onQualityMiss && maxBitrate > 0
 
-            let result: { /**
- * url 字段，沿用原业务结构与空值约定。
- */
-url: string, /**
- * quality 字段，沿用原业务结构与空值约定。
- */
-quality: string, /**
- * selected 字段，沿用原业务结构与空值约定。
- */
+            let result: { /** 远端资源地址。 */
+url: string, /** 音质标识。 */
+quality: string,
 selected?: string } | null = null
             let needTranscode = false
             try {
@@ -6878,15 +6476,9 @@ selected?: string } | null = null
      */
     private async resolveHighestQuality(
         source: string, songmid: string, id: string, musicInfo: any, username: string,
-    ): Promise<{ /**
- * url 字段，沿用原业务结构与空值约定。
- */
-url: string, /**
- * quality 字段，沿用原业务结构与空值约定。
- */
-quality: string, /**
- * selected 字段，沿用原业务结构与空值约定。
- */
+    ): Promise<{ /** 远端资源地址。 */
+url: string, /** 音质标识。 */
+quality: string,
 selected?: string } | null> {
         try {
             const r = await this.resolveStreamUrl(source, songmid, id, musicInfo, 'flac', 0, username)
@@ -6973,15 +6565,14 @@ selected?: string } | null> {
     }
 
     /**
-     * 处理 handleGetCoverArt 对应的业务能力，参数和执行顺序保持原实现。
-     * @param req 原 HTTP 请求。
-     * @param res 原 HTTP 响应。
-     * @param username 已解析的用户名称。
-     * @param params params 原业务参数。
-     * @param format format 原业务参数。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 返回歌曲、专辑或歌手封面，按请求格式写入 Subsonic 响应。
+ * @param req HTTP 请求，包含认证头、查询参数和上传正文。
+ * @param res HTTP 响应，用于写入状态码、数据或媒体流。
+ * @param username 已解析的用户名称。
+ * @param params 协议参数集合。
+ * @param format 目标音频格式。
+ * @author yahyaoo
+ */
     private async handleGetCoverArt(
         req: http.IncomingMessage,
         res: http.ServerResponse,
@@ -7574,21 +7165,11 @@ selected?: string } | null> {
      * 只回溯最近若干条，避免历史很长时逐首解析过慢。
      */
     private async buildPlayedAlbums(username: string, history: ScrobbleEntry[], type: 'recent' | 'frequent', limit: number) {
-        const stats = new Map<string, { /**
- * count 字段，沿用原业务结构与空值约定。
- */
-count: number, /**
- * lastTime 字段，沿用原业务结构与空值约定。
- */
-lastTime: number, /**
- * song 字段，沿用原业务结构与空值约定。
- */
-song: any, /**
- * duration 字段，沿用原业务结构与空值约定。
- */
-duration: number, /**
- * songIds 字段，沿用原业务结构与空值约定。
- */
+        const stats = new Map<string, { /** 结果条目数量。 */
+count: number,
+lastTime: number,
+song: any, /** 歌曲时长。 */
+duration: number, /** 歌曲标识集合。 */
 songIds: Set<string> }>()
 
         let unresolved = 0
@@ -7653,14 +7234,13 @@ songIds: Set<string> }>()
     }
 
     /**
-     * 处理 handleGetTopSongs 对应的业务能力，参数和执行顺序保持原实现。
-     * @param res 原 HTTP 响应。
-     * @param username 已解析的用户名称。
-     * @param params params 原业务参数。
-     * @param format format 原业务参数。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 查询歌手热门歌曲，按请求格式写入 Subsonic 响应。
+ * @param res HTTP 响应，用于写入状态码、数据或媒体流。
+ * @param username 已解析的用户名称。
+ * @param params 协议参数集合。
+ * @param format 目标音频格式。
+ * @author yahyaoo
+ */
     private async handleGetTopSongs(
         res: http.ServerResponse,
         username: string,
@@ -7671,12 +7251,8 @@ songIds: Set<string> }>()
         const id = params.get('id') // OpenSubsonic 扩展参数
         const count = Math.min(parseInt(params.get('count') || '50'), 500)
 
-        let picked: { /**
- * music 字段，沿用原业务结构与空值约定。
- */
-music: LX.Music.MusicInfo, /**
- * listId 字段，沿用原业务结构与空值约定。
- */
+        let picked: { /** 播放域 SQLite 仓储。 */
+music: LX.Music.MusicInfo, /** 歌单标识。 */
 listId: string }[] = []
 
         // 1. 尝试从本地歌手库 (artists.json) 匹配
@@ -7713,12 +7289,8 @@ listId: string }[] = []
         if (picked.length === 0) {
             const userSpace = getUserSpace(username)
             const listData = await userSpace.listManage.getListData()
-            const all: { /**
- * music 字段，沿用原业务结构与空值约定。
- */
-music: LX.Music.MusicInfo, /**
- * listId 字段，沿用原业务结构与空值约定。
- */
+            const all: { /** 播放域 SQLite 仓储。 */
+music: LX.Music.MusicInfo, /** 歌单标识。 */
 listId: string }[] = []
             const addAll = (musics: LX.Music.MusicInfo[], listId: string) => {
                 for (const m of musics) {
@@ -7770,12 +7342,11 @@ listId: string }[] = []
     }
 
     /**
-     * 处理 handleGetOpenSubsonicExtensions 对应的业务能力，参数和执行顺序保持原实现。
-     * @param res 原 HTTP 响应。
-     * @param format format 原业务参数。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 返回已实现的 OpenSubsonic 扩展能力，按请求格式写入 Subsonic 响应。
+ * @param res HTTP 响应，用于写入状态码、数据或媒体流。
+ * @param format 目标音频格式。
+ * @author yahyaoo
+ */
     private handleGetOpenSubsonicExtensions(res: http.ServerResponse, format: string) {
         const extensions = [
             { name: 'formPost', versions: [1] },
@@ -7799,14 +7370,13 @@ listId: string }[] = []
     }
 
     /**
-     * 处理 handleGetLyrics 对应的业务能力，参数和执行顺序保持原实现。
-     * @param res 原 HTTP 响应。
-     * @param username 已解析的用户名称。
-     * @param params params 原业务参数。
-     * @param format format 原业务参数。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 按歌曲名和歌手查询歌词，按请求格式写入 Subsonic 响应。
+ * @param res HTTP 响应，用于写入状态码、数据或媒体流。
+ * @param username 已解析的用户名称。
+ * @param params 协议参数集合。
+ * @param format 目标音频格式。
+ * @author yahyaoo
+ */
     private async handleGetLyrics(res: http.ServerResponse, username: string, params: URLSearchParams, format: string) {
         const artist = params.get('artist') || ''
         const title = params.get('title') || ''
@@ -7914,14 +7484,13 @@ listId: string }[] = []
     }
 
     /**
-     * 处理 handleGetLyricsBySongId 对应的业务能力，参数和执行顺序保持原实现。
-     * @param res 原 HTTP 响应。
-     * @param username 已解析的用户名称。
-     * @param params params 原业务参数。
-     * @param format format 原业务参数。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 按协议歌曲标识返回带时间信息的歌词，按请求格式写入 Subsonic 响应。
+ * @param res HTTP 响应，用于写入状态码、数据或媒体流。
+ * @param username 已解析的用户名称。
+ * @param params 协议参数集合。
+ * @param format 目标音频格式。
+ * @author yahyaoo
+ */
     private async handleGetLyricsBySongId(res: http.ServerResponse, username: string, params: URLSearchParams, format: string) {
         const id = params.get('id')
         if (!id) return this.sendError(res, 10, 'Required parameter is missing: id', format)
@@ -8035,26 +7604,17 @@ listId: string }[] = []
     }
 
     /**
-     * 解析 parseLrc 对应的业务能力，参数和执行顺序保持原实现。
-     * @param lrc lrc 原业务参数。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
-    private parseLrc(lrc: string): { /**
- * value 字段，沿用原业务结构与空值约定。
+ * 解析 LRC 时间标签与歌词文本，生成协议歌词行。
+ * @param lrc LRC 时间标签与歌词文本。
+ * @author yahyaoo
  */
-value: string, /**
- * start 字段，沿用原业务结构与空值约定。
- */
+    private parseLrc(lrc: string): {
+value: string,
 start?: number }[] {
         if (!lrc) return []
         const lines = lrc.split(/\r?\n/)
-        const result: { /**
- * value 字段，沿用原业务结构与空值约定。
- */
-value: string, /**
- * start 字段，沿用原业务结构与空值约定。
- */
+        const result: {
+value: string,
 start?: number }[] = []
         const timeRegex = /\[(\d+):(\d+)\.(\d+)\]/g
 
@@ -8081,14 +7641,13 @@ start?: number }[] = []
     }
 
     /**
-     * 处理 handleGetUser 对应的业务能力，参数和执行顺序保持原实现。
-     * @param res 原 HTTP 响应。
-     * @param username 已解析的用户名称。
-     * @param params params 原业务参数。
-     * @param format format 原业务参数。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 返回鉴权用户的信息与协议权限，按请求格式写入 Subsonic 响应。
+ * @param res HTTP 响应，用于写入状态码、数据或媒体流。
+ * @param username 已解析的用户名称。
+ * @param params 协议参数集合。
+ * @param format 目标音频格式。
+ * @author yahyaoo
+ */
     private async handleGetUser(res: http.ServerResponse, username: string, params: URLSearchParams, format: string) {
         const userInfo = {
             username,

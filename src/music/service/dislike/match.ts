@@ -1,4 +1,4 @@
-/** match 模块：按职责组织，原业务行为保持不变。 @author yahyaoo */
+/** 不喜欢规则同步入口：注册协议处理器和本地数据通知。 @author yahyaoo */
 import { SPLIT_CHAR } from '../../../constants'
 import { parseAlbumRule } from './utils'
 import { normalizeText, normalizeSongName } from '../discovery/songVersion'
@@ -19,10 +19,7 @@ export const splitSingers = (singer: unknown): string[] =>
     .map(s => normalizeText(s))
     .filter(Boolean)
 
-/**
- * DislikeRuleSet 契约，按当前模块职责组织，保留原字段和扩展能力。
- * @author yahyaoo
- */
+/** 歌曲、歌手和专辑的不喜欢规则集合。 @author yahyaoo */
 export interface DislikeRuleSet {
   /** 精确规则：歌名@歌手 */
   exact: Set<string>
@@ -94,41 +91,23 @@ export function parseDislikeRules(rules: string): DislikeRuleSet {
   return set
 }
 
-/**
- * DislikeMatchInput 契约，按当前模块职责组织，保留原字段和扩展能力。
- * @author yahyaoo
- */
+/** 规则匹配输入，包含歌曲名、歌手、专辑和音乐平台。 @author yahyaoo */
 export interface DislikeMatchInput {
-  /**
-   * name 字段，沿用原业务结构与空值约定。
-   */
+  /** 记录显示名称。 */
   name?: string
-  /**
-   * singer 字段，沿用原业务结构与空值约定。
-   */
+  /** 歌手名称。 */
   singer?: string
-  /**
-   * source 字段，沿用原业务结构与空值约定。
-   */
+  /** 歌曲或详情所属的音乐平台。 */
   source?: string
-  /**
-   * albumId 字段，沿用原业务结构与空值约定。
-   */
+  /** 平台专辑标识。 */
   albumId?: string | number
-  /**
-   * albumName 字段，沿用原业务结构与空值约定。
-   */
+  /** 专辑名称。 */
   albumName?: string
-  /**
-   * singerId 字段，沿用原业务结构与空值约定。
-   */
+
   singerId?: string | number
 }
 
-/**
- * DislikeMatchOptions 契约，按当前模块职责组织，保留原字段和扩展能力。
- * @author yahyaoo
- */
+/** 规则匹配选项，控制跨平台、合唱及名称归一化行为。 @author yahyaoo */
 export interface DislikeMatchOptions {
   /**
    * 跨平台同名是否也算命中（默认 false）。

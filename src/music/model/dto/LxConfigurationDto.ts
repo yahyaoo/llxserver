@@ -7,17 +7,9 @@ export interface LxConfigurationDto {
   /** 音效；提供时整体覆盖音效。 */
   soundEffects?: Record<string, unknown>
   /** 收藏及屏蔽媒体库。 */
-  library?: { /**
- * artists 字段，沿用原业务结构与空值约定。
- */
-artists?: unknown[], /**
- * albums 字段，沿用原业务结构与空值约定。
- */
-albums?: unknown[], /**
- * dislikedArtists 字段，沿用原业务结构与空值约定。
- */
-dislikedArtists?: unknown[], /**
- * dislikedAlbums 字段，沿用原业务结构与空值约定。
- */
+  library?: { /** 歌手条目集合。 */
+artists?: unknown[], /** 专辑记录集合。 */
+albums?: unknown[], /** 用户不喜欢的歌手记录。 */
+dislikedArtists?: unknown[], /** 用户不喜欢的专辑记录。 */
 dislikedAlbums?: unknown[] }
 }

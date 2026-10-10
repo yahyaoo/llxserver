@@ -6,7 +6,7 @@
 
 参考 `D:/code/qdgw` 的 Controller → Service → Mapper/Repository 和公共模型约定。Node 保持原 HTTP、WebSocket、Subsonic、音源选择、歌曲排序、下载及缓存协议。分层调整不改变原接口必填参数、状态码、授权条件或响应字段。设置增加 JSON 迁移入口，持久化改为 SQLite。
 
-`src` 是服务源码，`server` 是构建输出，不能直接修改输出。播放器页面位于 `public/music`，保留已有样式和交互。
+`src` 是服务源码，`server` 是构建输出，不能直接修改输出。播放器页面位于 `public/music`。本轮系统配置页面位于 `public/views/system-configuration`，使用设置目录组织管理表单。
 
 ## 目录职责
 
@@ -58,7 +58,7 @@ SDK 内部算法与平台协议继续使用原实现。动态平台扩展能力�
 
 ## 持久化与模型
 
-管理库和播放器库分别位于 `DATA_PATH/database/admin.sqlite`、`DATA_PATH/database/music.sqlite`。两库各有自己的 `storage_document` 元数据表。使用 WAL、外键开关和 5 秒忙等待；所有值参数绑定，表名仅允许使用注册常量。
+管理库和播放器库默认分别位于 `DATA_PATH/database/admin.sqlite`、`DATA_PATH/database/music.sqlite`；引导文件可指定独立位置，应用层负责迁移和切换。业务配置仅存管理库，详见 [系统配置说明](./system-configuration.md)。两库各有自己的 `storage_document` 元数据表。使用 WAL、外键开关和 5 秒忙等待；所有值参数绑定，表名仅允许使用注册常量。
 
 业务实体继承 `BaseEntity`：`documentKey`、`recordKey`、`sortOrder`、`valueJson`、`createdAt`、`updatedAt` 分别映射同名下划线 SQL 列。联合主键是作用域和记录键。数组按元素拆行，对象按顶层属性拆行，标量单行保存。未知平台字段、嵌套结构、重复歌曲和顺序保持原值。这里采用有序文档记录模型，避免引入歌曲去重、主键重编或关系重建改变业务含义。
 

@@ -1,4 +1,4 @@
-/** musicInfo 模块：按职责组织，原业务行为保持不变。 @author yahyaoo */
+/** QQ 音乐接口适配：歌曲详情与播放相关信息查询。 @author yahyaoo */
 import { httpFetch } from '../../request.js'
 import { formatPlayTime } from '../../index.js'
 import { buildQualitys } from './quality.js'

@@ -1,13 +1,13 @@
 import type { RequestContext, ServerRuntime } from '../../common/http/RequestContext'
-/** Source 服务所需能力，仅允许访问本模块使用的依赖。 @author yahyaoo */
+/** 自定义音源脚本校验、导入、启用配置与排序所需的应用依赖契约。 @author yahyaoo */
 export type SourceServiceRuntime = Pick<ServerRuntime, 'customSourceHandlers' | 'verifyUserAuth'>
-/** Source 业务服务，原路由处理顺序与错误响应保持不变。 @author yahyaoo */
+/** 自定义音源脚本校验、导入、启用配置与排序服务。 @author yahyaoo */
 
 /**
- * 处理 /api/custom-source/validate 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 校验上传音源脚本并解析平台能力。
+ * @param context /api/custom-source/validate 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 自定义音源脚本校验、导入、启用配置与排序的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postCustomSourceValidate(context: RequestContext, runtime: SourceServiceRuntime) {
@@ -19,10 +19,10 @@ export async function postCustomSourceValidate(context: RequestContext, runtime:
 }
 
 /**
- * 处理 /api/custom-source/import 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 从远端地址导入自定义音源脚本。
+ * @param context /api/custom-source/import 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 自定义音源脚本校验、导入、启用配置与排序的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postCustomSourceImport(context: RequestContext, runtime: SourceServiceRuntime) {
@@ -34,10 +34,10 @@ export async function postCustomSourceImport(context: RequestContext, runtime: S
 }
 
 /**
- * 处理 /api/custom-source/upload 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 保存上传的自定义音源脚本及注册信息。
+ * @param context /api/custom-source/upload 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 自定义音源脚本校验、导入、启用配置与排序的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postCustomSourceUpload(context: RequestContext, runtime: SourceServiceRuntime) {
@@ -49,10 +49,10 @@ export async function postCustomSourceUpload(context: RequestContext, runtime: S
 }
 
 /**
- * 处理 /api/custom-source/list 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 查询用户可见的自定义音源列表。
+ * @param context /api/custom-source/list 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 自定义音源脚本校验、导入、启用配置与排序的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function getCustomSourceList(context: RequestContext, runtime: SourceServiceRuntime) {
@@ -78,10 +78,10 @@ export async function getCustomSourceList(context: RequestContext, runtime: Sour
 }
 
 /**
- * 处理 /api/custom-source/toggle 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 切换指定音源的启用状态。
+ * @param context /api/custom-source/toggle 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 自定义音源脚本校验、导入、启用配置与排序的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postCustomSourceToggle(context: RequestContext, runtime: SourceServiceRuntime) {
@@ -93,10 +93,10 @@ export async function postCustomSourceToggle(context: RequestContext, runtime: S
 }
 
 /**
- * 处理 /api/custom-source/delete 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 删除指定音源脚本及注册信息。
+ * @param context /api/custom-source/delete 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 自定义音源脚本校验、导入、启用配置与排序的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postCustomSourceDelete(context: RequestContext, runtime: SourceServiceRuntime) {
@@ -108,10 +108,10 @@ export async function postCustomSourceDelete(context: RequestContext, runtime: S
 }
 
 /**
- * 处理 /api/custom-source/reorder 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 保存自定义音源优先级顺序。
+ * @param context /api/custom-source/reorder 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 自定义音源脚本校验、导入、启用配置与排序的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postCustomSourceReorder(context: RequestContext, runtime: SourceServiceRuntime) {
@@ -123,10 +123,10 @@ export async function postCustomSourceReorder(context: RequestContext, runtime: 
 }
 
 /**
- * 处理 /api/custom-source/update-platforms 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 更新音源的平台启用配置。
+ * @param context /api/custom-source/update-platforms 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 自定义音源脚本校验、导入、启用配置与排序的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postCustomSourceUpdatePlatforms(context: RequestContext, runtime: SourceServiceRuntime) {

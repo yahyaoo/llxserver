@@ -1,4 +1,4 @@
-/** dislikeDataManage 模块：按职责组织，原业务行为保持不变。 @author yahyaoo */
+/** 不喜欢数据管理：保存结构化条目并生成歌名、歌手和专辑规则。 @author yahyaoo */
 import storageFs from '../../../application/persistence/documentFileSystem'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -6,25 +6,18 @@ import { SPLIT_CHAR } from '../../../constants'
 import { type SnapshotDataManage } from './snapshotDataManage'
 import { filterRules, encodeAlbumRule } from './utils'
 
-/**
- * DislikeDataManage 契约，按当前模块职责组织，保留原字段和扩展能力。
- * @author yahyaoo
- */
+/** 维护用户的不喜欢条目、文本规则和快照数据。 @author yahyaoo */
 export class DislikeDataManage {
-  /**
-   * snapshotDataManage 字段，沿用原业务结构与空值约定。
-   */
+  /** 当前用户快照管理器。 */
   snapshotDataManage: SnapshotDataManage
-  /**
-   * dislikeRules 字段，沿用原业务结构与空值约定。
-   */
+  /** 用户不喜欢规则集合。 */
   dislikeRules: LX.Dislike.DislikeListData = { dislikeList: [] }
 
   /**
-   * 构造实例 constructor 对应的业务能力，参数和执行顺序保持原实现。
-   * @param snapshotDataManage snapshotDataManage 原业务参数。
-   * @author yahyaoo
-   */
+ * 绑定用户不喜欢数据目录并准备条目和规则映射。
+ * @param snapshotDataManage 当前用户的快照管理器。
+ * @author yahyaoo
+ */
   constructor(snapshotDataManage: SnapshotDataManage) {
     this.snapshotDataManage = snapshotDataManage
 
@@ -84,20 +77,18 @@ export class DislikeDataManage {
 
   // Returns the structured object
   /**
-   * 获取 getDislikeRules 对应的业务能力，参数和执行顺序保持原实现。
-   * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-   * @author yahyaoo
-   */
+ * 读取当前用户的不喜欢规则，用于歌曲、歌手和专辑过滤。
+ * @author yahyaoo
+ */
   getDislikeRules = async(): Promise<LX.Dislike.DislikeRules> => {
     return this.dislikeRules
   }
 
   // Returns all active rule strings separated by newline (used by dislikeCache for parsing)
   /**
-   * 获取 getDislikeRulesString 对应的业务能力，参数和执行顺序保持原实现。
-   * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-   * @author yahyaoo
-   */
+ * 将结构化不喜欢条目转换为客户端使用的规则字符串。
+ * @author yahyaoo
+ */
   getDislikeRulesString = (): string => {
     return this.dislikeRules.dislikeList
       .map(s => this.buildDislikeRule(s))
@@ -106,11 +97,10 @@ export class DislikeDataManage {
   }
 
   /**
-   * 添加 addDislikeInfo 对应的业务能力，参数和执行顺序保持原实现。
-   * @param infos infos 原业务参数。
-   * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-   * @author yahyaoo
-   */
+ * 添加不喜欢歌曲或歌手条目，并更新当前规则数据。
+ * @param infos 批量业务条目。
+ * @author yahyaoo
+ */
   addDislikeInfo = async(infos: LX.Dislike.DislikeSongInfo[]) => {
     // Check for duplicates
     const currentRules = new Set(this.dislikeRules.dislikeList.map(s => this.buildDislikeRule(s)))
@@ -127,11 +117,10 @@ export class DislikeDataManage {
   }
 
   /**
-   * 添加 addDislikeAlbums 对应的业务能力，参数和执行顺序保持原实现。
-   * @param infos infos 原业务参数。
-   * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-   * @author yahyaoo
-   */
+ * 添加不喜欢专辑条目，并生成可匹配的专辑规则。
+ * @param infos 批量业务条目。
+ * @author yahyaoo
+ */
   addDislikeAlbums = async(infos: LX.Dislike.DislikeAlbumInfo[]) => {
     if (!infos || infos.length === 0) return this.dislikeRules
     const currentRules = new Set(this.dislikeRules.dislikeList.map(s => this.buildDislikeRule(s)))
@@ -152,11 +141,10 @@ export class DislikeDataManage {
   }
 
   /**
-   * 处理 overwirteDislikeInfo 对应的业务能力，参数和执行顺序保持原实现。
-   * @param rulesString rulesString 原业务参数。
-   * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-   * @author yahyaoo
-   */
+ * 用传入条目覆盖当前不喜欢数据并更新规则索引。
+ * @param rulesString 客户端格式的不喜欢规则文本。
+ * @author yahyaoo
+ */
   overwirteDislikeInfo = async(rulesString: string) => {
     // Called when removing items: keep only entries whose rule key is still in the string
     const validRules = new Set(filterRules(rulesString))

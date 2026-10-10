@@ -14,8 +14,8 @@ export interface BrowserStorageDependencies {
 
 /**
  * 浏览器歌单缓存接口。账号和随机设备键联合隔离，不修改共享歌单业务。
- * @param req 原请求。
- * @param res 原响应。
+ * @param req HTTP 请求，提供认证头与上传正文。
+ * @param res HTTP 响应，用于写入状态码和处理结果。
  * @param dependencies 当前音乐域能力。
  * @returns 请求完成结果。
  * @author yahyaoo

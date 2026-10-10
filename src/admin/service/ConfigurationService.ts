@@ -1,13 +1,17 @@
+import { additionalConfigurationFields, validateAdditionalConfiguration } from './configuration/SystemConfigurationFields'
+import type { ConfigurationImportDto } from '../model/dto/ConfigurationImportDto'
+import { SystemConfigurationImportService } from './configuration/SystemConfigurationImportService'
+import { repositories } from '../../application/persistence/storage'
 import type { RequestContext, ServerRuntime } from '../../common/http/RequestContext'
-/** Configuration 服务所需能力，仅允许访问本模块使用的依赖。 @author yahyaoo */
-export type ConfigurationServiceRuntime = Pick<ServerRuntime, 'serverDownloads' | 'appUpdates' | 'path' | 'readBody' | 'validateCustomDirectoryUpdates' | 'storageFs' | 'saveUsers' | 'getSyncDownloadData' | 'migrateSyncStorage' | 'updateAllUserSnapshotDirs' | 'reloadServerData' | 'needle'>
-/** Configuration 业务服务，原路由处理顺序与错误响应保持不变。 @author yahyaoo */
+/** 系统配置、旧配置导入、本地配置备份与代理连接测试所需的应用依赖契约。 @author yahyaoo */
+export type ConfigurationServiceRuntime = Pick<ServerRuntime, 'serverDownloads' | 'appUpdates' | 'path' | 'readBody' | 'validateCustomDirectoryUpdates' | 'storageFs' | 'saveUsers' | 'getSyncDownloadData' | 'migrateSyncStorage' | 'updateAllUserSnapshotDirs' | 'reloadServerData' | 'needle' | 'databaseLocation'>
+/** 系统配置、旧配置导入、本地配置备份与代理连接测试服务。 @author yahyaoo */
 
 /**
- * 处理 /api/config 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 读取或保存系统配置；业务字段写管理库，数据库位置写引导文件。
+ * @param context /api/config 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 系统配置、旧配置导入、本地配置备份与代理连接测试的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function handleConfig(context: RequestContext, runtime: ConfigurationServiceRuntime) {
@@ -23,6 +27,9 @@ export async function handleConfig(context: RequestContext, runtime: Configurati
 
         if (req.method === 'GET') {
           const config = {
+            ...Object.fromEntries(Object.entries(global.lx.config).filter(([key]) => key !== "users" && key !== "update.token")),
+            ...runtime.databaseLocation.paths(),
+            additionalFields: additionalConfigurationFields,
             serverName: global.lx.config.serverName,
             'download.directory': global.lx.config['download.directory'] || '',
             'download.lyricMode': global.lx.config['download.lyricMode'] || 'embedded',
@@ -121,13 +128,15 @@ export async function handleConfig(context: RequestContext, runtime: Configurati
         if (req.method === 'POST') {
           void readBody(req).then(body => {
             try {
+              const previousConfig = { ...global.lx.config }
               const newConfig = JSON.parse(body)
+              const additional = validateAdditionalConfiguration(newConfig)
               const customDirectoryUpdates = validateCustomDirectoryUpdates(newConfig['user.customMusicDirectories'])
               const nameTemplate = newConfig['download.nameTemplate'] === undefined ? undefined : serverDownloads.validateNameTemplate(newConfig['download.nameTemplate'])
               const updateServer = newConfig['update.server'] === undefined ? undefined : appUpdates.validateUpdateServer(newConfig['update.server'])
               if (newConfig['update.enabled'] !== undefined && typeof newConfig['update.enabled'] !== 'boolean') throw new Error('检查更新开关格式错误')
               if (newConfig['update.token'] !== undefined && (typeof newConfig['update.token'] !== 'string' || /[\r\n]/.test(newConfig['update.token']))) throw new Error('更新访问令牌格式错误')
-              // 先校验目录，失败时不修改已有配置；保存沿用原 config.js 持久化流程。
+              // 先校验下载目录与命名模板，格式错误时不开始保存。
               let downloadDirectory: string | undefined
               if (newConfig['download.directory'] !== undefined) {
                 const value = newConfig['download.directory']
@@ -165,6 +174,7 @@ export async function handleConfig(context: RequestContext, runtime: Configurati
               if (newConfig['user.cacheSizeLimit'] !== undefined) global.lx.config['user.cacheSizeLimit'] = parseInt(newConfig['user.cacheSizeLimit']) || 2000
               if (newConfig['system.allowUnsafeVM'] !== undefined) global.lx.config['system.allowUnsafeVM'] = newConfig['system.allowUnsafeVM']
 
+              Object.assign(global.lx.config, additional)
               let warning = ''
 
               // 校验：至少开启一种模式
@@ -361,6 +371,18 @@ export async function handleConfig(context: RequestContext, runtime: Configurati
                   : 20
               }
 
+              if (newConfig['database.adminPath'] !== undefined || newConfig['database.musicPath'] !== undefined) {
+                try {
+                  const migrated = runtime.databaseLocation.move({ 'database.adminPath': newConfig['database.adminPath'], 'database.musicPath': newConfig['database.musicPath'] })
+                  if (migrated.warning) warning += migrated.warning
+                } catch (error) {
+                  // 迁库失败前尚未更新 WebDAV 或用户目录，恢复当前配置对象以保留调用方引用。
+                  Object.assign(global.lx.config, previousConfig)
+                  for (const key of Object.keys(global.lx.config)) if (!(key in previousConfig)) delete (global.lx.config as any)[key]
+                  throw error
+                }
+              }
+
               // 更新 WebDAVSync 配置
               if (global.lx.webdavSync && (newConfig['webdav.enable'] !== undefined || newConfig['webdav.url'] || newConfig['webdav.username'] || newConfig['webdav.password'] || newConfig['webdav.syncPath'] || newConfig['webdav.backupPath'] || newConfig['sync.interval'] || newConfig['sync.backupInterval'] || newConfig['webdav.excludeCache'] !== undefined || newConfig['webdav.excludeMusic'] !== undefined)) {
                 global.lx.webdavSync.updateConfig({
@@ -390,110 +412,7 @@ export async function handleConfig(context: RequestContext, runtime: Configurati
                   else if (update.enabled && update.oldDirectory && update.directory && update.oldDirectory !== update.directory) migrateSyncStorage(update.user.name, 'custom', { overrideOldCustomDir: update.oldDirectory, overrideNewCustomDir: update.directory })
                 } catch (error: any) { console.error('[用户目录] 保存后的目录迁移失败:', error.message) }
               }
-              const configPath = global.lx.configPath || process.env.CONFIG_PATH || path.join(global.lx.dataPath, 'config.js')
-              const configContent = `module.exports = ${JSON.stringify({
-                serverName: global.lx.config.serverName,
-                bindIP: global.lx.config.bindIP,
-                port: global.lx.config.port,
-                'proxy.enabled': global.lx.config['proxy.enabled'],
-                'proxy.header': global.lx.config['proxy.header'],
-                'user.enablePath': global.lx.config['user.enablePath'],
-                'user.enableRoot': global.lx.config['user.enableRoot'],
-                'user.enablePublicRestriction': global.lx.config['user.enablePublicRestriction'],
-                'user.enablePublicNonAdminLocalMusic': global.lx.config['user.enablePublicNonAdminLocalMusic'],
-                'user.enablePublicNonAdminBrowserDownload': global.lx.config['user.enablePublicNonAdminBrowserDownload'],
-                'user.enablePublicNonAdminServerCache': global.lx.config['user.enablePublicNonAdminServerCache'],
-                'user.enablePublicFavorites': global.lx.config['user.enablePublicFavorites'],
-                'user.enablePublicNonAdminAccess': global.lx.config['user.enablePublicNonAdminAccess'],
-                'user.enableCustomMusicDir': global.lx.config['user.enableCustomMusicDir'],
-                'user.enableLoginCacheRestriction': global.lx.config['user.enableLoginCacheRestriction'],
-                'user.enableCacheSizeLimit': global.lx.config['user.enableCacheSizeLimit'],
-                'user.cacheSizeLimit': global.lx.config['user.cacheSizeLimit'],
-                maxSnapshotNum: global.lx.config.maxSnapshotNum,
-                'list.addMusicLocationType': global.lx.config['list.addMusicLocationType'],
-                'debug.enabled': global.lx.config['debug.enabled'] || false,
-                disableTelemetry: global.lx.config.disableTelemetry,
-                'frontend.password': global.lx.config['frontend.password'],
-                'player.enableAuth': global.lx.config['player.enableAuth'],
-                'player.password': global.lx.config['player.password'],
-                'webdav.enable': global.lx.config['webdav.enable'],
-                'webdav.url': global.lx.config['webdav.url'],
-                'webdav.username': global.lx.config['webdav.username'],
-                'webdav.password': global.lx.config['webdav.password'],
-                'webdav.syncPath': global.lx.config['webdav.syncPath'],
-                'webdav.backupPath': global.lx.config['webdav.backupPath'],
-                'sync.interval': global.lx.config['sync.interval'],
-                'sync.backupInterval': global.lx.config['sync.backupInterval'],
-                'webdav.excludeCache': global.lx.config['webdav.excludeCache'],
-                'webdav.excludeMusic': global.lx.config['webdav.excludeMusic'],
-                'proxy.all.enabled': global.lx.config['proxy.all.enabled'],
-                'proxy.all.address': global.lx.config['proxy.all.address'],
-                // undefined 会被序列化省略 -> 下次启动仍为「沿用统一开关」
-                'proxy.music.enabled': global.lx.config['proxy.music.enabled'],
-                'proxy.music.address': global.lx.config['proxy.music.address'] || '',
-                'proxy.customSource.enabled': global.lx.config['proxy.customSource.enabled'],
-                'proxy.customSource.address': global.lx.config['proxy.customSource.address'] || '',
-                'proxy.app.enabled': global.lx.config['proxy.app.enabled'],
-                'proxy.app.address': global.lx.config['proxy.app.address'] || '',
-                'admin.path': global.lx.config['admin.path'] ?? '/admin',
-                'player.path': global.lx.config['player.path'] ?? '/',
-                'subsonic.enable': global.lx.config['subsonic.enable'],
-                'subsonic.path': global.lx.config['subsonic.path'],
-                'subsonic.port': global.lx.config['subsonic.port'] ?? 0,
-                'subsonic.enableDebug': global.lx.config['subsonic.enableDebug'],
-                'subsonic.onlineSearch': global.lx.config['subsonic.onlineSearch'],
-                'subsonic.onlineSearchMode': global.lx.config['subsonic.onlineSearchMode'],
-                'subsonic.onlineSearchSources': global.lx.config['subsonic.onlineSearchSources'],
-                'subsonic.publicLeaderboards': global.lx.config['subsonic.publicLeaderboards'],
-                'subsonic.leaderboardSource': global.lx.config['subsonic.leaderboardSource'],
-                'subsonic.sharedListMode': global.lx.config['subsonic.sharedListMode'],
-                'subsonic.sharedListSort': global.lx.config['subsonic.sharedListSort'],
-                'subsonic.dislikeRating': global.lx.config['subsonic.dislikeRating'],
-                'subsonic.linkRatingToDislike': global.lx.config['subsonic.linkRatingToDislike'],
-                'subsonic.linkDislikeToRating': global.lx.config['subsonic.linkDislikeToRating'],
-                'subsonic.hideDisliked': global.lx.config['subsonic.hideDisliked'],
-                'subsonic.dislikeCrossSource': global.lx.config['subsonic.dislikeCrossSource'],
-                'subsonic.dislikeNoRecommend': global.lx.config['subsonic.dislikeNoRecommend'],
-                'subsonic.dislikeDuetMode': global.lx.config['subsonic.dislikeDuetMode'],
-                'subsonic.dislikeNormalizeName': global.lx.config['subsonic.dislikeNormalizeName'],
-                'subsonic.dislikeRequireSinger': global.lx.config['subsonic.dislikeRequireSinger'],
-                'subsonic.recommendPoolSize': global.lx.config['subsonic.recommendPoolSize'],
-                'subsonic.lyricTranslation': global.lx.config['subsonic.lyricTranslation'],
-                'subsonic.cacheOnPlay': global.lx.config['subsonic.cacheOnPlay'],
-                'subsonic.playCacheFirst': global.lx.config['subsonic.playCacheFirst'],
-                'subsonic.quality.enabled': global.lx.config['subsonic.quality.enabled'],
-                'subsonic.quality.priority': global.lx.config['subsonic.quality.priority'],
-                'subsonic.quality.clientCapMode': global.lx.config['subsonic.quality.clientCapMode'],
-                'subsonic.source.priority': global.lx.config['subsonic.source.priority'],
-                'subsonic.source.crossPlatform': global.lx.config['subsonic.source.crossPlatform'],
-                'subsonic.source.autoSwitchCustom': global.lx.config['subsonic.source.autoSwitchCustom'],
-                'configBackup.enable': global.lx.config['configBackup.enable'],
-                'configBackup.retentionDays': global.lx.config['configBackup.retentionDays'],
-                'configBackup.dir': global.lx.config['configBackup.dir'],
-                'snapshot.backupPath': global.lx.config['snapshot.backupPath'] || '',
-                'singer.sourcePriority': global.lx.config['singer.sourcePriority'],
-                'artist.maxFetchPages': global.lx.config['artist.maxFetchPages'],
-                'cache.namingPattern': global.lx.config['cache.namingPattern'],
-                'download.directory': global.lx.config['download.directory'],
-                'download.lyricMode': global.lx.config['download.lyricMode'],
-                'download.nameTemplate': global.lx.config['download.nameTemplate'],
-                'update.enabled': global.lx.config['update.enabled'],
-                'update.server': global.lx.config['update.server'],
-                'update.token': global.lx.config['update.token'],
-                'system.allowUnsafeVM': global.lx.config['system.allowUnsafeVM'],
-                users: global.lx.config.users.map(u => ({
-                  name: u.name,
-                  password: u.password,
-                  maxSnapshotNum: u.maxSnapshotNum,
-                  'list.addMusicLocationType': u['list.addMusicLocationType'],
-                  enableCustomMusicDir: u.enableCustomMusicDir,
-                  customMusicDir: u.customMusicDir,
-                  allowOperateCustomMusicDir: u.allowOperateCustomMusicDir,
-                })),
-              }, null, 2)}`
-              if (typeof global.lx?.saveConfig === 'function') {
-                global.lx.saveConfig()
-              }
+              global.lx.saveConfig()
 
               // 动态热迁移所有活跃用户空间的快照目录
               if (newConfig['snapshot.backupPath'] !== undefined) {
@@ -518,10 +437,10 @@ export async function handleConfig(context: RequestContext, runtime: Configurati
 }
 
 /**
- * 处理 /api/config/backups 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 列出本地配置导出备份及保留策略。
+ * @param context /api/config/backups 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 系统配置、旧配置导入、本地配置备份与代理连接测试的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function getConfigBackups(context: RequestContext, runtime: ConfigurationServiceRuntime) {
@@ -537,18 +456,10 @@ export async function getConfigBackups(context: RequestContext, runtime: Configu
 
         try {
           const backupDir = global.lx.getConfigBackupDir ? global.lx.getConfigBackupDir() : path.join(global.lx.dataPath, 'backups')
-          const list: Array<{ /**
- * name 字段，沿用原业务结构与空值约定。
- */
-name: string, /**
- * size 字段，沿用原业务结构与空值约定。
- */
-size: number, /**
- * time 字段，沿用原业务结构与空值约定。
- */
-time: number, /**
- * type 字段，沿用原业务结构与空值约定。
- */
+          const list: Array<{ /** 条目名称。 */
+name: string, /** 文件字节数或记录数量。 */
+size: number,
+time: number, /** 记录或操作类别。 */
 type: 'auto' | 'manual' }> = []
 
           if (storageFs.existsSync(backupDir)) {
@@ -610,10 +521,10 @@ type: 'auto' | 'manual' }> = []
 }
 
 /**
- * 处理 /api/config/backup-now 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 导出当前 SQL 系统配置并创建本地备份。
+ * @param context /api/config/backup-now 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 系统配置、旧配置导入、本地配置备份与代理连接测试的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postConfigBackupNow(context: RequestContext, runtime: ConfigurationServiceRuntime) {
@@ -649,10 +560,10 @@ export async function postConfigBackupNow(context: RequestContext, runtime: Conf
 }
 
 /**
- * 处理 /api/config/backups/download 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 下载指定本地配置备份文件。
+ * @param context /api/config/backups/download 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 系统配置、旧配置导入、本地配置备份与代理连接测试的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function getConfigBackupsDownload(context: RequestContext, runtime: ConfigurationServiceRuntime) {
@@ -699,10 +610,10 @@ export async function getConfigBackupsDownload(context: RequestContext, runtime:
 }
 
 /**
- * 处理 /api/config/backups/ 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 删除指定本地配置备份。
+ * @param context /api/config/backups/ 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 系统配置、旧配置导入、本地配置备份与代理连接测试的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function deleteConfigBackups(context: RequestContext, runtime: ConfigurationServiceRuntime) {
@@ -745,10 +656,10 @@ export async function deleteConfigBackups(context: RequestContext, runtime: Conf
 }
 
 /**
- * 处理 /api/config/backups/restore 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 导入选定配置备份并热加载运行数据。
+ * @param context /api/config/backups/restore 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 系统配置、旧配置导入、本地配置备份与代理连接测试的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postConfigBackupsRestore(context: RequestContext, runtime: ConfigurationServiceRuntime) {
@@ -780,14 +691,14 @@ export async function postConfigBackupsRestore(context: RequestContext, runtime:
               return
             }
 
-            // 先自动备份一份当前的 config.js 防止回滚失误
+            // 恢复前导出当前 SQL 业务配置，保留可再次导入的回退副本。
             if (typeof global.lx.backupConfigNow === 'function') {
               global.lx.backupConfigNow()
             }
 
-            // 复制备份文件覆盖当前 config.js
-            const activeConfigPath = global.lx.configPath || path.join(global.lx.dataPath, 'config.js')
-            storageFs.copyFileSync(filePath, activeConfigPath)
+            // 还原业务配置到管理库，禁止覆盖数据库引导文件。
+            const imported = new SystemConfigurationImportService(repositories().admin).import(storageFs.readFileSync(filePath, 'utf8'), global.lx.config, global.lx.configPath)
+            global.lx.config = imported.config
 
             // 执行服务器热重载数据
             await reloadServerData()
@@ -809,10 +720,10 @@ export async function postConfigBackupsRestore(context: RequestContext, runtime:
 }
 
 /**
- * 处理 /api/config/test-proxy 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 使用提交的代理地址测试外网连接和响应耗时。
+ * @param context /api/config/test-proxy 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 系统配置、旧配置导入、本地配置备份与代理连接测试的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postConfigTestProxy(context: RequestContext, runtime: ConfigurationServiceRuntime) {
@@ -869,4 +780,26 @@ export async function postConfigTestProxy(context: RequestContext, runtime: Conf
         })
         return
 
+}
+
+/**
+ * 静态解析上传的旧 config.js，在管理库事务中覆盖提供的配置项。
+ * @param context 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 系统配置、旧配置导入、本地配置备份与代理连接测试的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
+ * @author yahyaoo
+ */
+export async function postConfigurationImport(context: RequestContext, runtime: ConfigurationServiceRuntime) {
+  const { req, res } = context
+  if (req.headers['x-frontend-auth'] !== global.lx.config['frontend.password']) { res.writeHead(401); res.end('Unauthorized'); return }
+  try {
+    const body = JSON.parse(await runtime.readBody(req)) as ConfigurationImportDto
+    if (typeof body?.content !== 'string') throw new Error('请选择旧 config.js 文件')
+    const previousPassword = global.lx.config['frontend.password']
+    const imported = new SystemConfigurationImportService(repositories().admin).import(body.content, global.lx.config, global.lx.configPath)
+    global.lx.config = imported.config
+    await runtime.reloadServerData()
+    runtime.updateAllUserSnapshotDirs(global.lx.config['snapshot.backupPath'])
+    res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ ...imported.result, authenticationChanged: previousPassword !== imported.config['frontend.password'] }))
+  } catch (error: any) { res.writeHead(400, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ success: false, message: error.message })) }
 }

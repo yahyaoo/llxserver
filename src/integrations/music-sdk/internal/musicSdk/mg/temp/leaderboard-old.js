@@ -1,4 +1,4 @@
-/** leaderboard-old 模块：按职责组织，原业务行为保持不变。 @author yahyaoo */
+/** 咪咕音乐接口适配：平台请求签名、字段转换及接口辅助。 @author yahyaoo */
 import { httpFetch } from '../../../request.js'
 import { formatPlayTime } from '../../../index.js'
 // import { sizeFormate } from '../../index'

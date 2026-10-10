@@ -257,7 +257,7 @@ Used for managing persistent API Tokens for third-party scripts and clients. Req
 - **`GET /api/config`**: Get full global configuration tree.
 - **`POST /api/config`**: Incrementally update configuration items (ports, paths, subsonic behaviors, proxy settings).
 - **`POST /api/config/test-proxy`**: Test proxy server connectivity.
-- **`POST /api/admin/reload`**: Hot reload `config.js`, `users.json`, and user script sources.
+- **`POST /api/admin/reload`**: Reload system configuration and users from SQLite, and reload user script sources.
 - **`POST /api/restart`** (alias `/api/admin/restart`): Safely restart server process.
 - **`GET /api/logs`**: Read access and error logs.
 - **`GET /api/stats`**: Performance and memory usage statistics.

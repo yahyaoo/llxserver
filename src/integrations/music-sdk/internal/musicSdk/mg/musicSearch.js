@@ -1,4 +1,4 @@
-/** musicSearch 模块：按职责组织，原业务行为保持不变。 @author yahyaoo */
+/** 咪咕音乐接口适配：歌曲搜索与分页结果整理。 @author yahyaoo */
 import { httpFetch } from '../../request.js'
 import { sizeFormate, formatPlayTime } from '../../index.js'
 import { toMD5, formatSingerName } from '../utils.js'

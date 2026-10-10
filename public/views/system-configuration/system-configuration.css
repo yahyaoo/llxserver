@@ -1,0 +1,17 @@
+/* 后台设置工作区，复用管理端颜色和配置控件。 @author yahyaoo */
+.system-settings-layout { display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 24px; align-items: start; }
+.system-settings-navigation { padding: 16px 12px; position: sticky; top: 16px; max-height: calc(100vh - 160px); overflow: auto; }
+.system-settings-navigation h3 { font-size: 12px; color: var(--text-secondary); margin: 18px 12px 8px; }
+.system-settings-item { display: block; width: 100%; border: 0; border-radius: 8px; background: transparent; color: var(--text-primary); text-align: left; padding: 11px 14px; cursor: pointer; font: inherit; font-size: 14px; }
+.system-settings-item:hover, .system-settings-item.is-active { background: color-mix(in srgb, var(--accent-primary) 15%, transparent); color: var(--accent-primary); }
+.system-settings .config-panels-layout { display: flex; flex-direction: column; min-width: 0; }
+.system-settings .config-card { width: 100%; min-width: 0; }
+.system-settings .config-card[hidden] { display: none !important; }
+.system-settings .config-actions-bar { width: 100%; }
+#system-config-database .config-field { margin: 18px 0; }
+#legacy-system-config-file { display: block; margin: 16px 0; max-width: 100%; }
+@media (max-width: 850px) {
+  .system-settings-layout { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  .system-settings-navigation { position: static; max-height: 220px; }
+  .system-settings-item { display: inline-block; width: auto; }
+}

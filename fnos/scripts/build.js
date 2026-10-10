@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** 从当前仓库编译并生成飞牛应用载荷。 @author jingyh */
+/** 从当前仓库编译并生成飞牛应用载荷。 @author yahyaoo */
 'use strict';
 const fs = require('node:fs');
 const path = require('node:path');
@@ -37,8 +37,8 @@ function preparePayload(root, pack) {
   copyDir(path.join(root, 'server'), path.join(payload, 'server'));
   copyDir(path.join(root, 'public'), path.join(payload, 'public'));
   fs.copyFileSync(path.join(root, 'index.js'), path.join(payload, 'index.js'));
-  // NAS 的真实配置由安装向导写入共享空间，不能复制开发机的密码或目录。
-  fs.writeFileSync(path.join(payload, 'config.js'), '/** 飞牛运行配置由 CONFIG_PATH 指向共享空间。 @author jingyh */\nmodule.exports = {};\n');
+  // NAS 的业务配置由安装向导初始化到 SQL；载荷不包含开发机的密码或数据库路径。
+  fs.writeFileSync(path.join(payload, 'config.js'), '/** SQLite 路径由共享空间引导文件保存。 @author yahyaoo */\nmodule.exports = {};\n');
   const distPkg = { name: pkg.name, version: pkg.version, private: true, engines: pkg.engines, dependencies: pkg.dependencies };
   fs.writeFileSync(path.join(payload, 'package.json'), JSON.stringify(distPkg, null, 2) + '\n');
   // 保留生产依赖的锁定版本，让 NAS 安装与本地验证使用同一依赖树。

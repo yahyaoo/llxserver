@@ -1,4 +1,4 @@
-/** singer 模块：按职责组织，原业务行为保持不变。 @author yahyaoo */
+/** 酷狗音乐接口适配：歌手详情、歌曲和专辑查询。 @author yahyaoo */
 import { getMusicInfosByList } from './musicInfo.js'
 import { createHttpFetch } from './util.js'
 

@@ -4,7 +4,7 @@
 
 ## 原存储确认
 
-管理用户、设备、音源元信息和任务记录原先使用 JSON；全局配置使用 `config.js`。播放器设置、音效、令牌、电台、媒体库、下载索引及快照原先也使用文件，浏览器歌单使用 IndexedDB。现在业务文档正常读取和写入 SQLite。`config.js` 保留外部编辑及旧备份兼容镜像，内容变化时重新导入管理库；未变化时使用 SQL 中的配置。
+管理用户、设备、音源元信息和任务记录原先使用 JSON；全局配置使用 `config.js`。播放器设置、音效、令牌、电台、媒体库、下载索引及快照原先也使用文件，浏览器歌单使用 IndexedDB。现在业务文档正常读取和写入 SQLite。`config.js` 仅保存独立数据库路径；系统业务配置只读写管理库。旧配置需在后台显式上传导入，具体步骤见 [系统配置说明](./system-configuration.md)。
 
 ## 首次启动
 
@@ -22,7 +22,7 @@
 | `admin_source` | sources.json，音源注册信息 |
 | `admin_source_state` | states.json，音源启用状态 |
 | `admin_source_order` | order.json，音源优先级 |
-| `admin_config` | config.js 解析结果及镜像摘要 |
+| `admin_config` | system-configuration.json 作用域的 SQL 业务配置 |
 | `admin_task_record` | network-list-autoupdate-records.json |
 | `admin_legacy_document` | 未专门登记的管理扩展 JSON |
 

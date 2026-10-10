@@ -1,4 +1,4 @@
-/** crypto 模块：按职责组织，原业务行为保持不变。 @author yahyaoo */
+/** 网易云音乐接口适配：平台请求签名、字段转换及接口辅助。 @author yahyaoo */
 // https://github.com/Binaryify/NeteaseCloudMusicApi/blob/master/util/crypto.js
 import { createCipheriv, createDecipheriv, publicEncrypt, randomBytes, createHash, constants } from 'crypto'
 const iv = Buffer.from('0102030405060708')

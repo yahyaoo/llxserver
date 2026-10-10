@@ -1,4 +1,4 @@
 import type { DocumentWriteDto } from '../../../common/model/dto/DocumentWriteDto'
-/** 服务器已下载歌曲写入参数，不增加原接口必填字段。 @author yahyaoo */
+/** 已下载歌曲的文件路径、音质与元信息的仓储写入参数；documentKey 定位文档，value 提供业务内容，modifiedAt 可指定更新时间。 @author yahyaoo */
 export interface DownloadRecordDto extends DocumentWriteDto {}
 

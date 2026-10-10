@@ -6,15 +6,15 @@ import sdk from './internal/musicSdk/index.js'
  * @author yahyaoo
  */
 export interface MusicGateway {
-  /** 初始化各平台，沿用原并行顺序。 */
+  /** 初始化平台请求能力和运行缓存。 */
   init: typeof sdk.init
   /** 多平台搜索能力。 */
   searchMusic: typeof sdk.searchMusic
-  /** 原有歌曲匹配能力。 */
+  /** 根据歌曲元信息匹配可用平台歌曲。 */
   findMusic: typeof sdk.findMusic
   /** 可用平台目录。 */
   sources: typeof sdk.sources
-  /** 平台原始能力，不在边界改变协议。 */
+  /** 按平台键访问搜索、歌词、歌曲详情及歌单等动态接口。 */
   [platform: string]: any
 }
 

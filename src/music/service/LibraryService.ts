@@ -1,13 +1,13 @@
 import type { RequestContext, ServerRuntime } from '../../common/http/RequestContext'
-/** Library 服务所需能力，仅允许访问本模块使用的依赖。 @author yahyaoo */
+/** 用户收藏及屏蔽的歌手和专辑所需的应用依赖契约。 @author yahyaoo */
 export type LibraryServiceRuntime = Pick<ServerRuntime, 'getUserDirname' | 'path' | 'storageFs' | 'fetchArtistPicShared' | 'readBody' | 'fetchAlbumPicShared'>
-/** Library 业务服务，原路由处理顺序与错误响应保持不变。 @author yahyaoo */
+/** 用户收藏及屏蔽的歌手和专辑服务。 @author yahyaoo */
 
 /**
- * 处理 /api/user/library/artists 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 读取用户收藏歌手列表。
+ * @param context /api/user/library/artists 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 用户收藏及屏蔽的歌手和专辑的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function getUserLibraryArtists(context: RequestContext, runtime: LibraryServiceRuntime) {
@@ -50,10 +50,10 @@ export async function getUserLibraryArtists(context: RequestContext, runtime: Li
 }
 
 /**
- * 处理 /api/user/library/artists 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 保存用户收藏歌手列表。
+ * @param context /api/user/library/artists 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 用户收藏及屏蔽的歌手和专辑的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postUserLibraryArtists(context: RequestContext, runtime: LibraryServiceRuntime) {
@@ -111,10 +111,10 @@ export async function postUserLibraryArtists(context: RequestContext, runtime: L
 }
 
 /**
- * 处理 /api/user/library/albums 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 读取用户收藏专辑列表。
+ * @param context /api/user/library/albums 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 用户收藏及屏蔽的歌手和专辑的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function getUserLibraryAlbums(context: RequestContext, runtime: LibraryServiceRuntime) {
@@ -157,10 +157,10 @@ export async function getUserLibraryAlbums(context: RequestContext, runtime: Lib
 }
 
 /**
- * 处理 /api/user/library/albums 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 保存用户收藏专辑列表。
+ * @param context /api/user/library/albums 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 用户收藏及屏蔽的歌手和专辑的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postUserLibraryAlbums(context: RequestContext, runtime: LibraryServiceRuntime) {
@@ -217,10 +217,10 @@ export async function postUserLibraryAlbums(context: RequestContext, runtime: Li
 }
 
 /**
- * 处理 /api/user/dislike/library/artists 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 读取用户屏蔽歌手列表。
+ * @param context /api/user/dislike/library/artists 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 用户收藏及屏蔽的歌手和专辑的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function getUserDislikeLibraryArtists(context: RequestContext, runtime: LibraryServiceRuntime) {
@@ -246,10 +246,10 @@ export async function getUserDislikeLibraryArtists(context: RequestContext, runt
 }
 
 /**
- * 处理 /api/user/dislike/library/artists 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 保存用户屏蔽歌手列表。
+ * @param context /api/user/dislike/library/artists 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 用户收藏及屏蔽的歌手和专辑的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postUserDislikeLibraryArtists(context: RequestContext, runtime: LibraryServiceRuntime) {
@@ -309,10 +309,10 @@ export async function postUserDislikeLibraryArtists(context: RequestContext, run
 }
 
 /**
- * 处理 /api/user/dislike/library/albums 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 读取用户屏蔽专辑列表。
+ * @param context /api/user/dislike/library/albums 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 用户收藏及屏蔽的歌手和专辑的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function getUserDislikeLibraryAlbums(context: RequestContext, runtime: LibraryServiceRuntime) {
@@ -338,10 +338,10 @@ export async function getUserDislikeLibraryAlbums(context: RequestContext, runti
 }
 
 /**
- * 处理 /api/user/dislike/library/albums 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 保存用户屏蔽专辑列表。
+ * @param context /api/user/dislike/library/albums 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 用户收藏及屏蔽的歌手和专辑的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postUserDislikeLibraryAlbums(context: RequestContext, runtime: LibraryServiceRuntime) {

@@ -1,66 +1,35 @@
-/** types 模块：按职责组织，原业务行为保持不变。 @author yahyaoo */
+/** 后台任务调度的数据结构和执行状态定义。 @author yahyaoo */
 export interface TaskExecutionResult {
-  /**
-   * taskId 字段，沿用原业务结构与空值约定。
-   */
+
   taskId: string
-  /**
-   * timestamp 字段，沿用原业务结构与空值约定。
-   */
+  /** 记录生成时间，单位毫秒。 */
   timestamp: number
-  /**
-   * success 字段，沿用原业务结构与空值约定。
-   */
+
   success: boolean
-  /**
-   * message 字段，沿用原业务结构与空值约定。
-   */
+  /** 处理结果或错误说明。 */
   message: string
-  /**
-   * details 字段，沿用原业务结构与空值约定。
-   */
+
   details?: any
 }
 
-/**
- * ScheduledTask 契约，按当前模块职责组织，保留原字段和扩展能力。
- * @author yahyaoo
- */
+/** 后台任务定义，记录执行间隔、运行状态、执行函数和最近结果。 @author yahyaoo */
 export interface ScheduledTask {
-  /**
-   * id 字段，沿用原业务结构与空值约定。
-   */
+  /** 业务记录标识。 */
   id: string
-  /**
-   * name 字段，沿用原业务结构与空值约定。
-   */
+  /** 记录显示名称。 */
   name: string
-  /**
-   * intervalMs 字段，沿用原业务结构与空值约定。
-   */
+  /** 任务执行间隔，单位毫秒。 */
   intervalMs: number
-  /**
-   * enabled 字段，沿用原业务结构与空值约定。
-   */
+  /** 功能是否启用。 */
   enabled: boolean
-  /**
-   * lastRunTime 字段，沿用原业务结构与空值约定。
-   */
+  /** 后台任务最近执行时间。 */
   lastRunTime?: number
-  /**
-   * nextRunTime 字段，沿用原业务结构与空值约定。
-   */
+  /** 后台任务下次计划执行时间。 */
   nextRunTime?: number
-  /**
-   * isRunning 字段，沿用原业务结构与空值约定。
-   */
+  /** 任务是否正在执行。 */
   isRunning: boolean
-  /**
-   * lastResult 字段，沿用原业务结构与空值约定。
-   */
+  /** 后台任务最近执行结果。 */
   lastResult?: TaskExecutionResult
-  /**
-   * run 字段，沿用原业务结构与空值约定。
-   */
+  /** 任务实际执行函数。 */
   run: () => Promise<TaskExecutionResult>
 }

@@ -1,4 +1,4 @@
-/** util 模块：按职责组织，原业务行为保持不变。 @author yahyaoo */
+/** 酷我音乐接口适配：平台请求签名、字段转换及接口辅助。 @author yahyaoo */
 
 import { createCipheriv, createDecipheriv } from 'crypto'
 import { toMD5 } from '../utils.js'

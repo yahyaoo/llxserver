@@ -1,4 +1,4 @@
-/** index 模块：按职责组织，原业务行为保持不变。 @author yahyaoo */
+/** 音乐 SDK 通用数据格式化与运行辅助函数。 @author yahyaoo */
 
 export const sizeFormate = (size) => {
     if (!size) return '0 B'

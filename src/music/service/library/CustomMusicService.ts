@@ -1,4 +1,4 @@
-/** CustomMusicService 模块：按职责组织，原业务行为保持不变。 @author yahyaoo */
+/** 用户自定义音乐目录服务：扫描音频、索引元信息、播放、关联与文件维护。 @author yahyaoo */
 import storageFs from '../../../application/persistence/documentFileSystem'
 import fs from 'fs'
 import path from 'path'
@@ -12,114 +12,62 @@ import { buildLyrics } from '../../../utils/lrcTool'
 import { getLyricFetcher, embedLyricsIntoFile, getAudioMetadataUnsupportedStatus } from '../cache/FileCacheService'
 import * as fileCache from '../cache/FileCacheService'
 
-/**
- * CustomCacheItem 契约，按当前模块职责组织，保留原字段和扩展能力。
- * @author yahyaoo
- */
+/** 自定义音乐目录的音频索引记录及元信息。 @author yahyaoo */
 export interface CustomCacheItem {
-    /**
-     * id 字段，沿用原业务结构与空值约定。
-     */
+    /** 业务记录标识。 */
     id: string
-    /**
-     * songmid 字段，沿用原业务结构与空值约定。
-     */
+    /** 音乐平台歌曲标识。 */
     songmid?: string
-    /**
-     * name 字段，沿用原业务结构与空值约定。
-     */
+    /** 记录显示名称。 */
     name: string
-    /**
-     * singer 字段，沿用原业务结构与空值约定。
-     */
+    /** 歌手名称。 */
     singer: string
-    /**
-     * album 字段，沿用原业务结构与空值约定。
-     */
+    /** 歌曲专辑信息。 */
     album: string
-    /**
-     * albumId 字段，沿用原业务结构与空值约定。
-     */
+    /** 平台专辑标识。 */
     albumId?: string
-    /**
-     * img 字段，沿用原业务结构与空值约定。
-     */
+
     img?: string
-    /**
-     * interval 字段，沿用原业务结构与空值约定。
-     */
+    /** 增量同步间隔，单位分钟。 */
     interval?: string
-    /**
-     * source 字段，沿用原业务结构与空值约定。
-     */
+    /** 歌曲或详情所属的音乐平台。 */
     source: string
-    /**
-     * quality 字段，沿用原业务结构与空值约定。
-     */
+    /** 音质标识。 */
     quality: string
-    /**
-     * filename 字段，沿用原业务结构与空值约定。
-     */
+    /** 关联音频或业务文件名。 */
     filename: string
-    /**
-     * subPath 字段，沿用原业务结构与空值约定。
-     */
+
     subPath?: string
-    /**
-     * folder 字段，沿用原业务结构与空值约定。
-     */
+    /** 缓存或下载目录类别。 */
     folder: 'custom'
-    /**
-     * mtime 字段，沿用原业务结构与空值约定。
-     */
+
     mtime: number
-    /**
-     * size 字段，沿用原业务结构与空值约定。
-     */
+    /** 文件字节数或记录数量。 */
     size: number
-    /**
-     * lyricFilename 字段，沿用原业务结构与空值约定。
-     */
+
     lyricFilename?: string
-    /**
-     * ext 字段，沿用原业务结构与空值约定。
-     */
+    /** 文件扩展名。 */
     ext: string
-    /**
-     * hasCover 字段，沿用原业务结构与空值约定。
-     */
+    /** 是否已获取封面。 */
     hasCover?: boolean
-    /**
-     * coverType 字段，沿用原业务结构与空值约定。
-     */
+
     coverType?: 'embedded' | 'cached' | 'remote' | 'none'
-    /**
-     * hasLyric 字段，沿用原业务结构与空值约定。
-     */
+    /** 是否存在歌词。 */
     hasLyric?: boolean
-    /**
-     * hasEmbedLyric 字段，沿用原业务结构与空值约定。
-     */
+    /** 是否已将歌词内嵌到音频。 */
     hasEmbedLyric?: boolean
-    /**
-     * bitrate 字段，沿用原业务结构与空值约定。
-     */
+    /** 音频码率。 */
     bitrate?: number
-    /**
-     * sampleRate 字段，沿用原业务结构与空值约定。
-     */
+    /** 音频采样率。 */
     sampleRate?: number
-    /**
-     * bitDepth 字段，沿用原业务结构与空值约定。
-     */
+    /** 音频采样位深。 */
     bitDepth?: number
 }
 
 // 获取用户配置的自定义音乐目录
 /**
- * 获取 getCustomMusicDir 对应的业务能力，参数和执行顺序保持原实现。
+ * 读取用户独立歌曲目录配置，未启用时返回无可用目录。
  * @param username 已解析的用户名称。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
  * @author yahyaoo
  */
 export const getCustomMusicDir = (username: string): string | null => {
@@ -185,22 +133,16 @@ const detectQualityFromBitrate = (bitrate: number | undefined, ext: string, tagg
     return '128k'
 }
 
-/**
- * CustomIndexManager 契约，按当前模块职责组织，保留原字段和扩展能力。
- * @author yahyaoo
- */
+/** 按用户管理自定义歌曲目录索引并保存到 SQL 文档。 @author yahyaoo */
 class CustomIndexManager {
-    /**
-     * indexes 字段，沿用原业务结构与空值约定。
-     */
+    /** 按用户和存储位置分组的内存索引。 */
     private indexes: Map<string, Map<string, CustomCacheItem>> = new Map() // username -> (compositeKey -> CustomCacheItem)
 
     /**
-     * 获取 getIndexFilePath 对应的业务能力，参数和执行顺序保持原实现。
-     * @param username 已解析的用户名称。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 计算自定义歌曲目录对应的用户 SQL 索引文档路径。
+ * @param username 已解析的用户名称。
+ * @author yahyaoo
+ */
     private getIndexFilePath(username: string): string | null {
         const customDir = getCustomMusicDir(username)
         if (!customDir) return null
@@ -208,11 +150,10 @@ class CustomIndexManager {
     }
 
     /**
-     * 加载 load 对应的业务能力，参数和执行顺序保持原实现。
-     * @param username 已解析的用户名称。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 读取并缓存用户自定义歌曲索引，缺失文档时初始化空索引。
+ * @param username 已解析的用户名称。
+ * @author yahyaoo
+ */
     load(username: string): Map<string, CustomCacheItem> {
         const file = this.getIndexFilePath(username)
         if (!file || !storageFs.existsSync(file)) {
@@ -233,11 +174,10 @@ class CustomIndexManager {
     }
 
     /**
-     * 保存 save 对应的业务能力，参数和执行顺序保持原实现。
-     * @param username 已解析的用户名称。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 将用户自定义歌曲索引保存到 SQLite 文档。
+ * @param username 已解析的用户名称。
+ * @author yahyaoo
+ */
     save(username: string) {
         const file = this.getIndexFilePath(username)
         const index = this.indexes.get(username)
@@ -251,36 +191,33 @@ class CustomIndexManager {
     }
 
     /**
-     * 获取 getAll 对应的业务能力，参数和执行顺序保持原实现。
-     * @param username 已解析的用户名称。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 返回用户自定义歌曲索引中的全部歌曲记录。
+ * @param username 已解析的用户名称。
+ * @author yahyaoo
+ */
     getAll(username: string): CustomCacheItem[] {
         const index = this.indexes.get(username) || this.load(username)
         return Array.from(index.values())
     }
 
     /**
-     * 设置 set 对应的业务能力，参数和执行顺序保持原实现。
-     * @param username 已解析的用户名称。
-     * @param key 业务作用域或缓存键。
-     * @param item item 原业务参数。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 向用户自定义歌曲索引写入或替换歌曲记录。
+ * @param username 已解析的用户名称。
+ * @param key 业务作用域或缓存键。
+ * @param item 待处理索引记录。
+ * @author yahyaoo
+ */
     set(username: string, key: string, item: CustomCacheItem) {
         const index = this.indexes.get(username) || this.load(username)
         index.set(key, item)
     }
 
     /**
-     * 移除 remove 对应的业务能力，参数和执行顺序保持原实现。
-     * @param username 已解析的用户名称。
-     * @param filenameOrKey filenameOrKey 原业务参数。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 从用户自定义歌曲索引删除对应歌曲记录。
+ * @param username 已解析的用户名称。
+ * @param filenameOrKey 文件名或索引记录键。
+ * @author yahyaoo
+ */
     remove(username: string, filenameOrKey: string): boolean {
         const index = this.indexes.get(username) || this.load(username)
         let deleted = false
@@ -299,20 +236,12 @@ export const customIndexManager = new CustomIndexManager()
 
 // 同步自定义目录下的歌曲并生成/更新 custom_index.json
 // 递归扫描目录下的所有音频文件（支持任意深层子目录）
-const scanAllFilesRecursively = async (baseDir: string, currentDir: string = baseDir): Promise<{ /**
- * relativePath 字段，沿用原业务结构与空值约定。
- */
-relativePath: string; /**
- * fullPath 字段，沿用原业务结构与空值约定。
- */
+const scanAllFilesRecursively = async (baseDir: string, currentDir: string = baseDir): Promise<{ /** 相对于业务数据目录的路径。 */
+relativePath: string; /** 文件完整路径。 */
 fullPath: string }[]> => {
     const extensions = ['.mp3', '.flac', '.m4a', '.ogg', '.wav', '.ape']
-    let results: { /**
- * relativePath 字段，沿用原业务结构与空值约定。
- */
-relativePath: string; /**
- * fullPath 字段，沿用原业务结构与空值约定。
- */
+    let results: { /** 相对于业务数据目录的路径。 */
+relativePath: string; /** 文件完整路径。 */
 fullPath: string }[] = []
     try {
         const entries = await storageFs.promises.readdir(currentDir, { withFileTypes: true })
@@ -399,9 +328,8 @@ const buildLinkedInfoMap = (rootDir: string): Map<string, any> => {
 
 // 同步扫描并更新自定义目录索引
 /**
- * 同步 syncCustomIndex 对应的业务能力，参数和执行顺序保持原实现。
+ * 扫描用户自定义目录中的音频文件，补齐元信息并更新 SQL 索引。
  * @param username 已解析的用户名称。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
  * @author yahyaoo
  */
 export const syncCustomIndex = async (username: string) => {
@@ -556,9 +484,8 @@ export const syncCustomIndex = async (username: string) => {
 
 // 获取自定义音乐列表（带 songInfo 转换）
 /**
- * 获取 getCustomMusicList 对应的业务能力，参数和执行顺序保持原实现。
+ * 同步目录索引后返回用户自定义目录歌曲列表。
  * @param username 已解析的用户名称。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
  * @author yahyaoo
  */
 export const getCustomMusicList = async (username: string) => {
@@ -593,10 +520,9 @@ export const getCustomMusicList = async (username: string) => {
 
 // 获取自定义目录音频封面
 /**
- * 获取 getCustomCover 对应的业务能力，参数和执行顺序保持原实现。
+ * 提取自定义目录歌曲封面，并使用封面缓存避免重复读取。
  * @param filename 文件或文档定位路径。
  * @param username 已解析的用户名称。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
  * @author yahyaoo
  */
 export const getCustomCover = async (filename: string, username: string) => {
@@ -628,12 +554,11 @@ export const getCustomCover = async (filename: string, username: string) => {
 
 // 流式服务自定义目录音频文件（支持 Range 206）
 /**
- * 响应 serveCustomFile 对应的业务能力，参数和执行顺序保持原实现。
- * @param req 原 HTTP 请求。
- * @param res 原 HTTP 响应。
+ * 向客户端流式传输自定义目录音频，校验用户目录与 Range 范围。
+ * @param req HTTP 请求，包含认证头、查询参数和上传正文。
+ * @param res HTTP 响应，用于写入状态码、数据或媒体流。
  * @param filename 文件或文档定位路径。
  * @param username 已解析的用户名称。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
  * @author yahyaoo
  */
 export const serveCustomFile = (req: http.IncomingMessage, res: http.ServerResponse, filename: string, username: string) => {
@@ -688,10 +613,9 @@ export const serveCustomFile = (req: http.IncomingMessage, res: http.ServerRespo
 
 // 删除自定义目录下的文件
 /**
- * 移除 removeCustomFile 对应的业务能力，参数和执行顺序保持原实现。
+ * 删除自定义目录歌曲文件及关联索引记录。
  * @param filename 文件或文档定位路径。
  * @param username 已解析的用户名称。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
  * @author yahyaoo
  */
 export const removeCustomFile = (filename: string, username: string): boolean => {
@@ -749,11 +673,10 @@ export const removeCustomFile = (filename: string, username: string): boolean =>
 
 // 手动关联自定义目录歌曲（更新 ID3 标签及 custom_index.json）
 /**
- * 处理 linkCustomSong 对应的业务能力，参数和执行顺序保持原实现。
+ * 将自定义目录音频与在线歌曲信息关联，更新文件元信息和索引。
  * @param filename 文件或文档定位路径。
- * @param songInfo songInfo 原业务参数。
+ * @param songInfo 歌曲详情及平台扩展字段。
  * @param username 已解析的用户名称。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
  * @author yahyaoo
  */
 export const linkCustomSong = async (filename: string, songInfo: any, username: string) => {
@@ -812,10 +735,9 @@ export const linkCustomSong = async (filename: string, songInfo: any, username: 
 
 // 批量补全自定义目录音乐元信息（封面与ID3标签）
 /**
- * 处理 batchUpdateMetadata 对应的业务能力，参数和执行顺序保持原实现。
- * @param filenames filenames 原业务参数。
+ * 批量写入歌曲元信息，汇总成功、跳过和失败结果。
+ * @param filenames 待处理文件名集合。
  * @param username 已解析的用户名称。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
  * @author yahyaoo
  */
 export const batchUpdateMetadata = async (filenames: string[], username: string) => {
@@ -897,10 +819,9 @@ export const batchUpdateMetadata = async (filenames: string[], username: string)
 
 // 批量将歌词嵌入自定义目录音频标签 (USLT)
 /**
- * 处理 batchEmbedLyric 对应的业务能力，参数和执行顺序保持原实现。
- * @param filenames filenames 原业务参数。
+ * 批量获取并内嵌自定义目录歌曲歌词，汇总成功与失败结果。
+ * @param filenames 待处理文件名集合。
  * @param username 已解析的用户名称。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
  * @author yahyaoo
  */
 export const batchEmbedLyric = async (filenames: string[], username: string) => {
@@ -990,11 +911,10 @@ export const batchEmbedLyric = async (filenames: string[], username: string) => 
 
 // 为自定义目录保存歌词缓存 (.lrc 文件并同步索引)
 /**
- * 保存 saveCustomLyricCache 对应的业务能力，参数和执行顺序保持原实现。
- * @param songInfo songInfo 原业务参数。
- * @param lyricsObj lyricsObj 原业务参数。
+ * 保存自定义目录歌曲歌词缓存并更新歌词索引标记。
+ * @param songInfo 歌曲详情及平台扩展字段。
+ * @param lyricsObj 歌词及翻译等扩展内容。
  * @param username 已解析的用户名称。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
  * @author yahyaoo
  */
 export const saveCustomLyricCache = (songInfo: any, lyricsObj: any, username: string): boolean => {
@@ -1054,14 +974,13 @@ const safeRenameFile = (src: string, dst: string) => {
 
 // 自定义目录歌曲洗版替换：下载新音质并替换自定义目录目标文件，保留封面和歌词，并更新 custom_index.json
 /**
- * 处理 replaceCustomMusicItem 对应的业务能力，参数和执行顺序保持原实现。
+ * 以新解析歌曲替换自定义目录中的音频，保持目录和索引对应。
  * @param username 已解析的用户名称。
- * @param originalItem originalItem 原业务参数。
- * @param songInfo songInfo 原业务参数。
- * @param url url 原业务参数。
+ * @param originalItem 替换前的本地歌曲索引记录。
+ * @param songInfo 歌曲详情及平台扩展字段。
+ * @param url 请求或播放地址。
  * @param quality 原音质选择。
  * @param signal 调用方取消信号。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
  * @author yahyaoo
  */
 export const replaceCustomMusicItem = async (

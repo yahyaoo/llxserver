@@ -1,4 +1,4 @@
-/** request 模块：按职责组织，原业务行为保持不变。 @author yahyaoo */
+/** 音乐 SDK 网络适配：请求转发、超时、代理和响应错误处理。 @author yahyaoo */
 import needle from 'needle'
 import { debugRequest } from './env.js'
 import { requestMsg } from './message.js'

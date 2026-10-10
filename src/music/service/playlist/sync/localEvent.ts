@@ -1,4 +1,4 @@
-/** localEvent 模块：按职责组织，原业务行为保持不变。 @author yahyaoo */
+/** 歌单本地事件桥接：订阅数据变化并发送同步协议消息。 @author yahyaoo */
 // import { updateDeviceSnapshotKey } from '@main/modules/sync/data'
 // import { registerListActionEvent } from '../../../utils'
 // import { getCurrentListInfoKey } from '../../utils'
@@ -19,9 +19,8 @@ let unregisterLocalListAction: (() => void) | null
 // }
 
 /**
- * 注册 registerEvent 对应的业务能力，参数和执行顺序保持原实现。
- * @param wss wss 原业务参数。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * 注册本地数据事件监听，将变更转为同步协议消息。
+ * @param wss 同步 WebSocket 服务。
  * @author yahyaoo
  */
 export const registerEvent = (wss: LX.SocketServer) => {
@@ -37,8 +36,7 @@ export const registerEvent = (wss: LX.SocketServer) => {
 }
 
 /**
- * 注销 unregisterEvent 对应的业务能力，参数和执行顺序保持原实现。
- * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
+ * 解除本地数据事件监听，释放用户同步订阅。
  * @author yahyaoo
  */
 export const unregisterEvent = () => {

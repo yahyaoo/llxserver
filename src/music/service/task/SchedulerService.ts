@@ -1,4 +1,4 @@
-/** SchedulerService 模块：按职责组织，原业务行为保持不变。 @author yahyaoo */
+/** 后台任务调度器：注册任务、计算下次执行时间、避免重叠执行并保存结果。 @author yahyaoo */
 import storageFs from '../../../application/persistence/documentFileSystem'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -37,15 +37,9 @@ const loadTaskRecords = () => {
 const saveTaskRecords = () => {
   try {
     const p = getTaskRecordsFilePath()
-    const records: Record<string, { /**
- * lastRunTime 字段，沿用原业务结构与空值约定。
- */
-lastRunTime?: number; /**
- * nextRunTime 字段，沿用原业务结构与空值约定。
- */
-nextRunTime?: number; /**
- * lastResult 字段，沿用原业务结构与空值约定。
- */
+    const records: Record<string, { /** 最近一次执行时间。 */
+lastRunTime?: number; /** 后台任务下次计划执行时间。 */
+nextRunTime?: number; /** 后台任务最近执行结果。 */
 lastResult?: TaskExecutionResult }> = {}
     for (const [id, task] of registeredTasks.entries()) {
       records[id] = {
@@ -155,12 +149,8 @@ export const executeTask = async (taskId: string): Promise<TaskExecutionResult> 
 /**
  * 更新任务的定时配置
  */
-export const updateTaskConfig = (taskId: string, config: { /**
- * intervalMs 字段，沿用原业务结构与空值约定。
- */
-intervalMs?: number; /**
- * enabled 字段，沿用原业务结构与空值约定。
- */
+export const updateTaskConfig = (taskId: string, config: { /** 执行间隔，单位毫秒。 */
+intervalMs?: number; /** 功能是否启用。 */
 enabled?: boolean }) => {
   const task = registeredTasks.get(taskId)
   if (!task) return false

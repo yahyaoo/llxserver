@@ -1,4 +1,4 @@
-/** songId 模块：按职责组织，原业务行为保持不变。 @author yahyaoo */
+/** 咪咕音乐接口适配：平台歌曲标识转换。 @author yahyaoo */
 // import { httpFetch } from '../../request'
 import { getMusicInfo } from './musicInfo.js'
 

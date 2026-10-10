@@ -1,4 +1,4 @@
-/** xm 模块：按职责组织，原业务行为保持不变。 @author yahyaoo */
+/** 虾米音乐接口适配及平台能力声明。 @author yahyaoo */
 // import { apis } from '../api-source'
 // import leaderboard from './leaderboard'
 // import songList from './songList'

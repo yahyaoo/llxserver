@@ -1,4 +1,4 @@
-/** hotSearch 模块：按职责组织，原业务行为保持不变。 @author yahyaoo */
+/** 酷狗音乐接口适配：热门搜索关键词查询。 @author yahyaoo */
 import { httpFetch } from '../../request.js'
 import { decodeName } from '../../index.js'
 

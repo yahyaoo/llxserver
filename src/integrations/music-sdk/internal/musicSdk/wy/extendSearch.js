@@ -1,4 +1,4 @@
-/** extendSearch 模块：按职责组织，原业务行为保持不变。 @author yahyaoo */
+/** 网易云音乐接口适配：歌手、专辑和歌单扩展搜索。 @author yahyaoo */
 import { eapiRequest } from './utils/index.js'
 import { formatSingerName } from '../utils.js'
 

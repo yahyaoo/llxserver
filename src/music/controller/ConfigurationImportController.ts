@@ -47,8 +47,8 @@ async function readUpload(req: IncomingMessage): Promise<string> {
 
 /**
  * 上传洛雪配置并覆盖当前用户的播放器 SQLite 数据。
- * @param req 原请求。
- * @param res 原响应。
+ * @param req HTTP 请求，提供认证头与上传正文。
+ * @param res HTTP 响应，用于写入状态码和处理结果。
  * @param dependencies 应用注入的能力，禁止访问管理数据库。
  * @returns HTTP 完成结果。
  * @author yahyaoo

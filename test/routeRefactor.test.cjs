@@ -16,7 +16,7 @@ function digest(body) {
   return crypto.createHash('sha256').update(JSON.stringify(tokens)).digest('hex')
 }
 
-test('160 个原路由迁移保持执行语句、条件顺序、权限和响应', () => {
+test('158 个非配置路由保持原执行语句，160 个原路由条件顺序保持一致', () => {
   assert.equal(routes.length, 160)
   const files = new Map()
   const http = fs.readFileSync(path.join(__dirname, '../src/application/http/HttpServer.ts'), 'utf8')
@@ -33,7 +33,9 @@ test('160 个原路由迁移保持执行语句、条件顺序、权限和响应'
     const statements = [...handler.body.body]
     while (statements[0]?.type === 'VariableDeclaration' && statements[0].declarations.length === 1 && ['context', 'runtime'].includes(statements[0].declarations[0].init?.name)) statements.shift()
     const body = statements.map(node => source.slice(node.start, node.end)).join('\n')
-    assert.equal(digest(body), route.baselineDigest, route.file + ':' + route.method)
+    // 本次需求明确修改配置持久化与配置备份还原；其余处理器继续固定原语句基线。
+    const changedConfigurationHandlers = ['handleConfig', 'postConfigBackupsRestore']
+    if (!(route.file === 'src/admin/service/ConfigurationService.ts' && changedConfigurationHandlers.includes(route.method))) assert.equal(digest(body), route.baselineDigest, route.file + ':' + route.method)
     const next = http.indexOf('if (' + route.condition + ')', position)
     assert.ok(next >= position, route.route + ' 条件顺序')
     position = next + 1

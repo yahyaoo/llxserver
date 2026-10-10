@@ -6,13 +6,11 @@ LX Music Sync Server 秉承**零配置、开箱即用**的设计原则，同时�
 
 LX Music Sync Server 构建了统一的基础模型骨架（位于 `src/defaultConfig.ts`）。在服务实例初始化期间，配置解析器将分别向**服务端底层环境**（如网络绑定、WebDAV 设置等）及**前端运行环境**（注入浏览器执行沙箱内的 `/js/config.js`）流式分发参数。
 
-配置的加载与合并遵循以下由高到低的优先级序列，高优先级选项将**硬性覆盖**低优先级对应的键值：
+业务配置只存储在管理 SQLite 数据库中。启动时将 SQL 配置与 `src/defaultConfig.ts` 默认值合并，再按既有规则应用环境变量并保存生效配置。WebDAV 恢复业务文档后从 SQL 热加载。
 
-1. **运行时环境变量 (Environment Variables)**：具有极高优先级。例如 `PORT=9527`。
-2. **WebDAV 云端同步数据 (WebDAV Cloud Data)**：若配置了 WebDAV，启动时系统会尝试从云端恢复。**云端恢复的内容会覆盖本地 `config.js` 并触发热重载**。
-3. **显式自定义配置文件路径 (Custom Config File)**：通过 `CONFIG_PATH` 指定的文件。
-4. **全局默认入口配置 (Global Config.js)**：项目根目录下的 `config.js`。
-5. **系统级默认常量 (Default Consts)**：`src/defaultConfig.ts`。
+`config.js` 仅包含 `database.adminPath` 和 `database.musicPath`；`CONFIG_PATH` 指定引导文件位置。相对数据库路径基于 `DATA_PATH`。旧业务字段不再自动读取，需要通过后台「系统配置 → 数据库与迁移」显式上传静态旧配置。
+
+后台设置按服务与访问、音乐与缓存、同步与数据分组。修改数据库位置会复制已提交数据、初始化并检查目标库、切换连接和保存引导路径；准备失败继续使用旧库，已存在目标文件拒绝覆盖。详细步骤见 [系统配置说明](../system-configuration.md)。
 
 ---
 
@@ -27,7 +25,7 @@ LX Music Sync Server 构建了统一的基础模型骨架（位于 `src/defaultC
 | 环境变量映射键 (ENV)  | 系统默认值    | 数据类型 | 作用域与适用场景                                                                                                                                    |
 | :-------------------- | :------------ | :------- | :-------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `PORT`              | `9527`      | Integer  | **服务监听端口**。建议避免使用主机中其他高频占用的端口（如 80、443、3306）。                                                                  |
-| `BIND_IP`           | `0.0.0.0`   | String   | **服务绑定的 IP 接口范围**。设定为 `127.0.0.1` 仅接受本机 Lookback 调用；设定为 `0.0.0.0` 意味着同时监听主机所有内外部可用网络适配器。    |
+| `BIND_IP` | `0.0.0.0` | String | 当前主 HTTP 服务固定监听 `0.0.0.0`；修改此值不改变监听地址。 |
 | `ADMIN_PATH`        | `'/admin'`  | String   | **后台管理界面访问路径**。默认为 `/admin`。                                                                                                    |
 | `PLAYER_PATH`       | `'/'`       | String   | **Web 播放器访问路径**。默认为根路径 `/`。                                                                                                     |
 | `SERVER_NAME`       | `lxserver` | String | **同步服务名称**。在客户端连接时显示的服务器标识名称。 |
@@ -51,7 +49,7 @@ LX Music Sync Server 构建了统一的基础模型骨架（位于 `src/defaultC
 | `MAX_SNAPSHOT_NUM`  | `10`     | Integer  | **时间快照保留阈值设定**。系统留存的历史归档快照队列最大允许长度。超出该队列限额的早期历史将会被底层定时 GC 任务循环丢弃。                                                |
 | `DATA_PATH` | `./data` | String | **数据目录路径**。指定持久化数据（如 users.json, 歌单快照等）的存储位置。 |
 | `LOG_PATH` | `./logs` | String | **日志目录路径**。指定系统运行日志的存储位置。 |
-| `CONFIG_PATH` | `''` | String | **外部配置路径**。手动指定一个额外的 `config.js` 文件路径。 |
+| `CONFIG_PATH` | `''` | String | **引导文件路径**。只包含两个 SQLite 数据库位置。 |
 | `USER_ENABLE_PATH`  | `true`   | Boolean  | **启用用户路径模式（推荐）**。开启后客户端连接 URL 为 `http://ip:port/<用户名>`，数据按用户隔离，**允许多个不同用户使用相同密码**。 |
 | `USER_ENABLE_ROOT`  | `false`  | Boolean  | **启用根路径模式**。开启后客户端连接 URL 为 `http://ip:port`（无用户名），服务端自动根据密码匹配用户。**开启时要求所有用户密码必须唯一**。 |
 | `ENABLE_PUBLIC_USER_RESTRICTION` | `true` | Boolean | **限制公开用户权限**。开启后，非管理员公开用户将被限制上传、删除公开源、缓存到服务器等敏感操作。 |
@@ -75,7 +73,7 @@ LX Music Sync Server 构建了统一的基础模型骨架（位于 `src/defaultC
 
 > 🔖 **状态无感迁移与初始化机制 (Stateful Resurrection)**：
 > 1. **云端优先恢复**：若启动时探测到此组变量，系统会优先尝试从云端拉取存档。
-> 2. **环境驱动落盘**：若云端配置为空（如首次在 Docker/云端部署），系统会**自动将当前运行环境中的生效配置（如通过环境变量设置的端口、密码等）持久化写入数据目录 `data/config.js` 并同步上传至云端**进行初始化。这确保了您仅通过环境变量即可完成云端数据的首次“开荒”建立。
+> 2. **环境驱动落盘**：若云端配置为空（如首次在 Docker/云端部署），系统会**自动将当前生效的业务配置保存到 SQLite，并导出业务文档同步至云端**进行初始化。这确保了您仅通过环境变量即可完成云端数据的首次“开荒”建立。
 
 ### 四、 Web 端复合媒体播放空间防护逻辑
 
@@ -108,7 +106,7 @@ LX Music Sync Server 构建了统一的基础模型骨架（位于 `src/defaultC
 | :--- | :--- | :--- | :--- |
 | `SINGER_SOURCE_PRIORITY` | `'tx,wy'` | String | **歌手信息源优先级**。控制歌手详情、照片及 Mid 的获取源优先顺序。可选值为 `tx` (腾讯) 和 `wy` (网易)，多个来源用英文逗号隔开，排列靠前者优先尝试。 |
 | `ARTIST_MAX_FETCH_PAGES` | `20` | Integer | **歌手歌曲最大抓取页数**。抓取歌手全量歌曲时的页数上限。 |
-| `CACHE_NAMING_PATTERN` | `'simple'` | String | **缓存文件命名规则**。可选值为 `simple`（简单规则）或 `custom`（自定义规则）。 |
+| `CACHE_NAMING_PATTERN` | `'simple'` | String | 缓存命名：`simple`、`standard`、`singer_name_quality_album`、`singer_name`、`name_singer`。播放器已保存的命名设置优先。 |
 | `SYSTEM_ALLOW_UNSAFE_VM` | `false` | Boolean | **是否允许运行 VM 模式自定义源脚本**。开启后允许加载含有高风险 VM 沙箱特性的自定义源脚本（需注意安全风险）。 |
 
 ### 九、 (高阶特性) CLI 环境下静默预置账户
@@ -127,7 +125,7 @@ export LX_USER_hello="12345"
 npm run start
 ```
 
-*(注意：伴随上述系统调控操作成功之后，此内存对象将被转化为实体数据永久归档落盘至挂载的 `<DATA_PATH>/users.json` 文件内持续发生作用效验。)*
+*(注意：伴随上述系统调控操作成功之后，此内存对象将被转化为实体数据永久归档落盘至管理 SQLite 用户表内持续发生作用效验。)*
 
 ---
 

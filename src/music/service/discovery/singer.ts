@@ -1,4 +1,4 @@
-/** singer 模块：按职责组织，原业务行为保持不变。 @author yahyaoo */
+/** 歌手详情聚合：按配置优先级查询 QQ 音乐和网易云的简介、头像与作品。 @author yahyaoo */
 /**
  * 歌手信息助手
  * 支持从 TX (QQ音乐) 和 WY (网易云音乐) 源获取歌手详细信息
@@ -9,32 +9,19 @@ import musicSdkRaw from '../../../integrations/music-sdk/MusicGateway'
 import { buildQueryVariants } from './zhConvert'
 const musicSdk = musicSdkRaw as any
 
-/**
- * SingerDetail 契约，按当前模块职责组织，保留原字段和扩展能力。
- * @author yahyaoo
- */
+/** 统一歌手详情，包含名称、头像、简介和平台标识。 @author yahyaoo */
 export interface SingerDetail {
-    /**
-     * name 字段，沿用原业务结构与空值约定。
-     */
+    /** 记录显示名称。 */
     name: string
     /** 音源上实际命中的官方歌手名（可能与查询名存在简繁/别名差异） */
     matchedName?: string
-    /**
-     * mid 字段，沿用原业务结构与空值约定。
-     */
+
     mid: string
-    /**
-     * source 字段，沿用原业务结构与空值约定。
-     */
+    /** 歌曲或详情所属的音乐平台。 */
     source: 'tx' | 'wy'
-    /**
-     * pic 字段，沿用原业务结构与空值约定。
-     */
+    /** 封面或头像地址。 */
     pic: string
-    /**
-     * desc 字段，沿用原业务结构与空值约定。
-     */
+
     desc: string
 }
 
@@ -78,12 +65,8 @@ export function nameSimilarity(a: string, b: string): number {
 }
 
 /** 从候选列表里挑最贴近搜索词的歌手；完全相同优先，其次相似度最高，最后退回第一条 */
-function pickBestSinger(list: any[], name: string): { /**
- * item 字段，沿用原业务结构与空值约定。
- */
-item: any, /**
- * score 字段，沿用原业务结构与空值约定。
- */
+function pickBestSinger(list: any[], name: string): {
+item: any,
 score: number } | null {
     if (!Array.isArray(list) || list.length === 0) return null
     const target = normalizeName(name)

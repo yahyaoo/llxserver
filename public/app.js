@@ -34,6 +34,7 @@ class App {
         this.users = [];
         this.customDirectoryDrafts = new Map();
         this.configLoaded = false;
+        this.systemConfiguration = new window.SystemConfigurationView(document.getElementById('view-config'), this);
         this.systemCpuHistory = [];
         this.processCpuHistory = [];
         this.systemMemHistory = [];
@@ -47,6 +48,12 @@ class App {
     }
 
     init() {
+        // 旧配置导入改变密码后，登录页继续显示成功提示；读取一次后移除。
+        const configurationImportNotice = sessionStorage.getItem('lx_configuration_import_notice');
+        if (configurationImportNotice) {
+            sessionStorage.removeItem('lx_configuration_import_notice');
+            showInfo(configurationImportNotice);
+        }
         // 检查是否已登录
         const savedPassword = localStorage.getItem('lx_auth');
         if (savedPassword) {
@@ -2415,6 +2422,7 @@ class App {
         try {
             const config = await this.request('/api/config');
             this.configLoaded = true;
+            this.systemConfiguration.load(config);
             this.loadedConfig = config; // 保存原始配置，供 saveConfig 对比「需重启」字段是否变更
             const form = document.getElementById('config-form');
             form.elements['download.directory'].value = config['download.directory'] || '';
@@ -3180,12 +3188,13 @@ class App {
             'subsonic.source.autoSwitchCustom': formData.get('subsonic.source.autoSwitchCustom') === 'on',
             'singer.sourcePriority': formData.get('singer.sourcePriority'),
             'system.allowUnsafeVM': formData.get('system.allowUnsafeVM') === 'on',
+            ...this.systemConfiguration.values(),
         };
 
         // [需要重启] 以下配置仅在进程启动时由 server.ts 读取
         // （startSubsonicStandaloneServer / handleStartServer），保存后不会即时生效，必须重启服务。
         // 检测本次保存是否实际修改了它们，若是则提示用户重启。
-        const restartRequiredKeys = ['subsonic.enable', 'subsonic.port'];
+        const restartRequiredKeys = ['subsonic.enable', 'subsonic.port', 'bindIP', 'port', 'disableTelemetry', 'cache.namingPattern', 'serverCacheLocation'];
         const prevConfig = this.loadedConfig || {};
         const changedRestartKeys = restartRequiredKeys.filter(k => {
             if (k === 'subsonic.port') return Number(config[k]) !== Number(prevConfig[k]);
@@ -4742,6 +4751,7 @@ class App {
     jumpToWebDAVConfig() {
         this.switchView('config').then(() => {
             setTimeout(() => {
+                this.systemConfiguration.select('WebDAV 同步配置');
                 const target = document.getElementById('config-card-webdav');
                 if (target) {
                     target.scrollIntoView({ behavior: 'smooth', block: 'center' });

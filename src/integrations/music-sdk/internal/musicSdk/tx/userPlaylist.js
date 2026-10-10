@@ -1,4 +1,4 @@
-/** userPlaylist 模块：按职责组织，原业务行为保持不变。 @author yahyaoo */
+/** QQ 音乐接口适配：用户公开歌单查询。 @author yahyaoo */
 import { httpFetch } from '../../request.js'
 import { formatPlayCount } from '../../index.js'
 

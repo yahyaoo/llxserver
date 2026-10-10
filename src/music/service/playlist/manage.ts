@@ -1,38 +1,30 @@
-/** manage 模块：按职责组织，原业务行为保持不变。 @author yahyaoo */
+/** 歌单管理门面：协调当前数据、历史快照和设备同步游标。 @author yahyaoo */
 import { type UserDataManage } from '../../../user'
 import { SnapshotDataManage } from './snapshotDataManage'
 import { ListDataManage } from './listDataManage'
 import { toMD5 } from '../../../utils'
 
-/**
- * ListManage 契约，按当前模块职责组织，保留原字段和扩展能力。
- * @author yahyaoo
- */
+/** 协调用户歌单数据、快照生成和设备同步游标。 @author yahyaoo */
 export class ListManage {
-  /**
-   * snapshotDataManage 字段，沿用原业务结构与空值约定。
-   */
+  /** 当前用户快照管理器。 */
   snapshotDataManage: SnapshotDataManage
-  /**
-   * listDataManage 字段，沿用原业务结构与空值约定。
-   */
+  /** 当前用户歌单数据管理器。 */
   listDataManage: ListDataManage
 
   /**
-   * 构造实例 constructor 对应的业务能力，参数和执行顺序保持原实现。
-   * @param userDataManage userDataManage 原业务参数。
-   * @author yahyaoo
-   */
+ * 装配当前用户的数据管理器、快照管理器和变更事件。
+ * @param userDataManage 当前用户空间的数据与快照管理器。
+ * @author yahyaoo
+ */
   constructor(userDataManage: UserDataManage) {
     this.snapshotDataManage = new SnapshotDataManage(userDataManage)
     this.listDataManage = new ListDataManage(this.snapshotDataManage)
   }
 
   /**
-   * 创建 createSnapshot 对应的业务能力，参数和执行顺序保持原实现。
-   * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-   * @author yahyaoo
-   */
+ * 将当前用户数据保存为新快照，并记录最新快照标识。
+ * @author yahyaoo
+ */
   createSnapshot = async () => {
     const listData = JSON.stringify(await this.getListData())
     const md5 = toMD5(listData)
@@ -50,10 +42,9 @@ export class ListManage {
   }
 
   /**
-   * 获取 getCurrentListInfoKey 对应的业务能力，参数和执行顺序保持原实现。
-   * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-   * @author yahyaoo
-   */
+ * 返回当前用户数据对应的最新快照标识。
+ * @author yahyaoo
+ */
   getCurrentListInfoKey = async () => {
     const snapshotInfo = await this.snapshotDataManage.getSnapshotInfo()
     if (snapshotInfo.latest) return snapshotInfo.latest
@@ -63,70 +54,63 @@ export class ListManage {
   }
 
   /**
-   * 获取 getDeviceCurrentSnapshotKey 对应的业务能力，参数和执行顺序保持原实现。
-   * @param clientId 配对客户端标识。
-   * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-   * @author yahyaoo
-   */
+ * 读取设备已确认同步到的快照标识。
+ * @param clientId 配对客户端标识。
+ * @author yahyaoo
+ */
   getDeviceCurrentSnapshotKey = async (clientId: string) => {
     return this.snapshotDataManage.getDeviceCurrentSnapshotKey(clientId)
   }
 
   /**
-   * 更新 updateDeviceSnapshotKey 对应的业务能力，参数和执行顺序保持原实现。
-   * @param clientId 配对客户端标识。
-   * @param key 业务作用域或缓存键。
-   * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-   * @author yahyaoo
-   */
+ * 更新设备同步游标，并保存设备到快照的对应关系。
+ * @param clientId 配对客户端标识。
+ * @param key 业务作用域或缓存键。
+ * @author yahyaoo
+ */
   updateDeviceSnapshotKey = async (clientId: string, key: string) => {
     await this.snapshotDataManage.updateDeviceSnapshotKey(clientId, key)
   }
 
   /**
-   * 移除 removeDevice 对应的业务能力，参数和执行顺序保持原实现。
-   * @param clientId 配对客户端标识。
-   * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-   * @author yahyaoo
-   */
+ * 关闭指定设备的在线连接，并删除用户空间中的设备记录。
+ * @param clientId 配对客户端标识。
+ * @author yahyaoo
+ */
   removeDevice = async (clientId: string) => {
     this.snapshotDataManage.removeSnapshotInfo(clientId)
   }
 
   /**
-   * 获取 getListData 对应的业务能力，参数和执行顺序保持原实现。
-   * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-   * @author yahyaoo
-   */
+ * 读取当前用户的默认列表、收藏列表和自定义歌单数据。
+ * @author yahyaoo
+ */
   getListData = async () => {
     return await this.listDataManage.getListData()
   }
 
   /**
-   * 获取 getSnapshotList 对应的业务能力，参数和执行顺序保持原实现。
-   * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-   * @author yahyaoo
-   */
+ * 列出用户可用于恢复的数据快照。
+ * @author yahyaoo
+ */
   getSnapshotList = async () => {
     return this.snapshotDataManage.getSnapshotListWithMeta()
   }
 
   /**
-   * 获取 getSnapshot 对应的业务能力，参数和执行顺序保持原实现。
-   * @param name 原名称或查询词。
-   * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-   * @author yahyaoo
-   */
+ * 读取指定快照中的完整用户数据。
+ * @param name 对象名称或归档内相对名称。
+ * @author yahyaoo
+ */
   getSnapshot = async (name: string) => {
     return this.snapshotDataManage.getSnapshot(name)
   }
 
   /**
-   * 恢复 restoreSnapshot 对应的业务能力，参数和执行顺序保持原实现。
-   * @param name 原名称或查询词。
-   * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-   * @author yahyaoo
-   */
+ * 载入选定快照作为当前数据，并发出同步通知。
+ * @param name 对象名称或归档内相对名称。
+ * @author yahyaoo
+ */
   restoreSnapshot = async (name: string) => {
     const listData = await this.snapshotDataManage.getSnapshot(name)
     if (!listData) throw new Error('Snapshot not found')
@@ -137,23 +121,21 @@ export class ListManage {
   }
 
   /**
-   * 移除 removeSnapshot 对应的业务能力，参数和执行顺序保持原实现。
-   * @param name 原名称或查询词。
-   * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-   * @author yahyaoo
-   */
+ * 删除选定快照数据并维护快照元数据。
+ * @param name 对象名称或归档内相对名称。
+ * @author yahyaoo
+ */
   removeSnapshot = async (name: string) => {
     await this.snapshotDataManage.removeSnapshot(name)
   }
 
   /**
-   * 保存 saveSnapshotWithTime 对应的业务能力，参数和执行顺序保持原实现。
-   * @param name 原名称或查询词。
-   * @param data 原业务数据，保留扩展字段。
-   * @param time time 原业务参数。
-   * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-   * @author yahyaoo
-   */
+ * 按指定历史时间保存快照，用于导入和恢复历史版本。
+ * @param name 对象名称或归档内相对名称。
+ * @param data 需要保存或转换的数据。
+ * @param time 快照或记录时间，单位毫秒。
+ * @author yahyaoo
+ */
   saveSnapshotWithTime = async (name: string, data: string, time: number) => {
     await this.snapshotDataManage.saveSnapshotWithTime(name, data, time)
   }

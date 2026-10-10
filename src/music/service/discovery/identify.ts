@@ -1,4 +1,4 @@
-/** identify 模块：按职责组织，原业务行为保持不变。 @author yahyaoo */
+/** 歌曲指纹识别：调用本地 fpcalc 生成指纹，再向 AcoustID 查询匹配录音。 @author yahyaoo */
 import { spawnSync } from 'child_process'
 import path from 'path'
 import os from 'os'
@@ -60,12 +60,8 @@ function getFpcalcPath(): string | null {
 /**
  * 提取音频指纹
  */
-export function getFingerprint(filePath: string): { /**
- * fingerprint 字段，沿用原业务结构与空值约定。
- */
-fingerprint: string; /**
- * duration 字段，沿用原业务结构与空值约定。
- */
+export function getFingerprint(filePath: string): { /** 音频指纹内容。 */
+fingerprint: string; /** 歌曲时长。 */
 duration: number } {
     const fpcalcPath = getFpcalcPath()
     if (!fpcalcPath) {

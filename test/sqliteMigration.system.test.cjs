@@ -24,6 +24,12 @@ test('真实系统：迁移旧 JSON、事务覆盖、库隔离、浏览器存储
   const config = path.join(root, 'config.js')
   fs.writeFileSync(config, 'module.exports = ' + JSON.stringify({ disableTelemetry: true, 'frontend.password': 'system-test', 'player.enableAuth': false,
     'user.enablePublicRestriction': true, 'configBackup.enable': false, users: [{ name: 'alice', password: 'alice-test' }, { name: 'bob', password: 'bob-test' }] }))
+  // 业务配置仅保存在 SQLite，旧 JS 文件不会在启动时自动导入。
+  const { createAdminRepository } = require('../server/admin/repository/AdminRepository')
+  const { GlobalConfigurationService } = require('../server/admin/service/GlobalConfigurationService')
+  const repository = createAdminRepository(data)
+  new GlobalConfigurationService(repository).save(config, require(config))
+  repository.close()
   const probe = http.createServer((_req, res) => res.end('ready'))
   let port
   // Windows 临时端口可能命中 Fetch 禁用端口；实际探测可请求后再启动应用。

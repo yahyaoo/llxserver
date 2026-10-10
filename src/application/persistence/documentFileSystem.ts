@@ -1,7 +1,8 @@
 import nativeFs from 'node:fs'
 import path from 'node:path'
 import { Readable, Writable } from 'node:stream'
-import { migrateLegacy, resolveStorage, storedDocuments, storageEvents } from './storage'
+import { migrateLegacy, resolveStorage, storedDocuments, storageEvents, repositories, dataRoot } from './storage'
+import { bootstrapFilename } from './BootstrapConfiguration'
 
 /** @param filename 请求路径。 @returns 与原文件系统一致的不存在错误。 */
 function missing(filename: unknown): NodeJS.ErrnoException {
@@ -28,8 +29,19 @@ function virtualDirectory(directory: unknown): boolean {
  * 原业务路径是文档作用域；所有事务与 SQL 都由仓储负责。
  * @author yahyaoo
  */
-const documentFileSystem: typeof nativeFs = Object.assign({}, nativeFs)
+const documentFileSystem = Object.assign({}, nativeFs) as typeof nativeFs & {
+  /** 判断备份路径是否指向引导文件、旧配置副本或当前数据库及其 WAL/SHM。 */
+  isBootstrapOrDatabaseFile(filename: string): boolean
+}
 const adapter: Record<string, any> = documentFileSystem
+
+/** @param filename 文件路径。备份不能覆盖当前引导和实际数据库文件。 @author yahyaoo */
+adapter.isBootstrapOrDatabaseFile = (filename: string) => {
+  const normalize = (value: string) => process.platform === 'win32' ? path.resolve(value).toLowerCase() : path.resolve(value)
+  const resolved = normalize(filename)
+  if ([bootstrapFilename(dataRoot()), path.join(dataRoot(), 'config.js'), bootstrapFilename(dataRoot()) + '.legacy.js'].some(value => resolved === normalize(value))) return true
+  return Object.values(repositories()).some(repository => ['', '-wal', '-shm'].some(suffix => resolved === normalize(repository.filename + suffix)))
+}
 
 /** @param filename 原路径。 @param options 原编码参数。 @returns 原格式文本或缓冲区。 */
 adapter.readFileSync = (filename: any, options?: any) => {
@@ -175,20 +187,18 @@ adapter.createWriteStream = (filename: any, options?: any) => {
   const chunks: Buffer[] = []
   return new Writable({
     /**
-     * 写入 write 对应的业务能力，参数和执行顺序保持原实现。
-     * @param chunk chunk 原业务参数。
-     * @param encoding encoding 原业务参数。
-     * @param callback 原完成回调。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 暂存流式写入的数据块，等待结束后统一写入 SQLite 文档。
+ * @param chunk 当前流式写入数据块。
+ * @param encoding 写入数据块的字符编码。
+ * @param callback 原完成回调。
+ * @author yahyaoo
+ */
     write(chunk, encoding, callback) { chunks.push(Buffer.from(chunk)); callback() },
     /**
-     * 处理 final 对应的业务能力，参数和执行顺序保持原实现。
-     * @param callback 原完成回调。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 合并暂存数据并提交完整文档，写入失败通过流回调返回。
+ * @param callback 原完成回调。
+ * @author yahyaoo
+ */
     final(callback) {
       try { adapter.writeFileSync(filename, Buffer.concat(chunks), options); callback() } catch (error) { callback(error as Error) }
     },

@@ -1,4 +1,4 @@
-/** leaderboard 模块：按职责组织，原业务行为保持不变。 @author yahyaoo */
+/** 咪咕音乐接口适配：排行榜分类与榜单歌曲查询。 @author yahyaoo */
 import { httpFetch } from '../../request.js'
 import { filterMusicInfoList } from './musicInfo.js'
 

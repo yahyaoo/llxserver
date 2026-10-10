@@ -8,6 +8,26 @@ const { Open } = require('unzipper')
 const { readDocument, writeDocument, closeStorage } = require('../server/application/persistence/storage')
 const storageFs = require('../server/application/persistence/documentFileSystem').default
 const WebDAV = require('../server/integrations/webdav/WebDavClient').default
+const { DatabaseLocationService } = require('../server/application/persistence/DatabaseLocationService')
+
+test('WebDAV 不上传或覆盖引导文件、旧配置副本与迁移后的数据库，但可同步 SQL 配置文档', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'lx-backup-boundary-'))
+  global.lx = { dataPath: root }
+  try {
+    fs.writeFileSync(path.join(root, 'config.js'), 'module.exports={}')
+    const migrated = new DatabaseLocationService(root).move({ 'database.adminPath': 'relocated/admin.db', 'database.musicPath': 'relocated/music.db' })
+    const client = new WebDAV({ url: '' }, root)
+    client.initClient = async () => assert.fail('保护路径不应发起远端请求')
+    for (const filename of ['config.js', 'config.js.legacy.js', 'relocated/admin.db', 'relocated/admin.db-wal', 'relocated/music.db']) {
+      assert.equal(await client.downloadFile(filename), false)
+      assert.equal(await client.uploadFile(filename), false)
+    }
+    if (process.platform === 'win32') assert.equal(await client.downloadFile('CONFIG.JS'), false)
+    assert.ok(fs.existsSync(migrated.paths['database.adminPath']))
+    assert.equal(client.shouldIgnore('system-configuration.json'), false)
+    assert.ok(fs.readFileSync(path.join(root, 'config.js'), 'utf8').includes('relocated'))
+  } finally { closeStorage(); fs.rmSync(root, { recursive: true, force: true }) }
+})
 
 test('备份导出 SQL 当前值、过滤墓碑和 WAL；恢复到新根目录仍能查询', async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'lx-backup-unit-'))

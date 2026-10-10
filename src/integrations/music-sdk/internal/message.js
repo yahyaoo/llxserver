@@ -1,4 +1,4 @@
-/** message 模块：按职责组织，原业务行为保持不变。 @author yahyaoo */
+/** 音乐 SDK 请求状态和错误消息定义。 @author yahyaoo */
 export const requestMsg = {
     cancelRequest: 'Cancel Request',
     unachievable: 'Socket Hang Up',

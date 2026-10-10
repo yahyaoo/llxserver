@@ -1,13 +1,13 @@
 import type { RequestContext, ServerRuntime } from '../../common/http/RequestContext'
-/** Discovery 服务所需能力，仅允许访问本模块使用的依赖。 @author yahyaoo */
+/** 音乐搜索、歌手专辑查询、自定义歌曲维护和不喜欢规则所需的应用依赖契约。 @author yahyaoo */
 export type DiscoveryServiceRuntime = Pick<ServerRuntime, 'verifyUserAuth' | 'customMusicManager' | 'getUserConfig' | 'readBody' | 'path' | 'storageFs' | 'fileCache' | 'serverDownloads' | 'musicSdk' | 'musicProgressClients' | 'normalizeSongInfo' | 'isSourceSupported' | 'callUserApiGetMusicUrl' | 'needle' | 'getProxyAgent' | 'resolveServerSong' | 'getAudioRemoteSize' | 'formatBytes' | 'getUserSpace' | 'serializeDislikeRules' | 'dislikeMatchOptions' | 'splitSingers' | 'encodeAlbumRule' | 'normalizeText' | 'invalidateDislikeCache'>
-/** Discovery 业务服务，原路由处理顺序与错误响应保持不变。 @author yahyaoo */
+/** 音乐搜索、歌手专辑查询、自定义歌曲维护和不喜欢规则服务。 @author yahyaoo */
 
 /**
- * 处理 /api/music/custom/sync 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 扫描用户自定义歌曲目录并刷新索引。
+ * @param context /api/music/custom/sync 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 音乐搜索、歌手专辑查询、自定义歌曲维护和不喜欢规则的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postMusicCustomSync(context: RequestContext, runtime: DiscoveryServiceRuntime) {
@@ -32,10 +32,10 @@ export async function postMusicCustomSync(context: RequestContext, runtime: Disc
 }
 
 /**
- * 处理 /api/music/custom/file 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 校验用户与文件路径后返回自定义音频，支持范围请求。
+ * @param context /api/music/custom/file 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 音乐搜索、歌手专辑查询、自定义歌曲维护和不喜欢规则的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function handleMusicCustomFile(context: RequestContext, runtime: DiscoveryServiceRuntime) {
@@ -75,10 +75,10 @@ export async function handleMusicCustomFile(context: RequestContext, runtime: Di
 }
 
 /**
- * 处理 /api/music/custom/cover 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 返回自定义歌曲的封面图片。
+ * @param context /api/music/custom/cover 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 音乐搜索、歌手专辑查询、自定义歌曲维护和不喜欢规则的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function getMusicCustomCover(context: RequestContext, runtime: DiscoveryServiceRuntime) {
@@ -121,10 +121,10 @@ export async function getMusicCustomCover(context: RequestContext, runtime: Disc
 }
 
 /**
- * 处理 /api/music/custom/remove 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 删除用户授权范围内的自定义歌曲文件。
+ * @param context /api/music/custom/remove 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 音乐搜索、歌手专辑查询、自定义歌曲维护和不喜欢规则的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postMusicCustomRemove(context: RequestContext, runtime: DiscoveryServiceRuntime) {
@@ -170,10 +170,10 @@ export async function postMusicCustomRemove(context: RequestContext, runtime: Di
 }
 
 /**
- * 处理 /api/music/custom/link 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 为自定义歌曲关联音乐平台歌曲信息。
+ * @param context /api/music/custom/link 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 音乐搜索、歌手专辑查询、自定义歌曲维护和不喜欢规则的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postMusicCustomLink(context: RequestContext, runtime: DiscoveryServiceRuntime) {
@@ -215,10 +215,10 @@ export async function postMusicCustomLink(context: RequestContext, runtime: Disc
 }
 
 /**
- * 处理 /api/music/custom/updateMetadata 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 更新自定义歌曲文件的元信息标签。
+ * @param context /api/music/custom/updateMetadata 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 音乐搜索、歌手专辑查询、自定义歌曲维护和不喜欢规则的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postMusicCustomUpdateMetadata(context: RequestContext, runtime: DiscoveryServiceRuntime) {
@@ -257,10 +257,10 @@ export async function postMusicCustomUpdateMetadata(context: RequestContext, run
 }
 
 /**
- * 处理 /api/music/custom/embedLyric 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 读取自定义歌曲内嵌歌词。
+ * @param context /api/music/custom/embedLyric 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 音乐搜索、歌手专辑查询、自定义歌曲维护和不喜欢规则的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function getMusicCustomEmbedLyric(context: RequestContext, runtime: DiscoveryServiceRuntime) {
@@ -306,10 +306,10 @@ export async function getMusicCustomEmbedLyric(context: RequestContext, runtime:
 }
 
 /**
- * 处理 /api/music/custom/embedLyric 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 将歌词写入自定义歌曲文件。
+ * @param context /api/music/custom/embedLyric 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 音乐搜索、歌手专辑查询、自定义歌曲维护和不喜欢规则的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postMusicCustomEmbedLyric(context: RequestContext, runtime: DiscoveryServiceRuntime) {
@@ -347,10 +347,10 @@ export async function postMusicCustomEmbedLyric(context: RequestContext, runtime
 }
 
 /**
- * 处理 /api/music/identify 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 提取音频指纹并查询匹配的歌曲录音。
+ * @param context /api/music/identify 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 音乐搜索、歌手专辑查询、自定义歌曲维护和不喜欢规则的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postMusicIdentify(context: RequestContext, runtime: DiscoveryServiceRuntime) {
@@ -405,10 +405,10 @@ export async function postMusicIdentify(context: RequestContext, runtime: Discov
 }
 
 /**
- * 处理 /api/music/lyric 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 查询歌曲歌词。
+ * @param context /api/music/lyric 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 音乐搜索、歌手专辑查询、自定义歌曲维护和不喜欢规则的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function getMusicLyric(context: RequestContext, runtime: DiscoveryServiceRuntime) {
@@ -518,10 +518,10 @@ export async function getMusicLyric(context: RequestContext, runtime: DiscoveryS
 }
 
 /**
- * 处理 /api/music/search 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 按关键词、平台和分页参数搜索歌曲。
+ * @param context /api/music/search 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 音乐搜索、歌手专辑查询、自定义歌曲维护和不喜欢规则的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function getMusicSearch(context: RequestContext, runtime: DiscoveryServiceRuntime) {
@@ -597,10 +597,10 @@ export async function getMusicSearch(context: RequestContext, runtime: Discovery
 }
 
 /**
- * 处理 /api/music/tipSearch 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 查询音乐平台的搜索建议。
+ * @param context /api/music/tipSearch 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 音乐搜索、歌手专辑查询、自定义歌曲维护和不喜欢规则的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function getMusicTipSearch(context: RequestContext, runtime: DiscoveryServiceRuntime) {
@@ -628,10 +628,10 @@ export async function getMusicTipSearch(context: RequestContext, runtime: Discov
 }
 
 /**
- * 处理 /api/music/artistDetail 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 聚合歌手简介、头像及详情。
+ * @param context /api/music/artistDetail 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 音乐搜索、歌手专辑查询、自定义歌曲维护和不喜欢规则的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function getMusicArtistDetail(context: RequestContext, runtime: DiscoveryServiceRuntime) {
@@ -655,10 +655,10 @@ export async function getMusicArtistDetail(context: RequestContext, runtime: Dis
 }
 
 /**
- * 处理 /api/music/artistAlbums 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 分页查询歌手专辑。
+ * @param context /api/music/artistAlbums 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 音乐搜索、歌手专辑查询、自定义歌曲维护和不喜欢规则的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function getMusicArtistAlbums(context: RequestContext, runtime: DiscoveryServiceRuntime) {
@@ -683,10 +683,10 @@ export async function getMusicArtistAlbums(context: RequestContext, runtime: Dis
 }
 
 /**
- * 处理 /api/music/artistSongs 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 分页查询歌手歌曲。
+ * @param context /api/music/artistSongs 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 音乐搜索、歌手专辑查询、自定义歌曲维护和不喜欢规则的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function getMusicArtistSongs(context: RequestContext, runtime: DiscoveryServiceRuntime) {
@@ -723,10 +723,10 @@ export async function getMusicArtistSongs(context: RequestContext, runtime: Disc
 }
 
 /**
- * 处理 /api/music/albumSongs 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 查询专辑歌曲。
+ * @param context /api/music/albumSongs 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 音乐搜索、歌手专辑查询、自定义歌曲维护和不喜欢规则的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function getMusicAlbumSongs(context: RequestContext, runtime: DiscoveryServiceRuntime) {
@@ -750,10 +750,10 @@ export async function getMusicAlbumSongs(context: RequestContext, runtime: Disco
 }
 
 /**
- * 处理 /api/music/progress 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 查询歌曲处理任务进度。
+ * @param context /api/music/progress 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 音乐搜索、歌手专辑查询、自定义歌曲维护和不喜欢规则的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function getMusicProgress(context: RequestContext, runtime: DiscoveryServiceRuntime) {
@@ -783,10 +783,10 @@ export async function getMusicProgress(context: RequestContext, runtime: Discove
 }
 
 /**
- * 处理 /api/music/url 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 按歌曲及音质解析可播放音频地址。
+ * @param context /api/music/url 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 音乐搜索、歌手专辑查询、自定义歌曲维护和不喜欢规则的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postMusicUrl(context: RequestContext, runtime: DiscoveryServiceRuntime) {
@@ -950,10 +950,10 @@ export async function postMusicUrl(context: RequestContext, runtime: DiscoverySe
 }
 
 /**
- * 处理 /api/music/quality/size 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 查询歌曲各音质的文件大小。
+ * @param context /api/music/quality/size 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 音乐搜索、歌手专辑查询、自定义歌曲维护和不喜欢规则的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postMusicQualitySize(context: RequestContext, runtime: DiscoveryServiceRuntime) {
@@ -1006,10 +1006,10 @@ export async function postMusicQualitySize(context: RequestContext, runtime: Dis
 }
 
 /**
- * 处理 /api/music/lyric 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 按提交的歌曲信息解析歌词。
+ * @param context /api/music/lyric 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 音乐搜索、歌手专辑查询、自定义歌曲维护和不喜欢规则的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postMusicLyric(context: RequestContext, runtime: DiscoveryServiceRuntime) {
@@ -1041,10 +1041,10 @@ export async function postMusicLyric(context: RequestContext, runtime: Discovery
 }
 
 /**
- * 处理 /api/music/hotSearch 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 查询音乐平台热门搜索关键词。
+ * @param context /api/music/hotSearch 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 音乐搜索、歌手专辑查询、自定义歌曲维护和不喜欢规则的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function getMusicHotSearch(context: RequestContext, runtime: DiscoveryServiceRuntime) {
@@ -1080,10 +1080,10 @@ export async function getMusicHotSearch(context: RequestContext, runtime: Discov
 }
 
 /**
- * 处理 /api/music/songList/tags 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 查询平台歌单标签分类。
+ * @param context /api/music/songList/tags 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 音乐搜索、歌手专辑查询、自定义歌曲维护和不喜欢规则的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function getMusicSongListTags(context: RequestContext, runtime: DiscoveryServiceRuntime) {
@@ -1109,10 +1109,10 @@ export async function getMusicSongListTags(context: RequestContext, runtime: Dis
 }
 
 /**
- * 处理 /api/music/songList/detail 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 查询平台歌单详情与歌曲。
+ * @param context /api/music/songList/detail 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 音乐搜索、歌手专辑查询、自定义歌曲维护和不喜欢规则的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function getMusicSongListDetail(context: RequestContext, runtime: DiscoveryServiceRuntime) {
@@ -1147,10 +1147,10 @@ export async function getMusicSongListDetail(context: RequestContext, runtime: D
 }
 
 /**
- * 处理 /api/music/songList/search 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 按关键词搜索平台歌单。
+ * @param context /api/music/songList/search 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 音乐搜索、歌手专辑查询、自定义歌曲维护和不喜欢规则的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function getMusicSongListSearch(context: RequestContext, runtime: DiscoveryServiceRuntime) {
@@ -1182,10 +1182,10 @@ export async function getMusicSongListSearch(context: RequestContext, runtime: D
 }
 
 /**
- * 处理 /api/music/songList/userPlaylist 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 查询平台用户公开歌单。
+ * @param context /api/music/songList/userPlaylist 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 音乐搜索、歌手专辑查询、自定义歌曲维护和不喜欢规则的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function getMusicSongListUserPlaylist(context: RequestContext, runtime: DiscoveryServiceRuntime) {
@@ -1217,10 +1217,10 @@ export async function getMusicSongListUserPlaylist(context: RequestContext, runt
 }
 
 /**
- * 处理 /api/music/leaderboard/boards 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 查询平台排行榜分类。
+ * @param context /api/music/leaderboard/boards 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 音乐搜索、歌手专辑查询、自定义歌曲维护和不喜欢规则的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function getMusicLeaderboardBoards(context: RequestContext, runtime: DiscoveryServiceRuntime) {
@@ -1248,10 +1248,10 @@ export async function getMusicLeaderboardBoards(context: RequestContext, runtime
 }
 
 /**
- * 处理 /api/music/comment 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 查询歌曲评论及分页结果。
+ * @param context /api/music/comment 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 音乐搜索、歌手专辑查询、自定义歌曲维护和不喜欢规则的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postMusicComment(context: RequestContext, runtime: DiscoveryServiceRuntime) {
@@ -1297,10 +1297,10 @@ export async function postMusicComment(context: RequestContext, runtime: Discove
 }
 
 /**
- * 处理 /api/music/dislike 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 查询用户不喜欢规则。
+ * @param context /api/music/dislike 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 音乐搜索、歌手专辑查询、自定义歌曲维护和不喜欢规则的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function getMusicDislike(context: RequestContext, runtime: DiscoveryServiceRuntime) {
@@ -1329,10 +1329,10 @@ export async function getMusicDislike(context: RequestContext, runtime: Discover
 }
 
 /**
- * 处理 /api/music/dislike/add 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 向用户不喜欢规则中添加歌曲或匹配条目。
+ * @param context /api/music/dislike/add 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 音乐搜索、歌手专辑查询、自定义歌曲维护和不喜欢规则的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postMusicDislikeAdd(context: RequestContext, runtime: DiscoveryServiceRuntime) {

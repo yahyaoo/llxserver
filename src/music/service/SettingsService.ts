@@ -1,13 +1,13 @@
 import type { RequestContext, ServerRuntime } from '../../common/http/RequestContext'
-/** Settings 服务所需能力，仅允许访问本模块使用的依赖。 @author yahyaoo */
+/** 用户播放器、音效和歌单自动下载设置所需的应用依赖契约。 @author yahyaoo */
 export type SettingsServiceRuntime = Pick<ServerRuntime, 'verifyUserAuth' | 'readBody' | 'getSyncDownloadData' | 'saveSyncDownloadData' | 'getUserSpace' | 'path' | 'File' | 'storageFs' | 'scheduler'>
-/** Settings 业务服务，原路由处理顺序与错误响应保持不变。 @author yahyaoo */
+/** 用户播放器、音效和歌单自动下载设置服务。 @author yahyaoo */
 
 /**
- * 处理 /api/user/sync-download/settings 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 保存用户歌单自动下载设置。
+ * @param context /api/user/sync-download/settings 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 用户播放器、音效和歌单自动下载设置的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function putUserSyncDownloadSettings(context: RequestContext, runtime: SettingsServiceRuntime) {
@@ -63,10 +63,10 @@ export async function putUserSyncDownloadSettings(context: RequestContext, runti
 }
 
 /**
- * 处理 /api/user/settings 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 读取用户播放器设置。
+ * @param context /api/user/settings 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 用户播放器、音效和歌单自动下载设置的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function getUserSettings(context: RequestContext, runtime: SettingsServiceRuntime) {
@@ -105,10 +105,10 @@ export async function getUserSettings(context: RequestContext, runtime: Settings
 }
 
 /**
- * 处理 /api/user/settings 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 保存用户播放器设置。
+ * @param context /api/user/settings 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 用户播放器、音效和歌单自动下载设置的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postUserSettings(context: RequestContext, runtime: SettingsServiceRuntime) {
@@ -160,12 +160,8 @@ export async function postUserSettings(context: RequestContext, runtime: Setting
 
             // 如果更新了网络歌单自动检测设置，同步更新后台任务调度器
             if (settings.networkListAutoCheckInterval !== undefined || settings.autoUpdateNetworkList !== undefined) {
-              const taskConfig: { /**
- * intervalMs 字段，沿用原业务结构与空值约定。
- */
-intervalMs?: number; /**
- * enabled 字段，沿用原业务结构与空值约定。
- */
+              const taskConfig: { /** 执行间隔，单位毫秒。 */
+intervalMs?: number; /** 功能是否启用。 */
 enabled?: boolean } = {}
               if (settings.networkListAutoCheckInterval !== undefined) {
                 const ms = scheduler.parseIntervalMs(settings.networkListAutoCheckInterval)
@@ -189,10 +185,10 @@ enabled?: boolean } = {}
 }
 
 /**
- * 处理 /api/user/sound-effects 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 读取用户音效设置。
+ * @param context /api/user/sound-effects 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 用户播放器、音效和歌单自动下载设置的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function getUserSoundEffects(context: RequestContext, runtime: SettingsServiceRuntime) {
@@ -223,10 +219,10 @@ export async function getUserSoundEffects(context: RequestContext, runtime: Sett
 }
 
 /**
- * 处理 /api/user/sound-effects 请求，保留原协议及权限判断。
- * @param context 原 HTTP 上下文。
- * @param runtime 应用装配的依赖能力。
- * @returns 原处理过程的完成结果。
+ * 保存用户音效设置。
+ * @param context /api/user/sound-effects 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
+ * @param runtime 用户播放器、音效和歌单自动下载设置的应用依赖。
+ * @returns 请求分派完成的 Promise；响应内容由服务写入 context.res。
  * @author yahyaoo
  */
 export async function postUserSoundEffects(context: RequestContext, runtime: SettingsServiceRuntime) {

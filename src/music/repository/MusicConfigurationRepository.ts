@@ -5,18 +5,10 @@ import type { LxConfigurationDto } from '../model/dto/LxConfigurationDto'
 /** 配置导入仓储契约，服务依赖接口而非数据库实现。 @author yahyaoo */
 export interface MusicConfigurationPort {
   /** 在单个事务中覆盖提供的配置与歌单快照。 */
-  replace(userDir: string, data: LxConfigurationDto, snapshot?: { /**
- * path 字段，沿用原业务结构与空值约定。
- */
-path: string, /**
- * key 字段，沿用原业务结构与空值约定。
- */
-key: string, /**
- * infoPath 字段，沿用原业务结构与空值约定。
- */
-infoPath: string, /**
- * info 字段，沿用原业务结构与空值约定。
- */
+  replace(userDir: string, data: LxConfigurationDto, snapshot?: { /** 本地文件或目录路径。 */
+path: string,
+key: string,
+infoPath: string,
 info: unknown }): void
 }
 
@@ -26,18 +18,10 @@ export class MusicConfigurationRepository implements MusicConfigurationPort {
   constructor(private readonly repository: SqliteDocumentRepository) {}
 
   /** @param userDir 已鉴权用户目录。 @param data 已校验配置。 @param snapshot 完整歌单快照元信息。 */
-  replace(userDir: string, data: LxConfigurationDto, snapshot?: { /**
- * path 字段，沿用原业务结构与空值约定。
- */
-path: string, /**
- * key 字段，沿用原业务结构与空值约定。
- */
-key: string, /**
- * infoPath 字段，沿用原业务结构与空值约定。
- */
-infoPath: string, /**
- * info 字段，沿用原业务结构与空值约定。
- */
+  replace(userDir: string, data: LxConfigurationDto, snapshot?: { /** 本地文件或目录路径。 */
+path: string,
+key: string,
+infoPath: string,
 info: unknown }): void {
     this.repository.transaction(() => {
       if (data.settings !== undefined) this.repository.write('music_settings', path.join(userDir, 'settings.json'), JSON.stringify(data.settings))

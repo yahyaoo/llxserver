@@ -10,7 +10,7 @@ export interface CustomSourceGateway {
   initUserApis: typeof client.initUserApis
   /** 当前装载状态。 */
   getApiStatus: typeof client.getApiStatus
-  /** 按原策略获取播放地址。 */
+  /** 按平台、歌曲和音质调用已加载音源，候选脚本失败时继续尝试。 */
   callUserApiGetMusicUrl: typeof client.callUserApiGetMusicUrl
   /** 平台支持判断。 */
   isSourceSupported: typeof client.isSourceSupported
@@ -19,7 +19,7 @@ export interface CustomSourceGateway {
   /** 已装载数量。 */
   getLoadedApisCount: typeof client.getLoadedApisCount
 }
-/** 默认脚本网关，原实现和异常策略保持一致。 @author yahyaoo */
+/** 将脚本客户端的装载、状态和解析能力公开给业务服务。 @author yahyaoo */
 export const customSourceGateway: CustomSourceGateway = client
 export const { extractMetadata, loadUserApi, initUserApis, getApiStatus, callUserApiGetMusicUrl, isSourceSupported, getLoadedApis, getLoadedApisCount } = customSourceGateway
 export type { ApiStatusInfo } from './CustomSourceClient'

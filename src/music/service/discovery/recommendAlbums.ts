@@ -1,4 +1,4 @@
-/** recommendAlbums 模块：按职责组织，原业务行为保持不变。 @author yahyaoo */
+/** 推荐专辑查询：调用音乐平台公开推荐接口并整理为统一专辑数据。 @author yahyaoo */
 import { httpFetch } from '../../../integrations/music-sdk/NetworkGateway'
 
 const MUSICU_URL = 'https://u.y.qq.com/cgi-bin/musicu.fcg'

@@ -1,4 +1,4 @@
-/** extendSearch 模块：按职责组织，原业务行为保持不变。 @author yahyaoo */
+/** QQ 音乐接口适配：歌手、专辑和歌单扩展搜索。 @author yahyaoo */
 import { httpFetch } from '../../request.js'
 
 const MUSICU_URL = 'https://u.y.qq.com/cgi-bin/musicu.fcg'

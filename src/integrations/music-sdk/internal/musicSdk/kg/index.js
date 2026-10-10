@@ -1,4 +1,4 @@
-/** index 模块：按职责组织，原业务行为保持不变。 @author yahyaoo */
+/** 酷狗音乐接口适配：汇总平台搜索、歌词、歌单和播放能力。 @author yahyaoo */
 import leaderboard from './leaderboard.js'
 import { apis } from '../api-source.js' // 现在已适配服务器端
 import songList from './songList.js'

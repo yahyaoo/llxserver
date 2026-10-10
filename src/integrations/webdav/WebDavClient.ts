@@ -1,4 +1,4 @@
-/** WebDavClient 模块：按职责组织，原业务行为保持不变。 @author yahyaoo */
+/** WebDAV 适配：比较文件摘要、增量同步、完整备份恢复和自动定时同步。 @author yahyaoo */
 import storageFs from '../../application/persistence/documentFileSystem'
 import fs from 'fs'
 import path from 'path'
@@ -10,77 +10,41 @@ import crypto from 'crypto'
 import { EventEmitter } from 'events'
 import { PassThrough } from 'stream'
 
-/**
- * WebDAVConfig 契约，按当前模块职责组织，保留原字段和扩展能力。
- * @author yahyaoo
- */
+/** WebDAV 认证、同步路径、备份间隔和目录排除选项。 @author yahyaoo */
 interface WebDAVConfig {
-    /**
-     * enable 字段，沿用原业务结构与空值约定。
-     */
+    /** 是否启用 WebDAV 同步。 */
     enable?: boolean
-    /**
-     * url 字段，沿用原业务结构与空值约定。
-     */
+    /** 请求或资源地址。 */
     url: string
-    /**
-     * username 字段，沿用原业务结构与空值约定。
-     */
+    /** 数据所属用户名。 */
     username: string
-    /**
-     * password 字段，沿用原业务结构与空值约定。
-     */
+    /** 连接或服务认证密码。 */
     password: string
-    /**
-     * syncPath 字段，沿用原业务结构与空值约定。
-     */
+    /** 远端增量同步目录。 */
     syncPath?: string
-    /**
-     * backupPath 字段，沿用原业务结构与空值约定。
-     */
+    /** 远端完整备份目录。 */
     backupPath?: string
-    /**
-     * interval 字段，沿用原业务结构与空值约定。
-     */
+    /** 增量同步间隔，单位分钟。 */
     interval?: number
-    /**
-     * backupInterval 字段，沿用原业务结构与空值约定。
-     */
+    /** 完整备份间隔，单位小时。 */
     backupInterval?: number
-    /**
-     * excludeCache 字段，沿用原业务结构与空值约定。
-     */
+    /** 是否排除用户缓存目录。 */
     excludeCache?: boolean  // 排除缓存目录 (data/cache)
-    /**
-     * excludeMusic 字段，沿用原业务结构与空值约定。
-     */
+    /** 是否排除用户下载音乐目录。 */
     excludeMusic?: boolean  // 排除下载目录 (data/music)
 }
 
-/**
- * SyncLog 契约，按当前模块职责组织，保留原字段和扩展能力。
- * @author yahyaoo
- */
+/** 单次 WebDAV 文件操作记录，保存时间、类型、路径和结果。 @author yahyaoo */
 interface SyncLog {
-    /**
-     * timestamp 字段，沿用原业务结构与空值约定。
-     */
+    /** 记录生成时间，单位毫秒。 */
     timestamp: number
-    /**
-     * type 字段，沿用原业务结构与空值约定。
-     */
+    /** 记录或操作类别。 */
     type: 'upload' | 'download' | 'backup' | 'restore'
-    /**
-     * file 字段，沿用原业务结构与空值约定。
-     */
+
     file: string
-    /**
-     * status 字段，沿用原业务结构与空值约定。
-     */
+    /** 当前处理或任务状态。 */
     status: 'success' | 'error'
-    /**
-     * message 字段，沿用原业务结构与空值约定。
-     */
+    /** 处理结果或错误说明。 */
     message?: string
 }
 
@@ -91,78 +55,45 @@ const normalizeRemotePath = (p?: string, defaultPath: string = ''): string => {
     return str.replace(/\/+$/, '')
 }
 
-/**
- * WebDAVSync 契约，按当前模块职责组织，保留原字段和扩展能力。
- * @author yahyaoo
- */
+/** 管理 WebDAV 客户端、文件摘要、恢复流程和自动同步定时器。 @author yahyaoo */
 class WebDAVSync extends EventEmitter {
-    /**
-     * config 字段，沿用原业务结构与空值约定。
-     */
+
     private config: WebDAVConfig
-    /**
-     * dataPath 字段，沿用原业务结构与空值约定。
-     */
+    /** 用户或服务的数据根目录。 */
     private dataPath: string
-    /**
-     * syncPath 字段，沿用原业务结构与空值约定。
-     */
+    /** 远端增量同步目录。 */
     private syncPath: string
-    /**
-     * backupPath 字段，沿用原业务结构与空值约定。
-     */
+    /** 远端完整备份目录。 */
     private backupPath: string
-    /**
-     * syncInterval 字段，沿用原业务结构与空值约定。
-     */
+    /** 自动增量同步定时器。 */
     private syncInterval: number // 文件增量变化检测与同步间隔（毫秒）
-    /**
-     * backupInterval 字段，沿用原业务结构与空值约定。
-     */
+    /** 完整备份间隔，单位小时。 */
     private backupInterval: number // 全量备份间隔（毫秒）
-    /**
-     * excludeCache 字段，沿用原业务结构与空值约定。
-     */
+    /** 是否排除用户缓存目录。 */
     private excludeCache: boolean  // 是否排除缓存目录 (data/cache)
-    /**
-     * excludeMusic 字段，沿用原业务结构与空值约定。
-     */
+    /** 是否排除用户下载音乐目录。 */
     private excludeMusic: boolean  // 是否排除下载目录 (data/music)
-    /**
-     * watchTimer 字段，沿用原业务结构与空值约定。
-     */
+
     private watchTimer: NodeJS.Timeout | null = null
-    /**
-     * backupTimer 字段，沿用原业务结构与空值约定。
-     */
+    /** 自动完整备份定时器。 */
     private backupTimer: NodeJS.Timeout | null = null
-    /**
-     * filesHash 字段，沿用原业务结构与空值约定。
-     */
+    /** 相对文件路径到上次内容摘要的映射。 */
     private filesHash: Map<string, string> = new Map()
-    /**
-     * syncLogs 字段，沿用原业务结构与空值约定。
-     */
+    /** 最近的 WebDAV 同步操作记录。 */
     private syncLogs: SyncLog[] = []
-    /**
-     * client 字段，沿用原业务结构与空值约定。
-     */
+    /** WebDAV 客户端实例。 */
     private client: any = null
-    /**
-     * initPromise 字段，沿用原业务结构与空值约定。
-     */
+
     private initPromise: Promise<boolean> | null = null
-    /**
-     * ensuredDirs 字段，沿用原业务结构与空值约定。
-     */
+
     private ensuredDirs: Set<string> = new Set()
 
     /**
-     * 构造实例 constructor 对应的业务能力，参数和执行顺序保持原实现。
-     * @param config 原配置对象。
-     * @param dataPath dataPath 原业务参数。
-     * @author yahyaoo
-     */
+ * 保存 WebDAV 配置和本地数据目录，初始化日志与同步状态。
+ * @param config 原配置对象。
+ * @param dataPath 业务数据根目录。
+ * @author yahyaoo
+ */
     constructor(config: WebDAVConfig, dataPath: string) {
         super()
         this.syncPath = normalizeRemotePath(config.syncPath, '/lx-sync')
@@ -183,11 +114,10 @@ class WebDAVSync extends EventEmitter {
     }
 
     /**
-     * 初始化 initClient 对应的业务能力，参数和执行顺序保持原实现。
-     * @param force 原强制操作标记。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 根据 WebDAV 地址和认证信息创建客户端，并准备同步及备份目录。
+ * @param force 原强制操作标记。
+ * @author yahyaoo
+ */
     async initClient(force = false): Promise<boolean> {
         if (!this.isConfigured()) return false
         if (this.client && !force) return true
@@ -224,20 +154,18 @@ class WebDAVSync extends EventEmitter {
     }
 
     /**
-     * 判断 isConfigured 对应的业务能力，参数和执行顺序保持原实现。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 检查 WebDAV 是否启用且连接地址与认证配置齐备。
+ * @author yahyaoo
+ */
     isConfigured(): boolean {
         return !!(this.config.enable && this.config.url && this.config.url.trim() !== '')
     }
 
     /**
-     * 添加 addLog 对应的业务能力，参数和执行顺序保持原实现。
-     * @param log log 原业务参数。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 将一条同步操作记录加入历史日志并限制日志长度。
+ * @param log 同步操作记录。
+ * @author yahyaoo
+ */
     private addLog(log: SyncLog) {
         this.syncLogs.unshift(log)
         if (this.syncLogs.length > 100) {
@@ -247,20 +175,18 @@ class WebDAVSync extends EventEmitter {
     }
 
     /**
-     * 获取 getSyncLogs 对应的业务能力，参数和执行顺序保持原实现。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 返回最近的 WebDAV 同步操作记录。
+ * @author yahyaoo
+ */
     getSyncLogs(): SyncLog[] {
         return this.syncLogs
     }
 
     /**
-     * 获取 getFileHash 对应的业务能力，参数和执行顺序保持原实现。
-     * @param filePath 文件或文档定位路径。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 计算本地文件或 SQL 文档导出内容的 MD5 摘要，用于判断变化。
+ * @param filePath 文件或文档定位路径。
+ * @author yahyaoo
+ */
     private getFileHash(filePath: string): string {
         try {
             const buffer = storageFs.readFileSync(filePath)
@@ -273,11 +199,10 @@ class WebDAVSync extends EventEmitter {
     }
 
     /**
-     * 判断 shouldIgnore 对应的业务能力，参数和执行顺序保持原实现。
-     * @param relativePath relativePath 原业务参数。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 根据临时文件、数据库、引导文件和缓存排除选项判断是否参与备份。
+ * @param relativePath 相对数据目录的文件路径。
+ * @author yahyaoo
+ */
     private shouldIgnore(relativePath: string): boolean {
         const norm = relativePath.replace(/\\/g, '/').toLowerCase()
         const basename = path.basename(norm)
@@ -296,6 +221,7 @@ class WebDAVSync extends EventEmitter {
         if (norm === 'runtime' || norm.startsWith('runtime/')) return true
         // 导出的是仓储文档，运行中的 SQLite/WAL 不进入旧格式备份。
         if (norm === 'database' || norm.startsWith('database/')) return true
+        if ((storageFs as any).isBootstrapOrDatabaseFile?.(path.join(this.dataPath, relativePath))) return true
 
         // 用户配置：排除缓存目录 (data/cache/ 下存放各用户缓存文件)
         if (this.excludeCache) {
@@ -311,10 +237,9 @@ class WebDAVSync extends EventEmitter {
     }
 
     /**
-     * 处理 scanFiles 对应的业务能力，参数和执行顺序保持原实现。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 递归扫描参与同步的本地文档与文件，建立相对路径到摘要的映射。
+ * @author yahyaoo
+ */
     private async scanFiles(): Promise<Map<string, string>> {
         const files = new Map<string, string>()
         const scanDir = (dir: string) => {
@@ -353,16 +278,11 @@ class WebDAVSync extends EventEmitter {
     }
 
     /**
-     * 获取 getChangedFiles 对应的业务能力，参数和执行顺序保持原实现。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
-    private async getChangedFiles(): Promise<{ /**
- * changed 字段，沿用原业务结构与空值约定。
+ * 比较当前摘要与上次记录，收集待上传、更新和删除的相对路径。
+ * @author yahyaoo
  */
-changed: string[], /**
- * deleted 字段，沿用原业务结构与空值约定。
- */
+    private async getChangedFiles(): Promise<{ /** 是否发生数据变化。 */
+changed: string[],
 deleted: string[] }> {
         const currentFiles = await this.scanFiles()
         const changed: string[] = []
@@ -387,11 +307,10 @@ deleted: string[] }> {
     }
 
     /**
-     * 获取 getRelativeRemotePath 对应的业务能力，参数和执行顺序保持原实现。
-     * @param remoteFilename remoteFilename 原业务参数。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 将 WebDAV 返回路径转换为相对同步根目录的业务路径。
+ * @param remoteFilename 远端备份文件名。
+ * @author yahyaoo
+ */
     private getRelativeRemotePath(remoteFilename: string): string {
         // 重要：不主动进行 decodeURIComponent！
         // 因为如果文件在磁盘上本身就是 URL 编码过的
@@ -410,13 +329,12 @@ deleted: string[] }> {
     }
 
     /**
-     * 执行 runConcurrent 对应的业务能力，参数和执行顺序保持原实现。
-     * @param items items 原业务参数。
-     * @param concurrency concurrency 原业务参数。
-     * @param fn fn 原业务参数。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 按并发上限消费异步操作队列，等待全部操作结束。
+ * @param items 批量处理的业务记录。
+ * @param concurrency 允许同时执行的下载任务数。
+ * @param fn 待执行的异步操作。
+ * @author yahyaoo
+ */
     private async runConcurrent<T, R>(
         items: T[],
         concurrency: number,
@@ -476,11 +394,10 @@ deleted: string[] }> {
     }
 
     /**
-     * 删除 deleteRemoteFile 对应的业务能力，参数和执行顺序保持原实现。
-     * @param relativePath relativePath 原业务参数。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 删除同步目录中对应的远端文件，并记录成功或失败日志。
+ * @param relativePath 相对数据目录的文件路径。
+ * @author yahyaoo
+ */
     async deleteRemoteFile(relativePath: string): Promise<boolean> {
         if (!this.client) await this.initClient()
         if (!this.client) return false
@@ -505,12 +422,12 @@ deleted: string[] }> {
     }
 
     /**
-     * 上传 uploadFile 对应的业务能力，参数和执行顺序保持原实现。
-     * @param relativePath relativePath 原业务参数。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 读取本地文件或 SQL 导出内容，上传至对应远端路径并记录结果。
+ * @param relativePath 相对数据目录的文件路径。
+ * @author yahyaoo
+ */
     async uploadFile(relativePath: string): Promise<boolean> {
+        if (storageFs.isBootstrapOrDatabaseFile(path.join(this.dataPath, relativePath))) return false
         if (!this.client) await this.initClient()
         if (!this.client) return false
 
@@ -611,13 +528,13 @@ deleted: string[] }> {
     }
 
     /**
-     * 下载 downloadFile 对应的业务能力，参数和执行顺序保持原实现。
-     * @param relativePath relativePath 原业务参数。
-     * @param rawRemotePath rawRemotePath 原业务参数。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 获取远端内容，比较摘要后写入本地业务文档或普通文件。
+ * @param relativePath 相对数据目录的文件路径。
+ * @param rawRemotePath WebDAV 返回的远端原始路径。
+ * @author yahyaoo
+ */
     async downloadFile(relativePath: string, rawRemotePath?: string): Promise<boolean> {
+        if (storageFs.isBootstrapOrDatabaseFile(path.join(this.dataPath, relativePath))) return false
         if (!this.client) await this.initClient()
         if (!this.client) return false
 
@@ -676,9 +593,6 @@ deleted: string[] }> {
 
                 storageFs.writeFileSync(localPath, content)
 
-                if (relativePath === 'config.js') {
-                    console.log('config.js restored from WebDAV, content updated in data directory.')
-                }
 
                 this.addLog({
                     timestamp: Date.now(),
@@ -707,10 +621,9 @@ deleted: string[] }> {
     }
 
     /**
-     * 创建 createBackup 对应的业务能力，参数和执行顺序保持原实现。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 将当前参与备份的数据打包为 ZIP，排除数据库实体、运行临时目录和备份 ZIP。
+ * @author yahyaoo
+ */
     async createBackup(): Promise<string | null> {
         try {
             const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
@@ -780,11 +693,10 @@ deleted: string[] }> {
     }
 
     /**
-     * 上传 uploadBackup 对应的业务能力，参数和执行顺序保持原实现。
-     * @param force 原强制操作标记。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 创建完整备份并上传到远端备份目录，然后按保留规则清理。
+ * @param force 原强制操作标记。
+ * @author yahyaoo
+ */
     async uploadBackup(force = false): Promise<boolean> {
         if (!this.client) await this.initClient()
         if (!this.client) return false
@@ -886,10 +798,9 @@ deleted: string[] }> {
     }
 
     /**
-     * 同步 syncAllFiles 对应的业务能力，参数和执行顺序保持原实现。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 扫描全部参与同步的文件并批量上传，报告当前同步进度。
+ * @author yahyaoo
+ */
     async syncAllFiles(): Promise<boolean> {
         if (!this.client) await this.initClient()
         if (!this.client) {
@@ -954,11 +865,10 @@ deleted: string[] }> {
     }
 
     /**
-     * 解析 parseBackupTime 对应的业务能力，参数和执行顺序保持原实现。
-     * @param item item 原业务参数。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 从备份文件名中解析生成时间，供备份排序和清理使用。
+ * @param item 待处理索引记录。
+ * @author yahyaoo
+ */
     private parseBackupTime(item: any): number {
         if (item.lastmod) {
             const parsed = Date.parse(item.lastmod)
@@ -977,10 +887,9 @@ deleted: string[] }> {
     }
 
     /**
-     * 处理 cleanOldBackups 对应的业务能力，参数和执行顺序保持原实现。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 读取远端备份列表，删除超出保留规则的旧备份。
+ * @author yahyaoo
+ */
     async cleanOldBackups() {
         if (!this.client) return
 
@@ -1000,25 +909,14 @@ deleted: string[] }> {
     }
 
     /**
-     * 获取 getBackupList 对应的业务能力，参数和执行顺序保持原实现。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
-    async getBackupList(): Promise<Array<{ /**
- * filename 字段，沿用原业务结构与空值约定。
+ * 查询远端备份目录，汇总文件大小、生成时间和下载定位信息。
+ * @author yahyaoo
  */
-filename: string; /**
- * basename 字段，沿用原业务结构与空值约定。
- */
-basename: string; /**
- * size 字段，沿用原业务结构与空值约定。
- */
-size?: number; /**
- * time 字段，沿用原业务结构与空值约定。
- */
-time: number; /**
- * timeStr 字段，沿用原业务结构与空值约定。
- */
+    async getBackupList(): Promise<Array<{ /** 文件名称或完整路径。 */
+filename: string;
+basename: string; /** 文件字节数或记录数量。 */
+size?: number;
+time: number;
 timeStr: string }>> {
         if (!this.client) await this.initClient()
         if (!this.client) return []
@@ -1053,11 +951,10 @@ timeStr: string }>> {
     }
 
     /**
-     * 删除 deleteBackupFile 对应的业务能力，参数和执行顺序保持原实现。
-     * @param targetFilename targetFilename 原业务参数。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 删除指定远端备份文件，返回操作是否成功。
+ * @param targetFilename 目标音频文件名。
+ * @author yahyaoo
+ */
     async deleteBackupFile(targetFilename: string): Promise<boolean> {
         if (!this.client) await this.initClient()
         if (!this.client) return false
@@ -1088,11 +985,10 @@ timeStr: string }>> {
     }
 
     /**
-     * 恢复 restoreBackupFile 对应的业务能力，参数和执行顺序保持原实现。
-     * @param targetFilename targetFilename 原业务参数。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 下载选定完整备份，解压到业务数据目录并发出恢复进度。
+ * @param targetFilename 目标音频文件名。
+ * @author yahyaoo
+ */
     async restoreBackupFile(targetFilename?: string): Promise<boolean> {
         if (!this.client) await this.initClient()
         if (!this.client) return false
@@ -1141,14 +1037,14 @@ timeStr: string }>> {
             await this.extractZip(zipPath, this.dataPath)
             storageFs.unlinkSync(zipPath)
 
-            // 检查解压后数据目录是否确实有了 config.js
-            const targetConfigPath = global.lx?.configPath || path.join(this.dataPath, 'config.js')
+            // 检查恢复后是否包含 SQL 系统配置文档，缺失时导出当前配置补传
+            const targetConfigPath = path.join(this.dataPath, 'system-configuration.json')
             if (!storageFs.existsSync(targetConfigPath)) {
-                console.log('Backup restored but config.js is missing in data dir, saving current config and uploading...')
+                console.log('Backup restored but system configuration is missing in SQL storage, saving current config and uploading...')
                 if (global.lx && global.lx.saveConfig) {
                     global.lx.saveConfig()
                 }
-                await this.uploadFile('config.js')
+                await this.uploadFile('system-configuration.json')
             }
 
             this.emit('progress', { type: 'restore', status: 'finish', message: '全量备份已成功恢复并还原！' })
@@ -1175,19 +1071,17 @@ timeStr: string }>> {
     }
 
     /**
-     * 下载 downloadLatestBackup 对应的业务能力，参数和执行顺序保持原实现。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 选择最新远端备份并恢复其业务数据。
+ * @author yahyaoo
+ */
     async downloadLatestBackup(): Promise<boolean> {
         return this.restoreBackupFile()
     }
 
     /**
-     * 恢复 restoreScatteredFiles 对应的业务能力，参数和执行顺序保持原实现。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 递归下载远端增量同步目录中的业务文件，并恢复本地文档。
+ * @author yahyaoo
+ */
     async restoreScatteredFiles(): Promise<boolean> {
         if (!this.client) await this.initClient()
         if (!this.client) return false
@@ -1209,12 +1103,8 @@ timeStr: string }>> {
 
             const remoteFileSet = new Set<string>()
             const localFiles = await this.scanFiles()
-            const filesToDownload: { /**
- * file 字段，沿用原业务结构与空值约定。
- */
-file: any; /**
- * relativePath 字段，沿用原业务结构与空值约定。
- */
+            const filesToDownload: { /** 待处理的文件条目。 */
+file: any; /** 相对业务目录的路径。 */
 relativePath: string }[] = []
 
             for (const file of files) {
@@ -1223,7 +1113,7 @@ relativePath: string }[] = []
                     continue
                 }
 
-                if (relativePath === 'config.js') hasConfig = true
+                if (relativePath === 'system-configuration.json') hasConfig = true
                 remoteFileSet.add(relativePath)
 
                 // 如果本地存在该文件，且大小一致，跳过不必要下载
@@ -1257,13 +1147,13 @@ relativePath: string }[] = []
                 }
             }
 
-            // 如果恢复的文件中没有 config.js，说明云端配置缺失，将当前内存配置（含环境变量）同步上去
+            // 云端缺少系统配置文档时，将当前生效配置写入管理库并补传
             if (!hasConfig) {
-                console.log('Cloud config.js not found, saving current memory config and uploading...')
+                console.log('Cloud system configuration not found, saving current memory config and uploading...')
                 if (global.lx && global.lx.saveConfig) {
                     global.lx.saveConfig()
                 }
-                await this.uploadFile('config.js')
+                await this.uploadFile('system-configuration.json')
             }
 
             // 双向数据一致性补齐：检查本地是否存在但云端缺失的文件，自动补传至云端
@@ -1302,21 +1192,19 @@ relativePath: string }[] = []
     }
 
     /**
-     * 提取 extractZip 对应的业务能力，参数和执行顺序保持原实现。
-     * @param zipPath zipPath 原业务参数。
-     * @param targetPath targetPath 原业务参数。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 通过压缩包接口还原业务数据，阻止路径越界和运行数据库覆盖。
+ * @param zipPath 待解压 ZIP 文件路径。
+ * @param targetPath 目标数据目录。
+ * @author yahyaoo
+ */
     public async extractZip(zipPath: string, targetPath: string): Promise<void> {
         await archiveGateway.extract(storageFs, zipPath, targetPath, true)
     }
 
     /**
-     * 同步 syncChangedFiles 对应的业务能力，参数和执行顺序保持原实现。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 比较本地和远端变化，执行增量上传、下载及删除并更新同步时间。
+ * @author yahyaoo
+ */
     async syncChangedFiles() {
         const { changed, deleted } = await this.getChangedFiles()
         if (changed.length === 0 && deleted.length === 0) return
@@ -1342,17 +1230,12 @@ relativePath: string }[] = []
     }
 
     /**
-     * 恢复 restoreFromRemote 对应的业务能力，参数和执行顺序保持原实现。
-     * @param options 可选操作参数，沿用原默认值。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
-    async restoreFromRemote(options?: { /**
- * mode 字段，沿用原业务结构与空值约定。
+ * 优先还原远端散文件，失败或无数据时尝试最新完整备份。
+ * @param options 可选操作参数，沿用原默认值。
+ * @author yahyaoo
  */
-mode?: 'auto' | 'zip' | 'files'; /**
- * targetFilename 字段，沿用原业务结构与空值约定。
- */
+    async restoreFromRemote(options?: { /** 当前处理模式。 */
+mode?: 'auto' | 'zip' | 'files';
 targetFilename?: string }): Promise<boolean> {
         if (!this.client) await this.initClient()
         if (!this.client) return false
@@ -1382,12 +1265,8 @@ targetFilename?: string }): Promise<boolean> {
 
                 const remoteFileSet = new Set<string>()
                 const localFiles = await this.scanFiles()
-                const filesToDownload: { /**
- * file 字段，沿用原业务结构与空值约定。
- */
-file: any; /**
- * relativePath 字段，沿用原业务结构与空值约定。
- */
+                const filesToDownload: { /** 待处理的文件条目。 */
+file: any; /** 相对业务目录的路径。 */
 relativePath: string }[] = []
 
                 for (const file of files) {
@@ -1396,7 +1275,7 @@ relativePath: string }[] = []
                         continue
                     }
 
-                    if (relativePath === 'config.js') hasConfig = true
+                    if (relativePath === 'system-configuration.json') hasConfig = true
                     remoteFileSet.add(relativePath)
 
                     // 如果本地存在该文件，且大小一致，跳过不必要下载
@@ -1430,13 +1309,13 @@ relativePath: string }[] = []
                     }
                 }
 
-                // 如果恢复的文件中没有 config.js，说明云端配置缺失，将当前内存配置（含环境变量）同步上去
+                // 云端缺少系统配置文档时，将当前生效配置写入管理库并补传
                 if (!hasConfig) {
-                    console.log('Cloud config.js not found, saving current memory config and uploading...')
+                    console.log('Cloud system configuration not found, saving current memory config and uploading...')
                     if (global.lx && global.lx.saveConfig) {
                         global.lx.saveConfig()
                     }
-                    await this.uploadFile('config.js')
+                    await this.uploadFile('system-configuration.json')
                 }
 
                 // 双向数据一致性补齐：检查本地是否存在但云端缺失的文件，自动补传至云端
@@ -1479,14 +1358,14 @@ relativePath: string }[] = []
             this.emit('progress', { type: 'restore', status: 'start', message: '正在从云端下载备份...' })
             const result = await this.downloadLatestBackup()
             if (result) {
-                // 检查解压后数据目录是否确实有了 config.js
-                const targetConfigPath = global.lx?.configPath || path.join(this.dataPath, 'config.js')
+                // 检查恢复后是否包含 SQL 系统配置文档，缺失时导出当前配置补传
+                const targetConfigPath = path.join(this.dataPath, 'system-configuration.json')
                 if (!storageFs.existsSync(targetConfigPath)) {
-                    console.log('Backup restored but config.js is missing in data dir, saving current config and uploading...')
+                    console.log('Backup restored but system configuration is missing in SQL storage, saving current config and uploading...')
                     if (global.lx && global.lx.saveConfig) {
                         global.lx.saveConfig()
                     }
-                    await this.uploadFile('config.js')
+                    await this.uploadFile('system-configuration.json')
                 }
                 this.emit('progress', { type: 'restore', status: 'finish', message: '备份恢复完成' })
                 return true
@@ -1516,16 +1395,11 @@ relativePath: string }[] = []
     }
 
     /**
-     * 测试 testConnection 对应的业务能力，参数和执行顺序保持原实现。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
-    async testConnection(): Promise<{ /**
- * success 字段，沿用原业务结构与空值约定。
+ * 验证 WebDAV 地址和认证，返回测试结果及错误原因。
+ * @author yahyaoo
  */
-success: boolean; /**
- * message 字段，沿用原业务结构与空值约定。
- */
+    async testConnection(): Promise<{ /** 操作是否成功。 */
+success: boolean; /** 处理结果或错误说明。 */
 message: string }> {
         // 检查配置是否完整
         if (!this.config.enable) {
@@ -1576,10 +1450,9 @@ message: string }> {
     }
 
     /**
-     * 启动 startAutoSync 对应的业务能力，参数和执行顺序保持原实现。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 设置增量同步和完整备份定时任务；使用当前配置的分钟与小时间隔。
+ * @author yahyaoo
+ */
     startAutoSync() {
         if (!this.isConfigured()) return
 
@@ -1605,10 +1478,9 @@ message: string }> {
     }
 
     /**
-     * 停止 stopAutoSync 对应的业务能力，参数和执行顺序保持原实现。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 清除增量同步和完整备份定时器。
+ * @author yahyaoo
+ */
     stopAutoSync() {
         if (this.watchTimer) {
             clearInterval(this.watchTimer)
@@ -1622,11 +1494,10 @@ message: string }> {
     }
 
     /**
-     * 更新 updateConfig 对应的业务能力，参数和执行顺序保持原实现。
-     * @param config 原配置对象。
-     * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-     * @author yahyaoo
-     */
+ * 更新 WebDAV 连接与排除配置，重建客户端并重新安排自动任务。
+ * @param config 原配置对象。
+ * @author yahyaoo
+ */
     updateConfig(config: Partial<WebDAVConfig>) {
         let changed = false
         if (config.enable !== undefined && config.enable !== this.config.enable) {

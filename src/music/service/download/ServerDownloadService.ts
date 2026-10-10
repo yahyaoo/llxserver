@@ -1,4 +1,4 @@
-/** ServerDownloadService 模块：按职责组织，原业务行为保持不变。 @author yahyaoo */
+/** 服务器下载服务：目录与命名校验、文件下载、歌词写入、索引和本地播放。 @author yahyaoo */
 import storageFs from '../../../application/persistence/documentFileSystem'
 /**
  * 指定目录下载与本地播放索引；仅服务于“服务器下载”，不改变普通缓存目录。
@@ -14,71 +14,36 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { pipeline } from 'node:stream/promises'
 import { getFileName } from '../cache/FileCacheService'
 
-/**
- * LyricMode 契约，按当前模块职责组织，保留原字段和扩展能力。
- * @author yahyaoo
- */
+/** 下载歌词的保存方式：内嵌歌词或外部 LRC。 @author yahyaoo */
 export type LyricMode = 'embedded' | 'external'
-/**
- * DownloadItem 契约，按当前模块职责组织，保留原字段和扩展能力。
- * @author yahyaoo
- */
+/** 已下载歌曲记录，关联歌曲元信息、音质与文件路径。 @author yahyaoo */
 interface DownloadItem {
-  /**
-   * id 字段，沿用原业务结构与空值约定。
-   */
+  /** 业务记录标识。 */
   id: string
-  /**
-   * username 字段，沿用原业务结构与空值约定。
-   */
+  /** 数据所属用户名。 */
   username: string
-  /**
-   * identity 字段，沿用原业务结构与空值约定。
-   */
+
   identity: string
-  /**
-   * quality 字段，沿用原业务结构与空值约定。
-   */
+  /** 音质标识。 */
   quality: string
-  /**
-   * root 字段，沿用原业务结构与空值约定。
-   */
+
   root: string
-  /**
-   * filename 字段，沿用原业务结构与空值约定。
-   */
+  /** 关联音频或业务文件名。 */
   filename: string
-  /**
-   * lyricFilename 字段，沿用原业务结构与空值约定。
-   */
+
   lyricFilename?: string
-  /**
-   * lyric 字段，沿用原业务结构与空值约定。
-   */
+  /** 歌词文本。 */
   lyric?: string
-  /**
-   * size 字段，沿用原业务结构与空值约定。
-   */
+  /** 文件字节数或记录数量。 */
   size: number
 }
-/**
- * DownloadHooks 契约，按当前模块职责组织，保留原字段和扩展能力。
- * @author yahyaoo
- */
+/** 下载流程使用的歌词获取与文件元信息写入钩子。 @author yahyaoo */
 interface DownloadHooks {
-  /**
-   * lyric 字段，沿用原业务结构与空值约定。
-   */
+  /** 歌词文本。 */
   lyric: (song: any, username: string) => Promise<string | null>
-  /**
-   * embed 字段，沿用原业务结构与空值约定。
-   */
-  embed: (file: string, lyric: string) => { /**
- * success 字段，沿用原业务结构与空值约定。
- */
-success: boolean; /**
- * error 字段，沿用原业务结构与空值约定。
- */
+
+  embed: (file: string, lyric: string) => { /** 操作是否成功。 */
+success: boolean; /** 操作失败原因。 */
 error?: string }
 }
 let hooks: DownloadHooks | null = null

@@ -1,4 +1,4 @@
-/** tipSearch 模块：按职责组织，原业务行为保持不变。 @author yahyaoo */
+/** QQ 音乐接口适配：搜索输入建议查询。 @author yahyaoo */
 import { httpFetch } from '../../request.js'
 
 export default {

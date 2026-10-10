@@ -1,4 +1,4 @@
-/** UpdateClient 模块：按职责组织，原业务行为保持不变。 @author yahyaoo */
+/** 发布仓库适配：校验更新 API 地址、比较版本并查询可用发布信息。 @author yahyaoo */
 /** 自定义发布仓库的更新检查；默认关闭，不依赖统计服务。 @author yahyaoo */
 export const DEFAULT_UPDATE_SERVER = 'https://api.github.com/repos/yahyaoo/fn-lxserver/releases/latest'
 

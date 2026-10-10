@@ -1,4 +1,4 @@
 import type { DocumentVo } from '../../../common/model/vo/DocumentVo'
-/** 音频缓存索引仓储查询结果；HTTP 层仍返回原始业务值。 @author yahyaoo */
+/** 缓存歌曲的文件位置与元信息索引的仓储查询结果；包含文档作用域、业务值、修改时间和序列化字节数。 @author yahyaoo */
 export interface CacheIndexVo extends DocumentVo {}
 

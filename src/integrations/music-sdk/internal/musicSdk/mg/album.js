@@ -1,4 +1,4 @@
-/** album 模块：按职责组织，原业务行为保持不变。 @author yahyaoo */
+/** 咪咕音乐接口适配：专辑详情与专辑歌曲查询。 @author yahyaoo */
 import { createHttpFetch } from '../../../../../modules/utils/musicSdk/mg/utils'
 import { filterMusicInfoList } from './musicInfo.js'
 import { formatPlayCount } from '../../index.js'

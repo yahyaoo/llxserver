@@ -1,35 +1,24 @@
-/** listDataManage 模块：按职责组织，原业务行为保持不变。 @author yahyaoo */
+/** 歌单数据管理：保存列表定义、歌曲映射以及列表和歌曲排序。 @author yahyaoo */
 import { arrPush, arrPushByPosition, arrUnshift } from '../../../utils/common'
 import { LIST_IDS } from '../../../constants'
 import { type SnapshotDataManage } from './snapshotDataManage'
 
-/**
- * ListDataManage 契约，按当前模块职责组织，保留原字段和扩展能力。
- * @author yahyaoo
- */
+/** 维护歌单定义和歌曲映射，实现歌单及歌曲增删改与排序。 @author yahyaoo */
 export class ListDataManage {
-  /**
-   * snapshotDataManage 字段，沿用原业务结构与空值约定。
-   */
+  /** 当前用户快照管理器。 */
   snapshotDataManage: SnapshotDataManage
-  /**
-   * userLists 字段，沿用原业务结构与空值约定。
-   */
+
   userLists: LX.List.UserListInfo[] = []
-  /**
-   * allMusicList 字段，沿用原业务结构与空值约定。
-   */
+
   allMusicList = new Map<string, LX.Music.MusicInfo[]>()
-  /**
-   * initPromise 字段，沿用原业务结构与空值约定。
-   */
+
   initPromise: Promise<void>
 
   /**
-   * 构造实例 constructor 对应的业务能力，参数和执行顺序保持原实现。
-   * @param snapshotDataManage snapshotDataManage 原业务参数。
-   * @author yahyaoo
-   */
+ * 绑定用户歌单目录并初始化列表与歌曲映射。
+ * @param snapshotDataManage 当前用户的快照管理器。
+ * @author yahyaoo
+ */
   constructor(snapshotDataManage: SnapshotDataManage) {
     this.snapshotDataManage = snapshotDataManage
 
@@ -46,11 +35,10 @@ export class ListDataManage {
     })
   }
   /**
-   * 恢复 restore 对应的业务能力，参数和执行顺序保持原实现。
-   * @param listData listData 原业务参数。
-   * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-   * @author yahyaoo
-   */
+ * 从已保存快照恢复用户歌单与歌曲映射。
+ * @param listData 默认、收藏及自定义歌单数据。
+ * @author yahyaoo
+ */
   restore = async (listData: LX.Sync.List.ListData) => {
     this.allMusicList.clear()
     this.userLists = []
@@ -63,10 +51,9 @@ export class ListDataManage {
     }))
   }
   /**
-   * 获取 getListData 对应的业务能力，参数和执行顺序保持原实现。
-   * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-   * @author yahyaoo
-   */
+ * 读取当前用户的默认列表、收藏列表和自定义歌单数据。
+ * @author yahyaoo
+ */
   getListData = async (): Promise<LX.Sync.List.ListData> => {
     await this.initPromise
     return {
@@ -78,57 +65,40 @@ export class ListDataManage {
 
 
   /**
-   * 设置 setUserLists 对应的业务能力，参数和执行顺序保持原实现。
-   * @param lists lists 原业务参数。
-   * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-   * @author yahyaoo
-   */
+ * 替换自定义歌单定义，并维护歌单到歌曲列表的映射。
+ * @param lists 歌单定义集合。
+ * @author yahyaoo
+ */
   private readonly setUserLists = (lists: LX.List.UserListInfo[]) => {
     this.userLists.splice(0, this.userLists.length, ...lists)
     return this.userLists
   }
 
   /**
-   * 设置 setMusicList 对应的业务能力，参数和执行顺序保持原实现。
-   * @param listId listId 原业务参数。
-   * @param musicList musicList 原业务参数。
-   * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-   * @author yahyaoo
-   */
+ * 按歌单标识保存该歌单的歌曲数组。
+ * @param listId 目标歌单标识。
+ * @param musicList 歌单歌曲数组。
+ * @author yahyaoo
+ */
   private readonly setMusicList = (listId: string, musicList: LX.Music.MusicInfo[]): LX.Music.MusicInfo[] => {
     this.allMusicList.set(listId, musicList)
     return musicList
   }
 
   /**
-   * 移除 removeMusicList 对应的业务能力，参数和执行顺序保持原实现。
-   * @param id 原业务标识。
-   * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-   * @author yahyaoo
-   */
+ * 删除歌单对应的歌曲数组记录。
+ * @param id 当前业务对象标识。
+ * @author yahyaoo
+ */
   private readonly removeMusicList = (id: string) => {
     this.allMusicList.delete(id)
   }
 
   /**
-   * 创建 createUserList 对应的业务能力，参数和执行顺序保持原实现。
-   * @param {
-    name,
-    id,
-    source,
-    sourceListId,
-    locationUpdateTime,
-  } {
-    name,
-    id,
-    source,
-    sourceListId,
-    locationUpdateTime,
-  } 原业务参数。
-   * @param position 原列表插入位置。
-   * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-   * @author yahyaoo
-   */
+ * 创建自定义歌单并初始化其歌曲记录。
+ * @param position 原列表插入位置。
+ * @author yahyaoo
+ */
   private readonly createUserList = ({
     name,
     id,
@@ -156,25 +126,9 @@ export class ListDataManage {
   }
 
   /**
-   * 更新 updateList 对应的业务能力，参数和执行顺序保持原实现。
-   * @param {
-    name,
-    id,
-    source,
-    sourceListId,
-    // meta,
-    locationUpdateTime,
-  } {
-    name,
-    id,
-    source,
-    sourceListId,
-    // meta,
-    locationUpdateTime,
-  } 原业务参数。
-   * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-   * @author yahyaoo
-   */
+ * 更新指定歌单的名称及其他定义信息。
+ * @author yahyaoo
+ */
   private readonly updateList = ({
     name,
     id,
@@ -182,12 +136,8 @@ export class ListDataManage {
     sourceListId,
     // meta,
     locationUpdateTime,
-  }: LX.List.UserListInfo & { /**
- * meta 字段，沿用原业务结构与空值约定。
- */
-meta?: { /**
- * id 字段，沿用原业务结构与空值约定。
- */
+  }: LX.List.UserListInfo & {
+meta?: { /** 条目唯一标识。 */
 id?: string } }) => {
     let targetList
     switch (id) {
@@ -209,11 +159,10 @@ id?: string } }) => {
   }
 
   /**
-   * 移除 removeUserList 对应的业务能力，参数和执行顺序保持原实现。
-   * @param id 原业务标识。
-   * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-   * @author yahyaoo
-   */
+ * 删除自定义歌单及其歌曲数据。
+ * @param id 当前业务对象标识。
+ * @author yahyaoo
+ */
   private readonly removeUserList = (id: string) => {
     const index = this.userLists.findIndex(l => l.id == id)
     if (index < 0) return
@@ -222,11 +171,10 @@ id?: string } }) => {
   }
 
   /**
-   * 处理 overwriteUserList 对应的业务能力，参数和执行顺序保持原实现。
-   * @param lists lists 原业务参数。
-   * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-   * @author yahyaoo
-   */
+ * 使用新歌单定义和歌曲内容覆盖指定自定义歌单。
+ * @param lists 歌单定义集合。
+ * @author yahyaoo
+ */
   private readonly overwriteUserList = (lists: LX.List.UserListInfo[]) => {
     this.userLists.splice(0, this.userLists.length, ...lists)
   }
@@ -238,11 +186,9 @@ id?: string } }) => {
 
 
   /**
-   * 列举 listDataOverwrite 对应的业务能力，参数和执行顺序保持原实现。
-   * @param { defaultList, loveList, userList, tempList } { defaultList, loveList, userList, tempList } 原业务参数。
-   * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-   * @author yahyaoo
-   */
+ * 覆盖全部歌单定义与歌曲内容，重建当前歌单映射。
+ * @author yahyaoo
+ */
   listDataOverwrite = async ({ defaultList, loveList, userList, tempList }: MakeOptional<LX.List.ListDataFull, 'tempList'>): Promise<string[]> => {
     const updatedListIds: string[] = []
     const newUserIds: string[] = []
@@ -276,35 +222,21 @@ id?: string } }) => {
   }
 
   /**
-   * 处理 userListCreate 对应的业务能力，参数和执行顺序保持原实现。
-   * @param { name, id, source, sourceListId, position, locationUpdateTime } { name, id, source, sourceListId, position, locationUpdateTime } 原业务参数。
-   * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-   * @author yahyaoo
-   */
+ * 批量创建自定义歌单并通知歌单变更。
+ * @author yahyaoo
+ */
   userListCreate = async ({ name, id, source, sourceListId, position, locationUpdateTime }: {
-    /**
-     * name 字段，沿用原业务结构与空值约定。
-     */
+    /** 记录显示名称。 */
     name: string
-    /**
-     * id 字段，沿用原业务结构与空值约定。
-     */
+    /** 业务记录标识。 */
     id: string
-    /**
-     * source 字段，沿用原业务结构与空值约定。
-     */
+    /** 歌曲或详情所属的音乐平台。 */
     source?: LX.OnlineSource
-    /**
-     * sourceListId 字段，沿用原业务结构与空值约定。
-     */
+    /** 远端歌单标识。 */
     sourceListId?: string
-    /**
-     * position 字段，沿用原业务结构与空值约定。
-     */
+
     position: number
-    /**
-     * locationUpdateTime 字段，沿用原业务结构与空值约定。
-     */
+
     locationUpdateTime: number | null
   }) => {
     if (this.userLists.some(item => item.id == id)) return
@@ -319,11 +251,10 @@ id?: string } }) => {
   }
 
   /**
-   * 处理 userListsRemove 对应的业务能力，参数和执行顺序保持原实现。
-   * @param ids ids 原业务参数。
-   * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-   * @author yahyaoo
-   */
+ * 批量删除指定自定义歌单及关联歌曲记录。
+ * @param ids 待处理标识集合。
+ * @author yahyaoo
+ */
   userListsRemove = async (ids: string[]) => {
     const changedIds = []
     for (const id of ids) {
@@ -339,11 +270,10 @@ id?: string } }) => {
   }
 
   /**
-   * 处理 userListsUpdate 对应的业务能力，参数和执行顺序保持原实现。
-   * @param listInfos listInfos 原业务参数。
-   * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-   * @author yahyaoo
-   */
+ * 批量更新自定义歌单定义并通知变更。
+ * @param listInfos 歌单定义与更新字段集合。
+ * @author yahyaoo
+ */
   userListsUpdate = async (listInfos: LX.List.UserListInfo[]) => {
     for (const info of listInfos) {
       this.updateList(info)
@@ -351,12 +281,11 @@ id?: string } }) => {
   }
 
   /**
-   * 处理 userListsUpdatePosition 对应的业务能力，参数和执行顺序保持原实现。
-   * @param position 原列表插入位置。
-   * @param ids ids 原业务参数。
-   * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-   * @author yahyaoo
-   */
+ * 按客户端给出的顺序调整自定义歌单位置。
+ * @param position 原列表插入位置。
+ * @param ids 待处理标识集合。
+ * @author yahyaoo
+ */
   userListsUpdatePosition = async (position: number, ids: string[]) => {
     const newUserLists = [...this.userLists]
 
@@ -390,25 +319,23 @@ id?: string } }) => {
   }
 
   /**
-   * 列举 listMusicOverwrite 对应的业务能力，参数和执行顺序保持原实现。
-   * @param listId listId 原业务参数。
-   * @param musicInfos musicInfos 原业务参数。
-   * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-   * @author yahyaoo
-   */
+ * 覆盖指定歌单的全部歌曲。
+ * @param listId 目标歌单标识。
+ * @param musicInfos 待处理歌曲信息集合。
+ * @author yahyaoo
+ */
   listMusicOverwrite = async (listId: string, musicInfos: LX.Music.MusicInfo[]): Promise<string[]> => {
     this.setMusicList(listId, musicInfos)
     return [listId]
   }
 
   /**
-   * 列举 listMusicAdd 对应的业务能力，参数和执行顺序保持原实现。
-   * @param id 原业务标识。
-   * @param musicInfos musicInfos 原业务参数。
-   * @param addMusicLocationType addMusicLocationType 原业务参数。
-   * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-   * @author yahyaoo
-   */
+ * 向歌单添加歌曲，按指定顶部或底部位置写入。
+ * @param id 当前业务对象标识。
+ * @param musicInfos 待处理歌曲信息集合。
+ * @param addMusicLocationType 歌曲添加位置，top 表示顶部，bottom 表示底部。
+ * @author yahyaoo
+ */
   listMusicAdd = async (id: string, musicInfos: LX.Music.MusicInfo[], addMusicLocationType: LX.AddMusicLocationType): Promise<string[]> => {
     const targetList = await this.getListMusics(id)
 
@@ -435,12 +362,11 @@ id?: string } }) => {
   }
 
   /**
-   * 列举 listMusicRemove 对应的业务能力，参数和执行顺序保持原实现。
-   * @param listId listId 原业务参数。
-   * @param ids ids 原业务参数。
-   * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-   * @author yahyaoo
-   */
+ * 从歌单中移除选定歌曲 ID 对应的条目。
+ * @param listId 目标歌单标识。
+ * @param ids 待处理标识集合。
+ * @author yahyaoo
+ */
   listMusicRemove = async (listId: string, ids: string[]): Promise<string[]> => {
     let targetList = await this.getListMusics(listId)
 
@@ -455,14 +381,13 @@ id?: string } }) => {
   }
 
   /**
-   * 列举 listMusicMove 对应的业务能力，参数和执行顺序保持原实现。
-   * @param fromId fromId 原业务参数。
-   * @param toId toId 原业务参数。
-   * @param musicInfos musicInfos 原业务参数。
-   * @param addMusicLocationType addMusicLocationType 原业务参数。
-   * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-   * @author yahyaoo
-   */
+ * 在两个歌单之间移动歌曲，维护源和目标歌单数据。
+ * @param fromId 来源歌单标识。
+ * @param toId 目标歌单标识。
+ * @param musicInfos 待处理歌曲信息集合。
+ * @param addMusicLocationType 歌曲添加位置，top 表示顶部，bottom 表示底部。
+ * @author yahyaoo
+ */
   listMusicMove = async (fromId: string, toId: string, musicInfos: LX.Music.MusicInfo[], addMusicLocationType: LX.AddMusicLocationType): Promise<string[]> => {
     return [
       ...await this.listMusicRemove(fromId, musicInfos.map(musicInfo => musicInfo.id)),
@@ -471,11 +396,10 @@ id?: string } }) => {
   }
 
   /**
-   * 列举 listMusicUpdateInfo 对应的业务能力，参数和执行顺序保持原实现。
-   * @param musicInfos musicInfos 原业务参数。
-   * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-   * @author yahyaoo
-   */
+ * 更新歌单中指定歌曲的元信息。
+ * @param musicInfos 待处理歌曲信息集合。
+ * @author yahyaoo
+ */
   listMusicUpdateInfo = async (musicInfos: LX.List.ListActionMusicUpdate): Promise<string[]> => {
     const updateListIds = new Set<string>()
     for (const { id, musicInfo } of musicInfos) {
@@ -500,13 +424,12 @@ id?: string } }) => {
 
 
   /**
-   * 列举 listMusicUpdatePosition 对应的业务能力，参数和执行顺序保持原实现。
-   * @param listId listId 原业务参数。
-   * @param position 原列表插入位置。
-   * @param ids ids 原业务参数。
-   * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-   * @author yahyaoo
-   */
+ * 调整歌单中歌曲的排列顺序。
+ * @param listId 目标歌单标识。
+ * @param position 原列表插入位置。
+ * @param ids 待处理标识集合。
+ * @author yahyaoo
+ */
   listMusicUpdatePosition = async (listId: string, position: number, ids: string[]): Promise<string[]> => {
     let targetList = await this.getListMusics(listId)
 
@@ -541,11 +464,10 @@ id?: string } }) => {
 
 
   /**
-   * 列举 listMusicClear 对应的业务能力，参数和执行顺序保持原实现。
-   * @param ids ids 原业务参数。
-   * @returns 原处理结果；异步操作沿用原完成与错误传播约定。
-   * @author yahyaoo
-   */
+ * 清空指定歌单的歌曲内容。
+ * @param ids 待处理标识集合。
+ * @author yahyaoo
+ */
   listMusicClear = async (ids: string[]): Promise<string[]> => {
     const changedIds: string[] = []
     for (const id of ids) {
