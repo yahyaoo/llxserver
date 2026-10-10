@@ -40,7 +40,10 @@
     <link rel="stylesheet" href="views/settings/settings.css">
     <link rel="stylesheet" href="components/top-bar/top-bar.css">
     <link rel="stylesheet" href="components/player-bar/player-bar.css">
+    <link rel="stylesheet" href="views/player-detail/player-detail.css">
+    <link rel="stylesheet" href="views/leaderboard/leaderboard.css">
     <link rel="stylesheet" href="components/theme-controls/appearance.css">
+    <link rel="stylesheet" href="css/page-surfaces.css">
 </head>
 
 <body class="t-bg-main h-screen flex flex-col overflow-hidden t-text-main font-sans">
@@ -669,234 +672,8 @@
                     </div>
                 </div>
 
-                <!-- Leaderboard View -->
-                <div id="view-leaderboard"
-                    class="absolute inset-0 flex flex-col px-2 pt-2 md:px-6 md:pt-6 pb-44 md:pb-32 hidden opacity-0 transition-all duration-300 overflow-hidden">
-
-                    <!-- 顶部工具栏：增强手机端适配 -->
-                    <div class="flex-shrink-0 flex items-center gap-2 md:gap-4 mb-4 md:mb-6">
-                        <!-- 手机端显示：切换榜单列表按钮 -->
-                        <button onclick="toggleLbSidebar()"
-                            class="md:hidden p-2 t-text-muted hover:t-bg-main rounded-lg transition-colors"
-                            title="切换榜单列表">
-                            <i class="fas fa-bars"></i>
-                        </button>
-
-                        <!-- 来源选择：手机端减小间距 -->
-                        <select id="lb-source-select" onchange="changeLeaderboardSource()"
-                            class="lm-select !w-auto min-w-[80px]">
-                            <option value="wy">网易云</option>
-                            <option value="tx">QQ</option>
-                            <option value="kg">酷狗</option>
-                            <option value="kw">酷我</option>
-                            <option value="mg">咪咕</option>
-                        </select>
-
-                        <div class="flex items-center gap-1 md:gap-2 flex-1 min-w-0">
-                            <i class="fas fa-chart-bar text-emerald-500 text-xs md:text-sm"></i>
-                            <span id="lb-board-title"
-                                class="text-xs md:text-sm font-bold t-text-main truncate">请选择榜单</span>
-                            <span id="lb-song-count" class="text-[10px] md:text-xs t-text-muted flex-shrink-0"></span>
-                        </div>
-
-                        <!-- 播放全部：手机端仅显示图标或紧凑文本 -->
-                        <button onclick="playAllLeaderboard()"
-                            class="flex-shrink-0 flex items-center gap-1 px-2 md:px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-[10px] md:text-xs font-bold transition-all shadow-sm hover:shadow-md active:scale-95">
-                            <i class="fas fa-play"></i>
-                            <span class="hidden sm:inline">播放全部</span>
-                        </button>
-                    </div>
-
-                    <!-- 主内容区：增加响应式侧边栏遮罩容器 -->
-                    <div
-                        class="flex-1 flex overflow-hidden relative t-bg-panel rounded-2xl shadow-sm border t-border-main">
-
-                        <!-- 左侧：榜单列表（手机端默认隐藏，通过 toggleLbSidebar 切换） -->
-                        <div id="lb-sidebar"
-                            class="absolute md:relative z-30 inset-y-0 left-0 w-44 md:w-52 flex-shrink-0 border-r t-border-main flex flex-col overflow-hidden t-bg-panel md:t-bg-panel/50 -translate-x-full md:translate-x-0 transition-transform duration-300 shadow-xl md:shadow-none">
-                            <div
-                                class="px-3 py-2 text-[10px] font-bold t-text-muted uppercase tracking-wider border-b t-border-main flex items-center justify-between">
-                                <span>榜单列表</span>
-                                <button onclick="toggleLbSidebar(false)"
-                                    class="md:hidden t-text-muted hover:text-red-500">
-                                    <i class="fas fa-times"></i>
-                                </button>
-                            </div>
-                            <!-- 加载状态 -->
-                            <div id="lb-boards-loading" class="hidden flex items-center justify-center py-8">
-                                <i class="fas fa-circle-notch fa-spin text-emerald-500 text-xl"></i>
-                            </div>
-                            <div id="lb-boards-list" class="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-0.5"
-                                onclick="if(window.innerWidth <= 1024) toggleLbSidebar(false)">
-                                <!-- 榜单项由 JS 注入 -->
-                                <div class="p-4 text-center t-text-muted text-sm animate-pulse">
-                                    <i class="fas fa-circle-notch fa-spin"></i>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- 手机端侧边栏遮罩 -->
-                        <div id="lb-sidebar-overlay" onclick="toggleLbSidebar(false)"
-                            class="absolute inset-0 z-20 bg-black/40 hidden md:hidden transition-opacity duration-300 opacity-0">
-                        </div>
-
-                        <!-- 右侧：歌曲列表区 -->
-                        <div id="lb-songs-container" class="flex-1 flex flex-col overflow-hidden">
-                            <!-- ... (批量操作和搜索过滤维持原样) ... -->
-                            <!-- 此处为了代码简洁，保留原有逻辑，仅外层容器调整 -->
-                            <!-- 批量操作工具栏 -->
-                            <div id="lb-batch-toolbar"
-                                class="hidden bg-emerald-50 dark:bg-emerald-900/20 border-b border-emerald-200 dark:border-emerald-800 p-3 flex items-center justify-between flex-shrink-0">
-                                <div class="flex items-center gap-3">
-                                    <span class="text-sm text-emerald-700 dark:text-emerald-300">已选择:
-                                        <span id="lb-batch-selected-count" class="font-bold">0</span> 首</span>
-                                    <button onclick="lbSelectAll()"
-                                        class="text-xs px-3 py-1 bg-emerald-500 hover:bg-emerald-600 text-white rounded shadow-sm transition-all font-medium">全选</button>
-                                    <button onclick="deselectAll()"
-                                        class="text-xs px-3 py-1 bg-gray-500 hover:bg-gray-600 text-white rounded shadow-sm transition-all font-medium">清空</button>
-                                    <button onclick="toggleLbBatchMode()"
-                                        class="text-xs px-3 py-1 bg-red-500 hover:bg-red-600 text-white rounded shadow-sm transition-all font-medium">退出</button>
-                                </div>
-                                <div class="flex items-center gap-2">
-                                    <button onclick="handleBatchCollect()"
-                                        class="text-xs px-2 md:px-4 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded transition-colors"
-                                        title="批量收藏">
-                                        <i class="fas fa-folder-plus md:mr-1"></i><span
-                                            class="hidden md:inline">批量收藏</span>
-                                    </button>
-                                    <button onclick="batchDownloadFromList()"
-                                        class="text-xs px-2 md:px-4 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded transition-colors"
-                                        title="批量下载">
-                                        <i class="fas fa-download md:mr-1"></i><span
-                                            class="hidden md:inline">批量下载</span>
-                                    </button>
-                                </div>
-                            </div>
-
-                            <!-- 搜索过滤栏（由 ListSearch 控制） -->
-                            <div id="lb-local-search-bar"
-                                class="hidden p-3 t-bg-main border-b t-border-main animate-fade-in flex-shrink-0">
-                                <div class="flex items-center gap-2 sm:gap-3">
-                                    <!-- Search Input -->
-                                    <div class="relative flex-1 min-w-[24px]">
-                                        <input type="text" id="lb-local-search-input"
-                                            class="w-full pl-9 pr-4 py-2 bg-gray-100 dark:bg-gray-800 border t-border-main rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 t-text-main transition-all"
-                                            placeholder="搜索歌曲名、歌手..." oninput="window.ListSearch.handleSearch()"
-                                            onkeydown="window.ListSearch.handleKeydown(event)">
-                                        <i
-                                            class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
-                                    </div>
-
-                                    <div id="lb-local-search-nav"
-                                        class="flex flex-col sm:flex-row items-center gap-0.5 sm:gap-2 opacity-0 pointer-events-none transition-opacity">
-                                        <div
-                                            class="flex border t-border-main rounded-lg overflow-hidden order-1 sm:order-2">
-                                            <button onclick="window.ListSearch.navigate(-1)"
-                                                class="p-1 sm:p-1.5 hover:t-bg-track t-text-main transition-colors border-r t-border-main"
-                                                title="上一个">
-                                                <i class="fas fa-chevron-left text-[10px]"></i>
-                                            </button>
-                                            <button onclick="window.ListSearch.navigate(1)"
-                                                class="p-1 sm:p-1.5 hover:t-bg-track t-text-main transition-colors"
-                                                title="下一个">
-                                                <i class="fas fa-chevron-right text-[10px]"></i>
-                                            </button>
-                                        </div>
-                                        <span id="lb-local-search-count"
-                                            class="text-[9px] sm:text-xs font-mono t-text-muted order-2 sm:order-1 leading-none">0/0</span>
-                                    </div>
-
-                                    <!-- Filter Toggle -->
-                                    <div class="flex items-center gap-3 ml-auto">
-                                        <label class="flex items-center cursor-pointer group">
-                                            <span
-                                                class="text-xs t-text-muted mr-2 group-hover:t-text-main transition-colors hidden sm:block">仅显示匹配项</span>
-                                            <div class="relative inline-flex items-center">
-                                                <input type="checkbox" id="lb-local-search-filter" class="sr-only peer"
-                                                    onchange="window.ListSearch.toggleFilter()">
-                                                <div
-                                                    class="w-10 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500 transition-all">
-                                                </div>
-                                            </div>
-                                        </label>
-                                        <button onclick="window.ListSearch.toggleBar(false)"
-                                            class="p-2 t-text-muted hover:text-red-500 transition-colors" title="关闭搜索">
-                                            <i class="fas fa-times"></i>
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- 列表表头 -->
-                            <div
-                                class="flex-shrink-0 grid grid-cols-12 gap-2 md:gap-4 px-5 py-2.5 border-b t-border-main t-bg-panel/80 text-gray-500 text-[10px] md:text-xs font-bold uppercase tracking-wider items-center pr-6">
-                                <div class="col-span-1 text-center flex items-center justify-center gap-1">
-                                    <span>#</span>
-                                    <div class="flex items-center gap-0.5 md:gap-1 ml-0.5">
-                                        <button onclick="toggleLbBatchMode()"
-                                            class="text-[10px] md:text-xs text-emerald-600 hover:text-emerald-700"
-                                            title="批量操作">
-                                            <i class="fas fa-tasks"></i>
-                                        </button>
-                                        <button onclick="lbToggleListSearch()"
-                                            class="text-[10px] md:text-xs text-emerald-600 hover:text-emerald-700 ml-0.5"
-                                            title="过滤歌曲">
-                                            <i class="fas fa-search"></i>
-                                        </button>
-                                    </div>
-                                </div>
-                                <div
-                                    class="col-span-7 sm:col-span-5 md:col-span-4 lg:col-span-4 flex items-center min-w-0">
-                                    歌曲</div>
-                                <div
-                                    class="hidden sm:flex sm:col-span-3 md:col-span-3 lg:col-span-2 items-center min-w-0">
-                                    歌手</div>
-                                <div class="hidden lg:flex lg:col-span-2 items-center min-w-0">专辑</div>
-                                <div
-                                    class="hidden md:flex md:col-span-2 lg:col-span-1 items-center justify-center text-center min-w-0">
-                                    时长</div>
-                                <div
-                                    class="col-span-4 sm:col-span-3 md:col-span-2 lg:col-span-2 text-right flex items-center justify-end min-w-0">
-                                    操作</div>
-                            </div>
-
-                            <!-- 歌曲列表 -->
-                            <div id="lb-songs-list" class="flex-1 overflow-y-auto p-2 space-y-1 custom-scrollbar pb-20">
-                                <!-- 歌曲行由 JS 注入 -->
-                                <div class="flex flex-col items-center justify-center py-20 t-text-muted">
-                                    <i class="fas fa-chart-bar text-5xl mb-4 opacity-20"></i>
-                                    <p class="text-base font-medium">请从左侧选择一个榜单</p>
-                                </div>
-                            </div>
-
-                            <!-- 分页 -->
-                            <div id="lb-pagination"
-                                class="flex-shrink-0 flex items-center justify-center gap-2 md:gap-4 py-3 border-t t-border-main t-bg-panel/80">
-                                <button id="lb-btn-first" onclick="window.LeaderboardManager.goToBoundary('first')"
-                                    disabled title="首页"
-                                    class="px-2 md:px-4 py-1.5 text-xs md:text-sm t-bg-main border t-border-main rounded-lg hover:t-bg-track disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
-                                    <i class="fas fa-angles-left md:mr-1"></i><span class="hidden md:inline">首页</span>
-                                </button>
-                                <button id="lb-btn-prev" onclick="leaderboardChangePage(-1)" disabled
-                                    class="px-2 md:px-4 py-1.5 text-xs md:text-sm t-bg-main border t-border-main rounded-lg hover:t-bg-track disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
-                                    <i class="fas fa-chevron-left md:mr-1"></i><span class="hidden sm:inline">上一页</span>
-                                </button>
-                                <span id="lb-page-info" class="text-[10px] md:text-sm t-text-muted font-medium">第 1
-                                    页</span>
-                                <button id="lb-btn-next" onclick="leaderboardChangePage(1)" disabled
-                                    class="px-2 md:px-4 py-1.5 text-xs md:text-sm t-bg-main border t-border-main rounded-lg hover:t-bg-track disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
-                                    <span class="hidden sm:inline">下一页</span><i
-                                        class="fas fa-chevron-right md:ml-1"></i>
-                                </button>
-                                <button id="lb-btn-last" onclick="window.LeaderboardManager.goToBoundary('last')"
-                                    disabled title="末页"
-                                    class="px-2 md:px-4 py-1.5 text-xs md:text-sm t-bg-main border t-border-main rounded-lg hover:t-bg-track disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
-                                    <span class="hidden md:inline">末页</span><i class="fas fa-angles-right md:ml-1"></i>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                <!-- 排行榜页面与榜单目录组件位于 views/leaderboard。 -->
+                <div id="view-leaderboard" class="absolute inset-0 hidden opacity-0 transition-all duration-300"></div>
 
                 <!-- Favorites View -->
                 <div id="view-favorites"
@@ -1343,94 +1120,8 @@
         </main>
     </div>
 
-    <!-- Player Detail View (Overlay) -->
-    <div id="view-player-detail" ondblclick="toggleDetailCover()"
-        class="fixed inset-0 z-30 t-bg-panel hidden flex flex-col transform translate-y-[100%] opacity-0 pb-24">
-        <!-- Blurry Background -->
-        <div class="absolute inset-0 overflow-hidden">
-            <img id="detail-bg-cover" src=""
-                class="w-full h-full object-cover filter blur-[60px] opacity-40 scale-125 transition-opacity duration-1000">
-            <div id="player-detail-bg-overlay" class="absolute inset-0 t-bg-panel/30 backdrop-blur-3xl"></div>
-            <!-- Detail Visualizer Canvas (Raised to avoid being blocked by footer) -->
-            <canvas id="detail-visualizer"
-                class="absolute bottom-24 left-0 w-full h-[calc(100vh-6rem)] pointer-events-none opacity-30"></canvas>
-        </div>
-
-        <!-- Navbar / Controls -->
-        <div onclick="event.stopPropagation()"
-            class="absolute top-0 inset-x-0 z-20 flex items-center justify-between px-6 h-20 pointer-events-none transition-all duration-300 [@media(max-height:500px)]:opacity-0 [@media(max-height:500px)]:pointer-events-none">
-            <button onclick="toggleLyrics()" id="btn-toggle-lyrics"
-                class="pointer-events-auto t-text-muted hover:text-emerald-600 t-bg-panel/40 hover:t-bg-panel/80 rounded-full w-10 h-10 flex items-center justify-center transition-all shadow-sm backdrop-blur-md">
-                <i class="fas fa-chevron-down text-lg"></i>
-            </button>
-            <div class="flex-col items-center hidden md:flex">
-                <h2 class="text-sm font-bold text-gray-500 tracking-widest uppercase">Now Playing</h2>
-            </div>
-            <div class="w-10"></div> <!-- Spacer -->
-        </div>
-
-        <!-- Main Content -->
-        <div id="player-detail-container"
-            class="relative z-10 flex-1 flex flex-col md:flex-row items-center justify-start md:justify-center gap-4 md:gap-20 pt-8 mt-4 md:mt-0 md:pt-0 pb-6 overflow-hidden transition-all duration-300 ease-out [@media(max-height:500px)]:pt-0 [@media(max-height:500px)]:justify-center">
-
-            <!-- Left: Image -->
-            <div id="mobile-player-cover-container" ondblclick="toggleDetailCover()"
-                class="w-auto h-auto max-w-[48vw] max-h-[32vh] [@media(max-height:500px)]:max-h-[40vh] aspect-square md:w-[60vh] md:h-[60vh] md:max-w-[35rem] md:max-h-[35rem] md:min-w-[20rem] md:min-h-[20rem] flex-shrink-0 shadow-2xl rounded-3xl overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] border-4 border-white/20 origin-top t-bg-track cursor-pointer">
-                <img id="detail-cover" src="/music/assets/logo.svg" loading="lazy" fetchpriority="low"
-                    onerror="this.src='/music/assets/logo.svg'; this.classList.add('is-placeholder');"
-                    class="w-full h-full object-cover dynamic-logo is-placeholder">
-            </div>
-
-            <!-- Right: Lyrics -->
-            <div id="lyrics-wrapper"
-                class="w-full md:w-[500px] lg:w-[600px] flex-1 min-h-0 md:flex-none md:h-full md:max-h-[70vh] flex flex-col relative transition-all duration-300 flex-shrink-0">
-                <!-- Song Info -->
-                <div class="mb-4 md:mb-8 text-center md:text-left px-4 md:pl-6 select-none transition-all duration-300 cursor-pointer"
-                    onclick="if(window.innerWidth <= 1024) { toggleDetailCover(); event.stopPropagation(); }">
-                    <div id="detail-title-container" class="overflow-hidden whitespace-nowrap mb-1">
-                        <div id="detail-title"
-                            class="inline-block text-2xl md:text-4xl font-black t-text-main drop-shadow-sm max-w-full truncate w-fit mx-auto md:mx-0">
-                            Song Name
-                        </div>
-                    </div>
-                    <div id="detail-artist"
-                        class="inline-block text-base md:text-xl t-text-muted font-medium truncate max-w-full">Artist
-                    </div>
-                    <div id="toggle-hint"
-                        class="text-[10px] text-emerald-500/60 mt-2 font-mono tracking-widest opacity-80 transition-all duration-1000 overflow-hidden max-h-8">
-                        <i class="fas fa-chevron-up text-xs animate-bounce mr-1"></i>
-                        <span class="md:hidden">点击歌曲名称隐藏显示封面</span>
-                        <span class="hidden md:inline">双击空白区域隐藏显示封面</span>
-                    </div>
-                </div>
-
-                <!-- Scroll Indicator - 固定参考线 -->
-                <div id="lyric-scroll-indicator"
-                    class="absolute left-0 right-0 z-20 pointer-events-none flex items-center transition-opacity duration-200"
-                    style="display: none;">
-                    <!-- 左边：从歌词延伸到右边的虚线 -->
-                    <div class="flex-1 h-px border-t-2 border-dashed border-emerald-500 opacity-60"></div>
-                    <!-- 右边：时间显示 -->
-                    <div
-                        class="time-display text-emerald-500 text-base font-mono font-bold tracking-wide ml-3 pr-4 md:pr-8">
-                        00:00
-                    </div>
-                </div>
-
-                <!-- Scrollable Lyrics Area -->
-                <div id="lyric-container" onclick="event.stopPropagation()"
-                    class="flex-1 w-full overflow-y-auto relative no-scrollbar mask-image-gradient"
-                    onwheel="handleLyricScroll()">
-
-                    <div id="lyric-content"
-                        class="flex flex-col items-center md:items-start text-center md:text-left gap-3 md:gap-6 py-[40vh] md:pl-6 transition-transform duration-300 ease-out">
-                        <!-- Lines injected here -->
-                        <p class="t-text-muted text-lg font-medium">暂无歌词</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+    <!-- 独立播放页挂载点，模板与子组件位于 views/player-detail。 -->
+    <div id="player-detail-root"></div>
 
     <!-- 独立播放栏组件挂载点，作者：yahyaoo -->
     <div id="player-bar-root"></div>
@@ -3305,10 +2996,16 @@
     <script src="views/settings/ConfigurationImport.js"></script>
     <script src="js/list_search.js"></script>
     <script src="js/songlist_manager.js"></script>
+    <script src="views/leaderboard/components/LeaderboardNavigation.js"></script>
+    <script src="views/leaderboard/LeaderboardView.js"></script>
     <script src="js/leaderboard_manager.js"></script>
     <script src="js/dislike_manager.js"></script>
     <script src="components/player-bar/template.js"></script>
     <script src="components/player-bar/index.js"></script>
+    <script src="views/player-detail/template.js"></script>
+    <script src="views/player-detail/components/PlayerBackground.js"></script>
+    <script src="views/player-detail/components/Spectrum.js"></script>
+    <script src="views/player-detail/PlayerDetailView.js"></script>
     <script src="js/wave.js"></script>
     <script src="js/visualizer.js"></script>
     <script src="js/pwa.js"></script>

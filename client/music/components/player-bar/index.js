@@ -94,6 +94,8 @@
         setVolumeExpanded(expanded) {
             const actions = this.root?.querySelector('.player-actions');
             if (!actions) return;
+            // 独立播放页的音量从下方弹出，不遮挡标题旁的操作入口。作者：jingyh
+            if (document.body.classList.contains('player-detail-open')) expanded = false;
             if (expanded) actions.classList.add('volume-open');
             else actions.classList.remove('volume-open');
             for (const child of actions.children || []) {
@@ -132,7 +134,8 @@
                 panel.inert = false;
                 this.setVolumeExpanded(name === 'volume');
                 document.getElementById(ids[1])?.setAttribute('aria-expanded', 'true');
-                panel.querySelector('button, [tabindex="0"]')?.focus();
+                const firstControl = name === 'volume' ? panel.querySelector('[role="slider"]') : panel.querySelector('button, [tabindex="0"]');
+                firstControl?.focus();
             }
         }
 

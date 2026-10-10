@@ -1,7 +1,7 @@
 /* 普通页面共用账号面板透明度与毛玻璃强度，播放详情的根节点位于此作用域之外。作者：jingyh */
 /* 导航内按完整类名匹配面板，避免把 hover:t-bg-main 菜单悬停样式套用为常驻背景和阴影。作者：jingyh */
 :root { --surface-blur: 24px; }
-:root.music-appearance .music-shell :is([class*="t-bg-panel"], [class*="t-bg-main"], [class*="t-bg-glass"],
+:root.music-appearance .music-shell :is([class~="t-bg-panel"], [class~="t-bg-panel/90"], [class~="t-bg-main"], [class~="t-bg-main/50"], [class~="t-bg-glass"],
     .settings-sidebar, .settings-content, .settings-form-card, .settings-mobile-toggle,
     .recent-view, .recent-view-actions button:not(:first-child), .recent-song:hover,
     .library-search-input, .header-actions, .library-search-results, .header-dropdown-panel,

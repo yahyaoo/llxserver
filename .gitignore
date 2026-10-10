@@ -102,3 +102,7 @@ __pycache__/
 
 /output/
 /.llx-*.cjs
+
+# 浏览器验证产生的本地日志与页面快照
+/.playwright-cli/
+/.playwright-mcp/

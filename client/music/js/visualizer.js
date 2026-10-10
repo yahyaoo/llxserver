@@ -100,6 +100,11 @@ const musicVisualizer = (function () {
                 options.diameter = 200;
             }
 
+            // 独立播放页仅替换绘制样式，沿用同一个分析器和动画调度。作者：jingyh
+            if (window.playerDetailView?.open && window.PlayerDetailSpectrum) {
+                AnimationClass = window.PlayerDetailSpectrum;
+            }
+
             waveDetail.addAnimation(new AnimationClass(options));
             detailCanvas.style.opacity = opacity;
         } else if (detailCanvas) {

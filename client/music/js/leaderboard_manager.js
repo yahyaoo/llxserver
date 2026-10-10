@@ -145,23 +145,9 @@ window.LeaderboardManager = (function () {
 
     // ==================== 渲染 ====================
 
+    /** 榜单目录由页面组件渲染，保留原数据与选择入口。 */
     function renderBoards(boards) {
-        const container = document.getElementById('lb-boards-list');
-        if (!container) return;
-        if (!boards || boards.length === 0) {
-            container.innerHTML = '<div class="p-4 text-center t-text-muted text-sm">暂无榜单</div>';
-            return;
-        }
-
-        container.innerHTML = boards.map((board, i) => `
-            <div id="lb-board-${board.bangid}"
-                onclick="window.LeaderboardManager.selectBoard('${board.bangid}', '${board.name.replace(/'/g, "\\'")}' )"
-                class="lb-board-item flex items-center gap-2 px-3 py-2.5 rounded-lg cursor-pointer transition-all duration-200 group ${state.currentBangid == board.bangid ? 'active-option' : 'hover:t-bg-panel t-text-muted'}">
-                <span class="text-xs font-mono w-5 text-center flex-shrink-0 ${i < 3 ? 'text-emerald-600 dark:text-emerald-500 font-bold' : 't-text-muted'}">${i + 1}</span>
-                <span class="text-sm font-medium truncate flex-1 ${state.currentBangid == board.bangid ? '' : 't-text-main group-hover:t-text-main'}">${board.name}</span>
-                <i class="fas fa-chevron-right text-[10px] t-text-muted opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"></i>
-            </div>
-        `).join('');
+        window.LeaderboardView.navigation.render(boards, state.currentBangid);
     }
 
     function renderSongs(songs) {
@@ -323,15 +309,7 @@ window.LeaderboardManager = (function () {
     }
 
     function updateBoardActiveState(bangid) {
-        document.querySelectorAll('.lb-board-item').forEach(el => {
-            el.classList.remove('active-option');
-            el.classList.add('hover:t-bg-panel', 't-text-muted');
-        });
-        const target = document.getElementById(`lb-board-${bangid}`);
-        if (target) {
-            target.classList.add('active-option');
-            target.classList.remove('hover:t-bg-panel', 't-text-muted');
-        }
+        window.LeaderboardView.navigation.setActive(bangid);
     }
 
     function updateBoardTitle(name) {
