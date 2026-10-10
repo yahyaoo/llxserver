@@ -136,7 +136,9 @@ npm run test:fpk:system
 
 `prepare:fpk` 编译并生成载荷，`package:fpk` 调用 SDK 和校验归档，输出 `deploy/fnos/dist/`。个人配置与数据库不进入包。安装向导初始化 SQL，升级保留已有配置。
 
-保留 `levis.lxserver` 应用 ID、应用用户和共享空间身份，以便升级和权限识别。客户端 `http://NAS-IP:17000/music`，后台 `http://NAS-IP:17000/admin/`。共享空间 `config.js` 保存引导，`data/` 保存数据，`logs/` 保存日志。为音乐目录授权时应选择应用用户。
+合体包的应用 ID、应用用户和共享空间名称统一为 `llxserver.all`，FPK 文件名使用同一标识。客户端 `http://NAS-IP:17000/music`，后台 `http://NAS-IP:17000/admin/`。共享空间 `config.js` 保存引导，`data/` 保存数据，`logs/` 保存日志。为音乐目录授权时应选择应用用户 `llxserver.all`。
+
+旧 `levis.lxserver` 安装与新合体包属于不同应用身份，原数据不会自动迁移。已有安装应先备份配置与数据，迁移到新应用后重新核对目录权限；两个应用默认使用相同端口，不能同时监听。
 
 独立服务端 ID 为 `llxserver.server`，默认端口 17001；独立客户端 ID 为 `llxserver.client`，默认端口 17002。客户端安装向导填写服务端 URL，写入共享空间 `config.js` 的 `client.serverUrl`。两个独立应用可同时安装，各有运行用户和共享空间；服务端管理页面通过客户端的 `/admin/` 访问。地址调整在客户端引导文件或环境变量中完成，重启客户端生效。
 

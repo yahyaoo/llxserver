@@ -1,6 +1,6 @@
 {
     ".url": {
-        "levis.lxserver.Application":
+        "llxserver.all.Application":
         {
             "title": "洛洛雪音乐",
             "desc": "洛洛雪音乐 播放器",

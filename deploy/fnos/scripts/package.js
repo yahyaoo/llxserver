@@ -8,7 +8,7 @@ const { normalizeArchive, validateArchive } = require('./fpk-archive');
 const root = path.resolve(__dirname, '..');
 const mode = process.argv[2] || 'all';
 if (!['all', 'server', 'client'].includes(mode)) throw new Error('打包模式错误');
-const appname = mode === 'all' ? 'levis.lxserver' : 'llxserver.' + mode;
+const appname = 'llxserver.' + mode;
 const pack = path.join(root, appname);
 const dist = path.join(root, 'dist');
 fs.mkdirSync(dist, { recursive: true });

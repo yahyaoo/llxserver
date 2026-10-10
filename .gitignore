@@ -90,7 +90,7 @@ dist-electron/
 build/
 
 # fnOS 模板保留，构建产物与 SDK 不提交
-/deploy/fnos/levis.lxserver/app/server/
+/deploy/fnos/llxserver.all/app/server/
 /deploy/fnos/llxserver.server/app/server/
 /deploy/fnos/llxserver.client/app/server/
 /deploy/fnos/dist/

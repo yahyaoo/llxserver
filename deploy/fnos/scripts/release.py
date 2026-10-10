@@ -203,10 +203,10 @@ def main():
         return
     if git(repo, 'status', '--porcelain'):
         raise RuntimeError('仓库尚有未提交内容，请先提交')
-    manifest = (pack / 'levis.lxserver/manifest').read_text(encoding='utf-8')
+    manifest = (pack / 'llxserver.all/manifest').read_text(encoding='utf-8')
     if re.search(r'^version\s*=\s*(\S+)', manifest, re.M).group(1) != version:
         raise RuntimeError('FPK 与源码版本不一致，请重新构建')
-    artifact = pack / 'dist' / f'levis.lxserver-{tag}.fpk'
+    artifact = pack / 'dist' / f'llxserver.all-{tag}.fpk'
     checksum_file = Path(str(artifact) + '.sha256')
     if checksum_file.read_text(encoding='utf-8').split()[0] != hashlib.sha256(artifact.read_bytes()).hexdigest():
         raise RuntimeError('安装包校验文件不匹配')

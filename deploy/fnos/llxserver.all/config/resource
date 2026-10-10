@@ -2,10 +2,10 @@
     "data-share": {
         "shares": [
             {
-                "name": "levis.lxserver",
+                "name": "llxserver.all",
                 "permission": {
                     "rw": [
-                        "levis.lxserver"
+                        "llxserver.all"
                     ]
                 }
             }

@@ -10,7 +10,7 @@ const { spawn } = require('node:child_process');
 const { entries, validateArchive } = require('../scripts/fpk-archive');
 const root = path.resolve(__dirname, '../../..');
 const version = require(path.join(root, 'package.json')).version;
-const file = path.join(root, `deploy/fnos/dist/levis.lxserver-v${version}.fpk`);
+const file = path.join(root, `deploy/fnos/dist/llxserver.all-v${version}.fpk`);
 
 /** 返回包内应用相对路径，复用归档解析器的路径校验。 */
 function readPackage(mode = 'all') {

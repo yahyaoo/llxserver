@@ -65,7 +65,7 @@ jobs:
         run: |
           for mode in all server client; do
             node deploy/scripts/package.cjs "$mode"
-            node -e 'const path = require("node:path"); const { preparePayload, ROOT } = require("./deploy/fnos/scripts/build.js"); const mode = process.argv[1]; preparePayload(ROOT, path.join(ROOT, "deploy/fnos", mode === "all" ? "levis.lxserver" : "llxserver." + mode), mode)' "$mode"
+            node -e 'const path = require("node:path"); const { preparePayload, ROOT } = require("./deploy/fnos/scripts/build.js"); const mode = process.argv[1]; preparePayload(ROOT, path.join(ROOT, "deploy/fnos", "llxserver." + mode), mode)' "$mode"
             node deploy/fnos/scripts/package.js "$mode"
           done
 
@@ -81,7 +81,7 @@ jobs:
           for mode in all server client; do
             cp "output/llxserver-$mode.zip" "output/snapshot/llxserver-$mode-$SNAPSHOT_TAG.zip"
           done
-          for app in levis.lxserver llxserver.server llxserver.client; do
+          for app in llxserver.all llxserver.server llxserver.client; do
             cp "deploy/fnos/dist/$app.fpk" "output/snapshot/$app-$SNAPSHOT_TAG.fpk"
           done
           printf 'channel=snapshot\ntag=%s\ncommit=%s\nrun=https://github.com/%s/actions/runs/%s\n' "$SNAPSHOT_TAG" "$SNAPSHOT_SHA" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" > output/snapshot/BUILD_INFO.txt

@@ -8,14 +8,14 @@ const { ROOT, PACK, preparePayload } = require('./build');
 
 test('构建入口只引用当前仓库', () => {
   assert.equal(ROOT, path.resolve(__dirname, '../../..'));
-  assert.equal(PACK, path.join(ROOT, 'deploy/fnos/levis.lxserver'));
+  assert.equal(PACK, path.join(ROOT, 'deploy/fnos/llxserver.all'));
 });
 
 test('生成载荷同步版本，排除开发机配置并清理旧产物', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'lx-fnos-build-'));
   try {
-    const pack = path.join(root, 'deploy/fnos/levis.lxserver');
-    for (const dir of ['dist/server', 'dist/client', 'deploy/fnos/levis.lxserver/app/server']) fs.mkdirSync(path.join(root, dir), { recursive: true });
+    const pack = path.join(root, 'deploy/fnos/llxserver.all');
+    for (const dir of ['dist/server', 'dist/client', 'deploy/fnos/llxserver.all/app/server']) fs.mkdirSync(path.join(root, dir), { recursive: true });
     const pkg = { name: 'fixture', version: '2.1.3', dependencies: { fixture: '1.0.0' } };
     fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify(pkg));
     fs.writeFileSync(path.join(root, 'package-lock.json'), JSON.stringify({ version: pkg.version, packages: { '': pkg } }));

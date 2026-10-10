@@ -9,7 +9,7 @@ dist-electron
 build
 dist
 output
-deploy/fnos/levis.lxserver/app/server
+deploy/fnos/llxserver.all/app/server
 deploy/fnos/llxserver.server/app/server
 deploy/fnos/llxserver.client/app/server
 deploy/fnos/dist

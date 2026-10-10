@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
 const ROOT = path.resolve(__dirname, '../../..');
-const PACK = path.join(ROOT, 'deploy/fnos/levis.lxserver');
+const PACK = path.join(ROOT, 'deploy/fnos/llxserver.all');
 
 /** 递归复制应用文件，不依赖旁边的源码仓库。 */
 function copyDir(source, destination) {
@@ -23,7 +23,7 @@ function copyDir(source, destination) {
 function preparePayload(root, pack, mode = 'all') {
   root = path.resolve(root);
   pack = path.resolve(pack);
-  if (!['all', 'server', 'client'].includes(mode) || pack !== path.join(root, 'deploy/fnos', mode === 'all' ? 'levis.lxserver' : 'llxserver.' + mode)) throw new Error('打包目录必须位于当前仓库指定飞牛模板');
+  if (!['all', 'server', 'client'].includes(mode) || pack !== path.join(root, 'deploy/fnos', 'llxserver.' + mode)) throw new Error('打包目录必须位于当前仓库指定飞牛模板');
   const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
   const lock = JSON.parse(fs.readFileSync(path.join(root, 'package-lock.json'), 'utf8'));
   if (!/^\d+\.\d+\.\d+$/.test(pkg.version)) throw new Error('源码版本必须使用标准 major.minor.patch 格式');
@@ -70,7 +70,7 @@ function main(mode = 'all') {
     console.log('[build] node ' + args.join(' '));
     execFileSync(process.execPath, args, { cwd: ROOT, stdio: 'inherit' });
   }
-  const pack = path.join(ROOT, 'deploy/fnos', mode === 'all' ? 'levis.lxserver' : 'llxserver.' + mode);
+  const pack = path.join(ROOT, 'deploy/fnos', 'llxserver.' + mode);
   console.log('[build] 应用载荷生成完成：' + preparePayload(ROOT, pack, mode));
 }
 

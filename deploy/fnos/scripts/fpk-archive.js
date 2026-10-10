@@ -62,9 +62,21 @@ function validateArchive(compressed, mode = 'all') {
     if (!entry.content.toString().startsWith('#!/bin/bash\n') || entry.content.includes(13)) throw new Error(`${entry.filename} 的脚本格式错误`);
   }
   JSON.parse(map.get('wizard/install').content.toString());
-  JSON.parse(map.get('config/privilege').content.toString());
-  JSON.parse(map.get('config/resource').content.toString());
+  const privilege = JSON.parse(map.get('config/privilege').content.toString());
+  const resource = JSON.parse(map.get('config/resource').content.toString());
   const app = entries(zlib.gunzipSync(map.get('app.tgz').content));
+  // 三种交付角色的文件名和飞牛内部身份必须一致，避免仅改名后仍安装成旧应用。
+  if (!['all', 'server', 'client'].includes(mode)) throw new Error('打包模式错误');
+  const appname = 'llxserver.' + mode;
+  const manifestValue = key => new RegExp('^' + key + '[ \\t]*=[ \\t]*(\\S+)[ \\t]*$', 'm').exec(manifest)?.[1];
+  if (manifestValue('appname') !== appname) throw new Error('安装包应用标识必须为 ' + appname);
+  if (privilege.username !== appname || privilege.groupname !== appname) throw new Error('安装包应用用户必须匹配 ' + appname);
+  const shares = resource['data-share']?.shares;
+  if (!Array.isArray(shares) || shares.length !== 1 || shares[0].name !== appname || !shares[0].permission?.rw?.includes(appname)) throw new Error('安装包共享目录必须匹配 ' + appname);
+  const launch = appname + '.Application';
+  const uiEntry = app.find(entry => /^(?:\.\/)?(?:app\/)?ui\/config$/.test(entry.filename));
+  const ui = uiEntry && JSON.parse(uiEntry.content.toString());
+  if (manifestValue('desktop_applaunchname') !== launch || !ui?.['.url']?.[launch] || Object.keys(ui['.url']).length !== 1) throw new Error('安装包桌面入口必须匹配 ' + launch);
   if (mode === 'client') {
     if (!app.some(entry => entry.filename.endsWith('server/deploy/client/gateway.cjs'))) throw new Error('客户端安装包缺少网关');
     if (app.some(entry => entry.filename.includes('/dist/server/'))) throw new Error('独立客户端包不得包含服务端');
