@@ -1,4 +1,4 @@
-/** 完整服务器接口测试：临时配置、真实队列、源解析、文件与重启恢复。 @author jingyh */
+/** 完整服务器接口测试：临时配置、真实队列、源解析、文件与重启恢复。 @author yahyaoo */
 const { test } = require('node:test')
 const assert = require('node:assert/strict')
 const fs = require('node:fs')
@@ -68,6 +68,20 @@ test('完整接口：配置持久化、队列下载、本地播放、缓存绝�
   const post = (route, body, headers = admin) => fetch(origin + route, { method: 'POST', headers, body: JSON.stringify(body) })
   try {
     await start()
+    // 真实静态资源路由：设置工作区和主题导航无需构建即可刷新生效。
+    const loginResponse = await post('/api/music/auth', { password: 'lx-player-test' }, { 'Content-Type': 'application/json' })
+    assert.equal(loginResponse.status, 200)
+    const playerHeaders = { Cookie: loginResponse.headers.get('set-cookie').split(';')[0] }
+    const playerPage = await fetch(origin + '/music/', { headers: playerHeaders })
+    assert.equal(playerPage.status, 200)
+    const playerHtml = await playerPage.text()
+    assert.ok(playerHtml.includes('views/settings/SettingsView.js'))
+    assert.ok(playerHtml.includes('id="header-theme-menu"'))
+    for (const resource of ['/music/views/settings/settings.css', '/music/views/settings/SettingsNavigation.js', '/music/views/settings/SettingsView.js', '/music/views/settings/index.js']) {
+      const response = await fetch(origin + resource, { headers: playerHeaders })
+      assert.equal(response.status, 200, resource)
+      assert.ok((await response.text()).length > 100)
+    }
     const disabled = await (await fetch(origin + '/api/app/update/check')).json()
     assert.equal(disabled.enabled, false)
     assert.equal(updateRequests, 0)

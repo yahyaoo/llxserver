@@ -1014,6 +1014,8 @@ function updateUserUI() {
 
     const username = localStorage.getItem('lx_sync_user');
     const token = localStorage.getItem('lx_user_token');
+    document.getElementById('header-account-label')?.classList.toggle('hidden', !!(token && username));
+    document.getElementById('header-sync-logout')?.classList.toggle('hidden', !(token && username));
 
     if (token && username) {
         // 已登录
@@ -4779,6 +4781,7 @@ async function toggleDislikeSong(song) {
         // 自动引导跳转到设置-登录区域
         if (typeof switchTab === 'function') {
             switchTab('settings');
+            selectSettingsSection('sync');
             setTimeout(() => {
                 const el = document.getElementById('btn-mode-local');
                 if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -4815,6 +4818,7 @@ async function toggleDislikeSong(song) {
             }
             if (typeof switchTab === 'function') {
                 switchTab('settings');
+                selectSettingsSection('sync');
                 setTimeout(() => {
                     const el = document.getElementById('btn-mode-local');
                     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -7233,6 +7237,7 @@ async function togglePlay() {
 
 function updatePlayButton(isPlaying) {
     const btn = document.getElementById('btn-play');
+    btn.setAttribute('aria-label', isPlaying ? '暂停' : '播放');
     btn.innerHTML = isPlaying ? '<i class="fas fa-pause"></i>' : '<i class="fas fa-play ml-1"></i>';
 }
 
@@ -7764,23 +7769,7 @@ function toggleMute() {
 
 // 更新音量 UI
 function updateVolumeUI() {
-    const volumeBar = document.getElementById('volume-bar');
-    const volumeIcon = document.getElementById('volume-icon');
-
-    if (volumeBar) {
-        const displayVolume = isMuted ? 0 : currentVolume;
-        volumeBar.style.width = `${displayVolume * 100}%`;
-    }
-
-    if (volumeIcon) {
-        if (isMuted || currentVolume === 0) {
-            volumeIcon.className = 'fas fa-volume-mute w-4';
-        } else if (currentVolume < 0.5) {
-            volumeIcon.className = 'fas fa-volume-down w-4';
-        } else {
-            volumeIcon.className = 'fas fa-volume-up w-4';
-        }
-    }
+    window.playerBar?.updateVolume(currentVolume, isMuted);
 }
 
 // ========== 播放模式 ==========
@@ -8013,7 +8002,7 @@ document.addEventListener('keydown', (e) => {
 
     // 如果焦点在输入框中，忽略快捷键
     const target = e.target;
-    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable || target.closest?.('#volume-container')) {
         return;
     }
 
@@ -16112,7 +16101,7 @@ document.addEventListener('DOMContentLoaded', () => {
     window.setCompactPlaybar = function (compact, showToastMsg = false) {
         const infoEl = document.getElementById('player-song-info');
         const collapseBtn = document.getElementById('btn-collapse-panel');
-        if (!infoEl) return;
+        if (!infoEl || document.getElementById('player-footer')?.classList.contains('floating-player')) return;
 
         if (compact) {
             infoEl.style.display = 'none';
@@ -16132,7 +16121,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // [New] 长按播放键隐藏播放栏内容 (精简模式)
     const btnPlay = document.getElementById('btn-play');
-    if (btnPlay) {
+    if (btnPlay && !document.getElementById('player-footer')?.classList.contains('floating-player')) {
         let pressTimer;
         const infoEl = document.getElementById('player-song-info');
 

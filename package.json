@@ -6,7 +6,7 @@
     "prebuild": "node scripts/update-build-hash.js",
     "build": "rimraf server && tsc --project tsconfig.json && tsc-alias -p tsconfig.json",
     "test": "node --test test/*.test.cjs",
-    "test:unit": "node --test test/appUpdates.test.cjs test/downloadAuth.test.cjs test/serverDownloads.test.cjs test/settingsFrontend.test.cjs",
+    "test:unit": "node --test test/appUpdates.test.cjs test/downloadAuth.test.cjs test/serverDownloads.test.cjs test/settingsFrontend.test.cjs test/playerBar.test.cjs",
     "test:system": "node --test test/serverDownloads.system.test.cjs",
     "test:fpk:system": "node --test fnos/test/fpk.system.test.cjs",
     "prestart": "node scripts/update-build-hash.js",

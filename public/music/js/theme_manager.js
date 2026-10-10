@@ -70,8 +70,12 @@ function setAppearance(mode, save = true) {
 }
 
 function updateThemeSelectionUI(activeTheme) {
+    const names = { emerald: '森之韵', blue: '深海谧', amber: '暖阳愿', violet: '紫微星', rose: '绯红月' };
+    const label = document.getElementById('header-theme-label');
+    if (label) label.textContent = names[activeTheme] || names.emerald;
     document.querySelectorAll('.theme-option').forEach(btn => {
         const theme = btn.getAttribute('data-theme');
+        btn.setAttribute('aria-pressed', String(theme === activeTheme));
         if (theme === activeTheme) {
             btn.setAttribute('data-active', 'true');
         } else {
@@ -83,6 +87,8 @@ function updateThemeSelectionUI(activeTheme) {
 function updateAppearanceUI(activeMode) {
     document.querySelectorAll('.appearance-option').forEach(btn => {
         const mode = btn.getAttribute('data-appearance');
+        btn.setAttribute('data-active', String(mode === activeMode));
+        btn.setAttribute('aria-pressed', String(mode === activeMode));
         if (mode === activeMode) {
             btn.classList.add('ring-emerald-500', 'border-emerald-500', 'text-emerald-600');
             btn.classList.remove('t-border-main', 't-text-muted');
@@ -91,53 +97,6 @@ function updateAppearanceUI(activeMode) {
             btn.classList.add('t-border-main', 't-text-muted');
         }
     });
-}
-
-function switchSettingsTab(tabName) {
-    const panels = ['system', 'display', 'logic', 'logs'];
-
-    // Deactivate all first
-    panels.forEach(p => {
-        const panel = document.getElementById(`settings-panel-${p}`);
-        const tab = document.getElementById(`settings-tab-${p}`);
-
-        if (panel) panel.classList.add('hidden');
-
-        if (tab) {
-            tab.classList.remove('text-emerald-600', 'border-emerald-600');
-            tab.classList.add('text-gray-500', 'border-transparent', 'hover:text-emerald-600');
-        }
-    });
-
-    // Activate the selected one
-    const activePanel = document.getElementById(`settings-panel-${tabName}`);
-    const activeTab = document.getElementById(`settings-tab-${tabName}`);
-
-    if (activePanel) {
-        activePanel.classList.remove('hidden');
-    }
-
-    if (activeTab) {
-        activeTab.classList.add('text-emerald-600', 'border-emerald-600');
-        activeTab.classList.remove('text-gray-500', 'border-transparent', 'hover:text-emerald-600');
-
-        // Scroll to the active tab inside its container (for mobile) without scrolling ancestor containers/window
-        const container = activeTab.parentElement;
-        if (container && container.scrollWidth > container.clientWidth) {
-            const tabLeft = activeTab.offsetLeft;
-            const tabWidth = activeTab.offsetWidth;
-            const containerWidth = container.clientWidth;
-            container.scrollTo({
-                left: tabLeft - (containerWidth / 2) + (tabWidth / 2),
-                behavior: 'smooth'
-            });
-        }
-    }
-
-    // Special logic for logs
-    if (tabName === 'logs' && window.renderSystemLogs) {
-        window.renderSystemLogs();
-    }
 }
 
 // Watch for system theme changes
