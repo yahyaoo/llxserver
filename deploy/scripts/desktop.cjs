@@ -22,7 +22,7 @@ async function buildDesktop(mode, args) {
     const source = path.join(root, 'output', 'llxserver-' + mode);
     fs.cpSync(path.join(root, 'deploy/desktop'), path.join(project, 'deploy/desktop'), { recursive: true });
     const pkg = require(path.join(root, 'package.json'));
-    fs.writeFileSync(path.join(project, 'package.json'), JSON.stringify({ name: 'llxserver-desktop-' + mode, version: pkg.version, description: pkg.description, author: 'yahyaoo', license: pkg.license, dependencies: {}, main }, null, 2));
+    fs.writeFileSync(path.join(project, 'package.json'), JSON.stringify({ name: 'llxserver-desktop-' + mode, version: pkg.version, description: pkg.description, author: pkg.author, homepage: pkg.homepage, repository: pkg.repository, license: pkg.license, dependencies: {}, main }, null, 2));
     fs.copyFileSync(path.join(source, 'config.js'), path.join(project, 'config.js'));
     if (mode !== 'server') {
       fs.cpSync(path.join(source, 'client'), path.join(project, 'client'), { recursive: true });

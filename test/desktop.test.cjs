@@ -12,6 +12,33 @@ const vm = require('node:vm');
 const { EventEmitter } = require('node:events');
 const { loadClientConfiguration } = require('../deploy/client/gateway.cjs');
 
+test('桌面交付目录保留主页与仓库元数据，单架构构建只传入指定架构', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'llx-desktop-package-'));
+  const commands = [];
+  const source = path.join(root, 'output/llxserver-client');
+  const metadata = { version: '2.1.3', description: '桌面测试', author: { name: 'yahyaoo' }, license: 'Apache-2.0', homepage: 'https://github.com/yahyaoo/llxserver', repository: { type: 'git', url: 'git+https://github.com/yahyaoo/llxserver.git' } };
+  try {
+    for (const relative of ['deploy/desktop', 'output/llxserver-client/client', 'output/llxserver-client/deploy/client']) fs.mkdirSync(path.join(root, relative), { recursive: true });
+    fs.writeFileSync(path.join(source, 'config.js'), 'module.exports={}');
+    const sandbox = { exports: {}, module: { exports: {} }, __dirname: path.join(root, 'deploy/scripts'), process, console, require: name => {
+      if (name === 'node:child_process') return { execFileSync: (command, args) => commands.push({ command, args }) };
+      if (name === './package.cjs') return { packageApplication: async mode => { assert.equal(mode, 'client'); } };
+      if (name === './node-runtime.cjs') return { version: '22.22.3', prepareNodeRuntime: () => { throw new Error('客户端不得准备后端运行时'); } };
+      if (name === path.join(root, 'package.json')) return metadata;
+      if (name === path.join(root, 'node_modules/electron/package.json')) return { version: '43.7.5' };
+      return require(name);
+    } };
+    vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../deploy/scripts/desktop.cjs'), 'utf8'), sandbox);
+    await sandbox.module.exports.buildDesktop('client', ['--win', '--x64']);
+    const pkg = JSON.parse(fs.readFileSync(path.join(root, 'output/desktop-client-win32-x64/package.json'), 'utf8'));
+    assert.equal(pkg.homepage, metadata.homepage); assert.deepEqual(pkg.repository, metadata.repository); assert.deepEqual(pkg.author, metadata.author);
+    assert.deepEqual(pkg.dependencies, {}); assert.equal(pkg.main, 'deploy/desktop/client-main.cjs');
+    assert.equal(commands.length, 1);
+    assert.deepEqual(Array.from(commands[0].args).filter(arg => /^--(?:x64|ia32|arm64|armv7l)$/.test(arg)), ['--x64']);
+    assert.ok(commands[0].args.includes('--publish=never'));
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
 /**
  * 执行桌面入口并记录窗口、托盘和网关调用，不触碰真实桌面或用户配置。
  * @param {string} role server 或 client。

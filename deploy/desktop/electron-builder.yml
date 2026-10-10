@@ -9,6 +9,7 @@ extraMetadata:
 
 # 后端在随包 Node 运行时中执行；依赖由 desktop.cjs 按 Node ABI 准备。
 npmRebuild: false
+publish: []
 
 directories:
   output: dist-electron
@@ -65,11 +66,9 @@ win:
   artifactName: "${productName} ${version} ${arch}.${ext}"
   target:
     # ── 独立架构安装包 ──
-    - target: nsis
-      arch: [x64, ia32, arm64]
+    - nsis
     # ── 便携绿色版 (分架构) ──
-    - target: portable
-      arch: [x64, ia32, arm64]
+    - portable
   requestedExecutionLevel: asInvoker
 
 nsis:
@@ -93,18 +92,16 @@ mac:
   artifactName: "${productName} ${version} ${arch}.${ext}"
   target:
     # 产生独立架构镜像 (x64 和 arm64 分开)
-    - target: dmg
-      arch: [x64, arm64]
+    - dmg
   category: public.app-category.utilities
 
 # ── Linux ────────────────────────────────────────────────────────────────────
 linux:
+  maintainer: yahyaoo
   # 统一命名文件名
   artifactName: "${productName} ${version} ${arch}.${ext}"
   target:
     # 为三个主流 Linux 架构创建独立包 (deb 和 AppImage)
-    - target: AppImage
-      arch: [x64, arm64, armv7l]
-    - target: deb
-      arch: [x64, arm64, armv7l]
+    - AppImage
+    - deb
   category: Utility
