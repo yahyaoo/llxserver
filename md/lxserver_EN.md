@@ -1,6 +1,6 @@
 # LX Music Sync Server (Enhanced Edition)
 
-![lxserver](https://socialify.git.ci/XCQ0607/lxserver/image?description=1&forks=0&issues=0&logo=https://raw.githubusercontent.com/XCQ0607/lxserver/refs/heads/main/public/icon.svg&owner=1&pulls=0&stargazers=0&theme=Auto)
+![lxserver](https://socialify.git.ci/XCQ0607/lxserver/image?description=1&forks=0&issues=0&logo=https://raw.githubusercontent.com/XCQ0607/lxserver/refs/heads/main/client/icon.svg&owner=1&pulls=0&stargazers=0&theme=Auto)
 
 <div align="center">
   <p>

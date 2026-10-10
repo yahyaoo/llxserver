@@ -6,24 +6,24 @@
 
 参考 `D:/code/qdgw` 的 Controller → Service → Mapper/Repository 和公共模型约定。Node 保持原 HTTP、WebSocket、Subsonic、音源选择、歌曲排序、下载及缓存协议。分层调整不改变原接口必填参数、状态码、授权条件或响应字段。设置增加 JSON 迁移入口，持久化改为 SQLite。
 
-`src` 是服务源码，`server` 是构建输出，不能直接修改输出。播放器页面位于 `public/music`。本轮系统配置页面位于 `public/views/system-configuration`，使用设置目录组织管理表单。
+`src` 是服务源码，`server` 是构建输出，不能直接修改输出。播放器页面位于 `client/music`。本轮系统配置页面位于 `client/views/system-configuration`，使用设置目录组织管理表单。
 
 ## 目录职责
 
 | 目录 | 职责 |
 | --- | --- |
-| `src/application` | 应用装配、原 HTTP 路由顺序、数据库实例生命周期和旧持久化协议适配 |
-| `src/admin/controller` | 管理 HTTP 入口；交给对应服务 |
-| `src/admin/service` | 用户、源注册、管理配置、运维与备份业务 |
-| `src/admin/repository` | 管理库表注册与连接工厂 |
-| `src/music/controller` | 播放器 HTTP 入口与上传/浏览器存储请求校验 |
-| `src/music/service` | 歌单、屏蔽规则、媒体库、发现、音效、下载、缓存、任务与 Subsonic |
-| `src/music/repository` | 播放器库及配置导入、浏览器存储仓储 |
-| `src/*/model/entity` | 每张业务表的存储实体 |
-| `src/*/model/dto` | 数据写入参数；不引入原接口必填字段 |
-| `src/*/model/vo` | 数据访问返回模型；原 HTTP 响应仍使用既有结构 |
-| `src/common` | 公共字段、请求上下文、令牌契约、通用 SQLite 文档仓储 |
-| `src/integrations` | 第三方音乐平台、脚本执行、更新查询、WebDAV、压缩包适配 |
+| `server/application` | 应用装配、原 HTTP 路由顺序、数据库实例生命周期和旧持久化协议适配 |
+| `server/admin/controller` | 管理 HTTP 入口；交给对应服务 |
+| `server/admin/service` | 用户、源注册、管理配置、运维与备份业务 |
+| `server/admin/repository` | 管理库表注册与连接工厂 |
+| `server/music/controller` | 播放器 HTTP 入口与上传/浏览器存储请求校验 |
+| `server/music/service` | 歌单、屏蔽规则、媒体库、发现、音效、下载、缓存、任务与 Subsonic |
+| `server/music/repository` | 播放器库及配置导入、浏览器存储仓储 |
+| `server/*/model/entity` | 每张业务表的存储实体 |
+| `server/*/model/dto` | 数据写入参数；不引入原接口必填字段 |
+| `server/*/model/vo` | 数据访问返回模型；原 HTTP 响应仍使用既有结构 |
+| `server/common` | 公共字段、请求上下文、令牌契约、通用 SQLite 文档仓储 |
+| `server/integrations` | 第三方音乐平台、脚本执行、更新查询、WebDAV、压缩包适配 |
 | `sql/admin`、`sql/music` | 两库各自的建表 SQL |
 
 所有命名保持类/模型 PascalCase、方法 camelCase、模块职责明确。SQL 表和列采用小写下划线，管理表前缀 `admin_`，播放器表前缀 `music_`。JSDoc 描述使用中文，作者 `yahyaoo`。
@@ -48,7 +48,7 @@ flowchart TD
 
 两个业务域不直接导入对方代码，不共享数据库连接、业务表或跨库事务。共用无业务归属的基础设施和应用装配入口。播放器既有鉴权仍由装配层注入；两个域的用户名称关联沿用原身份协议。
 
-原 160 个路由的处理块移动到相应 Service，Controller 保持薄包装。服务使用 `Pick<ServerRuntime, ...>` 收窄依赖。为保留原异步回调与错误响应，旧服务仍接收 HTTP 上下文；新增导入与浏览器存储业务服务不持有响应对象。旧 `src/server`、`src/modules` 路径保留重导出入口，便于既有脚本兼容。
+原 160 个路由的处理块移动到相应 Service，Controller 保持薄包装。服务使用 `Pick<ServerRuntime, ...>` 收窄依赖。为保留原异步回调与错误响应，旧服务仍接收 HTTP 上下文；新增导入与浏览器存储业务服务不持有响应对象。旧 `server/server`、`server/modules` 路径保留重导出入口，便于既有脚本兼容。
 
 ## 第三方接口
 

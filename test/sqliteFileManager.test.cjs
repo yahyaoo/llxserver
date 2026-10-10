@@ -4,9 +4,9 @@ const assert = require('node:assert/strict')
 const fs = require('node:fs')
 const os = require('node:os')
 const path = require('node:path')
-const { ElFinderConnector } = require('../server/server/elfinderConnector')
-const { readDocument, closeStorage } = require('../server/application/persistence/storage')
-const storageFs = require('../server/application/persistence/documentFileSystem').default
+const { ElFinderConnector } = require('../dist/server/server/elfinderConnector')
+const { readDocument, closeStorage } = require('../dist/server/application/persistence/storage')
+const storageFs = require('../dist/server/application/persistence/documentFileSystem').default
 
 test('文件管理可以创建空 JSON、编辑 SQL 当前值、ZIP 恢复和目录改名', async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'lx-file-manager-'))
@@ -40,7 +40,7 @@ test('文件管理可以创建空 JSON、编辑 SQL 当前值、ZIP 恢复和目
 test('每张 SQL 表都能找到对应实体、DTO 与 VO，公共字段映射完整', () => {
   for (const domain of ['admin', 'music']) {
     const ddl = fs.readFileSync(path.join(__dirname, '../sql', domain, '001_initial.sql'), 'utf8')
-    const models = ['entity', 'dto', 'vo'].map(kind => fs.readdirSync(path.join(__dirname, '../src', domain, 'model', kind)).map(file => ({ file, source: fs.readFileSync(path.join(__dirname, '../src', domain, 'model', kind, file), 'utf8') })))
+    const models = ['entity', 'dto', 'vo'].map(kind => fs.readdirSync(path.join(__dirname, '../server', domain, 'model', kind)).map(file => ({ file, source: fs.readFileSync(path.join(__dirname, '../server', domain, 'model', kind, file), 'utf8') })))
     for (const match of ddl.matchAll(/CREATE TABLE IF NOT EXISTS (\w+)/g)) {
       const table = match[1]
       if (table === 'storage_document') continue

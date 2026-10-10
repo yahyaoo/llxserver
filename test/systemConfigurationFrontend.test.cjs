@@ -4,19 +4,19 @@ const assert = require('node:assert/strict')
 const vm = require('node:vm')
 const fs = require('node:fs')
 const context = vm.createContext({ window: {} })
-vm.runInContext(fs.readFileSync(require('node:path').join(__dirname, '../public/views/system-configuration/SystemConfigurationView.js'), 'utf8'), context)
+vm.runInContext(fs.readFileSync(require('node:path').join(__dirname, '../client/views/system-configuration/SystemConfigurationView.js'), 'utf8'), context)
 const prototype = context.window.SystemConfigurationView.prototype
 
 test('全部默认业务配置都有管理入口，缓存命名选项与已有业务常量一致', () => {
   const path = require('node:path')
-  const defaults = require('../server/defaultConfig').default
-  const fields = require('../server/admin/service/configuration/SystemConfigurationFields').additionalConfigurationFields
-  const html = fs.readFileSync(path.join(__dirname, '../public/index.html'), 'utf8')
+  const defaults = require('../dist/server/defaultConfig').default
+  const fields = require('../dist/server/admin/service/configuration/SystemConfigurationFields').additionalConfigurationFields
+  const html = fs.readFileSync(path.join(__dirname, '../client/index.html'), 'utf8')
   const names = new Set([...html.matchAll(/name="([^"]+)"/g)].map(match => match[1]))
   const separate = new Set(['users', 'proxy.music.enabled', 'proxy.customSource.enabled', 'proxy.app.enabled'])
   for (const key of Object.keys(defaults)) assert.ok(names.has(key) || fields.some(field => field.key === key) || separate.has(key), '缺少配置入口：' + key)
   for (const category of ['music', 'customSource', 'app']) assert.ok(names.has('proxy.' + category + '.mode'))
-  const cacheSource = fs.readFileSync(path.join(__dirname, '../src/music/service/cache/FileCacheService.ts'), 'utf8')
+  const cacheSource = fs.readFileSync(path.join(__dirname, '../server/music/service/cache/FileCacheService.ts'), 'utf8')
   const constants = cacheSource.match(/CACHE_NAMING_PATTERNS = \{([\s\S]*?)^\}/m)[1]
   const options = [...constants.matchAll(/:\s*'([^']+)'/g)].map(match => match[1]).sort()
   assert.deepEqual([...fields.find(field => field.key === 'cache.namingPattern').options].sort(), options)

@@ -22,20 +22,20 @@
     "moduleResolution": "NodeNext",
     // typescript options here
     "allowJs": true,
-    "rootDir": "./src",
-    "outDir": "./server",
+    "rootDir": "./server",
+    "outDir": "./dist/server",
     "noImplicitReturns": false,
     "paths": {
       "@/*": [
-        "./src/*"
+        "./server/*"
       ],
       "@renderer/*": [
-        "./src/modules/*"
+        "./server/modules/*"
       ]
     },
   },
   "include": [
-    "src"
+    "server"
   ],
   "exclude": [
     "node_modules"

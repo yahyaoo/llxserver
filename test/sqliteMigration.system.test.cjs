@@ -25,8 +25,8 @@ test('真实系统：迁移旧 JSON、事务覆盖、库隔离、浏览器存储
   fs.writeFileSync(config, 'module.exports = ' + JSON.stringify({ disableTelemetry: true, 'frontend.password': 'system-test', 'player.enableAuth': false,
     'user.enablePublicRestriction': true, 'configBackup.enable': false, users: [{ name: 'alice', password: 'alice-test' }, { name: 'bob', password: 'bob-test' }] }))
   // 业务配置仅保存在 SQLite，旧 JS 文件不会在启动时自动导入。
-  const { createAdminRepository } = require('../server/admin/repository/AdminRepository')
-  const { GlobalConfigurationService } = require('../server/admin/service/GlobalConfigurationService')
+  const { createAdminRepository } = require('../dist/server/admin/repository/AdminRepository')
+  const { GlobalConfigurationService } = require('../dist/server/admin/service/GlobalConfigurationService')
   const repository = createAdminRepository(data)
   new GlobalConfigurationService(repository).save(config, require(config))
   repository.close()
@@ -46,9 +46,9 @@ test('真实系统：迁移旧 JSON、事务覆盖、库隔离、浏览器存储
   let child, logs = ''
   const admin = { 'x-frontend-auth': 'system-test', 'Content-Type': 'application/json' }
   const start = async () => {
-    const bootstrap = `require(${JSON.stringify(path.join(project, 'server/modules/utils/musicSdk/index.js'))}).default.init = async () => {}; require(${JSON.stringify(path.join(project, 'index.js'))});`
+    const bootstrap = `require(${JSON.stringify(path.join(project, 'dist/server/modules/utils/musicSdk/index.js'))}).default.init = async () => {}; require(${JSON.stringify(path.join(project, 'index.js'))});`
     child = spawn(process.execPath, ['-e', bootstrap], { cwd: project, windowsHide: true, env: { ...process.env, PORT: String(port), BIND_IP: '127.0.0.1',
-      DATA_PATH: data, LOG_PATH: path.join(root, 'logs'), CONFIG_PATH: config, STATIC_PATH: path.join(project, 'public'), NODE_ENV: 'production' } })
+      DATA_PATH: data, LOG_PATH: path.join(root, 'logs'), CONFIG_PATH: config, STATIC_PATH: path.join(project, 'client'), NODE_ENV: 'production' } })
     child.stdout.on('data', chunk => { logs += chunk }); child.stderr.on('data', chunk => { logs += chunk })
     for (let i = 0; i < 150; i++) {
       if (child.exitCode !== null) throw new Error('服务器退出：' + logs.slice(-2500))

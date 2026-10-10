@@ -21,7 +21,7 @@ function browser(legacy) {
     if (options.method === 'DELETE') remote.delete(account)
     return { ok: true, json: async () => ({ value: remote.get(account) ?? null }) }
   } }
-  vm.runInNewContext(fs.readFileSync(require('path').join(__dirname, '../public/music/js/idb_store.js'), 'utf8'), {
+  vm.runInNewContext(fs.readFileSync(require('path').join(__dirname, '../client/music/js/idb_store.js'), 'utf8'), {
     window, console, queueMicrotask, Uint8Array, crypto: { getRandomValues: array => webcrypto.getRandomValues(array) },
     localStorage: { getItem: key => local.get(key), setItem: (key, value) => local.set(key, value) },
     indexedDB: { open: () => { const request = {}; queueMicrotask(() => request.onsuccess({ target: { result: db } })); return request } },

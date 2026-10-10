@@ -1,14 +1,14 @@
-# LX Music Sync Server Architecture and Configuration Guide
+# 洛洛雪音乐 Architecture and Configuration Guide
 
-LX Music Sync Server adheres to the design principle of **zero configuration and out-of-the-box use**, while providing a highly flexible **multi-level configuration injection engine and environment variable reading mechanism** to meet the needs of advanced deployment scenarios. When the Node.js backend service process starts, the system will follow strict hierarchical rules to merge and rewrite various configuration items.
+洛洛雪音乐 adheres to the design principle of **zero configuration and out-of-the-box use**, while providing a highly flexible **multi-level configuration injection engine and environment variable reading mechanism** to meet the needs of advanced deployment scenarios. When the Node.js backend service process starts, the system will follow strict hierarchical rules to merge and rewrite various configuration items.
 
 ## Configuration Loading Hierarchy and Execution Priority
 
-LX Music Sync Server has built a unified basic model skeleton (located in `src/defaultConfig.ts`). During the initialization of the service instance, the configuration parser will streamingly distribute parameters to the **service-side underlying environment** (such as network binding, WebDAV settings, etc.) and the **front-end running environment** (injected into the browser execution sandbox `/js/config.js`) respectively.
+洛洛雪音乐 has built a unified basic model skeleton (located in `server/defaultConfig.ts`). During the initialization of the service instance, the configuration parser will streamingly distribute parameters to the **service-side underlying environment** (such as network binding, WebDAV settings, etc.) and the **front-end running environment** (injected into the browser execution sandbox `/js/config.js`) respectively.
 
-Business configuration is stored in the admin SQLite database. Startup loads stored values over defaults from `src/defaultConfig.ts`, then applies the existing environment variable overrides and persists the effective configuration. WebDAV restore writes business documents back to SQL and reloads them.
+Business configuration is stored in the admin SQLite database. Startup loads stored values over defaults from `server/defaultConfig.ts`, then applies the existing environment variable overrides and persists the effective configuration. WebDAV restore writes business documents back to SQL and reloads them.
 
-`config.js` only contains `database.adminPath` and `database.musicPath`. `CONFIG_PATH` selects this bootstrap file, not a business configuration source. Database paths are relative to `DATA_PATH` unless absolute. Editing old business fields in this file no longer changes configuration; explicitly upload a static old configuration through System Config → Database and Migration.
+`config.js` contains `server.database.adminPath`, `server.database.musicPath` and `client.xxx` connection settings. `CONFIG_PATH` selects this bootstrap file. Database paths are relative to `DATA_PATH` unless absolute. Editing old business fields in this file no longer changes configuration; explicitly upload a static old configuration through System Config → Database and Migration. See the [deployment configuration](https://github.com/yahyaoo/llxserver/blob/dev/deploy/README.md) for the environment variable overrides.
 
 The admin settings page groups service/access, music/cache, and synchronization/data controls. Database relocation copies committed records, verifies the candidate databases, switches connections, and saves bootstrap paths; preparation failure keeps the old databases. Existing target files are rejected. See the [system configuration guide](../../system-configuration.md) for migration details.
 
@@ -47,9 +47,9 @@ This module involves monitoring the status of connected clients and isolation sp
 | :-------------------- | :--------- | :------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `FRONTEND_PASSWORD` | `123456` | String | **Control Panel Admin Password**. Used to log into the management console (default `/admin`). Recommended to modify immediately on setup. |
 | `MAX_SNAPSHOT_NUM` | `10` | Integer | **Time snapshot retention threshold setting**. The maximum allowed length of the historical archive snapshot queue retained by the system. Early histories exceeding this queue limit will be cyclically discarded by the underlying timed GC task. |
-| `DATA_PATH` | `./data` | String | **Data directory path**. Specifies where persistence data (users.json, snapshots) are stored. |
+| `DATA_PATH` | `./data` | String | **Data directory path**. Specifies where persistence data (SQLite databases, music cache and compatibility exports) are stored. |
 | `LOG_PATH` | `./logs` | String | **Log directory path**. Specifies where system logs are stored. |
-| `CONFIG_PATH` | `''` | String | **Bootstrap file path**. Contains only the two SQLite database locations. |
+| `CONFIG_PATH` | `''` | String | **Bootstrap file path**. Server SQLite paths and client connection settings. CLIENT_CONFIG_PATH can select a separate client file. |
 | `USER_ENABLE_PATH` | `true` | Boolean | **Enable User Path Mode (Recommended)**. When enabled, client sync URL is `http://ip:port/<username>`, and data is isolated per user. **Allows multiple users to use identical passwords**. |
 | `USER_ENABLE_ROOT` | `false` | Boolean | **Enable Root Path Mode**. When enabled, client sync URL is `http://ip:port` (without username), and server auto-matches user by password. **Requires all user passwords to be unique**. |
 | `ENABLE_PUBLIC_USER_RESTRICTION` | `true` | Boolean | **Restrict public user permissions**. If enabled, non-admin public users will be restricted from sensitive operations like uploading source, deleting public sources, caching to server, etc. |
@@ -125,7 +125,7 @@ export LX_USER_hello="12345"
 npm run start
 ```
 
-*(Note: After the successful accompanying system control operation mentioned above, this memory object will be converted into entity data and permanently archived to the mounted `<DATA_PATH>/users.json` file for continuous function verification.)*
+*(Note: After the successful accompanying system control operation mentioned above, this memory object will be converted into entity data and permanently archived to the mounted `管理 SQLite 数据库` file for continuous function verification.)*
 
 ---
 

@@ -6,16 +6,21 @@
 
 业务配置读写管理库 `admin_config`，不再加载或监听旧 `config.js` 的业务字段。原数据库中以引导文件路径保存的配置会在库内转换为固定作用域 `system-configuration.json`，不重新读取文件。
 
-首次运行使用 `src/defaultConfig.ts` 初始化 SQL 配置；启动时仍按既有规则应用环境变量并保存生效配置。WebDAV 恢复业务文档后，从 SQL 刷新配置。修改旧文件不会改变运行配置，需要在页面显式导入。
+首次运行使用 `server/defaultConfig.ts` 初始化 SQL 配置；启动时仍按既有规则应用环境变量并保存生效配置。WebDAV 恢复业务文档后，从 SQL 刷新配置。修改旧文件不会改变运行配置，需要在页面显式导入。
 
-`config.js` 仅保存两个数据库文件位置：
+`config.js` 使用 `server.xxx` 保存数据库引导、`client.xxx` 保存独立客户端连接配置，环境变量优先：
 
 ```js
 module.exports = {
-  'database.adminPath': 'database/admin.sqlite',
-  'database.musicPath': 'database/music.sqlite'
+  'server.database.adminPath': 'database/admin.sqlite',
+  'server.database.musicPath': 'database/music.sqlite',
+  'client.serverUrl': 'http://127.0.0.1:9527',
+  'client.port': 9528,
+  'client.bindIP': '0.0.0.0'
 }
 ```
+
+独立客户端读取同一格式的配置；`SERVER_URL`、`CLIENT_PORT`、`CLIENT_BIND_IP` 和服务端 `SERVER_DATABASE_ADMIN_PATH`、`SERVER_DATABASE_MUSIC_PATH` 优先。后台迁库保存引导时保留客户端字段。详细说明见 [部署文档](https://github.com/yahyaoo/llxserver/blob/dev/deploy/README.md)。
 
 相对数据库路径基于 `DATA_PATH`。引导文件默认位于 `DATA_PATH/config.js`，可由 `CONFIG_PATH` 指定；该文件不存在时读取项目根目录的路径配置，首次启动后写出实际位置。精简已有旧文件前保留原文为 `config.js.legacy.js`，供管理员手动导入。配置导出备份和 WebDAV 同步不会包含引导文件、旧配置副本或实际数据库文件。
 

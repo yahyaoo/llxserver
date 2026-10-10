@@ -6,7 +6,7 @@ const path = require('node:path')
 const vm = require('node:vm')
 
 test('切换用户保留各自目录草稿，恢复原值后移除草稿', () => {
-  const source = fs.readFileSync(path.join(__dirname, '../public/app.js'), 'utf8')
+  const source = fs.readFileSync(path.join(__dirname, '../client/app.js'), 'utf8')
   const methods = source.slice(source.indexOf('    renderCustomDirectoryFields() {'), source.indexOf('    /** 预览文件名模板'))
   const fields = {
     'config-custom-dir-user': { value: 'admin' }, 'config-custom-dir-path': {},
@@ -38,7 +38,7 @@ test('切换用户保留各自目录草稿，恢复原值后移除草稿', () =>
 })
 
 test('关闭更新不请求，开启只调用本地接口；发布说明转义且拒绝脚本链接', async () => {
-  const source = fs.readFileSync(path.join(__dirname, '../public/js/notification-engine.js'), 'utf8')
+  const source = fs.readFileSync(path.join(__dirname, '../client/js/notification-engine.js'), 'utf8')
   const functions = source.slice(source.indexOf('    const escapeText ='), source.indexOf('    // 暴露给全局的方法'))
   let requests = 0, modal
   const context = vm.createContext({ window: { CONFIG: { updateEnabled: false } }, URL,
@@ -87,7 +87,7 @@ function createMusicSettingsContext() {
   const sections = ['sources', 'network', 'updates', 'sync', 'auto-update', 'cache', 'theme', 'layout', 'visuals', 'lyrics', 'queue', 'playback', 'recovery', 'devices', 'logs', 'admin', 'about'].map(id => {
     const element = get('settings-section-' + id); element.dataset.settingsSection = id; return element
   })
-  const themeButtons = ['emerald', 'blue', 'amber', 'violet', 'rose', 'emerald', 'blue', 'amber', 'violet', 'rose'].map(id => {
+  const themeButtons = ['pink', 'emerald', 'blue', 'amber', 'violet', 'rose', 'pink', 'emerald', 'blue', 'amber', 'violet', 'rose'].map(id => {
     const element = new Element(); element.setAttribute('data-theme', id); return element
   })
   const appearanceButtons = ['light', 'dark', 'system', 'light', 'dark', 'system'].map(id => {
@@ -115,7 +115,7 @@ function createMusicSettingsContext() {
   // 普通导航测试不模拟播放器；高度测量由单独的边界测试提供真实矩形。
   const originalGet = context.document.getElementById
   context.document.getElementById = id => id === 'player-footer' ? null : originalGet(id)
-  for (const file of ['js/theme_manager.js', 'views/settings/SettingsNavigation.js', 'views/settings/index.js']) vm.runInContext(fs.readFileSync(path.join(__dirname, '../public/music', file), 'utf8'), context)
+  for (const file of ['js/theme_manager.js', 'views/settings/SettingsNavigation.js', 'views/settings/index.js']) vm.runInContext(fs.readFileSync(path.join(__dirname, '../client/music', file), 'utf8'), context)
   context.initSettingsNavigation()
   return { context, get, sections, menus, values, documentEvents, themeButtons, appearanceButtons }
 }
@@ -175,13 +175,23 @@ test('顶部下拉互斥，外部点击和 Esc 关闭并恢复键盘焦点', () 
   assert.equal(get('header-theme-menu').classList.contains('hidden'), true)
 })
 
+test('顶部菜单由统一层级样式管理，搜索图标不能穿透菜单', () => {
+  const page = fs.readFileSync(path.join(__dirname, '../client/music/index.html'), 'utf8')
+  const css = fs.readFileSync(path.join(__dirname, '../client/music/views/settings/settings.css'), 'utf8')
+  const headerClasses = page.match(/<header class="([^"]+)"/)[1].split(/\s+/)
+  assert.ok(!headerClasses.some(value => /^z-/.test(value)), '不使用工具类覆盖顶部栏层级')
+  const rule = css.match(/\.app-header\s*\{([^}]+)\}/)[1]
+  assert.match(rule, /position:\s*relative/)
+  assert.match(rule, /z-index:\s*40/)
+})
+
 test('顶部与设置中的主题共享存储、选中态与外观模式，无效主题不改写偏好', () => {
   const { context, get, values, themeButtons, appearanceButtons } = createMusicSettingsContext()
   context.setTheme('violet')
   assert.equal(values.get('lx_theme'), 'violet')
   assert.equal(get('header-theme-label').textContent, '紫微星')
   assert.equal(themeButtons.filter(button => button.getAttribute('aria-pressed') === 'true').length, 2)
-  assert.equal(themeButtons[8].getAttribute('aria-pressed'), 'true', '设置中的主题也同步选中')
+  assert.equal(themeButtons[10].getAttribute('aria-pressed'), 'true', '设置中的主题也同步选中')
   context.setTheme('invalid')
   assert.equal(values.get('lx_theme'), 'violet')
   context.setAppearance('dark')
@@ -195,10 +205,26 @@ test('顶部与设置中的主题共享存储、选中态与外观模式，无�
   assert.equal(values.get('lx_appearance'), 'system')
 })
 
+test('六种主题在顶部与设置间往返切换，两个入口始终同步选中并保存粉色偏好', () => {
+  const { context, get, values, themeButtons } = createMusicSettingsContext()
+  for (const theme of ['pink', 'emerald', 'blue', 'amber', 'violet', 'rose', 'pink']) {
+    context.setTheme(theme)
+    assert.equal(context.document.documentElement.getAttribute('data-theme'), theme)
+    assert.equal(values.get('lx_theme'), theme)
+    for (const button of themeButtons) {
+      const selected = button.getAttribute('data-theme') === theme
+      assert.equal(button.getAttribute('aria-pressed'), String(selected))
+      assert.equal(button.getAttribute('data-active'), String(selected))
+    }
+    assert.equal(themeButtons.filter(button => button.getAttribute('aria-pressed') === 'true').length, 2)
+  }
+  assert.equal(get('header-theme-label').textContent, '樱花粉')
+})
+
 test('设置页铺满高度，补偿加在滚动区域末尾，不再扣减页面高度', () => {
-  const css = fs.readFileSync(path.join(__dirname, '../public/music/views/settings/settings.css'), 'utf8')
-  const source = fs.readFileSync(path.join(__dirname, '../public/music/views/settings/index.js'), 'utf8')
-  const playerCss = fs.readFileSync(path.join(__dirname, '../public/music/components/player-bar/player-bar.css'), 'utf8')
+  const css = fs.readFileSync(path.join(__dirname, '../client/music/views/settings/settings.css'), 'utf8')
+  const source = fs.readFileSync(path.join(__dirname, '../client/music/views/settings/index.js'), 'utf8')
+  const playerCss = fs.readFileSync(path.join(__dirname, '../client/music/components/player-bar/player-bar.css'), 'utf8')
   const viewRule = css.match(/#view-settings, body\.player-bar-floating #view-settings\s*\{([^}]+)\}/)[1]
   assert.match(viewRule, /bottom:\s*0\s*!important/)
   assert.ok(!css.includes('--settings-player-height'))
@@ -212,14 +238,14 @@ test('设置页铺满高度，补偿加在滚动区域末尾，不再扣减页�
 test('独立设置页面组件同步挂载，重复挂载保留控件草稿；模板和资源入口完整', () => {
   const { context } = createMusicSettingsContext()
   context.document.getElementById = () => null
-  vm.runInContext(fs.readFileSync(path.join(__dirname, '../public/music/views/settings/SettingsView.js'), 'utf8'), context)
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '../client/music/views/settings/SettingsView.js'), 'utf8'), context)
   const container = { dataset: {}, innerHTML: '' }
   context.window.SettingsView.mount(container)
   assert.equal(container.dataset.settingsMounted, 'true')
   assert.ok(container.innerHTML.includes('id="settings-navigation"'))
   assert.ok(container.innerHTML.includes('id="btn-mode-local"'))
   assert.equal([...container.innerHTML.matchAll(/data-settings-section=/g)].length, 17)
-  assert.equal([...container.innerHTML.matchAll(/data-theme=/g)].length, 5)
+  assert.equal([...container.innerHTML.matchAll(/data-theme=/g)].length, 6)
   assert.equal([...container.innerHTML.matchAll(/data-appearance=/g)].length, 3)
   assert.ok(container.innerHTML.includes('id="nav-admin-link"'))
   assert.ok(container.innerHTML.includes('id="about-content"'))
@@ -228,7 +254,7 @@ test('独立设置页面组件同步挂载，重复挂载保留控件草稿；�
   container.innerHTML = '保留已挂载控件及未保存草稿'
   context.window.SettingsView.mount(container)
   assert.equal(container.innerHTML, '保留已挂载控件及未保存草稿')
-  const page = fs.readFileSync(path.join(__dirname, '../public/music/index.html'), 'utf8')
+  const page = fs.readFileSync(path.join(__dirname, '../client/music/index.html'), 'utf8')
   assert.ok(page.indexOf('views/settings/SettingsView.js') < page.indexOf('src="app.js"'), '先挂载控件再执行原有业务脚本')
   assert.ok(page.includes('views/settings/settings.css'))
 })
@@ -252,7 +278,7 @@ test('应用分组切换后台和关于；旧关于入口进入设置并保持�
   context.expandBtnTimeout = null
   context.toggleLyricsBtnTimeout = null
   context.exitListSecondaryModes = () => {}
-  const source = fs.readFileSync(path.join(__dirname, '../public/music/app.js'), 'utf8')
+  const source = fs.readFileSync(path.join(__dirname, '../client/music/app.js'), 'utf8')
   const switchTabStart = source.indexOf('function switchTab(')
   vm.runInContext(source.slice(switchTabStart, source.indexOf('\n/**', switchTabStart)), context)
   context.switchTab('about')
@@ -267,7 +293,7 @@ test('应用分组切换后台和关于；旧关于入口进入设置并保持�
 test('主导航独立组件同步挂载，重复挂载保留收藏树；管理和关于只在设置中提供', () => {
   const { context } = createMusicSettingsContext()
   context.document.getElementById = () => null
-  vm.runInContext(fs.readFileSync(path.join(__dirname, '../public/music/views/main-navigation/MainNavigation.js'), 'utf8'), context)
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '../client/music/views/main-navigation/MainNavigation.js'), 'utf8'), context)
   const container = { dataset: {}, innerHTML: '' }
   context.window.MainNavigation.mount(container)
   assert.equal(container.dataset.navigationMounted, 'true')
@@ -278,7 +304,7 @@ test('主导航独立组件同步挂载，重复挂载保留收藏树；管理�
   container.innerHTML = '保留歌单树与当前展开状态'
   context.window.MainNavigation.mount(container)
   assert.equal(container.innerHTML, '保留歌单树与当前展开状态')
-  const page = fs.readFileSync(path.join(__dirname, '../public/music/index.html'), 'utf8')
+  const page = fs.readFileSync(path.join(__dirname, '../client/music/index.html'), 'utf8')
   assert.ok(page.indexOf('views/main-navigation/MainNavigation.js') < page.indexOf('src="app.js"'))
   assert.ok(page.indexOf('views/main-navigation/MainNavigation.js') < page.indexOf('js/user_sync.js'))
   assert.ok(page.includes('views/main-navigation/main-navigation.css'))
@@ -295,7 +321,7 @@ test('桌面导航收起保留手机抽屉和收藏状态，点击收藏展开�
   sidebar.classList.add('-translate-x-full')
   get('tab-search').classList.add('active-tab')
   get('favorites-children').style.height = '128px'
-  vm.runInContext(fs.readFileSync(path.join(__dirname, '../public/music/views/main-navigation/index.js'), 'utf8'), context)
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '../client/music/views/main-navigation/index.js'), 'utf8'), context)
   context.toggleMainNavigation()
   assert.equal(sidebar.classList.contains('navigation-collapsed'), true)
   assert.equal(sidebar.classList.contains('-translate-x-full'), true)
@@ -306,7 +332,7 @@ test('桌面导航收起保留手机抽屉和收藏状态，点击收藏展开�
   let favoritesToggles = 0
   context.exitListSecondaryModes = () => {}
   context.toggleFavorites = () => favoritesToggles++
-  const source = fs.readFileSync(path.join(__dirname, '../public/music/app.js'), 'utf8')
+  const source = fs.readFileSync(path.join(__dirname, '../client/music/app.js'), 'utf8')
   vm.runInContext(source.slice(source.indexOf('function handleFavoritesClick()'), source.indexOf('function handleDislikeFolderClick()')), context)
   context.handleFavoritesClick()
   assert.equal(sidebar.classList.contains('navigation-collapsed'), false)

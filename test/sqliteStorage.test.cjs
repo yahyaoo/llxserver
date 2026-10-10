@@ -5,8 +5,8 @@ const fs = require('node:fs')
 const path = require('node:path')
 const os = require('node:os')
 const Database = require('better-sqlite3')
-const { repositories, readDocument, writeDocument, closeStorage } = require('../server/application/persistence/storage')
-const storageFs = require('../server/application/persistence/documentFileSystem').default
+const { repositories, readDocument, writeDocument, closeStorage } = require('../dist/server/application/persistence/storage')
+const storageFs = require('../dist/server/application/persistence/documentFileSystem').default
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'lx-sqlite-unit-'))
 const settings = path.join(root, 'users/alice/settings.json')
 before(() => { global.lx = { dataPath: root }; fs.mkdirSync(path.dirname(settings), { recursive: true }) })

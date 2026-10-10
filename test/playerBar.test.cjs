@@ -6,7 +6,7 @@ const path = require('node:path')
 const vm = require('node:vm')
 
 const read = file => fs.readFileSync(path.join(__dirname, '..', file), 'utf8')
-const appSource = read('public/music/app.js')
+const appSource = read('client/music/app.js')
 
 /** 隔离浏览器环境，执行真实弹框和音量函数。 */
 function createContext() {
@@ -47,8 +47,8 @@ function createContext() {
   })
   const volumeFunctions = appSource.slice(appSource.indexOf('let currentVolume ='), appSource.indexOf('// ========== 播放模式'))
   const changeVolume = appSource.slice(appSource.indexOf('function changeVolume(delta)'), appSource.indexOf('// 注册全局键盘监听'))
-  vm.runInContext(read('public/music/components/player-bar/template.js'), context)
-  vm.runInContext(read('public/music/components/player-bar/index.js'), context)
+  vm.runInContext(read('client/music/components/player-bar/template.js'), context)
+  vm.runInContext(read('client/music/components/player-bar/index.js'), context)
   vm.runInContext(volumeFunctions + changeVolume, context)
   get('player-actions').children = ['player-more-anchor', 'play-mode-anchor', 'player-like-btn', 'player-queue-btn', 'player-volume-anchor'].map(get)
   get('player-volume-anchor').classList.add('player-volume-anchor')
@@ -200,8 +200,8 @@ test('音量栏内展开时菜单退出交互，关闭和切换更多恢复菜�
 })
 
 test('组件加载先于依赖其节点的模块，保留唯一控件 ID 和有效操作入口', () => {
-  const html = read('public/music/index.html')
-  const template = read('public/music/components/player-bar/template.js')
+  const html = read('client/music/index.html')
+  const template = read('client/music/components/player-bar/template.js')
   assert.ok(html.indexOf('components/player-bar/template.js') < html.indexOf('components/player-bar/index.js'))
   assert.ok(html.indexOf('components/player-bar/index.js') < html.indexOf('js/visualizer.js'))
   assert.ok(html.indexOf('components/player-bar/index.js') < html.indexOf('src="app.js"'))
@@ -231,7 +231,7 @@ test('移除底栏画布后详情页频谱独立初始化，旧底栏设置不�
     document: { documentElement: {}, getElementById: id => id === 'audio-player' ? audio : id === 'detail-visualizer' ? canvas : null },
     getComputedStyle: () => ({ getPropertyValue: () => '#10b981' }),
   })
-  vm.runInContext(read('public/music/js/visualizer.js'), context)
+  vm.runInContext(read('client/music/js/visualizer.js'), context)
   events.play()
   assert.equal(canvases.length, 1)
   assert.equal(canvases[0], canvas)

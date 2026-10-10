@@ -1,0 +1,9 @@
+#!/bin/bash
+# 独立客户端只保存连接配置，不安装服务端依赖或初始化数据库。 @author yahyaoo
+export PATH=/var/apps/nodejs_v24/target/bin:$PATH
+DATA_DIR="${TRIM_DATA_SHARE_PATHS%%:*}"
+mkdir -p "${DATA_DIR}"
+if [ ! -f "${DATA_DIR}/config.js" ]; then
+  LLX_SERVER_URL="${wizard_server_url:-http://127.0.0.1:17001}" LLX_CONFIG_PATH="${DATA_DIR}/config.js" node -e 'require("fs").writeFileSync(process.env.LLX_CONFIG_PATH,"module.exports="+JSON.stringify({"client.serverUrl":process.env.LLX_SERVER_URL,"client.port":17002,"client.bindIP":"0.0.0.0"}))' || exit 1
+fi
+exit 0

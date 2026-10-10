@@ -43,8 +43,8 @@ test('完整接口：配置持久化、队列下载、本地播放、缓存绝�
     disableTelemetry: true, users: [{ name: 'admin', password: 'lx-user-test', allowWriteCustomMusicDir: true }, { name: 'alice', password: 'lx-alice-test' }], 'configBackup.enable': false,
   }))
   // 业务配置仅保存在 SQLite，旧 JS 文件不会在启动时自动导入。
-  const { createAdminRepository } = require('../server/admin/repository/AdminRepository')
-  const { GlobalConfigurationService } = require('../server/admin/service/GlobalConfigurationService')
+  const { createAdminRepository } = require('../dist/server/admin/repository/AdminRepository')
+  const { GlobalConfigurationService } = require('../dist/server/admin/service/GlobalConfigurationService')
   const repository = createAdminRepository(data)
   new GlobalConfigurationService(repository).save(configFile, require(configFile))
   repository.close()
@@ -55,11 +55,11 @@ test('完整接口：配置持久化、队列下载、本地播放、缓存绝�
     lx.send(lx.EVENT_NAMES.inited, { sources: { wy: { name: '系统测试源', type: 'music', actions: ['musicUrl'], qualitys: ['320k'] } } });`)
   fs.writeFileSync(path.join(srcDir, 'sources.json'), JSON.stringify([{ id: 'fixture.js', name: '系统测试源', enabled: true }]))
   // 仅测试启动跳过 SDK 外网预热；下载仍通过真实源脚本与队列解析。
-  const bootstrap = `require(${JSON.stringify(path.join(project, 'server/modules/utils/musicSdk/index.js'))}).default.init = async () => {}; require(${JSON.stringify(path.join(project, 'index.js'))});`
+  const bootstrap = `require(${JSON.stringify(path.join(project, 'dist/server/modules/utils/musicSdk/index.js'))}).default.init = async () => {}; require(${JSON.stringify(path.join(project, 'index.js'))});`
   const start = async () => {
     child = spawn(process.execPath, ['-e', bootstrap], { cwd: project, windowsHide: true, env: {
       ...process.env, PORT: String(port), BIND_IP: '127.0.0.1', DATA_PATH: data, LOG_PATH: path.join(root, 'logs'),
-      CONFIG_PATH: configFile, STATIC_PATH: path.join(project, 'public'), DISABLE_TELEMETRY: 'true', NODE_ENV: 'production',
+      CONFIG_PATH: configFile, STATIC_PATH: path.join(project, 'client'), DISABLE_TELEMETRY: 'true', NODE_ENV: 'production',
     } })
     child.stdout.on('data', b => { logs += b })
     child.stderr.on('data', b => { logs += b })
@@ -166,7 +166,7 @@ test('完整接口：配置持久化、队列下载、本地播放、缓存绝�
     const store = new Map([['lx_sync_user', 'admin'], ['lx_sync_pass', 'lx-user-test'], ['lx_user_token', 'expired-before-restart'], ['lx_admin_password', 'lx-system-test']])
     const context = vm.createContext({ window: {}, console, fetch: (url, options) => fetch(origin + url, options),
       localStorage: { getItem: key => store.get(key) || null, setItem: (key, value) => store.set(key, value), removeItem: key => store.delete(key) } })
-    const frontend = fs.readFileSync(path.join(project, 'public/music/app.js'), 'utf8')
+    const frontend = fs.readFileSync(path.join(project, 'client/music/app.js'), 'utf8')
     const headersStart = frontend.indexOf('function getUserAuthHeaders()')
     vm.runInContext("let userToken = localStorage.getItem('lx_user_token');\n" + frontend.slice(headersStart, frontend.indexOf('window.getUserAuthHeaders = getUserAuthHeaders;', headersStart)), context)
     const refreshStart = frontend.indexOf('let userTokenRefreshPromise = null;')

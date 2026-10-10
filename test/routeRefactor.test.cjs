@@ -19,10 +19,10 @@ function digest(body) {
 test('158 个非配置路由保持原执行语句，160 个原路由条件顺序保持一致', () => {
   assert.equal(routes.length, 160)
   const files = new Map()
-  const http = fs.readFileSync(path.join(__dirname, '../src/application/http/HttpServer.ts'), 'utf8')
+  const http = fs.readFileSync(path.join(__dirname, '../server/application/http/HttpServer.ts'), 'utf8')
   let position = 0
   for (const route of routes) {
-    const filename = path.join(__dirname, '..', route.file.replace(/^src\//, 'server/').replace(/\.ts$/, '.js'))
+    const filename = path.join(__dirname, '..', route.file.replace(/^src\//, 'dist/server/').replace(/\.ts$/, '.js'))
     if (!files.has(filename)) {
       const source = fs.readFileSync(filename, 'utf8')
       files.set(filename, { source, tree: acorn.parse(source, { ecmaVersion: 'latest' }) })
@@ -43,7 +43,7 @@ test('158 个非配置路由保持原执行语句，160 个原路由条件顺序
 })
 
 test('管理和播放器业务域不直接导入彼此，业务不导入 SDK 内部文件', () => {
-  const root = path.join(__dirname, '../src')
+  const root = path.join(__dirname, '../server')
   function walk(directory) {
     return fs.readdirSync(directory, { withFileTypes: true }).flatMap(entry => entry.isDirectory() ? walk(path.join(directory, entry.name)) : [path.join(directory, entry.name)])
   }

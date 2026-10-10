@@ -4,15 +4,15 @@ const assert = require('node:assert/strict')
 const fs = require('node:fs')
 const path = require('node:path')
 const os = require('node:os')
-const { createAdminRepository } = require('../server/admin/repository/AdminRepository')
-const { GlobalConfigurationService } = require('../server/admin/service/GlobalConfigurationService')
-const { SystemConfigurationImportService } = require('../server/admin/service/configuration/SystemConfigurationImportService')
-const { parseLegacyConfiguration } = require('../server/admin/service/configuration/LegacyConfigurationParser')
-const { repositories, closeStorage } = require('../server/application/persistence/storage')
-const { DatabaseLocationService } = require('../server/application/persistence/DatabaseLocationService')
-const { readDatabasePaths, writeDatabasePaths } = require('../server/application/persistence/BootstrapConfiguration')
-const defaults = require('../server/defaultConfig').default
-const { initializeInstallationConfiguration } = require('../server/application/persistence/InstallationConfiguration')
+const { createAdminRepository } = require('../dist/server/admin/repository/AdminRepository')
+const { GlobalConfigurationService } = require('../dist/server/admin/service/GlobalConfigurationService')
+const { SystemConfigurationImportService } = require('../dist/server/admin/service/configuration/SystemConfigurationImportService')
+const { parseLegacyConfiguration } = require('../dist/server/admin/service/configuration/LegacyConfigurationParser')
+const { repositories, closeStorage } = require('../dist/server/application/persistence/storage')
+const { DatabaseLocationService } = require('../dist/server/application/persistence/DatabaseLocationService')
+const { readDatabasePaths, writeDatabasePaths } = require('../dist/server/application/persistence/BootstrapConfiguration')
+const defaults = require('../dist/server/defaultConfig').default
+const { initializeInstallationConfiguration } = require('../dist/server/application/persistence/InstallationConfiguration')
 
 test('飞牛向导配置初始化到 SQL，密码转义保持原值，重复安装不覆盖配置', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'lx-install-config-'))
@@ -24,7 +24,7 @@ test('飞牛向导配置初始化到 SQL，密码转义保持原值，重复安�
     repository = createAdminRepository(root)
     const config = new GlobalConfigurationService(repository).load(path.join(root, 'config.js'), defaults)
     assert.equal(config['frontend.password'], password)
-    assert.deepEqual(Object.keys(parseLegacyConfiguration(fs.readFileSync(path.join(root, 'config.js'), 'utf8'))).sort(), ['database.adminPath', 'database.musicPath'])
+    assert.deepEqual(Object.keys(parseLegacyConfiguration(fs.readFileSync(path.join(root, 'config.js'), 'utf8'))).sort(), ['server.database.adminPath', 'server.database.musicPath'])
   } finally { repository?.close(); fs.rmSync(root, { recursive: true, force: true }) }
 })
 
@@ -98,7 +98,7 @@ test('两库迁移保留 WAL 当前值与仓储引用；重启按新路径读取
     assert.equal(repositories(root).admin, admin); assert.equal(repositories(root).music, music)
     assert.equal(music.read('music_settings', path.join(root, 'users/alice/settings.json')).value['中文'], 'WAL当前值')
     assert.equal(fs.existsSync(old['database.adminPath']), false); assert.equal(fs.existsSync(old['database.musicPath']), false)
-    assert.deepEqual(Object.keys(parseLegacyConfiguration(fs.readFileSync(path.join(root, 'config.js'), 'utf8'))).sort(), ['database.adminPath', 'database.musicPath'])
+    assert.deepEqual(Object.keys(parseLegacyConfiguration(fs.readFileSync(path.join(root, 'config.js'), 'utf8'))).sort(), ['server.database.adminPath', 'server.database.musicPath'])
     closeStorage(root)
     assert.equal(repositories(root).music.read('music_settings', path.join(root, 'users/alice/settings.json')).value['中文'], 'WAL当前值')
   } finally { closeStorage(root); fs.rmSync(root, { recursive: true, force: true }) }

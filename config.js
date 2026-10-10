@@ -4,6 +4,9 @@
  * @author yahyaoo
  */
 module.exports = {
-  "database.adminPath": "database/admin.sqlite",
-  "database.musicPath": "database/music.sqlite"
+  "server.database.adminPath": "database/admin.sqlite",
+  "server.database.musicPath": "database/music.sqlite",
+  "client.serverUrl": "http://127.0.0.1:9527",
+  "client.port": 9528,
+  "client.bindIP": "0.0.0.0"
 }

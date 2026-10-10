@@ -1,0 +1,15 @@
+{
+    ".url": {
+        "llxserver.client.Application":
+        {
+            "title": "洛洛雪音乐客户端",
+            "desc": "洛洛雪音乐客户端 播放器",
+            "icon": "images/{0}.png",
+            "type": "url",
+            "port": "17002",
+            "protocol": "http",
+            "url": "/",
+            "allUsers": true
+        }
+    }
+}

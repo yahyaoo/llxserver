@@ -1,8 +1,8 @@
 /** 洛雪配置解析、事务及上传界面的单元测试。 @author yahyaoo */
 const { test } = require('node:test')
 const assert = require('node:assert/strict')
-const { parseLxConfiguration } = require('../server/music/service/configuration/LxConfigurationParser')
-const { LxConfigurationImportService } = require('../server/music/service/configuration/LxConfigurationImportService')
+const { parseLxConfiguration } = require('../dist/server/music/service/configuration/LxConfigurationParser')
+const { LxConfigurationImportService } = require('../dist/server/music/service/configuration/LxConfigurationImportService')
 const fs = require('node:fs')
 const path = require('node:path')
 const vm = require('node:vm')
@@ -48,7 +48,7 @@ test('上传界面使用既有认证请求，失败不删除浏览器缓存或�
   const window = { fetchDownloadWithAuth: async (url, options) => { assert.equal(url, '/api/music/configuration/import'); assert.equal(options.method, 'POST'); uploads++; return { ok: status === 200, json: async () => status === 200 ? { success: true, playlists: 3, songs: 3 } : { success: false, message: '无效文件' } } },
     ListStore: { remove: async () => { removed++ } }, location: { reload: () => { refreshed++ } } }
   const context = { window, document: { getElementById: id => elements[id] }, FormData: class { append() {} } }
-  vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../public/music/views/settings/ConfigurationImport.js'), 'utf8'), context)
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../client/music/views/settings/ConfigurationImport.js'), 'utf8'), context)
   const input = { files: [{ size: 10 }], value: 'file' }
   await window.importLxConfiguration(input)
   assert.equal(uploads, 1); assert.equal(removed, 0); assert.equal(refreshed, 0); assert.equal(input.value, '')

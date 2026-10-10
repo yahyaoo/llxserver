@@ -11,6 +11,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        mode: [all, server, client]
+        os: [windows-latest, macos-latest, ubuntu-latest]
         include:
           - os: windows-latest
             platform: win
@@ -20,7 +22,7 @@ jobs:
             platform: linux
 
     runs-on: ${{ matrix.os }}
-    name: Build (${{ matrix.platform }})
+    name: Build (${{ matrix.mode }} / ${{ matrix.platform }})
 
     steps:
       - name: Checkout
@@ -42,17 +44,13 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # ── 5. 编译原生模块 (music-tag-native 等) ────────────────────────────────
-      - name: Rebuild native modules
-        run: npx @electron/rebuild --version $(node -e "console.log(require('electron/package.json').version)")
-        env:
-          npm_config_build_from_source: true
+      # 各角色交付目录使用独立 Node 运行时准备后端原生依赖。
 
       - name: Build JS source
         run: npm run electron:build
 
       - name: Package Electron app
-        run: npx electron-builder --${{ matrix.platform }} --publish=never
+        run: node deploy/scripts/desktop.cjs ${{ matrix.mode }} --${{ matrix.platform }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: false
@@ -64,98 +62,98 @@ jobs:
         if: matrix.platform == 'win'
         uses: actions/upload-artifact@v4
         with:
-          name: lxserver-win-x64-Setup
-          path: dist-electron/*x64 Setup.exe
+          name: llxserver-${{ matrix.mode }}-win-x64-Setup
+          path: dist-electron/${{ matrix.mode }}/*x64 Setup.exe
 
       - name: Win x86 Setup
         if: matrix.platform == 'win'
         uses: actions/upload-artifact@v4
         with:
-          name: lxserver-win-x86-Setup
-          path: dist-electron/*ia32 Setup.exe
+          name: llxserver-${{ matrix.mode }}-win-x86-Setup
+          path: dist-electron/${{ matrix.mode }}/*ia32 Setup.exe
 
       - name: Win arm64 Setup
         if: matrix.platform == 'win'
         uses: actions/upload-artifact@v4
         with:
-          name: lxserver-win-arm64-Setup
-          path: dist-electron/*arm64 Setup.exe
+          name: llxserver-${{ matrix.mode }}-win-arm64-Setup
+          path: dist-electron/${{ matrix.mode }}/*arm64 Setup.exe
 
       - name: Win x64 Portable
         if: matrix.platform == 'win'
         uses: actions/upload-artifact@v4
         with:
-          name: lxserver-win-x64-Portable
-          path: dist-electron/*x64 Portable.exe
+          name: llxserver-${{ matrix.mode }}-win-x64-Portable
+          path: dist-electron/${{ matrix.mode }}/*x64 Portable.exe
 
       - name: Win x86 Portable
         if: matrix.platform == 'win'
         uses: actions/upload-artifact@v4
         with:
-          name: lxserver-win-x86-Portable
-          path: dist-electron/*ia32 Portable.exe
+          name: llxserver-${{ matrix.mode }}-win-x86-Portable
+          path: dist-electron/${{ matrix.mode }}/*ia32 Portable.exe
 
       - name: Win arm64 Portable
         if: matrix.platform == 'win'
         uses: actions/upload-artifact@v4
         with:
-          name: lxserver-win-arm64-Portable
-          path: dist-electron/*arm64 Portable.exe
+          name: llxserver-${{ matrix.mode }}-win-arm64-Portable
+          path: dist-electron/${{ matrix.mode }}/*arm64 Portable.exe
 
       # ── Mac 独立上传 ─────────────────────────────────────────────
       - name: Mac x64 DMG
         if: matrix.platform == 'mac'
         uses: actions/upload-artifact@v4
         with:
-          name: lxserver-mac-x64-dmg
-          path: dist-electron/*x64.dmg
+          name: llxserver-${{ matrix.mode }}-mac-x64-dmg
+          path: dist-electron/${{ matrix.mode }}/*x64.dmg
 
       - name: Mac arm64 DMG
         if: matrix.platform == 'mac'
         uses: actions/upload-artifact@v4
         with:
-          name: lxserver-mac-arm64-dmg
-          path: dist-electron/*arm64.dmg
+          name: llxserver-${{ matrix.mode }}-mac-arm64-dmg
+          path: dist-electron/${{ matrix.mode }}/*arm64.dmg
 
       # ── Linux 独立上传 ──────────────────────────────────────────
       - name: Linux amd64 AppImage
         if: matrix.platform == 'linux'
         uses: actions/upload-artifact@v4
         with:
-          name: lxserver-linux-amd64-AppImage
-          path: dist-electron/*x64.AppImage
+          name: llxserver-${{ matrix.mode }}-linux-amd64-AppImage
+          path: dist-electron/${{ matrix.mode }}/*x64.AppImage
 
       - name: Linux arm64 AppImage
         if: matrix.platform == 'linux'
         uses: actions/upload-artifact@v4
         with:
-          name: lxserver-linux-arm64-AppImage
-          path: dist-electron/*arm64.AppImage
+          name: llxserver-${{ matrix.mode }}-linux-arm64-AppImage
+          path: dist-electron/${{ matrix.mode }}/*arm64.AppImage
 
       - name: Linux armv7l AppImage
         if: matrix.platform == 'linux'
         uses: actions/upload-artifact@v4
         with:
-          name: lxserver-linux-armv7l-AppImage
-          path: dist-electron/*armv7l.AppImage
+          name: llxserver-${{ matrix.mode }}-linux-armv7l-AppImage
+          path: dist-electron/${{ matrix.mode }}/*armv7l.AppImage
 
       - name: Linux amd64 Deb
         if: matrix.platform == 'linux'
         uses: actions/upload-artifact@v4
         with:
-          name: lxserver-linux-amd64-deb
-          path: dist-electron/*amd64.deb
+          name: llxserver-${{ matrix.mode }}-linux-amd64-deb
+          path: dist-electron/${{ matrix.mode }}/*amd64.deb
 
       - name: Linux arm64 Deb
         if: matrix.platform == 'linux'
         uses: actions/upload-artifact@v4
         with:
-          name: lxserver-linux-arm64-deb
-          path: dist-electron/*arm64.deb
+          name: llxserver-${{ matrix.mode }}-linux-arm64-deb
+          path: dist-electron/${{ matrix.mode }}/*arm64.deb
 
       - name: Linux armv7l Deb
         if: matrix.platform == 'linux'
         uses: actions/upload-artifact@v4
         with:
-          name: lxserver-linux-armv7l-deb
-          path: dist-electron/*armv7l.deb
+          name: llxserver-${{ matrix.mode }}-linux-armv7l-deb
+          path: dist-electron/${{ matrix.mode }}/*armv7l.deb

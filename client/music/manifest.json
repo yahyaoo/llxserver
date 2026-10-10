@@ -1,0 +1,15 @@
+{
+  "name": "洛洛雪音乐",
+  "short_name": "洛洛雪音乐",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ec4899",
+  "icons": [
+    {
+      "src": "./assets/logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

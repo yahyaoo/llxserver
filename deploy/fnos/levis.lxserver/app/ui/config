@@ -1,0 +1,15 @@
+{
+    ".url": {
+        "levis.lxserver.Application":
+        {
+            "title": "洛洛雪音乐",
+            "desc": "洛洛雪音乐 播放器",
+            "icon": "images/{0}.png",
+            "type": "url",
+            "port": "17000",
+            "protocol": "http",
+            "url": "/music",
+            "allUsers": true
+        }
+    }
+}

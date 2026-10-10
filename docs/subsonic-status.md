@@ -1,6 +1,6 @@
 # Subsonic 协议支持状态对照
 
-> 范围：`src/server/subsonic.ts` 对 Subsonic REST API 的**自定义实现**对照表。
+> 范围：`server/server/subsonic.ts` 对 Subsonic REST API 的**自定义实现**对照表。
 > 图例：✅ 已实现可用　🟡 占位（返回空 / no-op，兼容客户端握手）　❌ 未实现（返回 `Method not found`）
 > 更新：2026-09-19（协议补全：专辑信息 / 播放上报 / 书签 / 播放队列 / 相似歌曲 / 转码，见第四节）
 
@@ -58,7 +58,7 @@
 此前代码里**完全没有**歌曲级「每日推荐」接口（`getRecommendedSongs` / `getDailySongs` / `getSongsByTag` / `DailySongs` 在 `subsonic.ts` 中均为空，走 default 分支返回 `Method not found`）。仅 `getAlbumList2` 带有「推荐专辑」逻辑（`cachedRecommend → fetchRecommendedAlbums`，专辑级）。
 
 ### 实现
-- 新增数据源 `src/server/utils/recommendSongs.ts`：`fetchRecommendedSongs(size)`
+- 新增数据源 `server/server/utils/recommendSongs.ts`：`fetchRecommendedSongs(size)`
   - 复用已验证的 `fetchRecommendedAlbums('random')` 拿推荐专辑；
   - 逐张调用 `musicSdk.tx.extendDetail.getAlbumSongs(mid)` 取出专辑内歌曲；
   - 按 `tx_<songmid>` 去重，按「自然日」做种子洗牌（当天稳定、跨天换批），返回可直接播放的在线歌曲。
@@ -111,5 +111,5 @@ GET /rest/getDailySongs?u=<user>&p=<pass>&f=json
 - `stream` / `download` 支持 OpenSubsonic `transcodeOffset`：`timeOffset`（秒）作为 ffmpeg 快速定位（`-ss` 置于 `-i` 之前）。
 - `getOpenSubsonicExtensions` 改为声明**实际实现**的扩展名：`formPost`、`songLyrics`、`playbackReport`、`sonicSimilarity`、`indexBasedQueue`、`transcodeOffset`、`transcoding`。此前的 `coverArtScaling` / `thumbnails` / `lyrics` 并非官方扩展名，客户端据此永远不会调用 `getLyricsBySongId`；封面缩放仍通过 `getCoverArt` 的 `size` 参数生效。
 - 服务端转码：`ffmpeg` 可用性探测（缺失时降级 302 直链）、并发信号量（`subsonic.transcode.maxConcurrent`）、目标格式（`subsonic.transcode.format`），并在 `handleStream` 中按客户端 `maxBitrate` 决定是否转码。
-- `search3` 补齐在线歌手 / 专辑搜索（此前只查本地库，未收藏时恒为空）；歌手寻址改为相似度匹配（失败短缓存 + 诊断日志）；跨源同名歌手合并与去重；简繁双向搜索（新增 `src/server/utils/zhConvert.ts`）。
+- `search3` 补齐在线歌手 / 专辑搜索（此前只查本地库，未收藏时恒为空）；歌手寻址改为相似度匹配（失败短缓存 + 诊断日志）；跨源同名歌手合并与去重；简繁双向搜索（新增 `server/server/utils/zhConvert.ts`）。
 - 协议根元素、参数截断与封面尺寸修正；共享歌单支持「排行榜 / 歌单 / 都要」三态配置（`subsonic.sharedListMode`、`subsonic.sharedListSort`）。

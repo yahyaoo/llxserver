@@ -2,19 +2,19 @@
 layout: home
 
 hero:
-  name: "LX Sync Server"
+  name: "洛洛雪音乐"
   text: "Perfect fusion of cloud synchronization and playback"
   tagline: "A service system that supports searching across major music platforms, online playback, and cloud synchronization of data"
   image:
     src: /icon.svg
-    alt: LX Sync Server
+    alt: 洛洛雪音乐
   actions:
     - theme: brand
       text: Get Started
       link: /en/guide/getting-started
     - theme: alt
       text: View on GitHub
-      link: https://github.com/XCQ0607/lxserver
+      link: https://github.com/yahyaoo/llxserver
 
 features:
   - title: Brand New Web Player

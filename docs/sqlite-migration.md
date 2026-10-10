@@ -45,7 +45,7 @@
 | `music_browser_state` | 账号与浏览器随机设备标识对应的歌单状态 |
 | `music_legacy_document` | 播放器扩展 JSON |
 
-每张表都有 Entity/DTO/VO，公共字段说明见 `src/common/model/entity/BaseEntity.ts`。两库均含独立 `storage_document` 表及对应模型；DDL 位于 `sql/admin/001_initial.sql` 和 `sql/music/001_initial.sql`。
+每张表都有 Entity/DTO/VO，公共字段说明见 `server/common/model/entity/BaseEntity.ts`。两库均含独立 `storage_document` 表及对应模型；DDL 位于 `sql/admin/001_initial.sql` 和 `sql/music/001_initial.sql`。
 
 ## 在页面导入
 

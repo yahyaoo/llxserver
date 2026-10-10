@@ -5,10 +5,10 @@ const fs = require('node:fs')
 const os = require('node:os')
 const path = require('node:path')
 const { Open } = require('unzipper')
-const { readDocument, writeDocument, closeStorage } = require('../server/application/persistence/storage')
-const storageFs = require('../server/application/persistence/documentFileSystem').default
-const WebDAV = require('../server/integrations/webdav/WebDavClient').default
-const { DatabaseLocationService } = require('../server/application/persistence/DatabaseLocationService')
+const { readDocument, writeDocument, closeStorage } = require('../dist/server/application/persistence/storage')
+const storageFs = require('../dist/server/application/persistence/documentFileSystem').default
+const WebDAV = require('../dist/server/integrations/webdav/WebDavClient').default
+const { DatabaseLocationService } = require('../dist/server/application/persistence/DatabaseLocationService')
 
 test('WebDAV 不上传或覆盖引导文件、旧配置副本与迁移后的数据库，但可同步 SQL 配置文档', async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'lx-backup-boundary-'))

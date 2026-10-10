@@ -1,6 +1,6 @@
 # Sync Service & Management Console Guide
 
-LX Music Sync Server includes a professional Web Management Console (located by default at `/admin`, i.e., `http://IP:9527/admin`), used for monitoring service status, managing user accounts and multi-device connections, inspecting playlists and snapshots, and configuring server options.
+洛洛雪音乐 includes a professional Web Management Console (located by default at `/admin`, i.e., `http://IP:9527/admin`), used for monitoring service status, managing user accounts and multi-device connections, inspecting playlists and snapshots, and configuring server options.
 
 ## Login and Authentication
 

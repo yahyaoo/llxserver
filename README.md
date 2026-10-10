@@ -1,199 +1,151 @@
-# FN LX Server
+<div align="center">
+  <a href="https://github.com/yahyaoo/llxserver"><img src="docs/assets/banner.png" width="100%" alt="llxserver · 洛洛雪音乐 — 让音乐，自在流动。"></a>
+  <br><br>
+  <a href="https://github.com/yahyaoo/llxserver/actions/workflows/verify.yml"><img src="https://img.shields.io/github/actions/workflow/status/yahyaoo/llxserver/verify.yml?branch=dev&style=flat-square&label=tests" alt="测试状态"></a>
+  <img src="https://img.shields.io/badge/Node.js-%E2%89%A520-22c55e?style=flat-square&logo=nodedotjs&logoColor=white" alt="Node.js ≥20">
+  <img src="https://img.shields.io/badge/storage-SQLite-38bdf8?style=flat-square&logo=sqlite&logoColor=white" alt="SQLite">
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/yahyaoo/llxserver?style=flat-square&color=818cf8" alt="Apache-2.0"></a>
+  <br><br>
+  <a href="https://github.com/yahyaoo/llxserver/stargazers"><img src="https://img.shields.io/github/stars/yahyaoo/llxserver?style=flat-square&color=fbbf24" alt="Stars"></a>
+  <a href="https://github.com/yahyaoo/llxserver/network/members"><img src="https://img.shields.io/github/forks/yahyaoo/llxserver?style=flat-square&color=38bdf8" alt="Forks"></a>
+  <a href="https://github.com/yahyaoo/llxserver/issues"><img src="https://img.shields.io/github/issues/yahyaoo/llxserver?style=flat-square&color=fb7185" alt="Issues"></a>
+  <a href="https://github.com/yahyaoo/llxserver/commits/dev"><img src="https://img.shields.io/github/last-commit/yahyaoo/llxserver/dev?style=flat-square&color=a78bfa" alt="最近提交"></a>
+  <a href="https://github.com/yahyaoo/llxserver/releases"><img src="https://img.shields.io/github/downloads/yahyaoo/llxserver/total?style=flat-square&color=34d399" alt="下载次数"></a>
+  <br><br>
+  <strong><a href="docs/index.md">帮助文档</a> · <a href="deploy/README.md">部署与打包</a> · <a href="docs/system-configuration.md">系统配置</a> · <a href="docs/guide/sync-server.md">同步服务</a> · <a href="changelog.md">更新日志</a> · <a href="README_EN.md">English</a></strong>
+</div>
 
-基于 [XCQ0607/lxserver](https://github.com/XCQ0607/lxserver) 的飞牛 NAS 版本。原 `lxserver-source` 自定义源码和 `lxserver` 飞牛打包工程已整合到本仓库，运行、测试、构建 FPK 都只需要这个仓库。
+---
 
-保留上游 Apache-2.0 协议、版权和音源实现。
+**洛洛雪音乐**是一个支持网页播放、音乐同步和管理后台的开源音乐产品。电脑、手机和 NAS 都可以通过浏览器使用；支持直接运行、Docker、飞牛 fnOS，以及 Windows、macOS、Linux 桌面打包。
 
-[本仓库发布](https://github.com/yahyaoo/fn-lxserver/releases) · [官方原说明](README_UPSTREAM.md) · [同步服务配置](md/lxserver.md) · [官方帮助文档](https://xcq0607.github.io/lxserver/)
+服务端在 **server**，客户端在 **client**。既可整体交付，也可分别打包、独立运行。所有部署入口集中在 **deploy**。
 
-## 已整合的功能
+## 客户端功能
 
-- 播放器“下载与缓存”新增服务器下载，沿用现有音质选择，将音乐保存至后台指定目录。
-- 歌词默认内嵌（使用 `music-tag-native`），可选择同名 UTF-8 外部 `.lrc`。不需要额外安装 ffmpeg。
-- 后台配置下载目录与命名模板；模板留空时使用播放器现有“歌曲命名方式”，不再附带内部索引 ID。模板支持 `{artist}`、`{title}`、`{album}`、`{platform}`、`{quality}`、`{id}`、`{track}`。
-- 已下载歌曲优先本地播放，支持分段请求、用户隔离与服务重启恢复。
-- 缓存歌曲位置支持输入服务器绝对路径；后台可编辑用户自定义歌曲目录，通过底部“保存配置”统一保存。
-- 更新检查默认关闭，允许修改检查服务器和可选只读令牌。默认地址为 `https://api.github.com/repos/yahyaoo/fn-lxserver/releases/latest`。旧配置中已保存的更新地址会继续保留，可在后台修改。
-- 保留已定制的界面、应用图标、飞牛权限配置、安装向导、Linux 换行和执行权限修复。
+### 音乐与发现
 
-## 目录
+多平台搜索、歌手与专辑、排行榜、歌单浏览和收藏，在一个客户端中整理自己的音乐。
 
-```text
-src/                         TypeScript 服务源码
-public/                      管理后台和播放器
-test/                        源码单元测试及接口系统测试
-fnos/
-  levis.lxserver/             飞牛模板、图标、权限、安装向导和生命周期脚本
-    app/server/              自动生成的应用载荷，不提交 Git
-  scripts/                   构建、归档校验、发布工具及测试
-  releases/                  按标签命名的发布说明
-  md/                        原飞牛截图、图标原稿和制作说明
-  dist/                      自动生成的 FPK 和 SHA256，不提交 Git
-README_UPSTREAM.md           原官方说明
-```
+<p align="center"><img src="md/player.png" width="850" alt="客户端音乐界面"></p>
+<p align="center"><img src="md/search.png" width="850" alt="多平台音乐搜索"></p>
 
-## 从源码运行
+### 歌单与播放
 
-建议安装 **Node.js 24 LTS** 与 npm，以便与飞牛的 `nodejs_v24` 一致。以下命令在仓库根目录执行；构建工具无需 RTK，也不需要旁边的旧仓库。
+歌单详情、拖拽排序、播放队列、多种播放模式、音质选择、歌词、倍速和睡眠定时。
+
+<p align="center"><img src="md/musiclist-detail.png" width="420" alt="歌单详情"> <img src="md/playlist.png" width="420" alt="播放队列"></p>
+<p align="center"><img src="md/controller.png" width="850" alt="播放控制"></p>
+
+### 下载与缓存
+
+客户端浏览器下载、服务器下载、缓存管理和本地音乐。服务器下载支持可配置目录、文件名模板，以及内嵌歌词或同名 UTF-8 LRC；已下载歌曲支持分段播放和重启恢复。
+
+<p align="center"><img src="md/cache.png" width="850" alt="缓存管理"></p>
+
+### 主题与分享
+
+保留现有深浅色主题、音效、歌词卡片分享、自定义源管理及分组设置。
+
+<p align="center"><img src="md/theme.png" width="420" alt="主题设置"> <img src="md/share.png" width="420" alt="歌词卡片"></p>
+
+### 同步与开放协议
+
+支持兼容的音乐同步客户端与 Subsonic 客户端。管理后台提供用户、音源、下载任务、系统配置、日志及备份入口；管理数据和音乐数据分别保存在两个 SQLite 数据库中。
+
+## 选择运行方式
+
+| 方式 | 入口 | 默认端口 |
+| --- | --- | --- |
+| Node.js / npm 整体运行 | `npm run build` → `npm start` | 9527 |
+| Docker 整体部署 | [compose.yaml](deploy/docker/compose.yaml) | 9527 |
+| 服务端与客户端独立部署 | [分离部署说明](deploy/README.md#独立部署) | 服务端 9527、客户端 9528 |
+| Docker 两容器部署 | [compose.split.yaml](deploy/docker/compose.split.yaml) | 客户端 9528 |
+| Windows / macOS / Linux 桌面 | [桌面打包](deploy/README.md#桌面程序) | 自动选择可用端口 |
+| 飞牛 fnOS | [飞牛打包与安装](deploy/README.md#飞牛-fnos) | 17000 |
+
+两端各自提供 Node、Docker、桌面和飞牛入口：`electron:dist:server` / `electron:dist:client` 生成独立桌面程序，`build:fpk:server` / `build:fpk:client` 生成独立飞牛应用。平台和架构参数见部署文档。
+
+### 从源码运行
+
+安装 Node.js（建议 24 LTS）和 npm，在仓库根目录执行：
 
 ```bash
-git clone https://github.com/yahyaoo/fn-lxserver.git
-cd fn-lxserver
+git clone https://github.com/yahyaoo/llxserver.git
+cd llxserver
 npm ci --ignore-scripts --no-audit --no-fund
+npm rebuild better-sqlite3
 npm run build
 npm start
 ```
 
-`--ignore-scripts` 跳过不必要的 Electron 安装；本项目的原生依赖使用平台对应的预编译包。`npm run build` 编译到 `server/`。构建和启动不会自动查询或下载 fpcalc，普通播放和服务器下载不依赖它。
+打开客户端 `http://localhost:9527/`、管理后台 `http://localhost:9527/admin/`。初始管理密码为 `123456`，首次使用请在后台修改。开发运行使用 `npm run dev`。
 
-需使用歌曲指纹识别时，按下方步骤单独安装 fpcalc。
+业务配置在后台保存到 SQLite。根目录 `config.js` 只提供服务端数据库位置和独立客户端连接配置；环境变量优先。旧业务配置需在后台显式导入，不会自动执行或加载。
 
-默认访问：播放器 `http://localhost:9527/`，后台 `http://localhost:9527/admin`。示例后台密码为 `123456`，请在自己的运行配置中修改。开发时可用 `npm run dev` 直接运行 TypeScript。
-
-推荐使用仓库之外的运行配置，避免把个人密码、音源和目录提交到 Git。PowerShell 示例：
-
-```powershell
-New-Item -ItemType Directory -Force D:\lxserver-runtime | Out-Null
-Copy-Item .\config.js D:\lxserver-runtime\config.js
-# 编辑复制出的配置文件，修改密码和需要的设置
-$env:CONFIG_PATH = 'D:\lxserver-runtime\config.js'
-$env:DATA_PATH = 'D:\lxserver-runtime\data'
-$env:LOG_PATH = 'D:\lxserver-runtime\logs'
-$env:DISABLE_TELEMETRY = 'true'
-npm start
+```javascript
+module.exports = {
+  'server.database.adminPath': 'database/admin.sqlite',
+  'server.database.musicPath': 'database/music.sqlite',
+  'client.serverUrl': 'http://127.0.0.1:9527',
+  'client.port': 9528,
+  'client.bindIP': '0.0.0.0'
+}
 ```
 
-Linux 示例：
+数据库相对路径基于 `DATA_PATH`，默认是应用根目录的 `data/`。使用 `CONFIG_PATH` 可让两端共用仓库外的引导文件；`CLIENT_CONFIG_PATH` 可单独指定客户端文件。
+
+### Docker
 
 ```bash
-mkdir -p "$HOME/lxserver-runtime"
-cp config.js "$HOME/lxserver-runtime/config.js"
-# 编辑运行配置后启动
-CONFIG_PATH="$HOME/lxserver-runtime/config.js" \
-DATA_PATH="$HOME/lxserver-runtime/data" \
-LOG_PATH="$HOME/lxserver-runtime/logs" \
-DISABLE_TELEMETRY=true npm start
+docker compose -f deploy/docker/compose.yaml up -d --build
+# 两个独立容器：
+docker compose -f deploy/docker/compose.split.yaml up -d --build
 ```
 
-后台保存设置会写入实际运行配置和用户数据。私有音源通过现有页面导入，存放在运行数据目录，不随源码或 FPK 分发。
-
-### 可选：安装歌曲指纹识别工具
-
-普通播放、服务器下载和构建不需要 fpcalc。需要歌曲指纹识别时，可选择以下任一方式。
-
-**方式一：命令下载**
-
-在仓库根目录执行：
+### 打包
 
 ```bash
-npm run download:fpcalc
+npm run build:bundle       # 整体 ZIP
+npm run package:server     # 独立服务端 ZIP（先 build）
+npm run package:client     # 独立客户端 ZIP（先 build）
 ```
 
-该命令会主动查询 [Chromaprint 官方发布](https://github.com/acoustid/chromaprint/releases)，并下载当前系统对应的 fpcalc 到 `public/music/bin/`。需要能访问 GitHub；网络超时可改用手动下载。已存在当前平台的工具时会跳过下载。
+产物位于 `output/llxserver-{all,server,client}.zip`。解压后分别运行各包中的 `npm start`；服务端包需先安装生产依赖，客户端包只需要 Node.js。设置独立客户端 `config.js` 中的 `client.serverUrl` 指向服务端即可连接。详细步骤见[部署文档](deploy/README.md)。
 
-**方式二：手动下载**
-
-1. 打开 [Chromaprint 官方发布页](https://github.com/acoustid/chromaprint/releases)，选择与运行设备匹配的压缩包：Windows x64 选择 `windows-x86_64.zip`，Linux x64 选择 `linux-x86_64.tar.gz`，ARM 设备选择对应 ARM 架构的包。
-2. 解压后取出 `fpcalc.exe`（Windows）或 `fpcalc`（Linux/macOS）。
-3. 将文件放到仓库的 `public/music/bin/`：Windows 文件名为 `fpcalc.exe`，Linux/macOS 文件名为 `fpcalc`；也可安装到系统 PATH。
-
-Windows PowerShell 示例（将源路径替换为实际解压位置）：
-
-```powershell
-New-Item -ItemType Directory -Force .\public\music\bin | Out-Null
-Copy-Item 'C:\tools\chromaprint\fpcalc.exe' .\public\music\bin\fpcalc.exe
-& .\public\music\bin\fpcalc.exe -version
-```
-
-Linux/macOS 示例：
-
-```bash
-mkdir -p public/music/bin
-cp /path/to/extracted/fpcalc public/music/bin/fpcalc
-chmod +x public/music/bin/fpcalc
-./public/music/bin/fpcalc -version
-```
-
-输出工具版本信息后，重启服务即可使用。工具需与实际运行环境匹配；给飞牛 NAS 使用时选择 NAS 架构对应的 Linux 二进制，不能复制 Windows 的 `.exe`。这些二进制不提交 Git。
-
-## 构建 FPK
-
-目标为 **x86_64 飞牛 NAS**，依赖飞牛应用 `nodejs_v24`。先从 [飞牛开发者文档](https://developer.fnnas.com/) 获取对应构建系统的官方 **fnpack** SDK，放到 `fnos/scripts/fnpack.exe`（Windows）或 `fnos/scripts/fnpack`（Linux，需执行权限）；也可通过 `FNPACK_BIN` 指定绝对路径。SDK 二进制不提交 Git。
-
-```powershell
-# 仓库根目录，Windows PowerShell
-npm ci --ignore-scripts --no-audit --no-fund
-$env:FNPACK_BIN = 'C:\tools\fnpack.exe'
-npm run build:fpk
-```
-
-```bash
-# Linux
-npm ci --ignore-scripts --no-audit --no-fund
-FNPACK_BIN=/opt/fnpack npm run build:fpk
-```
-
-也可拆开执行 `npm run prepare:fpk`（编译并生成载荷）与 `npm run package:fpk`（调用 SDK、修正并校验归档）。构建仅清理本仓库的生成目录，不访问旧 `lxserver` 或 `lxserver-source`。
-
-输出：
+## 工程目录
 
 ```text
-fnos/dist/levis.lxserver-<标签>.fpk
-fnos/dist/levis.lxserver-<标签>.fpk.sha256
+server/                 服务端源码：管理、音乐业务、应用装配、公共能力、第三方接口
+client/                 客户端：管理页面、音乐界面、PWA、网页静态资源
+deploy/                 Node、Docker、桌面、飞牛及第三方部署入口与构建工具
+sql/                    管理库与音乐库建表语句
+test/                   单元测试与隔离系统测试
+docs/                   使用、架构、配置、迁移文档和品牌资源
+dist/                   构建输出，不提交
+output/                 整体及独立 ZIP 交付包，不提交
+config.js               server.xxx / client.xxx 引导配置
 ```
 
-打包时复制生产依赖锁文件；个人 `config.js` 不进入安装包。归档检查包含 Linux 执行权限、换行、选盘字段和服务器下载模块。
+## 配置与数据迁移
 
-## 飞牛安装与配置
+- [系统配置](docs/system-configuration.md)：分组设置、旧 config.js 导入、数据库路径迁移。
+- [SQLite 迁移](docs/sqlite-migration.md)：原 JSON 导入、实体与表、双库隔离。
+- 客户端设置中的配置迁移可上传兼容 JSON，将歌单及相关数据覆盖写入音乐库。
+- 音源、密码、用户数据库和音乐文件属于运行数据，不包含在安装包中。
+- 歌曲指纹识别是可选功能，通过 `npm run download:fpcalc` 主动下载，或设置 `FPCALC_PATH` 指向工具所在目录；普通播放、构建和服务器下载无需 fpcalc。
 
-1. 在飞牛应用中心安装 `nodejs_v24`。
-2. 手动安装本仓库发布的 FPK，按系统向导选择安装盘并设置后台与播放器密码。模板显式声明空 `install_type`，首次安装由飞牛系统提供存储选择；升级沿用已有安装卷，不自动迁移到其他卷。
-3. 安装及升级需要联网，通过 `npm ci --omit=dev` 安装锁定的生产依赖。
-4. 访问播放器 `http://<NAS-IP>:17000/music`，后台 `http://<NAS-IP>:17000/admin`。
-
-飞牛应用 ID 和运行用户继续使用 `levis.lxserver`，共享空间由系统分配。实际配置为 `<共享空间>/config.js`，用户数据位于 `<共享空间>/data/`，日志位于 `<共享空间>/logs/`。不要把应用安装目录当作音乐保存目录。
-
-后台“服务器下载配置”可填写例如 `/vol6/1000/音乐/洛雪` 的飞牛绝对路径；留空默认保存到 `DATA_PATH/downloads`。应用用户 **levis.lxserver** 必须对目标目录及父目录有遍历和读写权限，在飞牛文件权限页面为该应用授权。NAS 登录账号的权限不能替代应用用户权限。
-
-播放器选择自定义缓存目录后，缓存写入该目录的 `cache/<用户>/`，原“仅下载模式”文件写入 `music/<用户>/`。缓存、自定义歌曲目录和服务器下载目录分别配置，切换位置不会自动搬移旧文件。缓存清理不会删除独立的服务器下载文件。
-
-## 验证
-
-在根目录安装依赖后执行：
+## 测试与贡献
 
 ```bash
-npm run prepare:fpk
-npm test
+npm run build
+npm run test:unit
+npm run test:system
 npm run test:fpk
-python fnos/scripts/release.test.py
 ```
 
-`npm test` 包括真实隔离服务、临时配置和本地测试音源的接口系统测试，覆盖下载队列、歌词、Range 播放、鉴权、缓存路径、配置保存、重启和更新检查，不使用个人音源或 NAS 数据。也可分别运行 `npm run test:unit` 与 `npm run test:system`。`npm run test:fpk` 覆盖归档权限与生成载荷；完成 `npm run build:fpk` 后，执行 `npm run test:fpk:system` 验证真实安装包与本仓库文件逐字节一致。实际飞牛向导、NAS 目录 ACL 和设备播放需在 NAS 上验证。
+系统测试创建临时 SQLite 数据与隔离服务，并解压真实 ZIP 验证整体包、独立服务端包及独立客户端包；不使用个人音源或已有实例。架构说明见 [backend-architecture.md](docs/backend-architecture.md)，贡献约定见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
-## 发布
+## 开源协议
 
-每次发布只操作本仓库，使用附注标签关联源码与安装包。准备好发布配置及 `fnos/releases/` 中的发布说明后，执行：
-
-```bash
-npm run build:fpk
-npm test
-npm run test:fpk
-npm run test:fpk:system
-python fnos/scripts/release.test.py
-git add .
-git commit -m "chore: prepare release"
-python fnos/scripts/release.py --check
-python fnos/scripts/release.py
-```
-
-发布工具默认使用 `origin`，本仓库为 GitHub。认证优先读取 `GH_TOKEN` / `GITHUB_TOKEN`，其次读取已配置的 Git 凭据，交互运行时也可隐藏输入令牌。令牌须具备仓库代码和发布写入权限。凭据只在进程中使用，不写入源码、安装包或发布说明。
-
-脚本核对发布配置、干净工作区、manifest 与 SHA256，创建附注标签并原子推送当前分支和标签，然后创建草稿、上传 FPK 和 SHA256、回读校验，再公开发布。任何失败都不会自动删除或覆盖远端标签、发布；附件失败留下的草稿需检查后处理。
-
-如需继续发布到自己的 Gitea，在同一仓库配置一个 Gitea 远端，再运行 `python fnos/scripts/release.py --remote gitea --username <账号>`。不再要求两套仓库分别打标签。
-
-原官方桌面与 ZIP 发布工作流保留为手动触发，不在本仓库的标签推送时自动运行；飞牛发布使用上述脚本，不删除历史 Release。
-
-## 协议与上游
-
-本项目遵循 [Apache-2.0](LICENSE)。上游项目：[XCQ0607/lxserver](https://github.com/XCQ0607/lxserver)。原功能、版权、贡献者与使用说明见 [README_UPSTREAM.md](README_UPSTREAM.md)。
+遵循 [Apache-2.0](LICENSE)，保留第三方版权与协议声明。项目继承来源和致谢见程序设置中的“关于”；历史说明保存在 [README_UPSTREAM.md](README_UPSTREAM.md)。
