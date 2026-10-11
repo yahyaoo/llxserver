@@ -42,8 +42,7 @@ body > .flex.flex-1 { z-index: 1; }
     background: transparent; pointer-events: none;
 }
 .top-search-host, .top-actions-host { pointer-events: auto; }
-/* 在线搜索以外隐藏顶部检索，保留手机导航按钮。 */
-body:not(:has(#view-search[data-online-search="true"]:not(.hidden))) .library-search { display: none; }
+/* 顶部音乐库搜索跨页面显示；全屏播放页由独立播放页样式统一隐藏顶部栏。作者：jingyh */
 #view-search:not([data-online-search="true"]) #song-search-controls { display: none !important; }
 .top-search-host { display: flex; align-items: center; gap: 8px; width: min(460px, 48%); min-width: 0; }
 .library-search { position: relative; width: 100%; }
