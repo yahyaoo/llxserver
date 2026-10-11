@@ -20,8 +20,6 @@ cd "${APP_DIR}" && npm ci --omit=dev --no-audit --no-fund 2>&1 | tee -a "${LOG_F
 
 # 3. 初始化 SQL 系统配置；升级保留已配置的数据库，config.js 仅保存库路径。
 DATA_PATH="${DATA_DIR}/data" CONFIG_PATH="${DATA_DIR}/config.js" \
-LX_INSTALL_PLAYER_PASSWORD="${wizard_player_password:-123456}" \
-LX_INSTALL_ADMIN_PASSWORD="${wizard_admin_password:-123456}" \
 node "${APP_DIR}/dist/server/application/persistence/InstallationConfiguration.js" >> "${LOG_FILE}" 2>&1 || exit 1
 log_msg "SQLite configuration initialized"
 

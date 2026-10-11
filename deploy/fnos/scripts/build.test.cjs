@@ -11,6 +11,20 @@ test('构建入口只引用当前仓库', () => {
   assert.equal(PACK, path.join(ROOT, 'deploy/fnos/llxserver.all'));
 });
 
+/** 检查安装和升级入口，不再收集播放器及控制台密码。作者：jingyh */
+test('飞牛向导移除两个密码项，安装和升级均初始化默认账号', () => {
+  for (const mode of ['all', 'server']) {
+    const template = path.join(ROOT, 'deploy/fnos/llxserver.' + mode)
+    const wizard = JSON.parse(fs.readFileSync(path.join(template, 'wizard/install'), 'utf8'))
+    assert.ok(wizard.every(step => step.items.every(item => item.type !== 'password')))
+    for (const callback of ['install_callback', 'upgrade_callback']) {
+      const source = fs.readFileSync(path.join(template, 'cmd', callback), 'utf8')
+      assert.ok(source.includes('InstallationConfiguration.js'))
+      assert.equal(/wizard_(player|admin)_password|LX_INSTALL_(PLAYER|ADMIN)_PASSWORD/.test(source), false)
+    }
+  }
+});
+
 test('生成载荷同步版本，排除开发机配置并清理旧产物', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'lx-fnos-build-'));
   try {

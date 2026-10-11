@@ -4,11 +4,42 @@ const assert = require('node:assert/strict')
 const path = require('node:path'), crypto = require('node:crypto')
 const Database = require('better-sqlite3')
 const { startAccountRuntime } = require('./helpers/accountRuntime.cjs')
+require('tsx/cjs')
+const { initializeInstallationConfiguration } = require('../server/application/persistence/InstallationConfiguration.ts')
 const json = async (runtime, url, token, method='GET', body) => {
   const response = await fetch(runtime.origin+url, { method, headers:{ ...(token ? { 'x-user-token':token } : {}), 'Content-Type':'application/json' }, ...(body === undefined ? {} : { body:JSON.stringify(body) }) })
   return { status:response.status, data:await response.json(), response }
 }
 const login = (runtime, rememberMe=true, username='alice', password='alice123', serverUrl) => json(runtime,'/api/user/login',null,'POST',{username,password,rememberMe,...(serverUrl?{serverUrl}:{})})
+
+/** 真实安装配置直接登录，不通过测试导入账号掩盖初始化缺失。作者：jingyh */
+test('飞牛默认账号可直接登录，重启保持账号及修改后的密码', {timeout:30000}, async () => {
+  const runtime = await startAccountRuntime({}, root => {
+    initializeInstallationConfiguration(path.join(root, 'data'), { 'player.enableAuth': true })
+  }, {importConfig:false})
+  try {
+    assert.equal((await login(runtime, true, 'admin', 'password')).status, 401)
+    const account = await login(runtime, true, 'admin', '123456')
+    assert.equal(account.status, 200)
+    assert.equal((await json(runtime, '/api/user/settings', account.data.token)).status, 200)
+    assert.equal((await json(runtime, '/api/user/account/password', account.data.token, 'POST', {currentPassword:'123456',newPassword:'changed123'})).status, 200)
+    initializeInstallationConfiguration(path.join(runtime.root, 'data'), {})
+    await runtime.restart()
+    assert.equal((await login(runtime, true, 'admin', '123456')).status, 401)
+    assert.equal((await login(runtime, true, 'admin', 'changed123')).status, 200)
+  } finally { await runtime.stop() }
+})
+
+test('旧部署账号列表为空：升级初始化后无需导入配置即可登录默认账号', {timeout:30000}, async () => {
+  const runtime = await startAccountRuntime({users:[]}, undefined, {importConfig:false})
+  try {
+    assert.equal((await login(runtime, true, 'admin', '123456')).status, 401)
+    assert.equal(initializeInstallationConfiguration(path.join(runtime.root, 'data'), {}), true)
+    await runtime.restart()
+    assert.equal((await login(runtime, true, 'admin', '123456')).status, 200)
+    assert.equal(initializeInstallationConfiguration(path.join(runtime.root, 'data'), {}), false)
+  } finally { await runtime.stop() }
+})
 test('HTTP 与 SQLite：必须登录、记住我重启恢复、资料持久化、改密撤销、配置有效期', {timeout:90000}, async () => {
   const runtime=await startAccountRuntime(); let db
   try {

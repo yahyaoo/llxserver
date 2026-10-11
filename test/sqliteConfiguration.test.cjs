@@ -44,6 +44,40 @@ test('只读 SQL：外部旧配置变化与删除均不改变业务配置；引�
   } finally { repository.close(); fs.rmSync(root, { recursive: true, force: true }) }
 })
 
+/** 安装账号必须同时落入独立用户表，避免启动时被空用户文档覆盖。作者：jingyh */
+test('首次安装生成默认 admin 账号，已有账号和修改后的密码不被重装覆盖', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'lx-install-account-')), filename = path.join(root, 'config.js')
+  let repository
+  try {
+    assert.equal(initializeInstallationConfiguration(root, {}), true)
+    repository = createAdminRepository(root)
+    const service = new GlobalConfigurationService(repository)
+    assert.deepEqual(service.load(filename, defaults).users, [{ name: 'admin', password: '123456' }])
+    assert.deepEqual(repository.read('server_user', path.join(root, 'users.json')).value, [{ name: 'admin', password: '123456' }])
+    repository.write('server_user', path.join(root, 'users.json'), JSON.stringify([{ name: 'admin', password: 'changed123' }]))
+    repository.close(); repository = null
+    assert.equal(initializeInstallationConfiguration(root, {}), false)
+    repository = createAdminRepository(root)
+    assert.equal(repository.read('server_user', path.join(root, 'users.json')).value[0].password, 'changed123')
+  } finally { repository?.close(); fs.rmSync(root, { recursive: true, force: true }) }
+})
+
+test('升级修复空账号旧安装，保留管理密码和其他 SQL 配置', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'lx-install-repair-')), filename = path.join(root, 'config.js')
+  let repository
+  try {
+    repository = createAdminRepository(root)
+    new GlobalConfigurationService(repository).save(filename, { ...defaults, serverName: '已有配置', 'frontend.password': 'existing-password', users: [] })
+    repository.write('server_user', path.join(root, 'users.json'), '[]')
+    repository.close(); repository = null
+    assert.equal(initializeInstallationConfiguration(root, { 'frontend.password': '不可覆盖' }), true)
+    repository = createAdminRepository(root)
+    const config = new GlobalConfigurationService(repository).load(filename, defaults)
+    assert.equal(config.serverName, '已有配置'); assert.equal(config['frontend.password'], 'existing-password')
+    assert.deepEqual(config.users, [{ name: 'admin', password: '123456' }])
+  } finally { repository?.close(); fs.rmSync(root, { recursive: true, force: true }) }
+})
+
 test('已有 SQL 配置转换固定键，旧配置文件不再参与；导出文本可直接静态导入', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'lx-config-key-')), filename = path.join(root, 'config.js')
   const repository = createAdminRepository(root), service = new GlobalConfigurationService(repository)

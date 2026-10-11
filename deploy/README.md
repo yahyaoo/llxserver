@@ -134,7 +134,9 @@ npm run build:fpk:client
 npm run test:fpk:system
 ```
 
-`prepare:fpk` 编译并生成载荷，`package:fpk` 调用 SDK 和校验归档，输出 `deploy/fnos/dist/`。个人配置与数据库不进入包。安装向导初始化 SQL，升级保留已有配置。
+`prepare:fpk` 编译并生成载荷，`package:fpk` 调用 SDK 和校验归档，输出 `deploy/fnos/dist/`。个人配置与数据库不进入包。安装向导初始化 SQL，不再要求填写播放器和管理端密码。
+
+合体包、独立服务端首次安装创建播放器账号 `admin`，默认密码 `123456`；安装后可在账号设置修改密码。管理后台初始访问密码仍为 `123456`。升级保留已有账号、密码和业务配置；旧安装的账号列表为空时，升级自动补建默认播放器账号。
 
 合体包的应用 ID、应用用户和共享空间名称统一为 `llxserver.all`，FPK 文件名使用同一标识。客户端 `http://NAS-IP:17000/music`，后台 `http://NAS-IP:17000/admin/`。共享空间 `config.js` 保存引导，`data/` 保存数据，`logs/` 保存日志。为音乐目录授权时应选择应用用户 `llxserver.all`。
 

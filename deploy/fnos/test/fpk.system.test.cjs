@@ -107,7 +107,7 @@ test('真实载荷：隔离安装锁定生产依赖并启动 HTTP 服务', { tim
       'frontend.password': 'fpk-system-test', 'admin.path': '/admin', 'player.path': '/music',
       'player.enableAuth': false, disableTelemetry: true, 'configBackup.enable': false, users: [],
     }));
-    const initialize = spawn(process.execPath, ['dist/server/application/persistence/InstallationConfiguration.js'], { cwd: application, windowsHide: true, env: { ...process.env, CONFIG_PATH: config, DATA_PATH: path.join(temp, 'data'), LX_INSTALL_ADMIN_PASSWORD: 'fpk-system-test', LX_INSTALL_PLAYER_PASSWORD: 'fpk-player-test' } });
+    const initialize = spawn(process.execPath, ['dist/server/application/persistence/InstallationConfiguration.js'], { cwd: application, windowsHide: true, env: { ...process.env, CONFIG_PATH: config, DATA_PATH: path.join(temp, 'data') } });
     initialize.stderr.on('data', chunk => { output += chunk; });
     assert.equal(await new Promise(resolve => initialize.once('exit', resolve)), 0, output.slice(-2500));
     const probe = http.createServer();
@@ -129,13 +129,16 @@ test('真实载荷：隔离安装锁定生产依赖并启动 HTTP 服务', { tim
     for (let attempt = 0; attempt < 100; attempt++) {
       assert.equal(child.exitCode, null, output.slice(-2500));
       try {
-        const response = await fetch(origin + '/api/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ password: 'fpk-system-test' }) });
+        const response = await fetch(origin + '/api/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ password: '123456' }) });
         if (response.ok) { adminToken = (await response.json()).token; ready = true; break; }
       } catch {}
       await wait(100);
     }
     assert.equal(ready, true, output.slice(-2500));
-    const admin = { 'content-type': 'application/json', 'x-frontend-auth': 'fpk-system-test', 'x-admin-token': adminToken };
+    // 在导入测试账号前验证安装包自带默认账号，防止再次交付无法登录的安装包。作者：jingyh
+    const defaultLogin = await fetch(origin + '/api/user/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ username: 'admin', password: '123456' }) });
+    assert.equal(defaultLogin.status, 200);
+    const admin = { 'content-type': 'application/json', 'x-frontend-auth': '123456', 'x-admin-token': adminToken };
     assert.equal((await fetch(origin + '/api/config', { headers: admin })).status, 200);
     assert.equal((await fetch(origin + '/api/config/import', { method: 'POST', headers: admin, body: JSON.stringify({ content: "module.exports={users:[{name:'fpk-user',password:'fpk-player-test'}],'player.path':'/music'}" }) })).status, 200);
     assert.equal((await fetch(origin + '/music', { redirect: 'manual' })).status, 302);
