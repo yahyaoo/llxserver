@@ -58,6 +58,8 @@ function environment() {
   const transport = add('transport', footer, 'player-transport');
   add('prev', transport, '', 'button'); add('btn-play', transport, '', 'button'); add('next', transport, '', 'button');
   const song = add('player-song-info', footer), copy = add('track-copy', song);
+  const miniLyrics = add('mini-lyrics', song, 'player-bar-lyrics');
+  add('detail-visualizer', view);
   add('player-title', copy); add('player-artist', copy); add('player-source', copy);
   const progress = add('progress', song, 'player-progress');
   add('time-current', progress); add('progress-container', progress); add('time-total', progress);
@@ -79,7 +81,7 @@ function environment() {
   const document = { body, documentElement: { requestFullscreen: async () => { document.fullscreenElement = document.documentElement; } },
     fullscreenElement: null, exitFullscreen: async () => { document.fullscreenElement = null; },
     getElementById: id => nodes.get(id), createElement: tag => new Node(tag), createComment: () => new Node('#comment'),
-    querySelector: () => comment, addEventListener: (key, handler) => { documentEvents[key] = handler; },
+    querySelector: selector => selector === '.player-bar-lyrics' ? miniLyrics : comment, addEventListener: (key, handler) => { documentEvents[key] = handler; },
   };
   const context = vm.createContext({ window, document, MutationObserver: Observer, console });
   vm.runInContext(read(pagePath + 'template.js'), context);
@@ -146,15 +148,20 @@ test('退出歌手背景后，迟到的头像请求和旧图片回调不能重�
   assert.equal(image.onload, null); assert.equal(image.onerror, null);
 });
 
-test('竖向音量只换算坐标并调用原入口；退出后不拦截横向点击', () => {
-  const env = environment(); env.open();
-  const control = env.nodes.get('volume-container'), handler = control.events.click[0];
-  let stopped = 0;
-  for (const [y, x] of [[100, 44], [150, 32], [200, 20], [0, 44], [999, 20]]) {
-    handler({ currentTarget: control, clientY: y, stopImmediatePropagation: () => stopped++ });
-    assert.deepEqual(env.calls.at(-1), ['volume', x]);
-  }
-  env.close(); handler({}); assert.equal(stopped, 5);
+test('手机歌词位于封面和控制区之间，画布跟随封面，切回桌面和退出恢复节点', () => {
+  const env = environment(); env.window.innerWidth = 390;
+  const lyric = env.nodes.get('mini-lyrics'), canvas = env.nodes.get('detail-visualizer');
+  const lyricParent = lyric.parent, canvasParent = canvas.parent;
+  env.open();
+  assert.equal(canvas.parent, env.page.coverStage); assert.equal(lyric.parent, env.page.left);
+  assert.ok(env.page.left.children.indexOf(lyric) > env.page.left.children.indexOf(env.page.coverStage));
+  assert.ok(env.page.left.children.indexOf(lyric) < env.page.left.children.indexOf(env.nodes.get('player-bar-root')));
+  assert.equal(env.nodes.get('volume-container').attributes['aria-orientation'], 'vertical');
+  env.window.innerWidth = 1440; env.page.updateResponsiveLayout();
+  assert.equal(canvas.parent, canvasParent); assert.equal(lyric.parent, lyricParent);
+  env.window.innerWidth = 390; env.page.updateResponsiveLayout(); env.close();
+  assert.equal(canvas.parent, canvasParent); assert.equal(lyric.parent, lyricParent);
+  assert.equal(env.nodes.get('volume-container').attributes['aria-orientation'], 'horizontal');
 });
 
 test('频谱菜单调用原设置，显示开关与原快捷键修改保持一致', () => {

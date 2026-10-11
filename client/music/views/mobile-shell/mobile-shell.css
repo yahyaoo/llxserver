@@ -32,6 +32,16 @@
     .mobile-menu-list .active-tab { border-right: 0; }
     .mobile-menu-list #favorites-children, .mobile-menu-list #dislike-children { padding: 0 10px; background: transparent; }
     .mobile-menu-list .playlist-sidebar-item { min-height: 46px; margin: 3px 0; font-size: 14px; }
+    .mobile-menu-list .favorite-sidebar-drag-handle,
+    .mobile-menu-list .sidebar-item-actions > button[aria-label="导出歌单到本地"] { display: none !important; }
+    :root #mobile-pages .mobile-menu-list .playlist-sidebar-item {
+        display: flex; align-items: center; gap: 0; padding: 8px 10px; min-height: 46px;
+    }
+    :root #mobile-pages .mobile-menu-list .playlist-sidebar-item > .sidebar-item-icon {
+        width: 20px; height: 20px; flex: none; font-size: 14px; color: var(--text-muted);
+        display: inline-flex; align-items: center; justify-content: center;
+    }
+    :root #mobile-pages .mobile-menu-list .playlist-name-wrapper { margin-left: 6px; }
     .mobile-menu-list .playlist-group-heading { padding: 16px 18px 10px; font-size: 16px; color: var(--text-main); }
     #mobile-library-playlists #playlist-lists-container { padding: 0 10px 12px; }
     .mobile-profile { display: flex; align-items: center; gap: 14px; width: 100%; padding: 20px 18px; text-align: left; }
@@ -58,7 +68,13 @@
     #mobile-bottom-nav button > span:not(.mobile-playing-indicator) { font-size: 9px; }
     #mobile-bottom-nav .is-active { color: var(--c-600); background: color-mix(in srgb, var(--c-500) 15%, transparent); }
     #mobile-bottom-nav .mobile-now-playing { position: relative; width: 48px; height: 48px; margin-left: 6px; border: 2px solid var(--border-main); }
-    #mobile-nav-cover { width: 40px; height: 40px; object-fit: cover; border-radius: 50%; }
+    #mobile-nav-cover {
+        width: 40px; height: 40px; object-fit: cover; border-radius: 50%;
+        animation: mobile-cover-spin 24s linear infinite;
+        animation-play-state: paused;
+    }
+    #mobile-bottom-nav.is-playing #mobile-nav-cover { animation-play-state: running; }
+    @keyframes mobile-cover-spin { to { transform: rotate(360deg); } }
     .mobile-playing-indicator { display: none; position: absolute; bottom: 0; right: 0; width: 10px; height: 10px; border: 2px solid var(--bg-panel); background: var(--c-500); border-radius: 50%; }
     .is-playing .mobile-playing-indicator { display: block; }
     #mobile-bottom-nav button:focus-visible, #mobile-page-header button:focus-visible, .mobile-menu-row:focus-visible, .mobile-profile:focus-visible { outline: 2px solid var(--c-500); outline-offset: -2px; }
@@ -71,4 +87,7 @@
     .mobile-settings-detail .settings-content { padding: 10px 16px !important; }
     #view-player-detail .player-transport { align-items: center !important; }
     #view-player-detail #player-detail-container { padding-top: calc(68px + env(safe-area-inset-top)) !important; padding-bottom: calc(20px + env(safe-area-inset-bottom)) !important; }
+}
+@media (prefers-reduced-motion: reduce) {
+    #mobile-nav-cover { animation: none; }
 }

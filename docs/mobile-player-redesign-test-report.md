@@ -39,3 +39,32 @@
 - [手机均衡器](../output/playwright/mobile-equalizer.png)
 - [手机评论](../output/playwright/mobile-comments.png)
 - [桌面更多菜单修复](../output/playwright/desktop-player-menu-fixed.png)
+
+## 后续播放页与导航调整
+
+本节记录 2026-10-11 后续八项调整及桌面重复歌词修复，以上初版说明和测试数量保留为历史记录。
+
+- 手机播放页隐藏滚动条，按可用高度缩小封面；竖屏控制区完整显示，短横屏仍能滚动访问控制区。
+- 手机频谱画布移入封面容器，底边随封面下沿对齐；现有同步歌词节点放在封面与标题之间，继续使用原时间轴和行切换动画。
+- 桌面独立播放页隐藏左侧两行歌词，只保留右侧歌词；底部迷你播放器的歌词维持原行为。
+- 音量点击和拖动共用方向计算：底部播放器横向、独立播放页竖向；触摸禁止页面滚动，取消触摸时结束拖动，手机竖向触摸区域扩至 44px。
+- 手机隐藏放大按钮、收藏和歌单导航的拖拽及下载图标，禁用这两组排序；切回桌面自动恢复排序。
+- 收藏与不喜欢的子项使用相同图标尺寸、文字间距和行高；手机设置不生成后台管理入口。
+
+实现文件：`app.js`、`components/player-bar/player-bar.css`、`views/player-detail/{PlayerDetailView.js,mobile-player.css,player-detail.css}`、`views/mobile-shell/{MobileShell.js,mobile-shell.css}`。新增 `test/volumeDrag.test.cjs`，扩展播放页与导航测试，并将音量及手机导航单元测试接入 `package.json`。
+
+| 验证 | 最终结果 |
+| --- | --- |
+| `rtk npm run test:unit` | 254 项通过 |
+| `rtk npm run test:system` | 21 项通过，真实 HTTP 与临时 SQLite |
+| `test/mobilePlayer.browser.cjs`，Playwright CLI + Chrome | 66 项通过 |
+| JS/CSS 解析、UTF-8 检查、`rtk git diff --check` | 通过 |
+
+新增单元测试先复现竖向鼠标、触摸音量方向错误及手机排序未禁用，再修复通过。浏览器验证手机与桌面实际鼠标拖动，并通过 Chrome 原生触摸事件验证连续调节。尺寸覆盖 320/375/390/767×844、320×568/667/740、667×390、1440×900；尺寸断言在封面动画完成后执行。真实 PCM 音频继续驱动频谱绘制，验证不同高度下频谱底边与封面一致。
+
+评论使用固定测试响应验证页面与分页；封面使用项目占位图。未执行生产构建或发布，保留工作区其他修改。
+
+- [调整后的手机播放页](../output/playwright/mobile-player-390.png)
+- [收藏与不喜欢对齐](../output/playwright/mobile-library-refined.png)
+- [手机设置](../output/playwright/mobile-settings-refined.png)
+- [桌面仅右侧歌词](../output/playwright/desktop-player-menu-fixed.png)

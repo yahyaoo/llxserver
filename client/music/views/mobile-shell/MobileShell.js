@@ -40,6 +40,7 @@
             SETTINGS_NAVIGATION.forEach(group => {
                 const card = document.createElement('div'); card.className = 'mobile-card';
                 group.items.forEach(item => {
+                    if (item.id === 'admin') return;
                     const button = document.createElement('button'); button.type = 'button'; button.className = 'mobile-menu-row';
                     button.innerHTML = `<i class="fas ${item.icon}" aria-hidden="true"></i><span>${item.label}</span><i class="fas fa-chevron-right" aria-hidden="true"></i>`;
                     button.addEventListener('click', () => settings(item.id)); card.append(button);
@@ -80,6 +81,13 @@
             placements.forEach(({ li, marker }) => marker.after(li));
             byId('mobile-pages').querySelectorAll('[id^="view-"]').forEach(n => n.classList.add('hidden'));
             if (!document.querySelector('.music-shell [id^="view-"]:not(.hidden)')) window.switchTab('localmusic');
+        }
+        // 移动同一份目录节点时同步排序权限，旋转或切回桌面无需刷新。作者：jingyh
+        if (typeof Sortable !== 'undefined') {
+            ['my-lists-container', 'playlist-lists-container'].forEach(id => {
+                const container = byId(id);
+                if (container) Sortable.get(container)?.option('disabled', mobile.matches);
+            });
         }
     }
 

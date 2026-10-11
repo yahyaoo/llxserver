@@ -132,7 +132,7 @@ body:not(.player-detail-open):not(:has(#view-player-detail:not(.hidden))) #playe
 }
 .player-volume-row { display: flex; align-items: center; gap: 12px; }
 .player-volume-row .player-icon-button { width: 22px; font-size: 14px; }
-.player-volume-track { flex: 1; min-width: 0; height: 24px; display: flex; align-items: center; cursor: pointer; }
+.player-volume-track { flex: 1; min-width: 0; height: 24px; display: flex; align-items: center; cursor: pointer; touch-action: none; user-select: none; }
 .player-volume-rail { width: 100%; height: 6px; background: color-mix(in srgb, var(--text-muted) 32%, transparent); border-radius: 6px; }
 #volume-percent { min-width: 38px; font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; text-align: right; }
 

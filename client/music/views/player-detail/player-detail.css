@@ -57,6 +57,7 @@
     padding: 76px 64px 54px !important; margin: 0; min-height: 0; overflow: visible;
 }
 .player-detail-left { width: min(100%, max(240px, calc(100dvh - 360px))); justify-self: end; min-width: 0; position: relative; }
+.player-cover-stage { display: contents; }
 #view-player-detail #mobile-player-cover-container {
     width: 100%; height: auto; min-width: 0; min-height: 0; max-width: none; max-height: none;
     aspect-ratio: 1; border: 0; border-radius: 28px; background: transparent !important; box-shadow: 0 24px 60px rgb(0 0 0 / 18%);
@@ -79,6 +80,7 @@
 .player-detail-album { font-size: 14px; color: var(--text-dim); }
 .player-detail-album[hidden] { display: none; }
 #view-player-detail .player-track-copy { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+#view-player-detail .player-bar-lyrics { display: none; }
 #view-player-detail .player-actions { grid-column: 2; grid-row: 1; align-self: center; gap: 2px; }
 #view-player-detail .player-actions .player-icon-button, #view-player-detail .player-detail-direct-action { width: 30px; height: 38px; font-size: 17px; padding: 0; justify-content: center; color: var(--text-muted); border-radius: 50%; }
 #view-player-detail .player-detail-direct-action > span { display: none; }

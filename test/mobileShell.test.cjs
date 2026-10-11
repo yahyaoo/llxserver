@@ -25,12 +25,23 @@ test('在线搜索、收藏和各业务页在手机导航中正确归类', () =>
     assert.equal(target('mobile-settings', 'network'), 'mobile-settings');
     assert.equal(target('mobile-home', 'network'), 'mobile-home');
 });
-test('来源标记保留平台信息，QQ 和无损使用不同标签颜色', () => {
+test('来源和无损标记保留平台信息及现有标签颜色', () => {
     const source = loadFunction('client/music/app.js', 'getSourceTag');
     const quality = loadFunction('client/music/app.js', 'getQualityTags', { window: {} });
     assert.match(source('tx'), /data-source="tx".*t-badge-green/);
     assert.match(source('kg'), /data-source="kg".*t-badge-blue/);
-    assert.match(quality({ quality: 'flac' }), /data-quality="flac".*t-badge-blue/);
+    assert.match(quality({ quality: 'flac' }), /data-quality="flac".*t-badge-green/);
     assert.equal(quality({}), '');
     assert.match(source('unknown'), /data-source="other"/);
+});
+
+test('底部唱片状态跟随播放与暂停，更新封面不打断播放状态', () => {
+    const nodes = { 'player-cover': { src: '/cover-one.png' }, 'mobile-nav-cover': { src: '' }, 'audio-player': { paused: true } };
+    let playing;
+    nodes['mobile-bottom-nav'] = { classList: { toggle: (name, value) => { assert.equal(name, 'is-playing'); playing = value; } } };
+    const sync = loadFunction('client/music/views/mobile-shell/MobileShell.js', 'syncPlayer', { mounted: true, byId: id => nodes[id] });
+    sync(); assert.equal(playing, false);
+    nodes['audio-player'].paused = false; sync(); assert.equal(playing, true);
+    nodes['player-cover'].src = '/cover-two.png'; sync(); assert.equal(playing, true); assert.equal(nodes['mobile-nav-cover'].src, '/cover-two.png');
+    nodes['audio-player'].paused = true; sync(); assert.equal(playing, false);
 });

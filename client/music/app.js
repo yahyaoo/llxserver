@@ -1262,6 +1262,7 @@ document.addEventListener('DOMContentLoaded', () => {
     window.addEventListener('touchmove', handleDragMove, { passive: false });
     window.addEventListener('mouseup', stopDragging);
     window.addEventListener('touchend', stopDragging);
+    window.addEventListener('touchcancel', stopDragging);
 
     // 同步所有设置 UI
     syncSettingsUI();
@@ -1337,18 +1338,7 @@ function handleDragMove(e) {
             }
         }
     } else if (isDragging === 'volume') {
-        const container = document.getElementById('volume-container');
-        if (!container) return;
-        const rect = container.getBoundingClientRect();
-        const x = clientX - rect.left;
-        const pct = Math.max(0, Math.min(1, x / rect.width));
-        window.playbackExperience.cancelFade();
-        currentVolume = pct;
-        audio.volume = pct;
-        isMuted = false;
-        updateVolumeUI();
-        // Debounce saving if needed, but simple localstorage here
-        localStorage.setItem('lx_volume', currentVolume.toString());
+        setVolume(e);
     }
 }
 
@@ -7551,9 +7541,14 @@ updateVolumeUI();
 // 设置音量
 function setVolume(e) {
     const container = document.getElementById('volume-container');
+    if (!container) return;
     const rect = container.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const pct = Math.max(0, Math.min(1, x / rect.width)); // 限制在 0-1 之间
+    const point = e.touches?.[0] || e;
+    // 点击和拖动使用相同方向，播放页由下向上增大音量。作者：jingyh
+    const vertical = document.body.classList.contains('player-detail-open');
+    const ratio = vertical ? (rect.bottom - point.clientY) / rect.height : (point.clientX - rect.left) / rect.width;
+    if (!Number.isFinite(ratio)) return;
+    const pct = Math.max(0, Math.min(1, ratio));
 
     currentVolume = pct;
     window.playbackExperience.cancelFade();
@@ -11677,6 +11672,7 @@ function initFavoriteSidebarSortable(container) {
     Sortable.create(container, {
         animation: 150,
         handle: '.favorite-sidebar-drag-handle',
+        disabled: window.innerWidth < 768,
         filter: '.ignore-sort',
         draggable: '.playlist-sidebar-item:not(.ignore-sort)',
         onMove: event => event.related?.getAttribute('data-sidebar-list-id') !== 'default',

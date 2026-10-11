@@ -20,7 +20,16 @@
             this.left.setAttribute('aria-label', '当前歌曲与播放控制');
             this.left.addEventListener('dblclick', event => event.stopPropagation());
             container.prepend(this.left);
-            this.left.append(document.getElementById('mobile-player-cover-container'));
+            this.coverStage = document.createElement('div');
+            this.coverStage.className = 'player-cover-stage';
+            this.left.append(this.coverStage);
+            this.coverStage.append(document.getElementById('mobile-player-cover-container'));
+            this.miniLyrics = document.querySelector('.player-bar-lyrics');
+            this.visualizer = document.getElementById('detail-visualizer');
+            this.lyricMarker = document.createComment('同步歌词原位置');
+            this.visualizerMarker = document.createComment('频谱画布原位置');
+            this.miniLyrics.before(this.lyricMarker);
+            this.visualizer.before(this.visualizerMarker);
             this.lyricsButton = document.createElement('button');
             this.lyricsButton.id = 'player-mobile-lyrics';
             this.lyricsButton.className = 'player-icon-button player-mobile-only';
@@ -52,13 +61,6 @@
             }
             // 频谱快捷键和设置页都可能修改已有开关，菜单打开时读最新状态。
             document.getElementById('player-more-btn').addEventListener('click', () => this.updateSpectrum());
-            document.getElementById('volume-container').addEventListener('click', event => {
-                if (!this.open) return;
-                event.stopImmediatePropagation();
-                const rect = event.currentTarget.getBoundingClientRect();
-                const percent = Math.max(0, Math.min(1, (rect.bottom - event.clientY) / rect.height));
-                window.setVolume({ clientX: rect.left + percent * rect.width });
-            }, true);
             document.addEventListener('fullscreenchange', this.onFullscreenChange);
             window.addEventListener('music-account-changed', this.onAccountChange);
             this.applyBackground();
@@ -104,7 +106,6 @@
                 document.getElementById('player-more-menu').append(this.spectrumButton);
                 this.applyBackground();
                 this.updateTrack();
-                this.updateResponsiveLayout();
                 this.updateSpectrum();
             } else {
                 window.PlayerFeaturePages?.dismiss();
@@ -119,6 +120,7 @@
                 if (this.ownsFullscreen && document.fullscreenElement) document.exitFullscreen().catch(() => {});
                 this.ownsFullscreen = false;
             }
+            this.updateResponsiveLayout();
             window.playerBar?.updateScrollClearance();
             // 布局变化后只同步原画布尺寸，歌词滚动仍由原页面负责。
             window.musicVisualizer?.applySettings();
@@ -136,6 +138,15 @@
 
         /** 手机标签沿用原节点和原样式，放在标题后；宽屏恢复进度区位置。 */
         updateResponsiveLayout() {
+            const mobile = this.open && window.innerWidth < 768;
+            if (mobile) {
+                if (this.miniLyrics.parentElement !== this.left) this.coverStage.after(this.miniLyrics);
+                if (this.visualizer.parentElement !== this.coverStage) this.coverStage.prepend(this.visualizer);
+            } else {
+                if (this.miniLyrics.parentElement !== this.lyricMarker.parentElement) this.lyricMarker.after(this.miniLyrics);
+                if (this.visualizer.parentElement !== this.visualizerMarker.parentElement) this.visualizerMarker.after(this.visualizer);
+            }
+            document.getElementById('volume-container').setAttribute('aria-orientation', this.open ? 'vertical' : 'horizontal');
             if (!this.open) return;
             const source = document.getElementById('player-source');
             if (window.innerWidth < 768) document.getElementById('player-title').after(source);

@@ -55,6 +55,7 @@ test('收起的桌面主导航点击不喜欢，展开主导航及子树，不�
 
 test('收藏与歌单均初始化排序，拖动后合并保存两组顺序并可重新渲染恢复', async () => {
   const { nodes, context, sorts, stored, calls } = fixture()
+  context.window.innerWidth = 1440
   context.currentListData = { defaultList: [], loveList: [], userList: [{ id: 'seeded', name: '默认列表', list: [] }, { id: 'a', name: 'A', list: [] }, { id: 'b', name: 'B', list: [] }] }
   context.renderMyLists(context.currentListData)
   const favorites = nodes.get('my-lists-container'), playlists = nodes.get('playlist-lists-container')
@@ -72,4 +73,16 @@ test('收藏与歌单均初始化排序，拖动后合并保存两组顺序并�
   assert.deepEqual(ids(favorites), ['love', '__lib_artists__', '__lib_albums__'])
   assert.deepEqual(ids(playlists), ['b', 'seeded', 'a'])
   assert.equal(sorts.get(playlists).options.onMove({ related: playlists.children[1] }), true)
+})
+
+test('手机收藏与歌单排序实例禁用，重新初始化到桌面后恢复', () => {
+  const { nodes, context, sorts } = fixture()
+  for (const id of ['my-lists-container', 'playlist-lists-container']) {
+    const container = nodes.get(id)
+    context.initFavoriteSidebarSortable(container)
+    assert.equal(sorts.get(container).options.disabled, true)
+    context.window.innerWidth = 1440; context.initFavoriteSidebarSortable(container)
+    assert.equal(sorts.get(container).options.disabled, false)
+    context.window.innerWidth = 390
+  }
 })
