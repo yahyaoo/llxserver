@@ -8,6 +8,8 @@ const http = require('node:http')
 const { spawn } = require('node:child_process')
 const vm = require('node:vm')
 const project = path.resolve(__dirname, '..')
+const currentVersion = require('../package.json').version
+const nextVersion = currentVersion.split('.').map((part, index) => Number(part) + (index === 2 ? 1 : 0)).join('.')
 require('tsx/cjs')
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
 const frame = Buffer.alloc(417)
@@ -24,7 +26,7 @@ test('完整接口：配置持久化、队列下载、本地播放、缓存绝�
       updateRequests++
       assert.equal(req.headers.authorization, 'token system-test-token')
       res.setHeader('Content-Type', 'application/json')
-      res.end(JSON.stringify({ tag_name: 'v2.1.4', html_url: 'https://example.com/release', body: '系统测试发布说明' }))
+      res.end(JSON.stringify({ tag_name: 'v' + nextVersion, html_url: 'https://example.com/release', body: '系统测试发布说明' }))
       return
     }
     audioRequests++; res.writeHead(200, { 'Content-Length': audio.length }); res.end(audio)
@@ -101,7 +103,7 @@ test('完整接口：配置持久化、队列下载、本地播放、缓存绝�
     assert.equal((await post('/api/config', { 'update.enabled': true, 'update.server': updateServer, 'update.token': 'system-test-token' })).status, 200)
     const updated = await (await fetch(origin + '/api/app/update/check', { headers: admin })).json()
     assert.equal(updated.hasUpdate, true)
-    assert.equal(updated.currentVersion, '2.1.3')
+    assert.equal(updated.currentVersion, currentVersion)
     assert.equal(updateRequests, 1)
     assert.equal(JSON.stringify(await (await fetch(origin + '/api/config', { headers: admin })).json()).includes('system-test-token'), false)
     assert.equal((await fetch(origin + '/js/config.js')).status, 200)

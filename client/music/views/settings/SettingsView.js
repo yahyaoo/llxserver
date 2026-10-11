@@ -874,8 +874,6 @@
                     <span class="leading-tight">重置所有设置</span>
                 </button>
 
-                <!-- Mobile bottom spacer: ensures the last button clears the browser nav bar -->
-                <div class="pb-36 md:pb-4"></div>
             </div>
         </div>
     </div>

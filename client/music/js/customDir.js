@@ -821,8 +821,6 @@ window.CustomDirManager = {
             return;
         }
 
-        const username = this.getCurrentUsername();
-        const authToken = (window.getUserAuthHeaders ? window.getUserAuthHeaders()['x-user-token'] : null) || (window.AccountSession ? window.AccountSession.getToken() : localStorage.getItem('lx_user_token')) || '';
         const page = this.getPageSlice();
         this.updatePagination();
 
@@ -851,15 +849,9 @@ window.CustomDirManager = {
             const qualityClass = window.QualityManager && window.QualityManager.getQualityColor ? window.QualityManager.getQualityColor(item.quality) : 'bg-gray-100 text-gray-600';
             const qualityName = window.QualityManager ? window.QualityManager.getQualityDisplayName(item.quality) : item.quality;
 
-            // 封面图片构造：携带 user 和 token 保证原生 img 加载正常鉴权通过
-            let coverHtml = `<div class="w-10 h-10 md:w-12 md:h-12 rounded-lg bg-gray-100/50 flex-shrink-0 flex items-center justify-center border t-border-main mr-2.5 md:mr-4 ml-0.5 md:ml-3">
-                                <i class="fas fa-music t-text-muted text-xs"></i>
-                             </div>`;
-            if (item.hasCover) {
-                const coverVersion = [Math.round(item.mtime || 0), item.size || 0].join('-');
-                const coverUrl = `/api/music/custom/cover?filename=${encodeURIComponent(item.filename)}&user=${encodeURIComponent(username)}${authToken ? `&token=${encodeURIComponent(authToken)}` : ''}&v=${encodeURIComponent(coverVersion)}`;
-                coverHtml = `<img data-src="${this.escapeAttr(coverUrl)}" data-lm-cover-index="${index}" src="/music/assets/logo.svg" loading="lazy" fetchpriority="low" class="lazy-image lm-cover-image is-placeholder w-10 h-10 md:w-12 md:h-12 rounded-lg object-cover shadow-sm flex-shrink-0 border t-border-main mr-2.5 md:mr-4 ml-0.5 md:ml-3">`;
-            }
+            // 旧索引可能尚未记录封面，仍走统一候选加载；图片失败不修改歌词或元数据状态。
+            const coverUrl = window.MusicExperience.coverUrl({ ...item, isCustomDir: true }) || '/music/assets/logo.svg';
+            const coverHtml = `<img data-src="${this.escapeAttr(coverUrl)}" data-lm-cover-index="${index}" src="/music/assets/logo.svg" loading="lazy" fetchpriority="low" class="lazy-image lm-cover-image is-placeholder w-10 h-10 md:w-12 md:h-12 rounded-lg object-cover shadow-sm flex-shrink-0 border t-border-main mr-2.5 md:mr-4 ml-0.5 md:ml-3">`;
 
 
             const formatTime = (ts) => {
@@ -1014,40 +1006,14 @@ window.CustomDirManager = {
         container.innerHTML = html;
         window.SongFileStatus?.update(container, page.list);
 
-        // 绑定封面加载失败兜底
         container.querySelectorAll('.lm-cover-image').forEach(img => {
-            img.addEventListener('error', () => {
-                const index = parseInt(img.dataset.lmCoverIndex || '', 10);
-                this.handleCoverLoadError(index, img);
-            }, { once: true });
+            const index = parseInt(img.dataset.lmCoverIndex || '', 10);
+            window.LibraryArtwork.bind(img, { ...this.displayData[index], isCustomDir: true });
         });
 
         if (typeof window.lazyLoadImages === 'function') {
             window.lazyLoadImages(container);
         }
-    },
-
-    handleCoverLoadError(index, img) {
-        const item = this.displayData[index];
-        if (!item) return;
-        if (item.img && typeof item.img === 'string' && /^https?:\/\//i.test(item.img) && !img.dataset.lmFallbackTried) {
-            img.dataset.lmFallbackTried = 'true';
-            img.src = item.img;
-            return;
-        }
-        item.hasCover = false;
-        item.coverType = 'none';
-
-        const placeholder = document.createElement('div');
-        placeholder.className = 'w-10 h-10 md:w-12 md:h-12 rounded-lg bg-gray-100/50 flex-shrink-0 flex items-center justify-center border t-border-main mr-2.5 md:mr-4 ml-0.5 md:ml-3';
-        placeholder.innerHTML = '<i class="fas fa-music t-text-muted text-xs"></i>';
-        if (img && img.isConnected) img.replaceWith(placeholder);
-
-        clearTimeout(this.coverRenderTimer);
-        this.coverRenderTimer = setTimeout(() => {
-            this.coverRenderTimer = null;
-            this.render();
-        }, 80);
     },
 
     openManualIndexModal(index) {

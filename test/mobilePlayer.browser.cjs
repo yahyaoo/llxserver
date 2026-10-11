@@ -1,0 +1,141 @@
+/** 手机播放与桌面按钮真实浏览器回归；在隔离账号中执行。 @author jingyh */
+async (page) => {
+    page.setDefaultTimeout(10000);
+    const results = [], errors = [];
+    const check = (ok, name) => { if (!ok) throw new Error(name); results.push(name); };
+    page.on('pageerror', error => errors.push(error.message));
+    const commentRequests = [];
+    await page.route('**/api/music/comment', async route => {
+        const body = route.request().postDataJSON(); commentRequests.push(body);
+        await route.fulfill({ json: { total: 40, maxPage: 2, comments: [{ userName: '隔离测试用户', text: `${body.type === 'hot' ? '最热' : '最新'}评论第 ${body.page} 页`, likedCount: 12 }] } });
+    });
+    const shot = name => page.screenshot({ path: `D:/opensource/fn-lxserver/output/playwright/${name}.png`, animations: 'disabled' });
+    try {
+        await page.evaluate(() => { localStorage.setItem('lx_agreement_accepted', 'true'); localStorage.removeItem('lx_playback_state'); });
+        await page.reload();
+        await page.waitForFunction(() => window.PlayerFeaturePages && typeof currentListData !== 'undefined' && currentListData);
+        await page.waitForTimeout(1500);
+        await page.setViewportSize({ width: 390, height: 844 });
+        const song = { id: 'kg_mobile_player', source: 'kg', songmid: 'mobile_player', name: '人间雪（DJ细霖版）', singer: '洛雪歌手', albumName: '人间雪', quality: 'hires', types: [{ type: 'hires' }], img: '/music/assets/logo.svg', interval: '03:30' };
+        await page.evaluate(async song => {
+            const response = await fetch('/api/user/favorites', { method: 'POST', headers: { ...getUserAuthHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify({ song, loved: true }) });
+            if (!response.ok) throw new Error(await response.text());
+            currentListData = await (await fetch('/api/user/list', { headers: getUserAuthHeaders() })).json();
+            renderMyLists(currentListData); handleListClick('love', true, true);
+        }, song);
+        await page.waitForFunction(() => document.querySelector('#search-results .song-row-more'));
+        const row = page.locator('#search-results .song-row-actions').first();
+        check(await row.locator('button:visible').count() === 2, '手机歌曲行只显示喜欢和更多');
+        await row.locator('.song-row-more').click();
+        check(await page.locator('#mobile-song-menu button:visible').count() === 4, '更多菜单显示下载、歌单、不喜欢、删除');
+        await shot('mobile-song-actions');
+        await page.keyboard.press('Escape');
+        check(await row.locator('button:visible').count() === 2 && !await page.locator('#mobile-song-menu').isVisible(), 'Esc 关闭菜单并还原原按钮');
+        await page.evaluate(song => {
+            currentPlayingSong = song; currentQuality = 'hires'; updatePlayerInfo(song, 'hires'); updateDetailInfo(song);
+            currentLyricLines = Array.from({ length: 20 }, (_, index) => ({ time: index * 10000, text: '歌词测试 ' + (index + 1) }));
+            renderLyric(currentLyricLines); toggleLyrics();
+        }, song);
+        await page.waitForFunction(() => document.body.classList.contains('player-detail-open'));
+        await page.waitForTimeout(650);
+        check(await page.locator('#player-footer').isVisible(), '手机播放页显示完整播放器');
+        check(!await page.locator('#lyrics-wrapper').isVisible(), '播放主页隐藏歌词内容');
+        check(await page.locator('#player-source').evaluate(n => n.previousElementSibling.id === 'player-title'), '原音源标签位于歌曲标题后');
+        check(await page.locator('#player-source').evaluate(n => getComputedStyle(n.children[0]).color !== getComputedStyle(n.children[1]).color), '酷狗和 Hi-Res 保留原标签颜色');
+        check(await page.locator('.player-detail-album').innerText() === ' - 人间雪', '第二行显示歌手与专辑');
+        check(await page.locator('#view-player-detail .player-actions').evaluate(n => {
+            const buttons = [...n.querySelectorAll(':scope > button, :scope > .player-popover-anchor > button')].filter(b => getComputedStyle(b).display !== 'none').sort((a,b) => a.getBoundingClientRect().left - b.getBoundingClientRect().left);
+            return buttons.length === 6 && buttons[0].id === 'player-like-btn' && buttons[1].id === 'player-mobile-lyrics' && buttons[2].getAttribute('onclick') === 'toggleQueueDrawer()' && buttons[3].id === 'btn-sound-effects' && buttons[4].getAttribute('onclick').includes('toggleCommentModal') && buttons[5].id === 'player-more-btn';
+        }), '操作顺序为喜欢、歌词、列表、均衡器、评论、更多');
+        check(await page.locator('#detail-cover').evaluate(n => Number(getComputedStyle(n.parentElement).opacity) < 1), '封面半透明展示背景特效');
+        await page.evaluate(async () => {
+            // 生成短 PCM 音频，真实驱动已有音频分析器与画布，无外部音源依赖。
+            const rate = 16000, length = rate * 3, buffer = new ArrayBuffer(44 + length * 2), data = new DataView(buffer);
+            const text = (offset, value) => [...value].forEach((char, index) => data.setUint8(offset + index, char.charCodeAt(0)));
+            text(0, 'RIFF'); data.setUint32(4, 36 + length * 2, true); text(8, 'WAVE'); text(12, 'fmt ');
+            data.setUint32(16, 16, true); data.setUint16(20, 1, true); data.setUint16(22, 1, true);
+            data.setUint32(24, rate, true); data.setUint32(28, rate * 2, true); data.setUint16(32, 2, true); data.setUint16(34, 16, true);
+            text(36, 'data'); data.setUint32(40, length * 2, true);
+            for (let index = 0; index < length; index++) data.setInt16(44 + index * 2, Math.sin(index * 2 * Math.PI * 440 / rate) * 8000, true);
+            const audio = document.getElementById('audio-player');
+            window.__mobileTestAudio = URL.createObjectURL(new Blob([buffer], { type: 'audio/wav' }));
+            audio.src = window.__mobileTestAudio;
+            window.soundEffects.init();
+            const analyser = window.soundEffects.getAnalyser(), silentOutput = analyser.context.createGain();
+            silentOutput.gain.value = 0; analyser.disconnect(); analyser.connect(silentOutput); silentOutput.connect(analyser.context.destination);
+            audio.muted = false; audio.volume = 1;
+            updateSetting('showDetailVisualizer', true); updateSetting('detailVisualizerStyle', 'spectrum');
+            await audio.play();
+        });
+        await page.waitForTimeout(500);
+        check(await page.locator('#detail-visualizer').evaluate(n => n.width > 0 && n.height > 0 && Number(getComputedStyle(n).opacity) > 0 && n.getContext('2d').getImageData(0, 0, n.width, n.height).data.some((value,index) => index % 4 === 3 && value > 0)), '实际音频驱动全屏背景频谱绘制');
+        await page.evaluate(() => { document.getElementById('audio-player').pause(); document.getElementById('audio-player').currentTime = 0; });
+        await shot('mobile-player-390');
+        await page.evaluate(() => updateSetting('detailVisualizerStyle', 'pulse'));
+        check(await page.locator('#view-player-detail').getAttribute('data-player-visualizer') === 'pulse', '动效模式沿用原设置并即时切换');
+        await page.evaluate(() => updateSetting('detailVisualizerStyle', 'spectrum'));
+        await page.locator('#player-mobile-lyrics').click();
+        await page.waitForTimeout(280);
+        check(await page.locator('#lyrics-wrapper').isVisible(), '歌词入口打开全屏歌词');
+        await shot('mobile-fullscreen-lyrics');
+        const time = await page.locator('#audio-player').evaluate(n => n.currentTime);
+        await page.locator('#lyric-content .lyric-line').nth(9).click({ force: true });
+        await page.waitForFunction(() => !document.getElementById('view-player-detail').classList.contains('mobile-lyrics-open'));
+        await page.waitForTimeout(280);
+        check(await page.locator('#audio-player').evaluate(n => n.currentTime) === time, '点击歌词返回播放页且不触发旧定位');
+        check(await page.locator('#player-footer').isVisible(), '歌词退出后恢复播放控制');
+        await page.locator('#player-mobile-lyrics').click();
+        await page.goBack();
+        await page.waitForTimeout(300);
+        check(await page.locator('#player-footer').isVisible() && await page.locator('#view-player-detail').isVisible(), '浏览器返回只退出歌词子页');
+        await page.locator('#btn-sound-effects').click();
+        await page.locator('#player-feature-page.is-open').waitFor();
+        check(await page.locator('#player-feature-page #sound-effects-content').count() === 1, '手机均衡器呈现独立页面');
+        check(await page.locator('#player-feature-page').evaluate(n => n.getBoundingClientRect().height === innerHeight), '均衡器页面铺满视口');
+        check(await page.locator('#player-feature-page #eq-sliders-container').count() === 1, '原 EQ 控件复用且只有一份');
+        await page.evaluate(() => window.soundEffects.setEQ(0, 4));
+        await page.waitForTimeout(900);
+        check(await page.evaluate(async () => (await (await fetch('/api/user/sound-effects', { headers: getUserAuthHeaders() })).json()).settings.eq[0] === 4), 'EQ 调节通过真实接口保存');
+        await shot('mobile-equalizer');
+        await page.locator('.player-feature-header button').click();
+        await page.waitForTimeout(300);
+        check(await page.locator('#sound-effects-modal #sound-effects-content').count() === 1 && await page.locator('#player-footer').isVisible(), '均衡器返回恢复面板节点和播放页');
+        await page.locator('#view-player-detail .player-detail-direct-action').filter({ hasText: '歌曲评论' }).click();
+        await page.locator('#player-feature-page.is-open').waitFor();
+        check(await page.locator('#player-feature-page #comment-modal-content').count() === 1, '手机评论为独立页面并保留最热最新入口');
+        await page.locator('#comment-list').getByText('最热评论第 1 页').waitFor();
+        await page.locator('#tab-new-comments').click();
+        await page.locator('#comment-list').getByText('最新评论第 1 页').waitFor();
+        await page.locator('#btn-comment-next').click();
+        await page.locator('#comment-list').getByText('最新评论第 2 页').waitFor();
+        check(commentRequests.some(r => r.type === 'hot') && commentRequests.some(r => r.type === 'new' && r.page === 2), '评论类型切换和分页调用原业务');
+        await shot('mobile-comments');
+        await page.goBack(); await page.waitForTimeout(300);
+        check(await page.locator('#comment-modal #comment-modal-content').count() === 1 && await page.locator('#player-footer').isVisible(), '评论浏览器返回恢复播放页');
+        for (const width of [320, 375, 390, 767]) {
+            await page.setViewportSize({ width, height: 844 });
+            check(await page.locator('#view-player-detail').evaluate(n => n.scrollWidth <= n.clientWidth), `${width}px 播放页面无横向溢出`);
+            check(await page.locator('#view-player-detail .player-actions').evaluate(n => [...n.querySelectorAll(':scope > button, :scope > div > button')].every(b => b.getBoundingClientRect().right <= innerWidth)), `${width}px 操作入口均在视口内`);
+        }
+        await page.setViewportSize({ width: 667, height: 390 });
+        check(await page.locator('#player-detail-container').evaluate(n => n.scrollHeight > n.clientHeight), '横屏可滚动访问下方播放控制');
+        await page.setViewportSize({ width: 1440, height: 900 });
+        await page.locator('#lyrics-wrapper').waitFor({ state: 'visible' });
+        check(await page.locator('#player-mobile-lyrics').isVisible() === false, '桌面隐藏手机歌词按钮');
+        check(await page.locator('#lyrics-wrapper').isVisible(), '桌面仍并排展示歌词');
+        check(await page.locator('#btn-sound-effects').evaluate(n => getComputedStyle(n).borderTopWidth === '0px' && !n.classList.contains('lx-el-button')), '桌面均衡器入口恢复无边框图标');
+        await page.locator('#player-more-btn').click();
+        check(await page.locator('#player-more-menu button').first().evaluate(n => getComputedStyle(n).borderTopWidth === '0px' && getComputedStyle(n).justifyContent === 'normal'), '桌面更多菜单恢复无边框左对齐');
+        await shot('desktop-player-menu-fixed');
+        await page.keyboard.press('Escape');
+        await page.locator('#btn-sound-effects').click();
+        check(await page.locator('#sound-effects-modal').isVisible() && !await page.locator('#player-feature-page').isVisible(), '桌面均衡器保留弹框展示');
+        await page.evaluate(() => window.soundEffects.close()); await page.waitForTimeout(350);
+        await page.evaluate(() => toggleLyrics()); await page.waitForTimeout(650);
+        check(await row.locator('button:visible').count() === 5, '桌面列表原五个操作恢复');
+        check(errors.length === 0, `无新增脚本异常：${errors.join('; ')}`);
+        await page.unroute('**/api/music/comment');
+        await page.evaluate(() => { URL.revokeObjectURL(window.__mobileTestAudio); delete window.__mobileTestAudio; localStorage.removeItem('lx_playback_state'); });
+        return { passed: results.length, results };
+    } catch (error) { await shot('mobile-player-failure'); throw new Error(`最后通过：${results.at(-1)}；${error.message}`); }
+}

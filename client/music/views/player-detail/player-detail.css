@@ -96,7 +96,9 @@ body.player-detail-open #queue-drawer [data-player-add-to-playlist] { display: n
 #view-player-detail #time-current { grid-column: 1; }
 #view-player-detail #time-total { grid-column: 3; text-align: right; }
 #view-player-detail #player-source { grid-column: 2; grid-row: 2; justify-content: center; max-width: 100%; }
-#view-player-detail #player-source > span { background: rgb(255 255 255 / 12%); border-color: transparent; color: #d5cddc; font-size: 10px; }
+@media (min-width: 768px) {
+    #view-player-detail #player-source > span { background: rgb(255 255 255 / 12%); border-color: transparent; color: #d5cddc; font-size: 10px; }
+}
 #view-player-detail .player-transport { grid-column: 1 / -1; grid-row: 3; justify-content: space-between; gap: 12px; margin-top: 26px; }
 #view-player-detail .player-transport .player-icon-button, #view-player-detail #play-mode-btn { width: 38px; height: 44px; display: inline-flex; align-items: center; justify-content: center; font-size: 22px; color: #d1cad7; border-radius: 50%; }
 #view-player-detail #btn-play { width: 60px; height: 60px; font-size: 36px; color: #eee8f1; }

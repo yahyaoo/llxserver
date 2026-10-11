@@ -200,9 +200,8 @@ window.soundEffects = (function () {
 
     async function pushToServer(payload) {
         if (localStorage.getItem('lx_sync_mode') !== 'local') return;
-        const user = localStorage.getItem('lx_sync_user');
-        const pass = localStorage.getItem('lx_sync_pass');
-        if (!user || !pass) return;
+        // 当前登录使用会话鉴权，不再读取或要求浏览器保存密码。
+        if (!window.isUserLoggedIn?.()) return;
 
         try {
             await fetch('/api/user/sound-effects', {
@@ -222,9 +221,8 @@ window.soundEffects = (function () {
         if (!window.settings || !window.settings.saveAccountSettingsToFile) return;
         if (localStorage.getItem('lx_sync_mode') !== 'local') return;
 
-        const user = localStorage.getItem('lx_sync_user');
-        const pass = localStorage.getItem('lx_sync_pass');
-        if (!user || !pass) return;
+        // 复用现有会话入口，兼容 Cookie 和用户令牌。
+        if (!window.isUserLoggedIn?.()) return;
 
         try {
             const res = await fetch('/api/user/sound-effects', {
@@ -495,6 +493,7 @@ window.soundEffects = (function () {
         },
         open: function () {
             if (!audioContext) init(); // Ensure init is called if not already
+            window.PlayerFeaturePages?.open('equalizer');
             const modal = document.getElementById('sound-effects-modal');
             modal.classList.remove('hidden');
             modal.classList.add('flex');
@@ -514,6 +513,7 @@ window.soundEffects = (function () {
             renderUI();
         },
         close: function () {
+            if (window.PlayerFeaturePages?.close('equalizer')) return;
             const modal = document.getElementById('sound-effects-modal');
             const content = document.getElementById('sound-effects-content');
             if (content) { // Check if content exists

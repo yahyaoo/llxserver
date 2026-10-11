@@ -66,7 +66,8 @@
             }
         }
         const remote = candidates.filter(url => /^https?:\/\//.test(url));
-        if (song.source && song.id != null && (remote.length || song.artworkCached || song.artworkUrl)) {
+        // 即使旧记录丢失图片字段，也按歌曲标识读取已落盘的封面。
+        if (song.source && song.id != null) {
             const params = new URLSearchParams({ source: song.source, id: String(song.id), user: accountName() });
             for (const url of remote.slice(0, 8)) params.append('url', url);
             const auth = window.getUserAuthHeaders?.() || {};

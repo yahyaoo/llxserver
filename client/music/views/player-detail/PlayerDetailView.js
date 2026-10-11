@@ -21,6 +21,14 @@
             this.left.addEventListener('dblclick', event => event.stopPropagation());
             container.prepend(this.left);
             this.left.append(document.getElementById('mobile-player-cover-container'));
+            this.lyricsButton = document.createElement('button');
+            this.lyricsButton.id = 'player-mobile-lyrics';
+            this.lyricsButton.className = 'player-icon-button player-mobile-only';
+            this.lyricsButton.title = '全屏歌词';
+            this.lyricsButton.setAttribute('aria-label', '全屏歌词');
+            this.lyricsButton.innerHTML = '<i class="fas fa-align-left" aria-hidden="true"></i>';
+            this.lyricsButton.addEventListener('click', () => window.PlayerFeaturePages.openLyrics());
+            window.addEventListener('resize', () => this.updateResponsiveLayout());
             this.fullscreenButton = document.getElementById('player-detail-fullscreen');
             this.fullscreenButton.addEventListener('click', () => this.toggleFullscreen());
             this.background = new window.PlayerBackground(document.getElementById('player-artist-background'));
@@ -83,6 +91,7 @@
                 this.move(document.getElementById('play-mode-btn').parentElement, transport, transport.firstElementChild);
                 this.move(document.getElementById('player-volume-btn').parentElement, transport);
                 this.move(document.getElementById('player-like-btn'), actions, more);
+                actions.insertBefore(this.lyricsButton, more);
                 this.move(actions.querySelector('[onclick="toggleQueueDrawer()"]'), actions, more);
                 for (const item of [document.getElementById('btn-sound-effects'), document.querySelector('#player-more-menu [onclick*="toggleCommentModal"]')]) {
                     this.move(item, actions, more);
@@ -95,8 +104,11 @@
                 document.getElementById('player-more-menu').append(this.spectrumButton);
                 this.applyBackground();
                 this.updateTrack();
+                this.updateResponsiveLayout();
                 this.updateSpectrum();
             } else {
+                window.PlayerFeaturePages?.dismiss();
+                this.lyricsButton.remove();
                 this.album.remove();
                 this.spectrumButton.remove();
                 for (const { node, marker } of this.moves.reverse()) {
@@ -114,12 +126,21 @@
 
         /** 展示原歌曲的专辑字段，读取现有数据且不改写歌曲对象。 */
         updateTrack(force = false) {
-            const song = window.currentPlayingSong;
+            const song = window.getActiveSongInfo?.() || window.currentPlayingSong;
             const album = window.getSongAlbumName?.(song) || '';
-            this.album.textContent = album ? ' · ' + album : '';
+            this.album.textContent = album ? (window.innerWidth < 768 ? ' - ' : ' · ') + album : '';
             this.album.title = album;
             this.album.hidden = !album;
             if (this.view.getAttribute('data-player-background') === 'artist') this.background.update(song, force);
+        }
+
+        /** 手机标签沿用原节点和原样式，放在标题后；宽屏恢复进度区位置。 */
+        updateResponsiveLayout() {
+            if (!this.open) return;
+            const source = document.getElementById('player-source');
+            if (window.innerWidth < 768) document.getElementById('player-title').after(source);
+            else document.getElementById('player-footer').querySelector('.player-progress').insertBefore(source, document.getElementById('time-total'));
+            this.updateTrack();
         }
 
         /** 仅切换背景层，不改变页面布局、播放控件和歌曲数据。 */
@@ -127,7 +148,7 @@
             const value = window.PlayerBackground.normalizeMode(mode);
             if (this.view.getAttribute('data-player-background') !== value) this.background.clear();
             this.view.setAttribute('data-player-background', value);
-            if (value === 'artist' && this.open) this.background.update(window.currentPlayingSong);
+            if (value === 'artist' && this.open) this.background.update(window.getActiveSongInfo?.() || window.currentPlayingSong);
         }
 
         /** 频谱入口仅调用原设置函数；画布与分析器由原模块管理。 */

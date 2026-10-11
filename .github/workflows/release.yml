@@ -2,246 +2,140 @@ name: Build and Release
 
 on:
   workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+      - '!v*-snapshot.*'
+      - '!v*-desktop'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
-  # ── 1. 初始化阶段：获取版本号和更新日志 ──────────────────────────────────────
-  init:
+  packages:
     runs-on: ubuntu-latest
-    outputs:
-      VERSION: ${{ steps.get_version.outputs.VERSION }}
+    timeout-minutes: 30
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Get version from config
-        id: get_version
-        run: |
-          VERSION=$(grep "version:" client/js/config.js | sed "s/.*'\(.*\)'.*/\1/")
-          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
-          echo "Detected version: $VERSION"
-
-      - name: Get Release Notes
-        run: |
-          awk '/^## v/ {if (p) exit; p=1} p' changelog.md > RELEASE_NOTES.md || cp changelog.md RELEASE_NOTES.md
-          echo "" >> RELEASE_NOTES.md
-          echo "---" >> RELEASE_NOTES.md
-          echo "* 本次版本由 @yahyaoo 维护构建 🚀" >> RELEASE_NOTES.md
-
-      - name: Upload metadata
-        uses: actions/upload-artifact@v4
+      - uses: actions/checkout@v4
         with:
-          name: release-metadata
-          path: RELEASE_NOTES.md
-
-  # ── 2. 桌面端构建阶段：复用 electron-build 逻辑 ──────────────────────────────
-  build_desktop:
-    needs: init
-    strategy:
-      fail-fast: false
-      matrix:
-        mode: [all, server, client]
-        os: [windows-latest, macos-latest, ubuntu-latest]
-        include:
-          - os: windows-latest
-            platform: win
-          - os: macos-latest
-            platform: mac
-          - os: ubuntu-latest
-            platform: linux
-    runs-on: ${{ matrix.os }}
-    name: Build Desktop (${{ matrix.platform }})
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-
-      - name: Install Linux system deps
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev libnotify-dev libnss3 libxss1 libasound2t64
-
-      - name: Install dependencies
-        run: npm ci
-
-      # 各角色交付目录使用独立 Node 运行时准备后端原生依赖。
-
-      - name: Build JS source
-        run: npm run electron:build
-
-      - name: Package Electron app
-        run: node deploy/scripts/desktop.cjs ${{ matrix.mode }} --${{ matrix.platform }}
+          fetch-depth: 0
+      - name: Verify merged release source
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CSC_IDENTITY_AUTO_DISCOVERY: false
-
-      # 复用我们之前调试好的分项目上传逻辑
-      - name: Win x64 Setup
-        if: matrix.platform == 'win'
-        uses: actions/upload-artifact@v4
-        with:
-          name: llxserver-${{ matrix.mode }}-win-x64-Setup
-          path: dist-electron/${{ matrix.mode }}/*x64 Setup.exe
-
-      - name: Win x86 Setup
-        if: matrix.platform == 'win'
-        uses: actions/upload-artifact@v4
-        with:
-          name: llxserver-${{ matrix.mode }}-win-x86-Setup
-          path: dist-electron/${{ matrix.mode }}/*ia32 Setup.exe
-
-      - name: Win arm64 Setup
-        if: matrix.platform == 'win'
-        uses: actions/upload-artifact@v4
-        with:
-          name: llxserver-${{ matrix.mode }}-win-arm64-Setup
-          path: dist-electron/${{ matrix.mode }}/*arm64 Setup.exe
-
-      - name: Win x64 Portable
-        if: matrix.platform == 'win'
-        uses: actions/upload-artifact@v4
-        with:
-          name: llxserver-${{ matrix.mode }}-win-x64-Portable
-          path: dist-electron/${{ matrix.mode }}/*x64 Portable.exe
-
-      - name: Win x86 Portable
-        if: matrix.platform == 'win'
-        uses: actions/upload-artifact@v4
-        with:
-          name: llxserver-${{ matrix.mode }}-win-x86-Portable
-          path: dist-electron/${{ matrix.mode }}/*ia32 Portable.exe
-
-      - name: Win arm64 Portable
-        if: matrix.platform == 'win'
-        uses: actions/upload-artifact@v4
-        with:
-          name: llxserver-${{ matrix.mode }}-win-arm64-Portable
-          path: dist-electron/${{ matrix.mode }}/*arm64 Portable.exe
-
-      - name: Mac x64 DMG
-        if: matrix.platform == 'mac'
-        uses: actions/upload-artifact@v4
-        with:
-          name: llxserver-${{ matrix.mode }}-mac-x64-dmg
-          path: dist-electron/${{ matrix.mode }}/*x64.dmg
-
-      - name: Mac arm64 DMG
-        if: matrix.platform == 'mac'
-        uses: actions/upload-artifact@v4
-        with:
-          name: llxserver-${{ matrix.mode }}-mac-arm64-dmg
-          path: dist-electron/${{ matrix.mode }}/*arm64.dmg
-
-      - name: Linux amd64 AppImage
-        if: matrix.platform == 'linux'
-        uses: actions/upload-artifact@v4
-        with:
-          name: llxserver-${{ matrix.mode }}-linux-amd64-AppImage
-          path: dist-electron/${{ matrix.mode }}/*x64.AppImage
-
-      - name: Linux arm64 AppImage
-        if: matrix.platform == 'linux'
-        uses: actions/upload-artifact@v4
-        with:
-          name: llxserver-${{ matrix.mode }}-linux-arm64-AppImage
-          path: dist-electron/${{ matrix.mode }}/*arm64.AppImage
-
-      - name: Linux armv7l AppImage
-        if: matrix.platform == 'linux'
-        uses: actions/upload-artifact@v4
-        with:
-          name: llxserver-${{ matrix.mode }}-linux-armv7l-AppImage
-          path: dist-electron/${{ matrix.mode }}/*armv7l.AppImage
-
-      - name: Linux amd64 Deb
-        if: matrix.platform == 'linux'
-        uses: actions/upload-artifact@v4
-        with:
-          name: llxserver-${{ matrix.mode }}-linux-amd64-deb
-          path: dist-electron/${{ matrix.mode }}/*amd64.deb
-
-      - name: Linux arm64 Deb
-        if: matrix.platform == 'linux'
-        uses: actions/upload-artifact@v4
-        with:
-          name: llxserver-${{ matrix.mode }}-linux-arm64-deb
-          path: dist-electron/${{ matrix.mode }}/*arm64.deb
-
-      - name: Linux armv7l Deb
-        if: matrix.platform == 'linux'
-        uses: actions/upload-artifact@v4
-        with:
-          name: llxserver-${{ matrix.mode }}-linux-armv7l-deb
-          path: dist-electron/${{ matrix.mode }}/*armv7l.deb
-
-  # ── 3. 服务端构建阶段：打包 Server Zip ──────────────────────────────────────
-  build_server:
-    needs: init
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-
-      - name: Install and Build
+          RELEASE_TAG: ${{ github.ref_name }}
         run: |
-          npm ci
-          node deploy/scripts/download-binary.js --all
-          npm run build
-          # 清理开发依赖，仅保留生产运行环境
-          rm -rf node_modules
-          npm ci --omit=dev
-
-      - name: Build and Zip Server
-        run: |
-          npm run package:all
-          npm run package:server
-          npm run package:client
-
-      - name: Upload Server Zip
-        uses: actions/upload-artifact@v4
+          [[ "$GITHUB_REF" == refs/tags/* ]]
+          git merge-base --is-ancestor HEAD origin/main
+          node -e 'const p = require("./package.json"); if (process.env.RELEASE_TAG !== "v" + p.version || !/^\d+\.\d+\.\d+$/.test(p.version)) throw new Error("正式标签与源码版本不一致")'
+          test -f "deploy/fnos/releases/$RELEASE_TAG.md"
+      - uses: actions/setup-node@v4
         with:
-          name: llxserver-node-packages
-          path: output/*.zip
+          node-version: '24'
+          cache: npm
+      - name: Install dependencies
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm rebuild better-sqlite3
+      - name: Build current source
+        run: npm run build
+      - name: Unit tests
+        run: npm run test:unit
+      - name: HTTP, SQLite and ZIP system tests
+        run: npm run test:system
+      - name: FPK packaging tests
+        run: npm run test:fpk
+      - name: Download verified official fnpack
+        run: |
+          curl --fail --location --retry 3 https://static2.fnnas.com/fnpack/fnpack-1.2.3-linux-amd64 -o "$RUNNER_TEMP/fnpack"
+          echo "54b97fa7b70968c4d05c79840f5daeff508957d0bb2062fdb0376d00d9615c93  $RUNNER_TEMP/fnpack" | sha256sum --check
+          chmod +x "$RUNNER_TEMP/fnpack"
+          echo "FNPACK_BIN=$RUNNER_TEMP/fnpack" >> "$GITHUB_ENV"
+      - name: Package all deployment modes
+        run: |
+          for mode in all server client; do
+            node deploy/scripts/package.cjs "$mode"
+            node -e 'const path = require("node:path"); const { preparePayload, ROOT } = require("./deploy/fnos/scripts/build.js"); const mode = process.argv[1]; preparePayload(ROOT, path.join(ROOT, "deploy/fnos", "llxserver." + mode), mode)' "$mode"
+            node deploy/fnos/scripts/package.js "$mode"
+          done
+      - name: Actual FPK system tests
+        run: npm run test:fpk:system
+      - name: Collect versioned packages
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_SHA: ${{ github.sha }}
+        run: |
+          mkdir -p output/release
+          for mode in all server client; do
+            cp "output/llxserver-$mode.zip" "output/release/llxserver-$mode-$RELEASE_TAG.zip"
+            cp "deploy/fnos/dist/llxserver.$mode-$RELEASE_TAG.fpk" output/release/
+          done
+          printf 'channel=release\ntag=%s\ncommit=%s\nrun=https://github.com/%s/actions/runs/%s\n' "$RELEASE_TAG" "$RELEASE_SHA" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" > output/release/BUILD_INFO.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-node-packages
+          path: output/release/*
+          if-no-files-found: error
 
-  # ── 4. 发布阶段：汇总所有产物并创建 Release ──────────────────────────────────
+  build_desktop:
+    needs: packages
+    uses: ./.github/workflows/electron-build.yml
+    secrets: inherit
+
   publish:
-    needs: [init, build_desktop, build_server]
+    needs: [packages, build_desktop]
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      RELEASE_TAG: ${{ github.ref_name }}
     steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/download-artifact@v4
         with:
           path: release_assets
           merge-multiple: true
-
-      - name: Create Release
-        uses: softprops/action-gh-release@v2
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          tag_name: ${{ needs.init.outputs.VERSION }}
-          name: 洛洛雪音乐 ${{ needs.init.outputs.VERSION }}
-          body_path: release_assets/RELEASE_NOTES.md
-          files: |
-            release_assets/*.exe
-            release_assets/*.dmg
-            release_assets/*.AppImage
-            release_assets/*.deb
-            release_assets/*.zip
-          draft: false
-          prerelease: false
-          make_latest: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Prepare checksums and verify source
+        run: |
+          git merge-base --is-ancestor HEAD origin/main
+          python3 - <<'PY'
+          import hashlib
+          from pathlib import Path
+          directory = Path('release_assets')
+          files = sorted(p for p in directory.iterdir() if p.is_file())
+          if not any(p.suffix == '.fpk' for p in files):
+              raise RuntimeError('缺少飞牛安装包')
+          (directory / 'SHA256SUMS').write_text(''.join(hashlib.sha256(p.read_bytes()).hexdigest() + '  ' + p.name + '\n' for p in files), encoding='utf-8')
+          PY
+          (cd release_assets && sha256sum --check SHA256SUMS)
+      - name: Create draft and upload all packages
+        run: |
+          gh release create "$RELEASE_TAG" --verify-tag --draft --title "洛洛雪音乐 $RELEASE_TAG" --notes-file "deploy/fnos/releases/$RELEASE_TAG.md" release_assets/*
+      - name: Verify uploaded bytes and publish
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" > "$RUNNER_TEMP/release.json"
+          gh release download "$RELEASE_TAG" --dir "$RUNNER_TEMP/verified-assets" --pattern '*'
+          python3 - "$RUNNER_TEMP/release.json" <<'PY'
+          import hashlib
+          import json
+          import os
+          import sys
+          from pathlib import Path
+          release = json.loads(Path(sys.argv[1]).read_text())
+          assert release['draft'] and not release['prerelease']
+          assets = {a['name']: a for a in release['assets']}
+          files = list(Path('release_assets').iterdir())
+          assert set(assets) == {p.name for p in files}
+          for path in files:
+              asset = assets[path.name]
+              assert asset['size'] == path.stat().st_size, path.name
+              assert asset['digest'] == 'sha256:' + hashlib.sha256(path.read_bytes()).hexdigest(), path.name
+              downloaded = Path(os.environ['RUNNER_TEMP']) / 'verified-assets' / path.name
+              assert hashlib.sha256(downloaded.read_bytes()).digest() == hashlib.sha256(path.read_bytes()).digest(), path.name
+          PY
+          gh release edit "$RELEASE_TAG" --draft=false --latest

@@ -3066,10 +3066,6 @@ window.LocalMusicManager = {
             container.innerHTML = `<div class="h-36 flex items-center justify-center text-xs t-text-muted">${emptyText}</div>`;
         } else {
             const isCustomDir = this.remasterSource === 'custom';
-            const username = isCustomDir
-                ? ((window.getCurrentUser && window.getCurrentUser()) || localStorage.getItem('lx_user_username') || 'default')
-                : this.getCurrentUsername();
-            const authToken = (window.getUserAuthHeaders ? window.getUserAuthHeaders()['x-user-token'] : null) || window.AccountSession.getToken() || '';
 
             container.innerHTML = pageItems.map(item => {
                 const selected = this.remasterSelectedItems.has(item.filename);
@@ -3081,18 +3077,8 @@ window.LocalMusicManager = {
                 const safeSource = isCustomOrUnknown ? '' : this.escapeHtml(String(displayedSource).toUpperCase());
                 const sourceBadge = safeSource ? `<span class="px-1.5 py-0.2 bg-gray-100 dark:bg-gray-800 border t-border-main rounded text-[9px] font-bold uppercase tracking-tight text-gray-500 dark:text-gray-400 mr-1 inline-block shrink-0 leading-tight" title="平台：${this.escapeAttr(displayedSource)}">${safeSource}</span>` : '';
 
-                let coverHtml = `<div class="w-9 h-9 rounded-lg bg-gray-100 dark:bg-gray-800/80 flex-shrink-0 flex items-center justify-center border t-border-main shadow-xs">
-                                    <i class="fas fa-music text-gray-400 text-xs"></i>
-                                 </div>`;
-                if (item.hasCover || (item.img && typeof item.img === 'string' && /^https?:\/\//i.test(item.img))) {
-                    const coverUrl = item.hasCover
-                        ? (isCustomDir
-                            ? `/api/music/custom/cover?filename=${encodeURIComponent(item.filename)}&user=${encodeURIComponent(username)}${authToken ? `&token=${encodeURIComponent(authToken)}` : ''}&v=${encodeURIComponent([Math.round(item.mtime || 0), item.size || 0].join('-'))}`
-                            : `/api/music/cache/cover?filename=${encodeURIComponent(item.filename)}&user=${encodeURIComponent(username)}${authToken ? `&token=${encodeURIComponent(authToken)}` : ''}&v=${encodeURIComponent([item.coverCheckedVersion || 0, Math.round(item.coverCheckedMtime || item.mtime || 0), item.coverCheckedSize || item.size || 0, 1].join('-'))}`)
-                        : item.img;
-                    const fallbackAttr = item.img && item.img !== coverUrl ? `data-fallback-src="${this.escapeAttr(item.img)}"` : '';
-                    coverHtml = `<img data-src="${this.escapeAttr(coverUrl)}" ${fallbackAttr} src="/music/assets/logo.svg" loading="lazy" fetchpriority="low" class="lazy-image lm-remaster-cover is-placeholder w-9 h-9 rounded-lg object-cover shadow-xs flex-shrink-0 border t-border-main" onerror="if(this.dataset.fallbackSrc && !this.dataset.fallbackTried){this.dataset.fallbackTried='true';this.src=this.dataset.fallbackSrc;}else{this.src='/music/assets/logo.svg';}">`;
-                }
+                const coverUrl = window.MusicExperience.coverUrl({ ...item, isCustomDir }) || '/music/assets/logo.svg';
+                const coverHtml = `<img data-src="${this.escapeAttr(coverUrl)}" src="/music/assets/logo.svg" loading="lazy" fetchpriority="low" class="lazy-image lm-remaster-cover is-placeholder w-9 h-9 rounded-lg object-cover shadow-xs flex-shrink-0 border t-border-main">`;
 
                 return `
                     <label class="min-h-13 px-3.5 py-2.5 flex items-center gap-3 transition-colors ${selected ? 'bg-red-500/[0.04] dark:bg-red-500/[0.06]' : ''} ${disabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer hover:t-bg-track'}">
@@ -3107,6 +3093,9 @@ window.LocalMusicManager = {
                     </label>`;
             }).join('');
 
+            container.querySelectorAll('.lm-remaster-cover').forEach((image, index) => {
+                window.LibraryArtwork.bind(image, { ...pageItems[index], isCustomDir });
+            });
             if (typeof window.lazyLoadImages === 'function') {
                 window.lazyLoadImages(container);
             }

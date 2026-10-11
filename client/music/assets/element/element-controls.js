@@ -38,7 +38,7 @@
     /** 统一按钮类型，保留导航选中态、纯图标按钮以及原来绑定的点击处理器。 */
     function button(source) {
         // 图片封面与磁贴自有布局，保留原生按钮语义，避免圆形内边距挤压图片。
-        if (source.matches('.player-cover-button,.playlist-add-tile,.song-cover-button,.recent-play-button,.download-cover-button')) return;
+        if (source.matches('.player-cover-button,.playlist-add-tile,.song-cover-button,.recent-play-button,.download-cover-button,.player-icon-button,.player-menu-item,.player-detail-toolbar button,#player-footer button,.song-row-more,.player-feature-header button')) return;
         const state = source.className.split(/\s+/).filter(name => !/^(el-button(?:--.*)?|lx-el-button|lx-el-navigation|is-circle|is-text|is-disabled)$/.test(name)).join(' ') + ':' + !!source.disabled;
         if (buttonStates.get(source) === state) return;
         buttonStates.set(source, state);

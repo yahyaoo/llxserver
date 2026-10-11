@@ -77,14 +77,26 @@
     #main-sidebar.main-navigation:not(.translate-x-0) { transform: translateX(calc(-100% - 24px)); }
 }
 
-/* 排序图标仅在移入或键盘操作时显示，保留占位避免歌单名称跳动。作者：jingyh */
-.playlist-sidebar-item .favorite-sidebar-drag-handle {
+/* 手柄默认不占位，移入时展开宽度并带动封面和名称平滑右移。作者：jingyh */
+#main-navigation .playlist-sidebar-item .favorite-sidebar-drag-handle {
+    width: 0;
+    min-width: 0;
+    margin-right: 0 !important;
+    overflow: hidden;
+    transform: translateX(-4px);
     opacity: 0;
     pointer-events: none;
-    transition: opacity .18s ease;
+    transition: width .2s ease, margin-right .2s ease, opacity .2s ease, transform .2s ease;
 }
-.playlist-sidebar-item:hover .favorite-sidebar-drag-handle,
-.playlist-sidebar-item:focus-within .favorite-sidebar-drag-handle {
+#main-navigation .playlist-sidebar-item:hover .favorite-sidebar-drag-handle,
+#main-navigation .playlist-sidebar-item:focus-within .favorite-sidebar-drag-handle,
+#main-navigation .playlist-sidebar-item.sortable-chosen .favorite-sidebar-drag-handle {
+    width: 12px;
+    margin-right: 5px !important;
+    transform: translateX(0);
     opacity: 1;
     pointer-events: auto;
+}
+@media (prefers-reduced-motion: reduce) {
+    #main-navigation .playlist-sidebar-item .favorite-sidebar-drag-handle { transition: none; }
 }

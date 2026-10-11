@@ -1,12 +1,29 @@
 /** 封面持久化与标签状态隔离的 SQLite 回归。 @author jingyh @date 2026-10-11 */
 require('tsx/cjs')
-const { test } = require('node:test'), assert = require('node:assert/strict')
+const { test, mock } = require('node:test'), assert = require('node:assert/strict')
 const fs = require('node:fs'), os = require('node:os'), path = require('node:path')
 const { createMusicRepository } = require('../server/music/repository/MusicRepository.ts')
 const { ExperienceRepository } = require('../server/music/repository/ExperienceRepository.ts')
 const { SongArtworkService } = require('../server/music/service/library/SongArtworkService.ts')
 const { PlayCountService } = require('../server/music/service/PlayCountService.ts')
 const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/lXcAAAAASUVORK5CYII=', 'base64')
+
+test('公网双栈封面源使用已校验 IPv4 连接，私网源不发起下载', async () => {
+  const dns = require('node:dns/promises'), https = require('node:https'), { PassThrough } = require('node:stream'), { EventEmitter } = require('node:events')
+  let connections = 0, privateHost = false
+  mock.method(dns, 'lookup', async () => privateHost ? [{ address: '127.0.0.1', family: 4 }] : [{ address: '2606:4700::1111', family: 6 }, { address: '1.1.1.1', family: 4 }])
+  mock.method(https, 'request', (_url, options, callback) => {
+    connections++; options.lookup('image.test', {}, (error, address, family) => { assert.equal(error, null); assert.equal(address, '1.1.1.1'); assert.equal(family, 4) })
+    const request = new EventEmitter()
+    request.end = () => { const response = new PassThrough(); response.statusCode = 200; response.headers = {}; callback(response); response.end(png) }
+    return request
+  })
+  try {
+    assert.deepEqual(await SongArtworkService.download('https://image.test/album.png'), png)
+    privateHost = true
+    assert.equal(await SongArtworkService.download('https://image.test/album.png'), null); assert.equal(connections, 1)
+  } finally { mock.restoreAll() }
+})
 test('真实 SQLite：封面落盘、回写、重启和账号隔离，内嵌歌词与元数据保持原样', async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'lx-artwork-unit-'))
   let db = createMusicRepository(root), calls = 0

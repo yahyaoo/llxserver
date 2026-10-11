@@ -50,7 +50,9 @@ body.player-detail-open .music-shell { visibility: hidden; }
 #view-player-detail :is(.player-transport .player-icon-button, #play-mode-btn, #btn-play):not(:disabled):hover {
     color: var(--c-400); background: var(--bg-item-hover);
 }
-#view-player-detail #player-source > span { color: var(--text-muted); background: var(--bg-item-hover); }
+@media (min-width: 768px) {
+    #view-player-detail #player-source > span { color: var(--text-muted); background: var(--bg-item-hover); }
+}
 #view-player-detail #progress-container { background: var(--bg-item-hover); }
 #view-player-detail :is(#progress-bar, .player-progress-thumb) { background: var(--text-main); }
 

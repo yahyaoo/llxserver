@@ -8565,13 +8565,7 @@ function renderCacheList() {
             qTagHtml = `<span class="flex-shrink-0 px-1 py-0 rounded text-[10px] t-badge-red border border-red-200 dark:border-red-500/30 transition-colors">${qName}</span>`;
         }
 
-        const username = (window.currentListData && window.currentListData.username) || localStorage.getItem('lx_sync_user') || '';
-        // <img src> 无法携带自定义请求头，将 token 附到 URL 以通过服务端认证
-        const authToken = (window.getUserAuthHeaders ? window.getUserAuthHeaders()['x-user-token'] : null)
-            || window.AccountSession.getToken() || '';
-        const coverUrl = item.hasCover
-            ? `/api/music/cache/cover?filename=${encodeURIComponent(item.filename)}&user=${encodeURIComponent(username)}${authToken ? `&token=${encodeURIComponent(authToken)}` : ''}`
-            : '/music/assets/logo.svg';
+        const coverUrl = window.MusicExperience.coverUrl(item) || '/music/assets/logo.svg';
 
         return `
             <div class="group flex items-center p-2.5 rounded-2xl hover:t-bg-panel-light transition-all duration-300 gap-3 border border-transparent 
@@ -8588,9 +8582,8 @@ function renderCacheList() {
                 ` : ''}
 
                 <div class="relative w-12 h-12 flex-shrink-0 group-hover:scale-105 transition-transform duration-500">
-                    <img class="w-full h-full object-cover rounded-xl shadow-md bg-gray-100" 
-                         src="${coverUrl}" 
-                         onerror="this.src='/music/assets/logo.svg'">
+                    <img class="cache-song-cover w-full h-full object-cover rounded-xl shadow-md bg-gray-100"
+                         src="${escapeHtmlText(coverUrl)}">
                     <div class="absolute inset-0 bg-black/5 rounded-xl"></div>
                 </div>
 
@@ -8635,6 +8628,7 @@ function renderCacheList() {
             </div>
         `;
     }).join('');
+    container.querySelectorAll('.cache-song-cover').forEach((image, index) => window.LibraryArtwork.bind(image, currentCacheList[index]));
 }
 
 function openCacheItemPlaylist(index) {
@@ -9015,6 +9009,7 @@ function toggleLyrics(fromPopState = false) {
 
 // 监听浏览器返回，用于在移动端通过物理返回键/手势关闭歌词详情页及搜索详情页
 window.addEventListener('popstate', (e) => {
+    if (window.PlayerFeaturePages?.handlePopState(e)) return;
     // 1. 优先处理歌词页
     if (isLyricViewOpen) {
         toggleLyrics(true);
@@ -14454,6 +14449,7 @@ function toggleCommentModal() {
     const isHidden = modal.classList.contains('hidden');
 
     if (isHidden) {
+        window.PlayerFeaturePages?.open('comments');
         // 打开
         modal.classList.remove('hidden');
         modal.classList.add('flex');
@@ -14483,6 +14479,7 @@ function toggleCommentModal() {
             document.getElementById('comment-loader').classList.add('hidden');
         }
     } else {
+        if (window.PlayerFeaturePages?.close('comments')) return;
         // 关闭
         content.classList.remove('translate-y-0', 'opacity-100');
         content.classList.add('translate-y-10', 'opacity-0');

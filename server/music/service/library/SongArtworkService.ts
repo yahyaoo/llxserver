@@ -3,6 +3,8 @@ import path from 'node:path'
 import crypto from 'node:crypto'
 import { lookup } from 'node:dns/promises'
 import { isIP } from 'node:net'
+import { request as requestHttp } from 'node:http'
+import { request as requestHttps } from 'node:https'
 import type { ExperienceRepository } from '../../repository/ExperienceRepository'
 
 /** 歌曲展示封面持久缓存，不写入音频标签，不改变内嵌歌词状态。 @author jingyh @date 2026-10-11 */
@@ -31,27 +33,40 @@ export class SongArtworkService {
     for (let redirects = 0; redirects < 4; redirects++) {
       const url = new URL(current)
       if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || isIP(url.hostname) || !/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(url.hostname)) return null
-      const addresses = await lookup(url.hostname, { all: true })
+      // 公网双栈主机选择已验证的 IPv4；连接固定到该地址，不再二次解析。
+      const addresses = (await lookup(url.hostname, { all: true })).filter(({ address }) => isIP(address) === 4)
       if (!addresses.length || addresses.some(({ address }) => {
-        // IPv6、私网、回环、链路本地和保留地址均不作为外部封面源。
-        if (isIP(address) !== 4) return true
+        // 私网、回环、链路本地和保留地址均不作为外部封面源。
         const [a, b] = address.split('.').map(Number)
         return a === 0 || a === 10 || a === 127 || a >= 224 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 100 && b >= 64 && b <= 127) || (a === 198 && (b === 18 || b === 19))
       })) return null
-      const response = await fetch(url, { redirect: 'manual', signal: AbortSignal.timeout(8000) })
+      const response = await new Promise<{ status: number; location?: string; data: Buffer }>((resolve, reject) => {
+        const request = (url.protocol === 'https:' ? requestHttps : requestHttp)(url, {
+          agent: false, family: 4, signal: AbortSignal.timeout(8000),
+          lookup: (_hostname, _options, callback) => callback(null, addresses[0].address, 4),
+        }, stream => {
+          const status = stream.statusCode || 0
+          if (status < 200 || status >= 300) {
+            stream.resume(); resolve({ status, location: stream.headers.location, data: Buffer.alloc(0) }); return
+          }
+          let size = 0; const chunks: Buffer[] = []
+          stream.on('data', (chunk: Buffer) => {
+            size += chunk.length
+            if (size > 5 * 1024 * 1024) { request.destroy(new Error('封面过大')); return }
+            chunks.push(chunk)
+          })
+          stream.on('end', () => resolve({ status, data: Buffer.concat(chunks) }))
+          stream.on('error', reject)
+        })
+        request.on('error', reject); request.end()
+      })
       if (response.status >= 300 && response.status < 400) {
-        const next = response.headers.get('location'); await response.body?.cancel()
+        const next = response.location
         if (!next) return null
         current = new URL(next, url).toString(); continue
       }
-      if (!response.ok) { await response.body?.cancel(); return null }
-      let size = 0; const chunks: Uint8Array[] = []
-      for await (const chunk of response.body as any) {
-        size += chunk.length
-        if (size > 5 * 1024 * 1024) throw new Error('封面过大')
-        chunks.push(chunk)
-      }
-      return Buffer.concat(chunks)
+      if (response.status < 200 || response.status >= 300) return null
+      return response.data
     }
     return null
   }
