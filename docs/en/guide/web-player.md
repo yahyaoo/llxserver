@@ -1,6 +1,6 @@
 # Web Player Usage Guide
 
-LX Music Sync Server provides a modern Web music player at the root route `/` by default (can also be customized to `/music` via `PLAYER_PATH`). It can achieve remote playback, search, and multi-terminal synchronization interaction.
+洛洛雪音乐 provides a modern Web music player at the root route `/` by default (can also be customized to `/music` via `PLAYER_PATH`). It can achieve remote playback, search, and multi-terminal synchronization interaction.
 
 ## Core Feature List
 

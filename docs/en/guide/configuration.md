@@ -1,18 +1,16 @@
-# LX Music Sync Server Architecture and Configuration Guide
+# 洛洛雪音乐 Architecture and Configuration Guide
 
-LX Music Sync Server adheres to the design principle of **zero configuration and out-of-the-box use**, while providing a highly flexible **multi-level configuration injection engine and environment variable reading mechanism** to meet the needs of advanced deployment scenarios. When the Node.js backend service process starts, the system will follow strict hierarchical rules to merge and rewrite various configuration items.
+洛洛雪音乐 adheres to the design principle of **zero configuration and out-of-the-box use**, while providing a highly flexible **multi-level configuration injection engine and environment variable reading mechanism** to meet the needs of advanced deployment scenarios. When the Node.js backend service process starts, the system will follow strict hierarchical rules to merge and rewrite various configuration items.
 
 ## Configuration Loading Hierarchy and Execution Priority
 
-LX Music Sync Server has built a unified basic model skeleton (located in `src/defaultConfig.ts`). During the initialization of the service instance, the configuration parser will streamingly distribute parameters to the **service-side underlying environment** (such as network binding, WebDAV settings, etc.) and the **front-end running environment** (injected into the browser execution sandbox `/js/config.js`) respectively.
+洛洛雪音乐 has built a unified basic model skeleton (located in `server/defaultConfig.ts`). During the initialization of the service instance, the configuration parser will streamingly distribute parameters to the **service-side underlying environment** (such as network binding, WebDAV settings, etc.) and the **front-end running environment** (injected into the browser execution sandbox `/js/config.js`) respectively.
 
-The loading and merging of configurations follow the priority sequence from high to low below. High-priority options will **hardly override** the corresponding keys of low-priority ones:
+Business configuration is stored in the admin SQLite database. Startup loads stored values over defaults from `server/defaultConfig.ts`, then applies the existing environment variable overrides and persists the effective configuration. WebDAV restore writes business documents back to SQL and reloads them.
 
-1. **Runtime Environment Variables (Environment Variables)**: Has very high priority. For example, `PORT=9527`.
-2. **WebDAV Cloud Data (WebDAV Cloud Data)**: If WebDAV is configured, the system will try to restore from the cloud on startup. **Restored cloud content will overwrite persistent `data/config.js` and trigger a hot-reload**.
-3. **Explicit Custom Configuration File Path (Custom Config File)**: Path specified via `CONFIG_PATH` (defaults to persistent `data/config.js` inside the data directory).
-4. **Persistent Configuration (Persistent Config)**: The `data/config.js` in the data directory (if absent on first launch, will smoothly migrate from legacy root `config.js`).
-5. **System-level Default Constants (Default Consts)**: Defaults in `src/defaultConfig.ts`.
+`config.js` contains `server.database.adminPath`, `server.database.musicPath` and `client.xxx` connection settings. `CONFIG_PATH` selects this bootstrap file. Database paths are relative to `DATA_PATH` unless absolute. Editing old business fields in this file no longer changes configuration; explicitly upload a static old configuration through System Config → Database and Migration. See the [deployment configuration](https://github.com/yahyaoo/llxserver/blob/dev/deploy/README.md) for the environment variable overrides.
+
+The admin settings page groups service/access, music/cache, and synchronization/data controls. Database relocation copies committed records, verifies the candidate databases, switches connections, and saves bootstrap paths; preparation failure keeps the old databases. Existing target files are rejected. See the [system configuration guide](../../system-configuration.md) for migration details.
 
 ---
 
@@ -27,7 +25,7 @@ This module manages the Node.js listening process and the basic settings of the 
 | Environment Variable Mapping Key (ENV) | System Default Value | Data Type | Scope and Applicable Scenarios |
 | :-------------------- | :------------ | :------- | :-------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `PORT` | `9527` | Integer | **Service listening port**. It is recommended to avoid using other high-frequency ports in the host (such as 80, 443, 3306). |
-| `BIND_IP` | `0.0.0.0` | String | **Scope of service binding IP interfaces**. Set to `127.0.0.1` to accept only local Lookback calls; set to `0.0.0.0` means listening to all internal and external available network adapters of the host simultaneously. |
+| `BIND_IP` | `0.0.0.0` | String | The current main HTTP listener remains fixed at `0.0.0.0`; changing this value does not change the listener. |
 | `ADMIN_PATH` | `'/admin'` | String | **Backend management interface path**. Default is `/admin`. |
 | `PLAYER_PATH` | `'/'` | String | **Web player access path**. Default is the root path `/`. |
 | `SERVER_NAME` | `lxserver` | String | **Sync service name**. Showed in client connections. |
@@ -49,9 +47,9 @@ This module involves monitoring the status of connected clients and isolation sp
 | :-------------------- | :--------- | :------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `FRONTEND_PASSWORD` | `123456` | String | **Control Panel Admin Password**. Used to log into the management console (default `/admin`). Recommended to modify immediately on setup. |
 | `MAX_SNAPSHOT_NUM` | `10` | Integer | **Time snapshot retention threshold setting**. The maximum allowed length of the historical archive snapshot queue retained by the system. Early histories exceeding this queue limit will be cyclically discarded by the underlying timed GC task. |
-| `DATA_PATH` | `./data` | String | **Data directory path**. Specifies where persistence data (users.json, snapshots) are stored. |
+| `DATA_PATH` | `./data` | String | **Data directory path**. Specifies where persistence data (SQLite databases, music cache and compatibility exports) are stored. |
 | `LOG_PATH` | `./logs` | String | **Log directory path**. Specifies where system logs are stored. |
-| `CONFIG_PATH` | `''` | String | **External config path**. Manually specify an extra config.js file path. |
+| `CONFIG_PATH` | `''` | String | **Bootstrap file path**. Server SQLite paths and client connection settings. CLIENT_CONFIG_PATH can select a separate client file. |
 | `USER_ENABLE_PATH` | `true` | Boolean | **Enable User Path Mode (Recommended)**. When enabled, client sync URL is `http://ip:port/<username>`, and data is isolated per user. **Allows multiple users to use identical passwords**. |
 | `USER_ENABLE_ROOT` | `false` | Boolean | **Enable Root Path Mode**. When enabled, client sync URL is `http://ip:port` (without username), and server auto-matches user by password. **Requires all user passwords to be unique**. |
 | `ENABLE_PUBLIC_USER_RESTRICTION` | `true` | Boolean | **Restrict public user permissions**. If enabled, non-admin public users will be restricted from sensitive operations like uploading source, deleting public sources, caching to server, etc. |
@@ -75,7 +73,7 @@ The underlying periodic polling asynchronous daemon of the service will only be 
 
 > 🔖 **Stateful Resurrection and Initialization Mechanism**:
 > 1. **Cloud-First Restoration**: If this set of variables is detected at startup, the system will prioritize attempting to pull archives from the cloud.
-> 2. **Environment-Driven Persistence**: If the cloud config is empty (e.g., first deployment in Docker/Cloud), the system will **automatically persist the current effective configuration (such as ports, passwords set via environment variables) into `data/config.js` in the data directory and upload it to the cloud** for initialization. This ensures you can establish the initial cloud data solely through environment variables.
+> 2. **Environment-Driven Persistence**: If the cloud config is empty (e.g., first deployment in Docker/Cloud), the system will **automatically persist effective business configuration to SQLite and upload its exported business document to the cloud** for initialization. This ensures you can establish the initial cloud data solely through environment variables.
 
 ### IV. Web-side Composite Media Playback Space Protection Logic
 
@@ -108,7 +106,7 @@ The underlying periodic polling asynchronous daemon of the service will only be 
 | :--- | :--- | :--- | :--- |
 | `SINGER_SOURCE_PRIORITY` | `'tx,wy'` | String | **Singer source priority**. Controls the priority order for fetching singer details, photos, and Mid. Available values are `tx` (Tencent) and `wy` (Netease), separated by commas. |
 | `ARTIST_MAX_FETCH_PAGES` | `20` | Integer | **Maximum fetch pages for artist tracks**. Upper limit when fetching full song lists for artists. |
-| `CACHE_NAMING_PATTERN` | `'simple'` | String | **Cache file naming pattern**. `simple` or `custom`. |
+| `CACHE_NAMING_PATTERN` | `'simple'` | String | Cache naming: `simple`, `standard`, `singer_name_quality_album`, `singer_name`, `name_singer`. Saved player naming settings take precedence. |
 | `SYSTEM_ALLOW_UNSAFE_VM` | `false` | Boolean | **Allow unsafe VM custom source scripts**. If enabled, allows running custom source scripts requiring VM sandbox features (use with caution). |
 
 ### IX. (Advanced Feature) Silent Preset Accounts in CLI Environment
@@ -127,7 +125,7 @@ export LX_USER_hello="12345"
 npm run start
 ```
 
-*(Note: After the successful accompanying system control operation mentioned above, this memory object will be converted into entity data and permanently archived to the mounted `<DATA_PATH>/users.json` file for continuous function verification.)*
+*(Note: After the successful accompanying system control operation mentioned above, this memory object will be converted into entity data and permanently archived to the mounted `管理 SQLite 数据库` file for continuous function verification.)*
 
 ---
 

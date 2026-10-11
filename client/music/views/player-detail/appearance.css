@@ -1,0 +1,67 @@
+/** 可选播放背景与视觉特效，沿用现有播放页布局。 @author jingyh @date 2026-10-10 */
+body.player-detail-open .music-shell { visibility: hidden; }
+:root #view-player-detail {
+    --text-main: inherit;
+    --text-muted: inherit;
+    --text-dim: inherit;
+    --bg-panel: inherit;
+    --bg-item-hover: inherit;
+    --border-main: inherit;
+    --border-dim: inherit;
+    background: transparent !important;
+    backdrop-filter: none !important;
+    box-shadow: none !important;
+}
+#view-player-detail .player-detail-background { background: transparent; z-index: -1; }
+#view-player-detail .player-detail-background::before,
+#view-player-detail .player-detail-background::after,
+#view-player-detail #player-artist-background { display: none; }
+
+/* 图像与黑色背景独立使用浅色文字，切回页面背景时恢复主题颜色。 */
+:root #view-player-detail:is([data-player-background="blur"], [data-player-background="artist"], [data-player-background="dark"]) {
+    --text-main: #f5f4f7;
+    --text-muted: #d1cbd8;
+    --text-dim: #bdb5c7;
+    --bg-panel: #211c29;
+    --bg-item-hover: rgb(255 255 255 / 10%);
+    --border-main: rgb(255 255 255 / 10%);
+    --border-dim: rgb(255 255 255 / 16%);
+    background: #19141f !important;
+}
+:root #view-player-detail[data-player-background="dark"] { background: #000 !important; }
+:root #view-player-detail[data-player-background="solid"] { background: var(--bg-main) !important; }
+#view-player-detail[data-player-background="artist"] .player-detail-background::before,
+#view-player-detail[data-player-background="artist"] .player-detail-background::after { display: block; }
+#view-player-detail[data-player-background="artist"] #player-artist-background:not([hidden]) { display: block; }
+#view-player-detail[data-player-background="blur"] #detail-bg-cover {
+    display: block !important; position: absolute; inset: -8%;
+    width: 116%; height: 116%; object-fit: cover;
+    filter: blur(48px) saturate(.85); opacity: .55; transform: none;
+}
+#view-player-detail[data-player-background="blur"] #player-detail-bg-overlay {
+    display: block !important;
+    background: linear-gradient(180deg, rgb(18 13 25 / 28%), rgb(18 13 25 / 65%));
+    backdrop-filter: none;
+}
+#view-player-detail :is(.player-detail-toolbar button, .player-transport .player-icon-button, #play-mode-btn, #btn-play, .lyric-line) { color: var(--text-main); }
+#view-player-detail :is(#player-more-menu, #play-mode-menu, #playback-rate-menu, .player-volume-popover) { background: var(--bg-panel); }
+#view-player-detail .player-detail-toolbar button { background: color-mix(in srgb, var(--text-main) 8%, transparent); }
+#view-player-detail .player-detail-toolbar button:hover { background: color-mix(in srgb, var(--text-main) 16%, transparent); }
+#view-player-detail :is(.player-transport .player-icon-button, #play-mode-btn, #btn-play):not(:disabled):hover {
+    color: var(--c-400); background: var(--bg-item-hover);
+}
+@media (min-width: 768px) {
+    #view-player-detail #player-source > span { color: var(--text-muted); background: var(--bg-item-hover); }
+}
+#view-player-detail #progress-container { background: var(--bg-item-hover); }
+#view-player-detail :is(#progress-bar, .player-progress-thumb) { background: var(--text-main); }
+
+/* 原底部频谱保留高度；其他效果桌面位于歌词区，手机铺满背景，不占用内容空间。 */
+#view-player-detail:not([data-player-visualizer="spectrum"]) #detail-visualizer { left: 50%; bottom: 0; width: 50%; height: 100%; }
+#view-player-detail #detail-visualizer { transition: opacity 180ms ease; }
+@media (max-width: 767px) {
+    #view-player-detail:not([data-player-visualizer="spectrum"]) #detail-visualizer { left: 0; width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+    #view-player-detail #detail-visualizer { transition: none; }
+}

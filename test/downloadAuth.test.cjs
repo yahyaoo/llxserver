@@ -7,7 +7,7 @@ const vm = require('node:vm')
 
 /** 运行播放器实际认证函数，不启动无关的页面初始化。 */
 function fixture(fetch, refresh) {
-  const source = fs.readFileSync(path.join(__dirname, '../public/music/app.js'), 'utf8')
+  const source = fs.readFileSync(path.join(__dirname, '../client/music/app.js'), 'utf8')
   const start = source.indexOf('async function fetchDownloadWithAuth(')
   assert.ok(start >= 0, '播放器应提供下载认证恢复函数')
   const end = source.indexOf('window.fetchDownloadWithAuth = fetchDownloadWithAuth;', start)

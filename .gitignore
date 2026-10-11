@@ -61,7 +61,7 @@ typings/
 .next
 
 /data
-/server
+/dist/
 
 knowledge
 lx-music-desktop-master
@@ -83,17 +83,26 @@ dist-electron/
 /reference/
 /music/
 
-/public/music/bin
+/client/music/bin
 
 .codegraph
 /cover_cache
 build/
 
 # fnOS 模板保留，构建产物与 SDK 不提交
-/fnos/levis.lxserver/app/server/
-/fnos/dist/
-/fnos/scripts/fnpack
-/fnos/scripts/fnpack.exe
+/deploy/fnos/llxserver.all/app/server/
+/deploy/fnos/llxserver.server/app/server/
+/deploy/fnos/llxserver.client/app/server/
+/deploy/fnos/dist/
+/deploy/fnos/scripts/fnpack
+/deploy/fnos/scripts/fnpack.exe
 *.fpk
 *.fpk.sha256
 __pycache__/
+
+/output/
+/.llx-*.cjs
+
+# 浏览器验证产生的本地日志与页面快照
+/.playwright-cli/
+/.playwright-mcp/

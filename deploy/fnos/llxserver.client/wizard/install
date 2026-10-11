@@ -1,0 +1,19 @@
+[
+  {
+    "stepTitle": "洛洛雪音乐客户端",
+    "items": [
+      {
+        "type": "text",
+        "field": "wizard_server_url",
+        "label": "服务端地址",
+        "initValue": "http://127.0.0.1:17001",
+        "rules": [
+          {
+            "required": true,
+            "message": "请填写服务端 HTTP/HTTPS 地址"
+          }
+        ]
+      }
+    ]
+  }
+]

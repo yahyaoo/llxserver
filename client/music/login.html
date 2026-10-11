@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-account-page="login">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>登录 · 洛洛雪音乐</title>
+    <script>document.write('<base href="' + new URL('./', location.href).pathname + '">');</script>
+    <script src="/js/config.js"></script>
+    <link rel="icon" href="assets/logo.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="assets/fontawesome/css/all.min.css">
+    <link rel="stylesheet" href="css/theme_variables.css">
+    <link rel="stylesheet" href="css/login.css">
+    <script src="js/account-session.js"></script>
+    <script src="js/account-login.js" defer></script>
+    <link rel="stylesheet" href="assets/element/element-plus.css">
+    <link rel="stylesheet" href="assets/element/element-controls.css">
+    <script src="assets/element/vue.global.prod.js" defer></script>
+    <script src="assets/element/element-plus.min.js" defer></script>
+    <script src="assets/element/zh-cn.min.js" defer></script>
+    <script src="assets/element/element-controls.js" defer></script>
+</head>
+<body>
+    <main id="auth-card" class="auth-card">
+        <img class="auth-logo" src="assets/logo.svg" alt="洛洛雪音乐">
+        <h1>洛洛雪音乐</h1>
+        <p class="auth-subtitle">登录你的音乐空间</p>
+        <div class="auth-modes" role="group" aria-label="服务器选择">
+            <button type="button" id="login-local" aria-pressed="true">本地服务器</button>
+            <button type="button" id="login-remote" aria-pressed="false">远程同步</button>
+        </div>
+        <p id="server-description" class="auth-hint">使用当前客户端绑定的服务器</p>
+        <form id="account-login-form">
+            <div id="remote-server-field" hidden>
+                <label for="server-url">服务器地址</label>
+                <input type="url" id="server-url" placeholder="https://music.example.com:9527" autocomplete="url">
+            </div>
+            <label for="auth-username-input">账号</label>
+            <input id="auth-username-input" name="username" placeholder="请输入账号" autocomplete="username" required autofocus maxlength="120">
+            <label for="auth-password-input">密码</label>
+            <input type="password" id="auth-password-input" name="password" placeholder="请输入密码" autocomplete="current-password" required>
+            <label class="remember-me"><input type="checkbox" id="remember-me">记住我</label>
+            <p id="auth-error" class="auth-error" role="alert" hidden></p>
+            <button type="submit" id="submit-btn" class="auth-submit">登录</button>
+        </form>
+        <p class="auth-footer">请使用管理员分配的账号和密码</p>
+    </main>
+</body>
+</html>

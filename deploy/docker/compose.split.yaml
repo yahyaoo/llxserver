@@ -1,0 +1,23 @@
+# 两个独立容器，客户端同源转发保留 Cookie、SSE 与 WebSocket。 @author yahyaoo
+services:
+  server:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile
+      target: server
+    restart: unless-stopped
+    volumes:
+      - ${LLX_DATA_PATH:-../../data}:/app/data
+    environment:
+      DISABLE_TELEMETRY: "true"
+  client:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/client.Dockerfile
+    restart: unless-stopped
+    ports:
+      - "9528:9528"
+    environment:
+      SERVER_URL: http://server:9527
+    depends_on:
+      - server

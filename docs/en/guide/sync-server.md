@@ -1,13 +1,13 @@
 # Sync Service & Management Console Guide
 
-LX Music Sync Server includes a professional Web Management Console (located by default at `/admin`, i.e., `http://IP:9527/admin`), used for monitoring service status, managing user accounts and multi-device connections, inspecting playlists and snapshots, and configuring server options.
+洛洛雪音乐 includes a professional Web Management Console (located by default at `/admin`, i.e., `http://IP:9527/admin`), used for monitoring service status, managing user accounts and multi-device connections, inspecting playlists and snapshots, and configuring server options.
 
 ## Login and Authentication
 
 Accessing the management console (default `http://IP:9527/admin`) requires entering the administrator password.
 
 - **Default Password**: `123456`
-- **Modify Password**: You can override the default password by setting the environment variable `FRONTEND_PASSWORD`, or go to the "System Config" page to modify it after logging in. The password will be persisted in the `data/config.js` file on the server.
+- **Modify Password**: You can override the default password by setting the environment variable `FRONTEND_PASSWORD`, or go to the "System Config" page to modify it after logging in. The password will be persisted in the admin SQLite database.
 
 ## 🔗 Client Sync & Connection Setup
 

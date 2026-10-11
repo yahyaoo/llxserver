@@ -1,0 +1,17 @@
+#!/bin/bash
+
+export PATH=/var/apps/nodejs_v24/target/bin:$PATH
+export HOME="${TRIM_PKGVAR}"
+APP_DIR="${TRIM_APPDEST}/server"
+DATA_DIR="${TRIM_DATA_SHARE_PATHS%%:*}"
+LOG_FILE="${TRIM_PKGVAR}/info.log"
+
+echo "$(date '+%Y-%m-%d %H:%M:%S') - Upgrading dependencies..." >> ${LOG_FILE}
+set -o pipefail
+cd "${APP_DIR}" && npm ci --omit=dev --no-audit --no-fund 2>&1 | tee -a "${LOG_FILE}" || exit 1
+
+# 修复旧安装的空账号列表；已有账号和业务配置保持原值。作者：jingyh
+DATA_PATH="${DATA_DIR}/data" CONFIG_PATH="${DATA_DIR}/config.js" \
+node "${APP_DIR}/dist/server/application/persistence/InstallationConfiguration.js" >> "${LOG_FILE}" 2>&1 || exit 1
+
+exit 0

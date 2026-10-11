@@ -1,0 +1,102 @@
+/* 主导航沿用设置目录的滚动和图标收起方式，面板与条目均使用圆角。 */
+#main-sidebar.main-navigation {
+    flex-shrink: 0;
+    min-height: 0;
+    overflow: hidden;
+    border: 1px solid var(--border-dim);
+    border-radius: 18px;
+    margin: 12px;
+    height: calc(100% - 24px);
+    padding-bottom: 0 !important;
+    box-shadow: 0 4px 20px rgb(0 0 0 / 5%);
+}
+.main-navigation-brand { flex-shrink: 0; }
+.playlist-group-heading { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px 8px; color: var(--text-muted); font-size: 13px; }
+#playlist-actions-button { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 7px; }
+#playlist-actions-button:hover, #playlist-actions-button[aria-expanded="true"] { color: var(--c-500); background: color-mix(in srgb, var(--c-500) 12%, transparent); }
+#playlist-actions-button:disabled { opacity: .5; cursor: progress; }
+.playlist-actions-menu { position: fixed; z-index: 10020; min-width: 128px; padding: 5px; border: 1px solid var(--border-main); border-radius: 10px; background: var(--bg-panel); color: var(--text-main); box-shadow: 0 8px 24px rgb(0 0 0 / 16%); }
+.playlist-actions-menu[hidden] { display: none; }
+.playlist-actions-menu button { display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 12px; border-radius: 6px; font-size: 13px; text-align: left; }
+.playlist-actions-menu button:hover, .playlist-actions-menu button:focus-visible { outline: none; color: var(--c-500); background: color-mix(in srgb, var(--c-500) 12%, transparent); }
+#playlist-actions-button:focus-visible { outline: 2px solid var(--c-500); outline-offset: 2px; }
+#main-navigation { min-height: 0; padding: 16px 12px; overscroll-behavior: contain; }
+#main-navigation > ul > li > :is(a, div[onclick]) {
+    min-height: 46px; margin: 2px 0; padding: 12px 14px; border-radius: 12px;
+}
+/* 导航保持整行左对齐，Element 仅提供交互状态，不改变行内布局。 */
+:root #main-navigation > ul > li > a {
+    display: flex; justify-content: flex-start; gap: 0;
+    border: 0 !important; border-radius: 12px !important; background: transparent !important;
+}
+:root #main-navigation > ul > li > a.justify-between { justify-content: space-between; }
+:root #main-navigation .hidden { display: none !important; }
+:root #main-navigation > ul > li > a.active-tab { background: color-mix(in srgb, var(--c-500) 12%, var(--bg-panel)) !important; }
+#main-navigation .active-tab {
+    border-right: 0;
+    background: color-mix(in srgb, var(--c-500) 12%, var(--bg-panel));
+}
+.main-navigation-collapse {
+    display: none; align-items: center; gap: 11px; flex-shrink: 0;
+    padding: 14px; margin: 6px 12px 0; border-top: 1px solid var(--border-main);
+    color: var(--text-muted); font-size: 14px; text-align: left;
+}
+.main-navigation-collapse:hover { color: var(--text-main); }
+:root #main-sidebar .main-navigation-collapse {
+    min-height: 46px; height: 46px; width: auto; margin: 6px 12px 0 !important; padding: 14px !important;
+    border: 0 !important; border-top: 1px solid var(--border-main) !important; border-radius: 0 !important;
+    background: transparent !important; justify-content: flex-start;
+}
+.main-navigation-collapse:focus-visible, #main-navigation :is(a, div[onclick]):focus-visible {
+    outline: 2px solid var(--c-500); outline-offset: -2px;
+}
+@media (min-width: 1025px) {
+    .main-navigation-collapse { display: flex; }
+    #main-sidebar.navigation-collapsed { width: 72px; }
+    .navigation-collapsed .main-navigation-brand h1,
+    .navigation-collapsed #main-navigation span,
+    .navigation-collapsed #favorites-arrow,
+    .navigation-collapsed #favorites-children,
+    .navigation-collapsed #dislike-arrow,
+    .navigation-collapsed #dislike-children,
+    .navigation-collapsed #custom-dir-switch-container,
+    .navigation-collapsed .sidebar-song-info-wrapper,
+    .navigation-collapsed .main-navigation-collapse span { display: none !important; }
+    .navigation-collapsed .main-navigation-brand svg { margin-right: 0; }
+    .navigation-collapsed #main-navigation { padding: 16px 7px; }
+    .navigation-collapsed #main-navigation > ul > li > :is(a, div[onclick]) {
+        justify-content: center; padding-left: 0; padding-right: 0;
+    }
+    :root .navigation-collapsed #main-navigation > ul > li > a { justify-content: center; padding-left: 0; padding-right: 0; }
+    :root #main-sidebar.navigation-collapsed .main-navigation-collapse { justify-content: center; padding: 14px 0 !important; margin-inline: 7px !important; }
+    .navigation-collapsed .main-navigation-collapse { justify-content: center; padding: 14px 0; margin-inline: 7px; }
+    .navigation-collapsed .main-navigation-collapse i { transform: rotate(180deg); }
+}
+@media (max-width: 1024px) {
+    #main-sidebar.main-navigation { max-width: calc(100vw - 24px); height: calc(100dvh - 24px); }
+    #main-sidebar.main-navigation:not(.translate-x-0) { transform: translateX(calc(-100% - 24px)); }
+}
+
+/* 手柄默认不占位，移入时展开宽度并带动封面和名称平滑右移。作者：jingyh */
+#main-navigation .playlist-sidebar-item .favorite-sidebar-drag-handle {
+    width: 0;
+    min-width: 0;
+    margin-right: 0 !important;
+    overflow: hidden;
+    transform: translateX(-4px);
+    opacity: 0;
+    pointer-events: none;
+    transition: width .2s ease, margin-right .2s ease, opacity .2s ease, transform .2s ease;
+}
+#main-navigation .playlist-sidebar-item:hover .favorite-sidebar-drag-handle,
+#main-navigation .playlist-sidebar-item:focus-within .favorite-sidebar-drag-handle,
+#main-navigation .playlist-sidebar-item.sortable-chosen .favorite-sidebar-drag-handle {
+    width: 12px;
+    margin-right: 5px !important;
+    transform: translateX(0);
+    opacity: 1;
+    pointer-events: auto;
+}
+@media (prefers-reduced-motion: reduce) {
+    #main-navigation .playlist-sidebar-item .favorite-sidebar-drag-handle { transition: none; }
+}

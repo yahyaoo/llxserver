@@ -1,0 +1,35 @@
+/* 普通页面共用账号面板透明度与毛玻璃强度，播放详情的根节点位于此作用域之外。作者：jingyh */
+/* 导航内按完整类名匹配面板，避免把 hover:t-bg-main 菜单悬停样式套用为常驻背景和阴影。作者：jingyh */
+:root { --surface-blur: 24px; }
+/* 两个入口共用五种外观；窄屏自动换行，黑白色块保持可见边框。作者：jingyh */
+.appearance-choices { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.appearance-choices .appearance-option { min-width: 0; white-space: nowrap; }
+.appearance-choices .appearance-option[data-appearance="system"] { grid-column: 1 / -1; }
+.theme-dot { border: 1px solid var(--border-dim); }
+:root .appearance-option[data-active="true"] {
+    border-color: var(--c-500);
+    color: var(--c-600);
+    background: color-mix(in srgb, var(--c-500) 8%, var(--bg-panel));
+}
+:root.music-appearance .music-shell :is([class~="t-bg-panel"], [class~="t-bg-panel/90"], [class~="t-bg-main"], [class~="t-bg-main/50"], [class~="t-bg-glass"],
+    .settings-sidebar, .settings-content, .settings-form-card, .settings-mobile-toggle,
+    .recent-view, .recent-view-actions button:not(:first-child), .recent-song:hover,
+    .library-search-input, .header-actions, .library-search-results, .header-dropdown-panel,
+    .glass, #lb-sidebar, #lb-songs-container, [class*="bg-white/"], [class*="dark:bg-gray-800/"]),
+:root.music-appearance #main-sidebar.main-navigation,
+:root.music-appearance #main-sidebar :is(.t-bg-panel, .t-bg-main, [class~="t-bg-main/50"]),
+:root.music-appearance body.player-bar-floating:not(.player-detail-open):not(:has(#view-player-detail:not(.hidden))) #player-footer.floating-player {
+    background: color-mix(in srgb, var(--bg-panel) calc(var(--surface-opacity) * 100%), transparent) !important;
+    backdrop-filter: blur(var(--surface-blur)) !important;
+    -webkit-backdrop-filter: blur(var(--surface-blur)) !important;
+    box-shadow: 0 8px 30px rgb(0 0 0 / calc(var(--surface-opacity) * .12));
+}
+/* 不在视口中永久扣除顶部或底部；分页与末行能滚到悬浮播放栏上方。作者：jingyh */
+body.player-bar-floating .music-shell :is(#view-search, #view-songlist, #songlist-detail-view, #view-localmusic, #view-favorites) {
+    padding-bottom: calc(var(--player-bar-clearance, 112px) + 24px) !important;
+}
+body.player-bar-floating .music-shell .settings-sidebar { padding-bottom: var(--player-bar-clearance, 112px); }
+@media (max-width: 959px) {
+    body.player-bar-floating .music-shell .settings-shell { padding-bottom: var(--player-bar-clearance, 112px); }
+    body.player-bar-floating .music-shell .settings-content { padding-bottom: 32px !important; }
+}

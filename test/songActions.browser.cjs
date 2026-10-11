@@ -1,0 +1,48 @@
+/** 在已登录的隔离测试服务中验证歌曲操作和桌面、手机布局。 */
+async (page) => {
+  const results = []
+  const check = (value, name) => { if (!value) throw new Error(name); results.push(name) }
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.locator('#tab-leaderboard').click()
+  await page.waitForFunction(() => window.LeaderboardManager?.getCurrentList().length === 80)
+  const row = () => page.locator('#lb-row-0')
+  await page.mouse.move(400, 50)
+  check(await row().locator('.song-row-actions').evaluate(node => getComputedStyle(node).opacity === '1' && node.querySelectorAll('button').length === 5), '排行榜默认展示喜欢、播放、下载、加歌单、不喜欢五个按钮')
+  await page.evaluate(async () => { await window.toggleArtistDislike('artist-test', 'wy', '测试歌手', '') })
+  await page.waitForFunction(() => document.getElementById('dislike-artist-count').textContent === '1')
+  check(await row().evaluate(node => node.classList.contains('grayscale')), '不喜欢歌手立即更新统计和歌曲灰色状态')
+  await row().getByTitle('取消不喜欢', { exact: true }).click()
+  await page.waitForFunction(() => !document.getElementById('lb-row-0').classList.contains('grayscale') && document.getElementById('dislike-artist-count').textContent === '0')
+  check(true, '歌曲取消不喜欢同时解除命中的歌手规则，计数归零且灰色恢复')
+  for (const expected of [true, false, true, false]) {
+    await row().getByTitle(expected ? '不喜欢' : '取消不喜欢', { exact: true }).click()
+    await page.waitForFunction(value => document.getElementById('lb-row-0').classList.contains('grayscale') === value, expected)
+  }
+  check(true, '连续四次点击不喜欢正确交替增删并恢复颜色')
+  await row().getByTitle('喜欢', { exact: true }).click()
+  await page.waitForFunction(() => document.querySelector('#lb-row-0 .song-love-btn').getAttribute('aria-pressed') === 'true')
+  check(await page.locator('#playlist-add-modal').evaluate(node => node.classList.contains('hidden')), '点击喜欢直接加入我的喜爱，不打开选择歌单弹窗')
+  check(await page.evaluate(async () => { const response = await fetch('/api/user/list', { headers: getUserAuthHeaders() }); const data = await response.json(); return data.loveList.length === 1 }), '喜欢歌曲真实保存到服务端')
+  await row().getByTitle('添加到歌单', { exact: true }).click()
+  await page.waitForFunction(() => !document.getElementById('playlist-add-modal').classList.contains('hidden'))
+  check(true, '点击加号仍打开选择歌单弹窗')
+  await page.evaluate(() => closePlaylistAddModal())
+  await page.waitForFunction(() => document.getElementById('playlist-add-modal').classList.contains('hidden'))
+  await row().getByTitle('取消喜欢', { exact: true }).hover()
+  check(await row().locator('.song-love-btn i').evaluate(node => getComputedStyle(node).animationName === 'song-action-hop'), '悬停图标使用单次跳动动画')
+  check(await row().locator('.song-love-btn').evaluate(node => getComputedStyle(node).boxShadow !== 'none'), '悬停保留按钮边框反馈')
+  await page.mouse.move(400, 50)
+  await page.screenshot({ path: 'D:/opensource/fn-lxserver/output/playwright/song-actions-desktop.png' })
+  await page.setViewportSize({ width: 390, height: 844 })
+  check(await row().evaluate(node => [...node.querySelectorAll('.song-row-actions button')].every(button => { const rect = button.getBoundingClientRect(), box = node.getBoundingClientRect(); return rect.left >= box.left && rect.right <= box.right + 1 })), '手机宽度五个操作按钮均在歌曲行内')
+  check(await page.locator('#view-leaderboard').evaluate(node => node.scrollWidth === node.clientWidth), '手机排行榜没有横向溢出')
+  await page.screenshot({ path: 'D:/opensource/fn-lxserver/output/playwright/song-actions-mobile.png' })
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.evaluate(() => handleListClick('love'))
+  await page.waitForFunction(() => document.querySelector('#search-results .song-love-btn')?.getAttribute('aria-pressed') === 'true')
+  check(await page.locator('#search-results .song-row-actions').first().evaluate(node => getComputedStyle(node).opacity === '1'), '个人歌单同样默认显示操作且正确显示喜欢状态')
+  await page.locator('#search-results .song-love-btn').first().click()
+  await page.waitForFunction(() => currentListData.loveList.length === 0)
+  check(await page.locator('#search-results .song-love-btn').count() === 0, '在我的喜爱取消后歌曲立即从当前列表移除')
+  return { passed: results.length, results }
+}

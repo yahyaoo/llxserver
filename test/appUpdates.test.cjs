@@ -1,7 +1,7 @@
 /** 更新检查的配置、认证与关闭行为测试。 @author jingyh */
 const { test, after } = require('node:test')
 const assert = require('node:assert/strict')
-const updates = require('../server/server/appUpdates')
+const updates = require('../dist/server/server/appUpdates')
 const originalFetch = global.fetch
 after(() => { global.fetch = originalFetch })
 

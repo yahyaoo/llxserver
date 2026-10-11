@@ -1,0 +1,106 @@
+/**
+ * 内容页直接铺在应用背景上；歌曲行仅在交互状态时显示轻量提示。
+ * 控件、弹出层、封面与主题预览继续使用各自的组件样式。
+ * @author jingyh
+ * @date 2026-10-10
+ */
+:root:root .music-shell :is(#view-search, #view-songlist, #songlist-detail-view, #view-leaderboard,
+    #view-favorites, #view-localmusic, #view-settings, #view-recent, #view-about) {
+    background: transparent !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    box-shadow: none !important;
+}
+
+/* 清除内容面板的常驻底色，排除定位弹出层和表单控件。 */
+:root .music-shell :is(#view-search, #view-songlist, #songlist-detail-view, #view-leaderboard,
+    #view-favorites, #view-localmusic, #view-settings, #view-recent, #view-about)
+    :is(div, section, article, aside, nav, header, footer, ul, li, table, thead, tbody, th, td):is(
+        [class~="t-bg-panel"], [class~="t-bg-panel/30"], [class~="t-bg-panel/50"], [class~="t-bg-panel/60"], [class~="t-bg-panel/80"], [class~="t-bg-panel/90"],
+        [class~="t-bg-main"], [class~="t-bg-main/50"], [class~="t-bg-glass"],
+        [class*="bg-white/"], [class*="dark:bg-gray-800/"], [class*="bg-gray-50"], [class*="bg-gray-100"],
+        .settings-content, .settings-sidebar, .leaderboard-songs):not(.settings-form-card):not([data-settings-section] > .grid > div):not(.grid.grid-cols-12):not(.absolute):not(.fixed):not(.theme-background-preview):not(.theme-background-preview *):not(:is(.absolute.t-bg-panel, .fixed.t-bg-panel, .cs-dropdown, [role="dialog"], [role="menu"]) *):not(:is(#search-results, #sl-detail-list, #lb-songs-list, #lm-list-container, #songlist-container) .group *) {
+    background: transparent !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    box-shadow: none !important;
+}
+/* 透明详情层打开时，底层歌单网格不参与显示。 */
+#view-songlist:has(#songlist-detail-view:not(.hidden)) > :not(#songlist-detail-view) { visibility: hidden; }
+/* 热搜长标题的滚动限制在文字区域内，保留序号与搜索图标的位置。 */
+:root #view-search .hot-search-item { justify-content: flex-start; gap: 0; min-width: 0; }
+:root #view-search .hot-search-item > .keyword { display: block; min-width: 0; overflow: hidden; white-space: nowrap; }
+/* 目录筛选为紧凑组合控件；明确宽度，避免手机端被相邻按钮挤成单个箭头。 */
+:root #lm-location-container { max-width: 100%; }
+:root #lm-location-container #cs-w-lm-location-select { width: 140px; min-width: 110px; flex: 0 0 140px; }
+@media (max-width: 767px) {
+    #lm-toolbar { grid-template-columns: minmax(0, 1fr) auto; }
+    #lm-directory-controls { grid-column: 1 / -1; min-width: 0; flex-wrap: wrap; }
+    :root #lm-location-container #cs-w-lm-location-select { width: 130px; min-width: 110px; flex-basis: 130px; }
+}
+/* 歌手与专辑的装饰光晕属于面板底色，封面和徽标仍保持原样。 */
+#view-search :is(#artist-detail-header, #album-detail-header) > div > .absolute.pointer-events-none { display: none; }
+#view-search #album-detail-header p {
+    background: transparent !important;
+    border-block: 1px solid var(--content-divider);
+    border-radius: 0;
+}
+
+/* 内容区域使用轻量上下分隔线，不围四边框。 */
+:root { --content-divider: color-mix(in srgb, var(--text-main) 10%, transparent); }
+:root .music-shell :is(#view-search, #view-songlist, #songlist-detail-view, #view-leaderboard, #view-localmusic, #view-settings, #view-recent)
+    :is(#lb-boards-list, #recent-list) {
+    border: 0;
+    border-block: 1px solid var(--content-divider);
+    border-radius: 0;
+}
+
+/* 歌曲表格取消外围卡片，保留上下边界与表头分隔线。 */
+:root .music-shell :is(#view-search, #view-songlist, #songlist-detail-view, #view-leaderboard, #view-localmusic)
+    :is(.leaderboard-songs, div:has(> #search-results), div:has(> #sl-detail-list), #lm-list-container) {
+    border: 0 !important;
+    border-block: 1px solid var(--content-divider) !important;
+    border-radius: 0;
+    background: transparent !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    box-shadow: none !important;
+}
+:root .music-shell :is(#search-results-header, #sl-detail-header, #lb-pagination, #search-pagination-bar,
+    #lb-sidebar, .leaderboard-songs > .grid, .settings-sidebar, #lm-pagination,
+    #artist-detail-header > div, #album-detail-header > div, #artist-mini-bar, #album-mini-bar) {
+    border-color: var(--content-divider) !important;
+}
+:root .music-shell #view-leaderboard #lb-sidebar { border-right: 0; }
+
+/* 行状态使用透明混色，避免共享面板规则给每一行加上磨砂背景。 */
+:root:root .music-shell :is(#search-results-header, #lb-songs-container > .grid,
+    #view-localmusic .grid-cols-12:not([data-lm-row-index]), #songlist-detail-view .grid-cols-12:not(#sl-detail-list *)) {
+    background: transparent !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    box-shadow: none !important;
+}
+:root .music-shell :is(#view-search, #view-songlist, #songlist-detail-view, #view-leaderboard, #view-localmusic, #view-recent)
+    :is(#search-results, #sl-detail-list, #lb-songs-list, #lm-list-container, #recent-list)
+    :is(.grid.grid-cols-12, .recent-song) {
+    background: transparent !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    box-shadow: none !important;
+}
+:root .music-shell :is(#view-search, #view-songlist, #songlist-detail-view, #view-leaderboard, #view-localmusic, #view-recent)
+    :is(#search-results, #sl-detail-list, #lb-songs-list, #lm-list-container, #recent-list)
+    :is(.grid.grid-cols-12, .recent-song):hover {
+    background: color-mix(in srgb, var(--text-main) 6%, transparent) !important;
+}
+:root .music-shell :is(#view-search, #view-songlist, #songlist-detail-view, #view-leaderboard, #view-localmusic, #view-recent)
+    :is(#search-results, #sl-detail-list, #lb-songs-list, #lm-list-container, #recent-list)
+    :is(.row-selected, .search-match, [data-lm-row-index].t-bg-item-hover) {
+    background: color-mix(in srgb, var(--c-500) 12%, transparent) !important;
+}
+:root .music-shell :is(#view-search, #view-songlist, #songlist-detail-view, #view-leaderboard, #view-localmusic, #view-recent)
+    :is(#search-results, #sl-detail-list, #lb-songs-list, #lm-list-container, #recent-list) .search-current {
+    background: color-mix(in srgb, var(--c-500) 20%, transparent) !important;
+    box-shadow: inset 0 0 0 1px var(--c-500) !important;
+}

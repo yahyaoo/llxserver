@@ -1,0 +1,71 @@
+/* 所有业务弹框统一使用 10px 内容边距及紧凑标题栏。 @author jingyh */
+.lx-dialog-overlay { padding: 10px; }
+:is(.lx-dialog-overlay .lx-dialog-panel, dialog.lx-dialog-panel) {
+    width: min(720px, calc(100vw - 20px));
+    max-width: calc(100vw - 20px); max-height: calc(100dvh - 20px);
+    margin-inline: 0; padding: 0 !important; border-radius: 14px;
+    display: flex; flex-direction: column; overflow: hidden;
+}
+.el-message-box.lx-dialog-panel { padding: 0 !important; border-radius: 14px; overflow: hidden; max-height: calc(100dvh - 20px); width: min(420px, calc(100vw - 20px)); }
+.lx-dialog-overlay .lx-dialog-panel.max-w-sm { width: min(384px, calc(100vw - 20px)); }
+.lx-dialog-overlay .lx-dialog-panel.max-w-lg { width: min(512px, calc(100vw - 20px)); }
+.lx-dialog-overlay #edit-source-modal-content { width: min(720px, calc(100vw - 20px)); }
+.lx-dialog-panel .lx-dialog-heading {
+    position: relative; display: flex; align-items: center; justify-content: space-between;
+    gap: 10px; flex-shrink: 0; min-height: 48px; padding: 10px 46px 10px 24px !important;
+    margin: 0 !important; border-bottom: 1px solid var(--border-main);
+    background: var(--bg-panel); border-radius: 14px 14px 0 0;
+}
+.lx-dialog-heading::before { content: ''; position: absolute; left: 10px; top: 16px; width: 3px; height: 16px; border-radius: 1px; background: var(--c-500); }
+.lx-dialog-heading .lx-dialog-title { font-size: 16px !important; line-height: 24px; font-weight: 600; margin: 0 !important; min-width: 0; }
+.lx-dialog-heading .lx-dialog-close { position: absolute; right: 8px; top: 8px; width: 32px; height: 32px; padding: 0 !important; display: grid; place-items: center; border-radius: 8px; color: var(--text-muted); }
+/* 关闭按钮沿用弹框尺寸，不受全局 Element 按钮最小高度和边框覆盖。 */
+:root .lx-dialog-heading .lx-dialog-close { min-height: 32px; height: 32px; width: 32px; border: 0 !important; border-radius: 8px !important; background: transparent !important; color: var(--text-muted) !important; }
+:root .lx-dialog-heading .lx-dialog-close:hover { background: var(--bg-item-hover) !important; color: var(--text-main) !important; }
+.lx-dialog-close:hover { background: var(--bg-item-hover); color: var(--text-main); }
+.lx-dialog-close:focus-visible { outline: 2px solid var(--c-500); outline-offset: -2px; }
+.lx-dialog-close i { font-size: 16px !important; }
+.lx-dialog-panel > .lx-dialog-section { padding: 10px !important; margin: 0 !important; min-height: 0; }
+.lx-dialog-panel > .lx-dialog-section:has(#custom-timer-input) { overflow-y: auto; }
+dialog.lx-dialog-panel { width: min(460px, calc(100vw - 20px)); margin: auto; }
+dialog#lyric-settings-dialog.lx-dialog-panel { width: min(720px, calc(100vw - 20px)); }
+dialog.lx-dialog-panel:not([open]) { display: none; }
+#custom-source-modal-content > .lx-dialog-heading p { display: none; }
+#modal-source-scope-info { display: none; }
+.edit-source-title-line { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; min-width: 0; }
+.edit-source-title-line h3 { flex-shrink: 0; }
+.edit-source-title-detail { display: flex; align-items: baseline; gap: 6px; min-width: 0; font-size: 12px; }
+#edit-source-modal-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 230px; }
+#edit-source-modal-content { width: min(720px, calc(100vw - 20px)); }
+#edit-source-modal-content .source-platform-body { overflow-y: auto; max-height: 65dvh; }
+#edit-source-platform-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+#edit-source-platform-list > * { margin: 0 !important; min-width: 0; }
+@media (min-width: 1025px) {
+    #edit-source-platform-list { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    #edit-source-platform-list .platform-toggle-item > div:first-child { gap: 8px; min-width: 0; }
+    #edit-source-platform-list .platform-toggle-item > div:first-child > div:last-child { min-width: 0; }
+    #edit-source-platform-list .platform-toggle-item > div:first-child > div:last-child > div:first-child { flex-wrap: wrap; gap: 4px; }
+}
+#edit-source-platform-list .platform-toggle-item { padding: 10px; min-height: 64px; }
+#edit-source-platform-list .platform-toggle-item label > .lx-element-checkbox { display: none !important; }
+#edit-source-platform-list .platform-checkbox { position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; overflow: hidden !important; clip: rect(0, 0, 0, 0) !important; white-space: nowrap !important; border: 0 !important; }
+.source-platform-notice { flex-wrap: wrap; gap: 8px; }
+.source-platform-notice > div:first-child { min-width: 0; flex: 1 1 260px; }
+@media (max-width: 520px) {
+    #edit-source-platform-list { grid-template-columns: minmax(0, 1fr); }
+    #edit-source-modal-name { max-width: 170px; }
+    .edit-source-title-detail { flex-basis: 100%; }
+    .lx-dialog-heading .lx-dialog-title { font-size: 15px !important; }
+}
+/* 来源沿用洛雪平台色；独立类别样式防止樱花主题把 QQ 改成粉色。 */
+:root .music-source-tag[data-source="tx"] { background: #d1fae5 !important; color: #047857 !important; border-color: #a7f3d0 !important; }
+:root .music-source-tag[data-source="kg"] { background: #dbeafe !important; color: #1d4ed8 !important; border-color: #bfdbfe !important; }
+:root .music-source-tag[data-source="kw"] { background: #fef3c7 !important; color: #b45309 !important; border-color: #fde68a !important; }
+:root .music-source-tag[data-source="wy"] { background: #ffe4e6 !important; color: #be123c !important; border-color: #fecdd3 !important; }
+:root .music-source-tag[data-source="mg"] { background: #fce7f3 !important; color: #be185d !important; border-color: #fbcfe8 !important; }
+:root[data-appearance="dark"] .music-source-tag { background: color-mix(in srgb, currentColor 16%, transparent) !important; }
+:root[data-appearance="dark"] .music-source-tag[data-source="tx"] { color: #34d399 !important; border-color: #10b9814d !important; }
+:root[data-appearance="dark"] .music-source-tag[data-source="kg"] { color: #60a5fa !important; border-color: #3b82f64d !important; }
+:root[data-appearance="dark"] .music-source-tag[data-source="kw"] { color: #fbbf24 !important; border-color: #f59e0b4d !important; }
+:root[data-appearance="dark"] .music-source-tag[data-source="wy"] { color: #fb7185 !important; border-color: #f43f5e4d !important; }
+:root[data-appearance="dark"] .music-source-tag[data-source="mg"] { color: #f472b6 !important; border-color: #ec48994d !important; }

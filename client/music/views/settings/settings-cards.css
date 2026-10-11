@@ -1,0 +1,56 @@
+/* 后台同款章节标题，所有设置子页共用。 @author jingyh @date 2026-10-11 */
+:root #view-settings { --settings-gap: 16px; }
+:root #view-settings .settings-content .settings-section-frame { padding: 0 !important; margin-top: 0 !important; border: 0; }
+:root #view-settings .settings-content .settings-section-card { padding: 0 !important; border: 1px solid var(--border-main) !important; border-radius: 14px !important; background: var(--bg-panel) !important; box-shadow: none !important; overflow: visible; }
+.settings-card-header { display: flex; align-items: center; gap: 16px; padding: 22px 24px; margin: 0 !important; border-bottom: 1px solid var(--border-main); border-radius: 14px 14px 0 0; background: color-mix(in srgb, var(--c-500) 3%, var(--bg-panel)); }
+.settings-card-icon { display: grid; place-items: center; width: 44px; height: 44px; flex: 0 0 44px; border-radius: 12px; background: var(--c-500); color: var(--theme-on-accent, #fff); font-size: 19px; }
+.settings-card-heading-text { min-width: 0; }
+:root #view-settings .settings-card-header h3 { display: block !important; margin: 0 !important; padding: 0 !important; color: var(--text-main); font-size: 16px; font-weight: 600; line-height: 1.5; }
+.settings-card-header p { margin: 4px 0 0; font-size: 13px; line-height: 1.5; color: var(--text-muted); }
+/* 由内容区管理模块间距，避免包装卡片后丢失原章节的 space-y。隐藏项不占间隔。 */
+.settings-card-body { display: flex; flex-direction: column; gap: var(--settings-gap); padding: 24px; min-width: 0; }
+:root #view-settings .settings-card-body > * { margin-block: 0 !important; }
+.settings-card-body > button { align-self: flex-start; }
+.settings-card-body :is(.space-y-4, .space-y-3):not(.hidden),
+.settings-card-body > .t-bg-main:not(.hidden),
+.settings-card-body > [data-theme-controls]:not(.hidden) { display: flex; flex-direction: column; gap: var(--settings-gap); min-width: 0; }
+:root #view-settings .settings-card-body :is(.space-y-4, .space-y-3) > *,
+:root #view-settings .settings-card-body > .t-bg-main > *,
+:root #view-settings .settings-card-body > [data-theme-controls] > * { margin-block: 0 !important; }
+:root #view-settings [data-settings-section="account"] { display: flex; flex-direction: column; gap: var(--settings-gap); padding-top: 0; }
+:root #view-settings [data-settings-section="account"].hidden { display: none; }
+:root #view-settings [data-settings-section="account"] > * { margin-block: 0 !important; }
+.settings-card-body .setting-tooltip-content { display: none; }
+.settings-card-body .setting-tooltip-trigger:is(:hover,:focus,:focus-within) .setting-tooltip-content { display: block; }
+.settings-subsection-header { width: 100%; padding: 16px 0; margin-bottom: 16px !important; border-radius: 0; background: transparent; }
+.settings-subsection-header .settings-card-icon { width: 38px; height: 38px; flex-basis: 38px; font-size: 16px; }
+.settings-card-body .theme-editor > .settings-subsection-header { grid-column: 1 / -1; }
+.settings-card-body .theme-editor { border: 1px solid var(--border-main); border-radius: 12px; padding: 18px; }
+.settings-card-body > .space-y-4 > .flex.items-center.justify-between { padding-block: 10px; min-height: 52px; gap: 20px; }
+.settings-card-body > .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: var(--settings-gap); }
+.settings-card-body .grid > div { min-width: 0; }
+.settings-card-body > .t-bg-main > .grid { gap: var(--settings-gap); }
+.settings-card-body [data-theme-controls] :is(.appearance-choices, .theme-swatches) { gap: var(--settings-gap); }
+.settings-card-body > .grid > div { padding: 18px; border: 1px solid var(--border-main); border-radius: 10px; }
+.settings-card-body :is(input,textarea) { max-width: 100%; }
+.settings-card-body > .t-bg-main { padding: 0 !important; border: 0 !important; border-radius: 0; background: transparent !important; }
+.settings-card-body .account-fields-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--settings-gap); }
+.settings-card-body .account-fields-grid > * { padding: 0; border: 0; }
+.settings-card-body .theme-editor { padding-top: 20px; border-top: 1px solid var(--border-main); }
+.settings-card-body .theme-editor h3 { font-size: 16px; font-weight: 600; }
+.settings-card-body .grid > .col-span-full { grid-column: 1 / -1; }
+.settings-content [data-settings-section="logs"] > .settings-section-card { display: flex; flex-direction: column; height: 100%; min-height: 400px; }
+.settings-content [data-settings-section="logs"] .settings-card-body { min-height: 0; flex: 1; }
+.settings-card-body .prose { padding: 0 !important; margin: 0; max-width: 100%; background: transparent !important; border: 0; }
+@media (max-width: 1199px) { .settings-card-body .account-fields-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 767px) {
+    /* 所有设置章节共用导航安全留白，避免最后一项被手机底栏遮挡。 */
+    :root #view-settings .settings-shell { padding-bottom: var(--mobile-nav-clearance, 110px) !important; }
+}
+@media (max-width: 639px) {
+    .settings-card-header { padding: 18px; gap: 12px; align-items: flex-start; }
+    .settings-card-icon { width: 40px; height: 40px; flex-basis: 40px; font-size: 17px; }
+    .settings-card-body { padding: 18px; }
+    .settings-card-body .account-fields-grid { grid-template-columns: minmax(0, 1fr); }
+    .settings-card-body > .space-y-4 > .flex.items-center.justify-between { gap: 12px; }
+}

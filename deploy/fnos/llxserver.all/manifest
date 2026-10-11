@@ -1,0 +1,14 @@
+appname         = llxserver.all
+version         = 2.1.4
+desc            = 洛洛雪音乐 播放器 - 聚合多平台音乐搜索与在线播放
+arch            = x86_64
+platform        = x86
+display_name    = 洛洛雪音乐
+maintainer      = yahyaoo
+distributor     = yahyaoo
+desktop_uidir   = ui
+desktop_applaunchname = llxserver.all.Application
+source          = thirdparty
+install_type    =
+install_dep_apps = nodejs_v24
+service_port    = 17000

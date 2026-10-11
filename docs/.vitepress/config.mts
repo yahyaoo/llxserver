@@ -1,14 +1,14 @@
 import { defineConfig } from 'vitepress'
 
 export default defineConfig({
-  base: "/lxserver/",
+  base: "/llxserver/",
   head: [
-    ['link', { rel: 'icon', href: '/lxserver/icon.svg' }]
+    ['link', { rel: 'icon', href: '/llxserver/icon.svg' }]
   ],
   themeConfig: {
     logo: '/icon.svg',
     socialLinks: [
-      { icon: 'github', link: 'https://github.com/XCQ0607/lxserver' }
+      { icon: 'github', link: 'https://github.com/yahyaoo/llxserver' }
     ],
     search: {
       provider: 'local'
@@ -18,8 +18,8 @@ export default defineConfig({
     root: {
       label: '简体中文',
       lang: 'zh-CN',
-      title: "LX Sync Server",
-      description: "一个增强版的 LX Music 数据同步服务端与 Web 播放器",
+      title: "洛洛雪音乐",
+      description: "洛洛雪音乐客户端、音乐同步与多平台服务",
       themeConfig: {
         nav: [
           { text: '首页', link: '/' },
@@ -65,8 +65,8 @@ export default defineConfig({
       label: 'English',
       lang: 'en-US',
       link: '/en/',
-      title: "LX Sync Server",
-      description: "An enhanced data synchronization server and Web player for LX Music",
+      title: "洛洛雪音乐",
+      description: "llxserver web music client and synchronization service",
       themeConfig: {
         nav: [
           { text: 'Home', link: '/en/' },

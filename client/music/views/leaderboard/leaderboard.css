@@ -1,0 +1,107 @@
+/* 排行榜页面：右侧随页面滚动，左侧目录固定在可视区域。 @author jingyh @date 2026-10-10 */
+.music-shell #view-leaderboard {
+    display: block;
+    padding: 0 !important;
+    bottom: 0 !important;
+    overflow-y: auto;
+    overflow-x: hidden;
+    container-type: size;
+    scroll-padding-top: var(--top-bar-clearance, 92px);
+}
+.music-shell #view-leaderboard.hidden { display: none; }
+.leaderboard-shell {
+    display: grid;
+    grid-template-columns: 260px minmax(0, 1fr);
+    align-items: start;
+    min-height: 100%;
+}
+.music-shell #view-leaderboard #lb-sidebar {
+    position: sticky;
+    top: 0;
+    grid-column: 1;
+    grid-row: 1;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100dvh;
+    height: 100cqh;
+    min-height: 0;
+    padding: calc(var(--top-bar-clearance, 92px) + 24px) 12px 0;
+    overflow: hidden;
+    border-right: 1px solid var(--border-dim);
+    /* 覆盖共享外观对侧栏的半透明面板设置，目录直接使用页面背景。 */
+    background: transparent !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    box-shadow: none !important;
+    transform: none;
+}
+.leaderboard-sidebar-heading {
+    display: flex; align-items: center; justify-content: space-between;
+    flex-shrink: 0; padding: 0 14px 18px;
+    color: #000; font-size: 22px; font-weight: 700;
+}
+.leaderboard-sidebar-heading button, .leaderboard-mobile-toggle { display: none; }
+.music-shell #view-leaderboard #lb-boards-list {
+    flex: 1; min-height: 0; max-height: none;
+    overflow-y: auto; overscroll-behavior: contain;
+    padding: 0 0 var(--player-bar-clearance, 112px);
+}
+.leaderboard-navigation-item {
+    display: flex; align-items: center; gap: 12px;
+    width: 100%; min-height: 46px; margin: 2px 0; padding: 11px 13px;
+    border-radius: 10px; color: var(--text-muted); font-size: 15px; text-align: left;
+}
+.leaderboard-navigation-number { width: 24px; flex-shrink: 0; text-align: center; font-size: 13px; font-variant-numeric: tabular-nums; }
+.leaderboard-navigation-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#view-leaderboard .leaderboard-navigation-item {
+    color: #000 !important; background: transparent !important; box-shadow: none;
+}
+#view-leaderboard .leaderboard-navigation-item.active-option {
+    font-weight: 600; box-shadow: none;
+}
+#view-leaderboard .leaderboard-navigation-item.active-option span { color: inherit !important; }
+.leaderboard-navigation-empty { padding: 20px 12px; color: var(--text-muted); font-size: 14px; text-align: center; }
+.leaderboard-navigation-item:focus-visible, .leaderboard-mobile-toggle:focus-visible {
+    outline: 2px solid var(--c-500); outline-offset: -2px;
+}
+.leaderboard-content {
+    grid-column: 2; grid-row: 1; min-width: 0;
+    padding: calc(var(--top-bar-clearance, 92px) + 28px) 32px calc(var(--player-bar-clearance, 112px) + 24px);
+}
+.leaderboard-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 16px; margin-bottom: 24px; }
+.music-shell #view-leaderboard #lb-songs-container {
+    display: flex; flex-direction: column; min-width: 0; overflow: visible;
+    border: 1px solid var(--border-dim); border-radius: 16px; background: var(--bg-panel);
+}
+/* 歌曲区不建立滚动容器，分页之后统一预留播放栏空间。 */
+.music-shell #view-leaderboard #lb-songs-list,
+body.player-bar-floating .music-shell #view-leaderboard #lb-songs-list {
+    flex: none; overflow: visible; padding-bottom: 8px !important; scroll-padding-bottom: 0;
+}
+#view-leaderboard #lb-pagination { border-radius: 0 0 16px 16px; }
+#view-leaderboard #lb-sidebar-overlay { display: none; }
+@media (max-width: 1199px) {
+    .leaderboard-shell { grid-template-columns: 238px minmax(0, 1fr); }
+    .leaderboard-content { padding-left: 24px; padding-right: 24px; }
+}
+/* 小屏目录直接展开在歌曲区上方，透明目录不再叠在歌曲文字上。作者：jingyh */
+@media (max-width: 1024px) {
+    .leaderboard-shell { grid-template-columns: minmax(0, 1fr); align-content: start; }
+    .leaderboard-content { grid-column: 1; grid-row: 2; padding-left: 12px; padding-right: 12px; }
+    .leaderboard-toolbar { gap: 8px; margin-bottom: 16px; }
+    .leaderboard-mobile-toggle, .leaderboard-sidebar-heading button { display: inline-flex; }
+    .music-shell #view-leaderboard #lb-sidebar {
+        position: relative; top: auto; width: 100%; height: auto;
+        padding: calc(var(--top-bar-clearance, 92px) + 16px) 12px 0;
+        transform: none; transition: none; z-index: auto;
+    }
+    .music-shell #view-leaderboard #lb-sidebar.-translate-x-full { display: none; transform: none; }
+    .music-shell #view-leaderboard #lb-boards-list {
+        flex: none; height: min(320px, 40dvh, max(100px, calc(100cqh - var(--top-bar-clearance, 92px) - var(--player-bar-clearance, 112px) - 80px)));
+        padding-bottom: 8px;
+    }
+    #view-leaderboard #lb-sidebar:not(.-translate-x-full) ~ .leaderboard-content { padding-top: 16px; }
+    #view-leaderboard #lb-sidebar-overlay:not(.hidden) { display: none; }
+    #view-leaderboard #lb-batch-toolbar { flex-wrap: wrap; gap: 12px; }
+}

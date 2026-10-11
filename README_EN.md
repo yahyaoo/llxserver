@@ -1,403 +1,69 @@
-# LX Music Sync Server (Enhanced Edition)
-
-![lxserver](https://socialify.git.ci/XCQ0607/lxserver/image?description=1&forks=0&issues=0&logo=https://raw.githubusercontent.com/XCQ0607/lxserver/refs/heads/main/public/icon.svg&owner=1&pulls=0&stargazers=0&theme=Auto)
-
 <div align="center">
-  <p>
-    <img src="https://img.shields.io/badge/build-passing-brightgreen?style=flat-square" alt="Build Status">
-    <img src="https://img.shields.io/badge/version-v2.1.2-blue?style=flat-square" alt="Version">
-    <img src="https://img.shields.io/badge/node-%3E%3D20-green?style=flat-square" alt="Node Version">
-    <img src="https://img.shields.io/github/license/XCQ0607/lxserver?style=flat-square" alt="License">
-    <br>
-    <br>
-    <a href="https://github.com/XCQ0607/lxserver/stargazers"><img src="https://img.shields.io/github/stars/XCQ0607/lxserver?style=flat-square&color=ffe16b" alt="GitHub stars"></a>
-    <a href="https://github.com/XCQ0607/lxserver/network/members"><img src="https://img.shields.io/github/forks/XCQ0607/lxserver?style=flat-square" alt="GitHub forks"></a>
-    <a href="https://github.com/XCQ0607/lxserver/issues"><img src="https://img.shields.io/github/issues/XCQ0607/lxserver?style=flat-square&color=red" alt="GitHub issues"></a>
-    <a href="https://github.com/XCQ0607/lxserver/commits/main"><img src="https://img.shields.io/github/last-commit/XCQ0607/lxserver?style=flat-square&color=blueviolet" alt="Last Commit"></a>
-    <img src="https://img.shields.io/github/commit-activity/m/XCQ0607/lxserver?style=flat-square&color=ff69b4" alt="Commit Activity">
-    <a href="https://github.com/XCQ0607/lxserver/releases"><img src="https://img.shields.io/github/downloads/XCQ0607/lxserver/total?style=flat-square&color=blue" alt="Total Downloads"></a>
-  </p>
+  <img src="docs/assets/banner.png" width="100%" alt="llxserver · 洛洛雪音乐">
+  <p>Web music client · Music synchronization · Multi-platform deployment</p>
+  <a href="README.md">中文</a> · <a href="deploy/README.md">Deployment</a> · <a href="docs/en/index.md">Documentation</a> · <a href="https://github.com/yahyaoo/llxserver/releases">Releases</a>
 </div>
 
-[Documentation](https://xcq0607.github.io/lxserver/) | [SyncServer](md/lxserver_EN.md) | [Changelog](changelog.md) | [中文版](README.md)
+**llxserver** provides a web music client, an administration UI, music synchronization and Subsonic support. It retains search, playlists, themes, lyrics, downloads, local music, caching, custom sources and backups.
 
----
-This project features a powerful built-in **Web Player**, allowing you to enjoy music anywhere in your browser. It also serves as an enhanced [LX Music Data Sync Server](md/lxserver_EN.md).
+Source directories are `server/` and `client/`. Deployment and build entry points are in `deploy/`. Administration and music data use separate SQLite databases. Build outputs are in `dist/`.
 
-## ✨ Web Player Key Features
+## Run
 
-### 1. Modern Interface
-Featuring a clean, modern UI design with support for dark mode, providing a top-tier visual experience.
-<p align="center">
-  <img src="md/player.png" width="800" alt="Web Player Interface">
-</p>
-
-### 2. Multi-source Search
-Supports aggregated searching across major music platforms, search and listen to anything you want.
-<p align="center">
-  <img src="md/search.png" width="800" alt="Search Interface">
-</p>
-
-### 3. Content & Playlists
-  
-Browse and search **multi-platform playlists** with ease. View comprehensive **playlist details** including covers, authors, and descriptions. Manage your **playback queue** with drag-and-drop sorting, batch operations, and quick positioning.
-
-<p align="center">
-  <img src="md/musiclist.png" width="800" alt="Playlist Browsing">
-</p>
-
-<p align="center">
-  <img src="md/musiclist-detail.png" width="400" alt="Playlist Details">
-  <img src="md/playlist.png" width="400" alt="Queue Management">
-</p>
-
-### 4. Powerful Playback Controls
-Supports playback mode switching, sound quality selection, lyrics display, sleep timer, playback speed control, and more.
-
-<p align="center">
-  <img src="md/controller.png" width="800" alt="Controller">
-</p>
-
-### 5. Cache Management
-  
-Features a **fully automated caching system** for lyrics, links, and song files, managed via a dedicated **cache control panel** for smooth playback even in weak network conditions.
-
-<p align="center">
-  <img src="md/cache.png" width="800" alt="Automated Cache Management">
-</p>
-
-### 6. Lyric Card Sharing
-  
-Introducing **Lyric Card Sharing**—generate stunning posters with customizable aspect ratios (Portrait/Landscape/Square), color styles (Dark/Light/Album colors), and line counts, with support for rotation and scaling.
-
-<p align="center">
-  <img src="md/share.png" width="800" alt="Social Lyric Card Sharing">
-</p>
-
-### 7. Themes & System Configuration
-  
-Choose from multiple **modern themes** (Emerald, Deep Blue, Warm Sun, Nebula, Crimson) with automatic Light/Dark mode switching. Powerful system settings include **auto-updating network playlists**, **automatic config backups**, and multi-dimensional proxy support for seamless playback.
-
-<p align="center">
-  <img src="md/theme.png" width="400" alt="Modern Theme Switching">
-  <img src="md/settings.png" width="400" alt="System Configuration">
-</p>
-
-### 8. Custom Source Management
-
-Supports importing custom source scripts to expand music sources even further.
-
-<p align="center">
-  <img src="md/source.png" width="800" alt="Source Management">
-</p>
-
-### 9. Album & Artist Search & Collection
-
-Search for albums and artists and favorite them with one click for quick access to your favorite music.
-
-<p align="center">
-  <img src="md/album.png" width="400" alt="Album Display">
-  <img src="md/singer.png" width="400" alt="Artist Display">
-</p>
-
-### 10. Subsonic Protocol & Global Search Support
-
-Fully compatible with the Subsonic protocol, allowing you to use various Subsonic clients (e.g., Yinliu, Feishin, etc.) to connect and play music. Supports specifying platform prefixes such as `wy:`, `kg:`, `tx:`, `kw:`, `mg:`, or using `online:` / `local:` prefixes to force global online or local search within Subsonic clients.
-
-<p align="center">
-  <img src="md/subsonic.png" width="400" alt="Subsonic Support">
-  <img src="md/subsonic-search.png" width="400" alt="Subsonic Online Search">
-</p>
-
-### 11. Public Library & Shared Favorites
-
-When **"Enable Public Favorites and Songs"** is enabled in the backend settings, all users (guests or different accounts) can share a common public music library and public playlists.
-
-<p align="center">
-  <img src="md/_open_song.png" width="800" alt="Public Library & Shared Favorites">
-</p>
-
-## 🔒 Access Control & Security
-To protect your privacy, the Web Player supports password protection.
-### How to Enable
-
-1. **Environment Variable** (Recommended for Docker users):
-   - `ENABLE_WEBPLAYER_AUTH=true`: Enable authentication
-   - `WEBPLAYER_PASSWORD=yourpassword`: Set access password
-2. **Web Interface**:
-   Log in to the management dashboard (default port 9527), go to **"System Config"**, check **"Enable Web Player Password"** and set your password.
-
-### Permission & Custom Source Matrix (when `user.enablePublicRestriction` is enabled)
-
-| User Type | View List | Use/Toggle (Personal) | Change Default Quality | Upload/Import Public | Delete/Modify Public |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **Admin** | ✅ Allowed | ✅ Allowed | ✅ Allowed | ✅ Allowed | ✅ Allowed |
-| **Logged-in** | ✅ Allowed | ✅ Allowed | ✅ Allowed | ❌ Denied | ❌ Denied |
-| **Guest** | ❌ Hidden | ❌ Denied | ❌ Denied | ❌ Denied | ❌ Denied |
-
-## 📱 Mobile Adaptation
-The Web Player is deeply optimized for mobile devices, providing a native App-like experience in mobile browsers.
-
----
-
-## 🚀 Quick Start
-
-Built with **Node.js**, supporting multiple deployment methods.
-
-
-### Option 1: Desktop Client
-
-You can now run LX Music Sync Server more conveniently via our Desktop Client, available for Windows, macOS, and Linux.
-
-- **📦 Download Latest**: [GitHub Releases](https://github.com/XCQ0607/lxserver/releases/latest)
-- **✨ Key Advantages**:
-    - **Single Window**: Integrated management dashboard and Web player for a unified experience.
-    - **System Tray**: Minimizes to tray on close, ensuring the sync service stays active in the background.
-    - **Port Conflict Resolution**: Automatically detects and switches ports if the default is in use.
-    - **Setup Wizard**: Guided data path selection on first launch, supports **Portable Mode**.
-    - **Multi-Arch Support**: Builds for Windows (x64/x86/ARM64 Setup & Portable), macOS (Intel x64 & Apple Silicon arm64), and Linux (amd64/arm64/armv7l deb/AppImage).
-
-### Option 2: Containerized Deployment via Docker
-
-This project supports pulling images from Docker Hub or GitHub Packages:
-- **Docker Hub**: `xcq0607/lxserver:latest`
-- **GitHub Packages**: `ghcr.io/xcq0607/lxserver:latest`
-
-**Docker Run Example:**
+Use Node.js 20 or newer (24 LTS recommended):
 
 ```bash
-docker run -d \
-  -p 9527:9527 \
-  -v $(pwd)/data:/server/data \
-  -v $(pwd)/logs:/server/logs \
-  -v $(pwd)/cache:/server/cache \
-  -v $(pwd)/music:/server/music \
-  --name lx-sync-server \
-  --restart unless-stopped \
-  xcq0607/lxserver:latest
-```
-
-**Docker Compose Example:**
-
-Create a `docker-compose.yml` file:
-
-```yaml
-version: '3'
-services:
-  lx-sync-server:
-    image: xcq0607/lxserver:latest
-    container_name: lx-sync-server
-    restart: unless-stopped
-    ports:
-      - "9527:9527"
-    volumes:
-      - ./data:/server/data
-      - ./logs:/server/logs
-      - ./cache:/server/cache
-      - ./music:/server/music
-    environment:
-      - NODE_ENV=production
-      # - FRONTEND_PASSWORD=123456
-      # - ENABLE_WEBPLAYER_AUTH=true
-      # - WEBPLAYER_PASSWORD=yourpassword
-      # - ADMIN_PATH=
-      # - PLAYER_PATH=/music
-```
-
-### Option 3: Manual Run (Git Clone)
-
-```bash
-# 1. Clone project
-git clone https://github.com/XCQ0607/lxserver.git && cd lxserver
-
-# 2. Install dependencies and build
-npm ci && npm run build
-
-# 3. Start service
+git clone https://github.com/yahyaoo/llxserver.git
+cd llxserver
+npm ci --ignore-scripts --no-audit --no-fund
+npm rebuild better-sqlite3
+npm run build
 npm start
 ```
 
-### Option 4: Using Release Build
+Client: `http://localhost:9527/`. Administration: `http://localhost:9527/admin/`. Change the initial administration password `123456` after first use. Save business settings in the administration UI; they are persisted to SQLite.
 
-1. Download the archive from GitHub Releases.
-2. Extract and run `npm install --production`.
-3. Execute `npm start`.
+## Configuration
 
-### 3. Service Connection & Client Setup Guide
+The application root `config.js` contains bootstrap and client connection settings:
 
-#### ① Web Interface Access
-- **Web Player**: `http://<server-ip>:9527` (Default root path `/`, customizable via `PLAYER_PATH` env or backend settings, e.g., `/music`).
-  - If password authentication is enabled (`ENABLE_WEBPLAYER_AUTH`), enter your player password (default: `123456`).
-- **Sync Dashboard**: `http://<server-ip>:9527/admin` (Default path `/admin`, customizable via `ADMIN_PATH`, default admin password: `123456`).
+```javascript
+module.exports = {
+  'server.database.adminPath': 'database/admin.sqlite',
+  'server.database.musicPath': 'database/music.sqlite',
+  'client.serverUrl': 'http://127.0.0.1:9527',
+  'client.port': 9528,
+  'client.bindIP': '0.0.0.0'
+}
+```
 
-#### ② LX Music Client Sync Setup (Desktop / Mobile)
-Go to LX Music client "Settings → Sync Settings" and choose Custom Server:
-- **Mode 1: User Path Mode (Recommended, enabled by default `USER_ENABLE_PATH=true`)**
-  - **Connection URL**: `http://<server-ip>:9527/<username>` (e.g., `http://192.168.1.100:9527/user1`)
-  - **Connection Password**: Password of the corresponding user.
-  - **Feature**: Routes directly to isolated user storage via username in the URL. **Allows different users to use identical passwords**.
-- **Mode 2: Root Path Mode (Requires `USER_ENABLE_ROOT=true`)**
-  - **Connection URL**: `http://<server-ip>:9527` (e.g., `http://192.168.1.100:9527`)
-  - **Connection Password**: Password of the corresponding user.
-  - **Feature**: Connect without username in the URL; server auto-matches user by password. **Note: In this mode, all user passwords must be strictly unique**.
+Environment variables have priority. Set `SERVER_URL`, `CLIENT_PORT`, `CLIENT_BIND_IP`, `SERVER_DATABASE_ADMIN_PATH` and `SERVER_DATABASE_MUSIC_PATH` to override the corresponding fields. Use `CONFIG_PATH` for a shared external configuration or `CLIENT_CONFIG_PATH` for a client-specific file. Relative database paths are resolved against `DATA_PATH`.
 
-#### ③ Subsonic Music Client Setup (Yinliu / Feishin / Symfonium, etc.)
-Fully compatible with Subsonic API protocol:
-- **Server Address (Server URL)**:
-  - **Default Shared Port**: `http://<server-ip>:9527/rest` (Subpath configured via `SUBSONIC_PATH`, default `/rest`).
-  - **Standalone Port Mode** (if `SUBSONIC_PORT` > 0, e.g., `4533`): `http://<server-ip>:4533/rest`.
-- **Username & Password**: Sync username and password configured in the "User Management" dashboard.
-- **Global Online Search**: Search and stream tracks across music platforms directly within Subsonic clients. Prefix keywords with `wy:`, `tx:`, `kw:`, `kg:`, `mg:` to specify sources, or `online:` / `local:` to toggle online/local search.
+## Deployment and packages
 
----
+```bash
+docker compose -f deploy/docker/compose.yaml up -d --build
+docker compose -f deploy/docker/compose.split.yaml up -d --build
+npm run build:bundle
+npm run package:server
+npm run package:client
+```
 
-## 🏗️ Architecture
+ZIP packages are generated in `output/`. Extract the server or combined package, run `npm ci --omit=dev`, then `npm start`. The independent client package only needs Node.js: set `client.serverUrl` and run `npm start` (port 9528).
 
-Separated frontend and backend architecture based on Node.js:
+The independent client forwards API, audio, SSE and WebSocket requests through the original server authentication and routing. It serves authorized static assets locally and does not contain server code, databases or third-party Node dependencies.
 
-- **Backend (Express + WebSocket)**: Core sync logic and WebDAV backup.
-- **WebPlayer (Vanilla JS)**: Handles music playback, default access path is root `/`.
-- **Console (Vanilla JS)**: Located at `/admin` path, handles user and data management.
+Desktop builds: `npm ci`, then `npm run electron:dist`. fnOS builds: install fnpack, set `FNPACK_BIN`, then `npm run build:fpk`. See [deployment instructions](deploy/README.md) for platform requirements and data paths.
 
----
+## Validation
 
-## 🛠️ Configuration
+```bash
+npm run build
+npm run test:unit
+npm run test:system
+npm run test:fpk
+```
 
-The configuration file is persisted by default in the data directory at `data/config.js` (Docker deployments only need to mount the `./data` volume to retain all settings across container updates and restarts; existing legacy `config.js` in root will be migrated automatically). Environment variables take precedence:
+Tests use temporary databases and isolated services, including extraction and startup of actual combined and independent ZIP packages. Existing runtime instances are not modified.
 
-| Env Variable | Config Key | Description | Default |
-| --- | --- | --- | --- |
-| `PORT` | `port` | Service port | `9527` |
-| `ADMIN_PATH` | `admin.path` | Backend management interface path | `/admin` |
-| `PLAYER_PATH` | `player.path` | Web player access path (default root `/`) | `/` |
-| `FRONTEND_PASSWORD` | `frontend.password` | Web dashboard password | `123456` |
-| `SERVER_NAME` | `serverName` | Sync service name | `lxserver` |
-| `ENABLE_DEBUG` | `debug.enabled` | Enable DEBUG mode (verbose debug and source sandbox logs, default false) | `false` |
-| `MAX_SNAPSHOT_NUM` | `maxSnapshotNum` | Max snapshots to keep | `10` |
-| `CONFIG_PATH` | - | Absolute path to external config file (defaults to `data/config.js`) | - |
-| `DATA_PATH` | - | Absolute path to data storage directory | `./data` |
-| `LOG_PATH` | - | Absolute path to log output directory | `./logs` |
-| `PROXY_HEADER` | `proxy.header` | Proxy IP header (e.g., `x-real-ip`) | - |
-| `USER_ENABLE_ROOT` | `user.enableRoot` | Enable root path (use `ip:port`, password must be unique) | `false` |
-| `USER_ENABLE_PATH` | `user.enablePath` | Enable user path (use `ip:port/username`, passwords can repeat) | `true` |
-| `WEBDAV_ENABLE` | `webdav.enable` | Enable WebDAV sync and backup | `false` |
-| `WEBDAV_URL` | `webdav.url` | WebDAV URL | - |
-| `WEBDAV_USERNAME` | `webdav.username` | WebDAV Username | - |
-| `WEBDAV_PASSWORD` | `webdav.password` | WebDAV Password | - |
-| `WEBDAV_SYNC_PATH` | `webdav.syncPath` | WebDAV remote sync path | `/lx-sync` |
-| `WEBDAV_BACKUP_PATH` | `webdav.backupPath` | WebDAV remote backup path | `/lx-sync-backups` |
-| `SYNC_INTERVAL` | `sync.interval` | WebDAV incremental sync interval (min) | `60` |
-| `BACKUP_INTERVAL` | `sync.backupInterval` | WebDAV full backup interval (hours) | `24` |
-| `WEBDAV_EXCLUDE_CACHE` | `webdav.excludeCache` | Exclude cache dir from sync (`data/<user>/cache`). When enabled, skips incremental sync & full backup (already-synced files are NOT deleted) | `false` |
-| `WEBDAV_EXCLUDE_MUSIC` | `webdav.excludeMusic` | Exclude music/download dir from sync (`data/<user>/music`). When enabled, skips incremental sync & full backup (already-synced files are NOT deleted) | `false` |
-| `ENABLE_WEBPLAYER_AUTH` | `player.enableAuth` | Enable Web Player password | `false` |
-| `WEBPLAYER_PASSWORD` | `player.password` | Web Player password | `123456` |
-| `DISABLE_TELEMETRY` | `disableTelemetry` | Disable anonymous telemetry and update notifications | `false` |
-| `ENABLE_PUBLIC_USER_RESTRICTION` | `user.enablePublicRestriction` | Enable public user permission restriction (restrict upload/delete public sources) | `true` |
-| `ENABLE_PUBLIC_NON_ADMIN_LOCAL_MUSIC` | `user.enablePublicNonAdminLocalMusic` | Enable non-admin access to local music (allows non-admin public accounts to access local music) | `false` |
-| `ENABLE_PUBLIC_NON_ADMIN_BROWSER_DOWNLOAD` | `user.enablePublicNonAdminBrowserDownload` | Enable non-admin browser download (allows non-admin/public accounts to download songs via browser) | `true` |
-| `ENABLE_PUBLIC_NON_ADMIN_SERVER_CACHE` | `user.enablePublicNonAdminServerCache` | Enable non-admin server cache (allows non-admin/public accounts to cache songs on server) | `false` |
-| `ENABLE_PUBLIC_FAVORITES` | `user.enablePublicFavorites` | Enable public favorites and songs (allows guest/public to view and play public favorites) | `false` |
-| `ENABLE_PUBLIC_NON_ADMIN_ACCESS` | `user.enablePublicNonAdminAccess` | Enable non-admin access to public favorites & songs (allows non-admin public accounts to view) | `false` |
-| `ENABLE_CUSTOM_MUSIC_DIR` | `user.enableCustomMusicDir` | Enable custom music directories feature globally | `false` |
-| `ENABLE_LOGIN_USER_CACHE_RESTRICTION` | `user.enableLoginCacheRestriction` | Enable cache settings restriction for logged-in non-admin users | `false` |
-| `ENABLE_CACHE_SIZE_LIMIT` | `user.enableCacheSizeLimit` | Enable cache size limit (auto-cleanup via LRU) | `false` |
-| `CACHE_SIZE_LIMIT` | `user.cacheSizeLimit` | Cache size limit in MB | `2000` |
-| `CONFIG_BACKUP_ENABLE` | `configBackup.enable` | Enable automatic config.js backup (creates daily backup copy) | `true` |
-| `CONFIG_BACKUP_RETENTION_DAYS` | `configBackup.retentionDays` | Config backup retention period in days (auto cleans up expired backups) | `7` |
-| `CONFIG_BACKUP_DIR` | `configBackup.dir` | Custom storage directory for config backups (absolute or relative to `./data`) | `backups` |
-| `SNAPSHOT_BACKUP_PATH` | `snapshot.backupPath` | Custom storage path for playlist snapshots (absolute or relative to `./data`) | - |
-| `LIST_ADD_MUSIC_LOCATION_TYPE` | `list.addMusicLocationType` | Position when adding songs to list (`top` / `bottom`) | `top` |
-| `PROXY_ALL_ENABLED` | `proxy.all.enabled` | Enable outgoing request proxy (for Music SDK) | `false` |
-| `PROXY_ALL_ADDRESS` | `proxy.all.address` | Proxy address (supports http:// or socks5://) | - |
-| `SINGER_SOURCE_PRIORITY` | `singer.sourcePriority` | Singer info retrieval priority (e.g., `tx,wy` or `wy,tx`) | `tx,wy` |
-| `SUBSONIC_ENABLE` | `subsonic.enable` | Enable Subsonic API support | `true` |
-| `SUBSONIC_PATH` | `subsonic.path` | Subsonic API access path (default `/rest`) | `/rest` |
-| `SUBSONIC_PORT` | `subsonic.port` | Standalone port for Subsonic (`0` means disabled, shares main port) | `0` |
-| `SUBSONIC_ENABLE_DEBUG` | `subsonic.enableDebug` | Enable Subsonic debug log mode | `false` |
-| `SUBSONIC_ONLINE_SEARCH` | `subsonic.onlineSearch` | Enable Subsonic online search | `true` |
-| `SUBSONIC_ONLINE_SEARCH_MODE` | `subsonic.onlineSearchMode` | Subsonic online search mode (`fallback` / `merge` / `local_only`) | `fallback` |
-| `SUBSONIC_ONLINE_SEARCH_SOURCES` | `subsonic.onlineSearchSources` | Subsonic online search default platforms | `wy,tx,kw,kg,mg` |
-| `SUBSONIC_PUBLIC_LEADERBOARDS` | `subsonic.publicLeaderboards` | Enable Subsonic public leaderboards (map online charts to read-only playlists) | `true` |
-| `SUBSONIC_LEADERBOARD_SOURCE` | `subsonic.leaderboardSource` | Subsonic public leaderboard default platform (single platform, e.g., `tx`, `wy`) | `tx` |
-| `SUBSONIC_LYRIC_TRANSLATION` | `subsonic.lyricTranslation` | Include translations in Subsonic lyrics | `true` |
-| `SUBSONIC_CACHE_ON_PLAY` | `subsonic.cacheOnPlay` | Trigger server caching on Subsonic playback (cached to user dir) | `false` |
-| `SUBSONIC_PLAY_CACHE_FIRST` | `subsonic.playCacheFirst` | Prefer streaming local cached/downloaded files on Subsonic playback | `true` |
-| `SUBSONIC_QUALITY_ENABLED` | `subsonic.quality.enabled` | Enable Subsonic audio quality selection | `true` |
-| `SUBSONIC_QUALITY_PRIORITY` | `subsonic.quality.priority` | Subsonic audio quality priority order (e.g. `flac,320k,128k`) | `flac,320k,128k` |
-| `ARTIST_MAX_FETCH_PAGES` | `artist.maxFetchPages` | Maximum fetch pages for artist tracks | `20` |
-| `CACHE_NAMING_PATTERN` | `cache.namingPattern` | Cache file naming rule (`simple` / `custom`) | `simple` |
-| `SYSTEM_ALLOW_UNSAFE_VM` | `system.allowUnsafeVM` | Allow VM mode custom source scripts (note security risks) | `false` |
-| `LX_USER_<username>` | `users` array | Quickly add a user, value is the password (e.g., `LX_USER_test=123`) | - |
-
-> **Advanced User Configuration Note**: The environment variable `LX_USER_<username>` is only used to quickly add users and set passwords. If you need to configure independent advanced options for specific users (such as enabling personal custom music directories, assigning operation permissions `allowOperateCustomMusicDir` or write permissions `allowWriteCustomMusicDir`, adjusting snapshot counts, etc.), please manually configure the corresponding fields for that user in the `users` array within `config.js`, or modify them through the GUI in the admin panel's User Management section.
-
-> **Boolean Environment Variable Format**: All boolean env variables support flexible case-insensitive formats: `true`/`1`/`yes`/`y`/`on` for enabled, and `false`/`0`/`no`/`n`/`off` for disabled.
-
-> **Note**: The service currently supports two types of sync connection URLs: `Root Path` (URL configuration is `ip:port`) and `User Path` (URL configuration is `ip:port/username`). If the User Path is disabled, all sync user passwords must be completely unique.
-
----
-
-## 🛡️ Data Collection & Privacy
-
-Anonymous telemetry via PostHog is used for:
-
-1. **Bug Tracking**: Version number and environment type.
-2. **Notifications**: **Update alerts** and **maintenance notices**.
-
-- **Totally Anonymous**: No IP, username, or playlist content is collected.
-- **How to Disable**: Set `DISABLE_TELEMETRY=true`. **Note: Disabling this prevents receiving update notifications.**
-
----
-
-## 🤝 Credits & Acknowledgements
-
-- Forked from [lyswhut/lx-music-sync-server](https://github.com/lyswhut/lx-music-sync-server).
-- Web player logic inspired by [lx-music-desktop](https://github.com/lyswhut/lx-music-desktop).
-- API based on `musicsdk`.
-
-### 👥 Contributors
-
-<a href="https://github.com/xcq0607/lxserver/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=xcq0607/lxserver" />
-</a>
-
-## 📈 Star History
-
-
-<a href="https://gitdata.xuanhun520.com/?repos=xcq0607/lxserver&type=Date">
-<picture >
-  <source media="(prefers-color-scheme: dark) and (max-width: 800px)" srcset="https://gitdata.xuanhun520.com/api/starimg?repos=xcq0607/lxserver&type=Date&theme=dark" />
-  <source  media="(prefers-color-scheme: light) and (max-width: 800px)" srcset="https://gitdata.xuanhun520.com/api/starimg?repos=xcq0607/lxserver&type=Date&theme=light" />
-  <img style="width: 800px; height: 533px;" alt="Star History Chart" src="https://gitdata.xuanhun520.com/api/starimg?repos=xcq0607/lxserver&type=Date&theme=dark" />
-</picture>
-</a>
-
-
----
-
-## 📄 License
-
-This project is released under the Apache License 2.0. The following agreement is a supplement to the Apache License 2.0. In case of conflict, this agreement shall prevail.
-
-Apache License 2.0 copyright (c) 2026 [xcq0607](https://github.com/xcq0607)
-
-**Terminology**: "This Project" refers to LX Music Web Player; "User" refers to the user who agrees to this agreement; "Official Music Platforms" refers to the collective official platforms of the music sources built into this project, including Kuwo, Kugou, Migu, etc.; "Copyrighted Data" refers to data owned by others, including but not limited to images, audio, names, etc.
-
-### I. Data Sources
-
-1. **Official Platforms**: The online data from various official platforms in this project is pulled from their public servers. It is displayed after simple filtering and merging (the same as the data obtained from official apps in an unlogged state). Therefore, this project is not responsible for the legality or accuracy of the data.
-2. **Audio Data**: This project itself does not have the ability to obtain specific audio data. The online audio data sources used come from the online links returned by the "Source" selected in the "Custom Source" settings. This project cannot verify its accuracy, and playback abnormalities may occur during use.
-3. **Other Data**: Non-official platform data in this project (such as lists in "My List") comes from server-stored data. This project is not responsible for the legality or accuracy of this data.
-
-### II. Disclaimer
-
-1. **Copyrighted Data**: Copyrighted data may be generated during the use of this project. This project does not own ownership of this copyrighted data. To avoid infringement, users must clear the copyrighted data generated during the use of this project within **24 hours**.
-2. **Liability**: Any direct, indirect, special, incidental, or consequential damages of any nature arising from this agreement or from the use or inability to use this project are the responsibility of the user.
-3. **Laws and Regulations**: This project is completely free and open-sourced on GitHub for technical learning and exchange. Use of this project in violation of local laws and regulations is **PROHIBITED**. The user shall bear full responsibility for any illegal or non-compliant behavior caused by using this project, whether the user is aware of local laws and regulations or not.
-
-### III. Miscellaneous
-
-1. **Resource Usage**: Some resources used in this project, including but not limited to fonts and images, come from the internet. If there is any infringement, please contact this project for removal.
-2. **Non-Commercial Nature**: This project is only for technical feasibility exploration and research. It does not accept any commercial cooperation (including but not limited to advertising) or donations.
-3. **Acceptance of Agreement**: If you use this project, it means you accept this agreement.
+Licensed under [Apache-2.0](LICENSE). Project origins and acknowledgements are listed in the application's About settings; historical documentation is retained in [README_UPSTREAM.md](README_UPSTREAM.md).

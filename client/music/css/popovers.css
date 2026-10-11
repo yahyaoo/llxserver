@@ -1,0 +1,11 @@
+/** 弹出菜单保持实色主题背景，不继承页面透明度与毛玻璃设置。 @author jingyh @date 2026-10-10 */
+:root:root:root:root :is(.header-dropdown-panel, .library-search-results, .cs-dropdown, .player-popover,
+    .playlist-actions-menu, [role="menu"], #tag-selector-popup, #search-suggestions,
+    #play-mode-menu, #playback-rate-menu, #interval-popover-panel) {
+    --surface-opacity: 1;
+    --surface-blur: 0px;
+    background: var(--bg-panel) !important;
+    color: var(--text-main);
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}

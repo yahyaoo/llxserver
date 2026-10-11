@@ -1,0 +1,96 @@
+name: Build Snapshot Test Packages
+
+on:
+  push:
+    tags:
+      - 'v*-snapshot.*'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: snapshot-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  packages:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout snapshot tag
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify snapshot source
+        env:
+          SNAPSHOT_TAG: ${{ github.ref_name }}
+          SNAPSHOT_SHA: ${{ github.sha }}
+        run: |
+          [[ "$SNAPSHOT_TAG" == v*-snapshot.* ]]
+          test "$(git rev-parse HEAD)" = "$SNAPSHOT_SHA"
+          node -e 'const p = require("./package.json"); if (!process.env.SNAPSHOT_TAG.startsWith("v" + p.version + "-snapshot.")) throw new Error("标签与源码版本不一致")'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install dependencies
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm rebuild better-sqlite3
+
+      - name: Build current source
+        run: npm run build
+
+      - name: Unit tests
+        run: npm run test:unit
+
+      - name: HTTP, SQLite and ZIP system tests
+        run: npm run test:system
+
+      - name: FPK packaging tests
+        run: npm run test:fpk
+
+      - name: Download verified official fnpack
+        run: |
+          curl --fail --location --retry 3 https://static2.fnnas.com/fnpack/fnpack-1.2.3-linux-amd64 -o "$RUNNER_TEMP/fnpack"
+          echo "54b97fa7b70968c4d05c79840f5daeff508957d0bb2062fdb0376d00d9615c93  $RUNNER_TEMP/fnpack" | sha256sum --check
+          chmod +x "$RUNNER_TEMP/fnpack"
+          echo "FNPACK_BIN=$RUNNER_TEMP/fnpack" >> "$GITHUB_ENV"
+
+      - name: Package all deployment modes
+        run: |
+          for mode in all server client; do
+            node deploy/scripts/package.cjs "$mode"
+            node -e 'const path = require("node:path"); const { preparePayload, ROOT } = require("./deploy/fnos/scripts/build.js"); const mode = process.argv[1]; preparePayload(ROOT, path.join(ROOT, "deploy/fnos", "llxserver." + mode), mode)' "$mode"
+            node deploy/fnos/scripts/package.js "$mode"
+          done
+
+      - name: Actual FPK system tests
+        run: npm run test:fpk:system
+
+      - name: Collect snapshot packages and checksums
+        env:
+          SNAPSHOT_TAG: ${{ github.ref_name }}
+          SNAPSHOT_SHA: ${{ github.sha }}
+        run: |
+          mkdir -p output/snapshot
+          for mode in all server client; do
+            cp "output/llxserver-$mode.zip" "output/snapshot/llxserver-$mode-$SNAPSHOT_TAG.zip"
+          done
+          for app in llxserver.all llxserver.server llxserver.client; do
+            cp "deploy/fnos/dist/$app.fpk" "output/snapshot/$app-$SNAPSHOT_TAG.fpk"
+          done
+          printf 'channel=snapshot\ntag=%s\ncommit=%s\nrun=https://github.com/%s/actions/runs/%s\n' "$SNAPSHOT_TAG" "$SNAPSHOT_SHA" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" > output/snapshot/BUILD_INFO.txt
+          (cd output/snapshot && sha256sum *.zip *.fpk BUILD_INFO.txt > SHA256SUMS && sha256sum --check SHA256SUMS)
+
+      - name: Upload snapshot test packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: llxserver-${{ github.ref_name }}-test-packages
+          path: output/snapshot/*
+          if-no-files-found: error
+          retention-days: 30

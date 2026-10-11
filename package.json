@@ -1,32 +1,48 @@
 {
-  "name": "lx-music-sync-server",
-  "version": "2.1.3",
+  "name": "llxserver",
+  "version": "2.1.4",
   "private": true,
   "scripts": {
-    "prebuild": "node scripts/update-build-hash.js",
-    "build": "rimraf server && tsc --project tsconfig.json && tsc-alias -p tsconfig.json",
+    "prebuild": "node deploy/scripts/update-build-hash.js",
+    "build": "npm run build:server && npm run build:client",
     "test": "node --test test/*.test.cjs",
-    "test:unit": "node --test test/appUpdates.test.cjs test/downloadAuth.test.cjs test/serverDownloads.test.cjs test/settingsFrontend.test.cjs",
-    "test:system": "node --test test/serverDownloads.system.test.cjs",
-    "test:fpk:system": "node --test fnos/test/fpk.system.test.cjs",
-    "prestart": "node scripts/update-build-hash.js",
-    "download:fpcalc": "node scripts/download-binary.js",
+    "test:mobile": "node --test test/mobileShell.test.cjs",
+    "test:layout": "node --test test/dialogChrome.test.cjs test/mobileShell.test.cjs",
+    "test:unit": "node --test test/leaderboardFrontend.test.cjs test/appUpdates.test.cjs test/downloadAuth.test.cjs test/downloadsFrontend.test.cjs test/serverDownloads.test.cjs test/settingsFrontend.test.cjs test/playerBar.test.cjs test/playerDetail.test.cjs test/playerFeaturePages.test.cjs test/mobileSongMenu.test.cjs test/soundEffectsSession.test.cjs test/playbackExperience.test.cjs test/lyricSettings.test.cjs test/configurationImport.test.cjs test/sqliteStorage.test.cjs test/sqliteBackup.test.cjs test/browserStorage.test.cjs test/routeRefactor.test.cjs test/sqliteFileManager.test.cjs test/sqliteConfiguration.test.cjs test/systemConfigurationFrontend.test.cjs test/deployment.test.cjs test/desktop.test.cjs test/theme.test.cjs test/batchPagination.test.cjs test/musicExperience.test.cjs test/musicExperienceFrontend.test.cjs test/accountLogin.test.cjs test/songActions.test.cjs test/favoriteStorage.test.cjs test/songMetadata.test.cjs test/playlistImport.test.cjs test/navigationBehavior.test.cjs test/settingsToggle.test.cjs test/songFileStatus.test.cjs test/songFileStatusFrontend.test.cjs test/songFileStatusSources.test.cjs test/userInitialization.test.cjs test/elementControls.test.cjs test/playlistCover.test.cjs test/playlistStorage.test.cjs test/songArtwork.test.cjs test/songArtworkCache.test.cjs",
+    "test:system": "node --test test/leaderboard.system.test.cjs test/serverDownloads.system.test.cjs test/sqliteMigration.system.test.cjs test/systemConfiguration.system.test.cjs test/deployment.system.test.cjs test/musicExperience.system.test.cjs test/accountLogin.system.test.cjs test/songActions.system.test.cjs test/favorites.system.test.cjs test/playlistImport.system.test.cjs test/songFileStatus.system.test.cjs test/userInitialization.system.test.cjs test/playlistCover.system.test.cjs test/playlistStorage.system.test.cjs test/songArtwork.system.test.cjs",
+    "test:fpk:system": "node --test deploy/fnos/test/fpk.system.test.cjs",
+    "prestart": "node deploy/scripts/update-build-hash.js",
+    "download:fpcalc": "node deploy/scripts/download-binary.js",
     "start": "node ./index.js",
-    "predev": "node scripts/update-build-hash.js",
+    "predev": "node deploy/scripts/update-build-hash.js",
     "dev": "nodemon",
-    "predev1": "node scripts/update-build-hash.js",
-    "dev1": "nodemon --exec \"tsx --inspect=127.0.0.1:9301 ./src/index.ts\"",
-    "predev2": "node scripts/update-build-hash.js",
-    "dev2": "nodemon --exec \"cmd /c start /affinity 1 /b /wait tsx --inspect=127.0.0.1:9302 ./src/index.ts\"",
-    "prd": "pm2 start ecosystem.config.js --env production",
+    "predev1": "node deploy/scripts/update-build-hash.js",
+    "dev1": "nodemon --exec \"tsx --inspect=127.0.0.1:9301 ./server/index.ts\"",
+    "predev2": "node deploy/scripts/update-build-hash.js",
+    "dev2": "nodemon --exec \"cmd /c start /affinity 1 /b /wait tsx --inspect=127.0.0.1:9302 ./server/index.ts\"",
+    "prd": "pm2 start deploy/node/ecosystem.config.cjs --env production",
     "publish": "node publish",
     "electron:build": "npm run build",
-    "electron:dist": "npm run electron:build && electron-builder",
+    "electron:dist": "npm run electron:build && node deploy/scripts/desktop.cjs all",
     "prepare": "husky || true",
-    "build:fpk": "node fnos/scripts/build.js && node fnos/scripts/package.js",
-    "prepare:fpk": "node fnos/scripts/build.js",
-    "package:fpk": "node fnos/scripts/package.js",
-    "test:fpk": "node --test fnos/scripts/*.test.cjs"
+    "build:fpk": "node deploy/fnos/scripts/build.js && node deploy/fnos/scripts/package.js",
+    "prepare:fpk": "node deploy/fnos/scripts/build.js",
+    "package:fpk": "node deploy/fnos/scripts/package.js",
+    "test:fpk": "node --test deploy/fnos/scripts/*.test.cjs",
+    "build:server": "rimraf dist/server && tsc --project tsconfig.json && tsc-alias -p tsconfig.json && node deploy/scripts/copy-sql.js && node deploy/scripts/client-metadata.cjs",
+    "build:client": "node deploy/scripts/build-client.cjs",
+    "build:bundle": "npm run build && node deploy/scripts/package.cjs all",
+    "package:all": "node deploy/scripts/package.cjs all",
+    "package:server": "node deploy/scripts/package.cjs server",
+    "package:client": "node deploy/scripts/package.cjs client",
+    "start:client": "node deploy/client/gateway.cjs",
+    "build:icons": "node deploy/scripts/brand-assets.cjs",
+    "prebuild:server": "node deploy/scripts/update-build-hash.js",
+    "electron:dist:server": "npm run build && node deploy/scripts/desktop.cjs server",
+    "build:fpk:server": "node deploy/fnos/scripts/build.js server && node deploy/fnos/scripts/package.js server",
+    "electron:dist:client": "npm run build && node deploy/scripts/desktop.cjs client",
+    "build:fpk:client": "node deploy/fnos/scripts/build.js client && node deploy/fnos/scripts/package.js client",
+    "test:desktop:system": "node --test test/desktop.system.test.cjs"
   },
   "engines": {
     "node": ">= 20",
@@ -34,21 +50,21 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/yahyaoo/fn-lxserver.git"
+    "url": "git+https://github.com/yahyaoo/llxserver.git"
   },
   "author": {
-    "name": "XCQ",
-    "email": "2406498704@qq.com"
+    "name": "yahyaoo"
   },
   "license": "Apache-2.0",
   "bugs": {
-    "url": "https://github.com/yahyaoo/fn-lxserver/issues"
+    "url": "https://github.com/yahyaoo/llxserver/issues"
   },
-  "homepage": "https://github.com/yahyaoo/fn-lxserver#readme",
+  "homepage": "https://github.com/yahyaoo/llxserver#readme",
   "dependencies": {
     "@foobar404/wave": "^2.0.5",
     "@types/formidable": "^3.5.1",
     "archiver": "^8.0.0",
+    "better-sqlite3": "12.11.1",
     "brace-expansion": "^5.0.12",
     "bufferutil": "^4.0.8",
     "crypto-js": "^4.2.0",
@@ -60,6 +76,7 @@
     "module-alias": "^2.3.4",
     "music-tag-native": "0.2.5",
     "needle": "^3.3.1",
+    "sharp": "^0.35.5",
     "socks-proxy-agent": "^10.1.0",
     "tunnel": "^0.0.6",
     "unzipper": "^0.12.5",
@@ -79,13 +96,13 @@
     "@types/tunnel": "^0.0.7",
     "@types/unzipper": "^0.10.11",
     "@types/ws": "8.18.2",
+    "acorn": "8.18.0",
     "changelog-parser": "^4.1.0",
     "electron": "^43.7.5",
     "electron-builder": "^26.15.3",
     "husky": "^9.1.7",
     "nodemon": "^3.1.14",
     "rimraf": "^5.0.5",
-    "sharp": "^0.35.5",
     "stylelint": "^17.16.0",
     "stylelint-config-standard": "^40.0.0",
     "ts-node": "^10.9.2",
@@ -101,6 +118,8 @@
       "logs/",
       "config.js"
     ],
-    "exec": "npx tsx ./src/index.ts"
-  }
+    "exec": "npx tsx ./server/index.ts"
+  },
+  "description": "洛洛雪音乐 · 网页播放器与音乐同步服务",
+  "main": "index.js"
 }

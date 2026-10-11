@@ -1,0 +1,14 @@
+{
+    "data-share": {
+        "shares": [
+            {
+                "name": "llxserver.server",
+                "permission": {
+                    "rw": [
+                        "llxserver.server"
+                    ]
+                }
+            }
+        ]
+    }
+}

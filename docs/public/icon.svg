@@ -1,3 +1,20 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#4a90e2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M9 18V5l12-2v13M6 15v8m6-8v8" />
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">洛洛雪音乐 llxserver</title>
+  <desc id="desc">双 L 与音符构成的白色标识，樱花粉渐变底色和雪星。</desc>
+  <defs>
+    <linearGradient id="base" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#f9a8d4"/><stop offset=".48" stop-color="#ec4899"/><stop offset="1" stop-color="#db2777"/></linearGradient>
+    <linearGradient id="glass" x1="0" y1="0" x2="0" y2="1"><stop stop-color="white" stop-opacity=".26"/><stop offset="1" stop-color="white" stop-opacity="0"/></linearGradient>
+  </defs>
+  <rect x="16" y="16" width="480" height="480" rx="126" fill="url(#base)"/>
+  <rect x="28" y="28" width="456" height="456" rx="116" fill="none" stroke="white" stroke-opacity=".23" stroke-width="2"/>
+  <path d="M40 254C110 20 310 15 473 150V28H28v226Z" fill="url(#glass)"/>
+  <g fill="none" stroke="white" stroke-width="27" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M158 177v155h77"/>
+    <path d="M246 157v126h64"/>
+    <path d="M328 294V147l63-17v132"/>
+  </g>
+  <ellipse cx="309" cy="301" rx="33" ry="25" transform="rotate(-18 309 301)" fill="white"/>
+  <ellipse cx="372" cy="270" rx="33" ry="25" transform="rotate(-18 372 270)" fill="white"/>
+  <g stroke="white" stroke-linecap="round" stroke-width="8"><path d="M115 98v28m-14-14h28"/><path d="M378 365v22m-11-11h22"/></g>
+  <g fill="white" opacity=".45"><circle cx="107" cy="279" r="5"/><circle cx="289" cy="104" r="4"/><circle cx="237" cy="392" r="5"/></g>
 </svg>

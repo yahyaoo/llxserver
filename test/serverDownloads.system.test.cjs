@@ -1,4 +1,4 @@
-/** 完整服务器接口测试：临时配置、真实队列、源解析、文件与重启恢复。 @author jingyh */
+/** 完整服务器接口测试：临时配置、真实队列、源解析、文件与重启恢复。 @author yahyaoo */
 const { test } = require('node:test')
 const assert = require('node:assert/strict')
 const fs = require('node:fs')
@@ -8,6 +8,9 @@ const http = require('node:http')
 const { spawn } = require('node:child_process')
 const vm = require('node:vm')
 const project = path.resolve(__dirname, '..')
+const currentVersion = require('../package.json').version
+const nextVersion = currentVersion.split('.').map((part, index) => Number(part) + (index === 2 ? 1 : 0)).join('.')
+require('tsx/cjs')
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
 const frame = Buffer.alloc(417)
 Buffer.from([255, 251, 144, 100]).copy(frame)
@@ -23,7 +26,7 @@ test('完整接口：配置持久化、队列下载、本地播放、缓存绝�
       updateRequests++
       assert.equal(req.headers.authorization, 'token system-test-token')
       res.setHeader('Content-Type', 'application/json')
-      res.end(JSON.stringify({ tag_name: 'v2.1.4', html_url: 'https://example.com/release', body: '系统测试发布说明' }))
+      res.end(JSON.stringify({ tag_name: 'v' + nextVersion, html_url: 'https://example.com/release', body: '系统测试发布说明' }))
       return
     }
     audioRequests++; res.writeHead(200, { 'Content-Length': audio.length }); res.end(audio)
@@ -42,6 +45,12 @@ test('完整接口：配置持久化、队列下载、本地播放、缓存绝�
     'user.enablePublicRestriction': true, 'user.enablePublicNonAdminServerCache': false,
     disableTelemetry: true, users: [{ name: 'admin', password: 'lx-user-test', allowWriteCustomMusicDir: true }, { name: 'alice', password: 'lx-alice-test' }], 'configBackup.enable': false,
   }))
+  // 业务配置仅保存在 SQLite，旧 JS 文件不会在启动时自动导入。
+  const { createAdminRepository } = require('../server/admin/repository/AdminRepository.ts')
+  const { GlobalConfigurationService } = require('../server/admin/service/GlobalConfigurationService.ts')
+  const repository = createAdminRepository(data)
+  new GlobalConfigurationService(repository).save(configFile, require(configFile))
+  repository.close()
   const srcDir = path.join(data, 'users/source/_open')
   fs.mkdirSync(srcDir, { recursive: true })
   fs.writeFileSync(path.join(srcDir, 'fixture.js'), `/** @name 系统测试源 */
@@ -49,40 +58,58 @@ test('完整接口：配置持久化、队列下载、本地播放、缓存绝�
     lx.send(lx.EVENT_NAMES.inited, { sources: { wy: { name: '系统测试源', type: 'music', actions: ['musicUrl'], qualitys: ['320k'] } } });`)
   fs.writeFileSync(path.join(srcDir, 'sources.json'), JSON.stringify([{ id: 'fixture.js', name: '系统测试源', enabled: true }]))
   // 仅测试启动跳过 SDK 外网预热；下载仍通过真实源脚本与队列解析。
-  const bootstrap = `require(${JSON.stringify(path.join(project, 'server/modules/utils/musicSdk/index.js'))}).default.init = async () => {}; require(${JSON.stringify(path.join(project, 'index.js'))});`
+  const bootstrap = `require(${JSON.stringify(path.join(project, 'server/modules/utils/musicSdk/index.js'))}).default.init = async () => {}; require(${JSON.stringify(path.join(project, 'server/index.ts'))});`
   const start = async () => {
-    child = spawn(process.execPath, ['-e', bootstrap], { cwd: project, windowsHide: true, env: {
+    child = spawn(process.execPath, ['-r', 'tsx/cjs', '-e', bootstrap], { cwd: project, windowsHide: true, env: {
       ...process.env, PORT: String(port), BIND_IP: '127.0.0.1', DATA_PATH: data, LOG_PATH: path.join(root, 'logs'),
-      CONFIG_PATH: configFile, STATIC_PATH: path.join(project, 'public'), DISABLE_TELEMETRY: 'true', NODE_ENV: 'production',
+      CONFIG_PATH: configFile, STATIC_PATH: path.join(project, 'client'), DISABLE_TELEMETRY: 'true', NODE_ENV: 'production',
     } })
     child.stdout.on('data', b => { logs += b })
     child.stderr.on('data', b => { logs += b })
     for (let i = 0; i < 100; i++) {
       if (child.exitCode !== null) throw new Error('服务器启动失败：' + logs.slice(-3000))
-      try { if ((await fetch(origin + '/api/config', { headers: admin })).ok) return } catch {}
+      try { const loggedIn = await fetch(origin + '/api/login', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ password: 'lx-system-test' }) }); if (loggedIn.ok) { admin['x-admin-token'] = (await loggedIn.json()).token; return } } catch {}
       await sleep(100)
     }
     throw new Error('服务器启动超时：' + logs.slice(-3000))
   }
   const stop = async () => { if (child && child.exitCode === null) { const exited = new Promise(resolve => child.once('exit', resolve)); child.kill(); await exited } }
+  const musicFetch = (url, options = {}) => fetch(url, { ...options, headers: { ...admin, ...options.headers } })
   const post = (route, body, headers = admin) => fetch(origin + route, { method: 'POST', headers, body: JSON.stringify(body) })
   try {
     await start()
-    const disabled = await (await fetch(origin + '/api/app/update/check')).json()
+    // 真实静态资源路由：设置工作区和主题导航无需构建即可刷新生效。
+    const loginResponse = await post('/api/user/login', { username: 'admin', password: 'lx-user-test' }, { 'Content-Type': 'application/json' })
+    assert.equal(loginResponse.status, 200)
+    const playerHeaders = { Cookie: loginResponse.headers.get('set-cookie').split(';')[0] }
+    const playerPage = await fetch(origin + '/music/', { headers: playerHeaders })
+    assert.equal(playerPage.status, 200)
+    const playerHtml = await playerPage.text()
+    assert.ok(playerHtml.includes('views/settings/SettingsView.js'))
+    assert.ok(playerHtml.includes('components/top-bar/index.js'))
+    const actions = await fetch(origin + '/music/components/top-bar/AccountActions.js', { headers: playerHeaders })
+    assert.equal(actions.status, 200)
+    assert.ok((await actions.text()).includes('id="header-theme-menu"'))
+    for (const resource of ['/music/views/settings/settings.css', '/music/views/settings/SettingsNavigation.js', '/music/views/settings/SettingsView.js', '/music/views/settings/index.js']) {
+      const response = await fetch(origin + resource, { headers: playerHeaders })
+      assert.equal(response.status, 200, resource)
+      assert.ok((await response.text()).length > 100)
+    }
+    const disabled = await (await fetch(origin + '/api/app/update/check', { headers: admin })).json()
     assert.equal(disabled.enabled, false)
     assert.equal(updateRequests, 0)
     const updateServer = fixtureUrl.replace('/audio', '/latest')
     assert.equal((await post('/api/config', { 'update.enabled': true, 'update.server': 'file:///bad' })).status, 400)
     assert.equal((await post('/api/config', { 'update.enabled': true, 'update.server': updateServer, 'update.token': 'system-test-token' })).status, 200)
-    const updated = await (await fetch(origin + '/api/app/update/check')).json()
+    const updated = await (await fetch(origin + '/api/app/update/check', { headers: admin })).json()
     assert.equal(updated.hasUpdate, true)
-    assert.equal(updated.currentVersion, '2.1.3')
+    assert.equal(updated.currentVersion, currentVersion)
     assert.equal(updateRequests, 1)
     assert.equal(JSON.stringify(await (await fetch(origin + '/api/config', { headers: admin })).json()).includes('system-test-token'), false)
     assert.equal((await fetch(origin + '/js/config.js')).status, 200)
     assert.equal((await (await fetch(origin + '/js/config.js')).text()).includes('system-test-token'), false)
     assert.equal((await post('/api/config', { 'update.enabled': false, 'update.token': '' })).status, 200)
-    assert.equal((await (await fetch(origin + '/api/app/update/check')).json()).enabled, false)
+    assert.equal((await (await fetch(origin + '/api/app/update/check', { headers: admin })).json()).enabled, false)
     assert.equal(updateRequests, 1)
     assert.equal((await fetch(origin + '/api/config')).status, 401)
     assert.equal((await post('/api/config', { 'download.directory': '../bad' })).status, 400)
@@ -100,7 +127,7 @@ test('完整接口：配置持久化、队列下载、本地播放、缓存绝�
     let cached
     const cacheParams = new URLSearchParams({ name: songInfo.name, singer: songInfo.singer, source: 'wy', songmid: '88888', quality: '320k' })
     for (let i = 0; i < 100; i++) {
-      cached = await (await fetch(origin + '/api/music/cache/check?' + cacheParams)).json()
+      cached = await (await musicFetch(origin + '/api/music/cache/check?' + cacheParams)).json()
       if (cached.exists) break
       await sleep(100)
     }
@@ -109,7 +136,7 @@ test('完整接口：配置持久化、队列下载、本地播放、缓存绝�
     const lyric = '[00:00.00]系统测试中文歌词\n[00:01.00]外部 LRC 验证'
     assert.equal((await post('/api/music/cache/lyric', { songInfo, lyricsObj: { lyric } })).status, 200)
     const tasks = [{ id: 'download_system', songInfo, quality: '320k', serverDownload: true, lyricMode: 'external' }]
-    assert.equal((await post('/api/music/cache/queue', { tasks }, { 'Content-Type': 'application/json' })).status, 403)
+    assert.equal((await post('/api/music/cache/queue', { tasks }, { 'Content-Type': 'application/json' })).status, 401)
     assert.equal((await post('/api/music/cache/queue', { tasks })).status, 200)
     let completed
     for (let i = 0; i < 100; i++) {
@@ -123,18 +150,18 @@ test('完整接口：配置持久化、队列下载、本地播放、缓存绝�
     assert.ok(fs.readdirSync(directory).includes('系统测试歌曲 - 测试歌手 - 320k - Unknown Album.mp3'), '空模板沿用当前歌曲命名方式')
     assert.ok(fs.readdirSync(directory).some(f => f.endsWith('.lrc')))
     const checkUrl = '/api/music/server-download/check?source=wy&songmid=88888&quality=320k'
-    const found = await (await fetch(origin + checkUrl)).json()
+    const found = await (await musicFetch(origin + checkUrl)).json()
     assert.equal(found.exists, true)
     const count = audioRequests
-    const playback = await fetch(origin + found.url, { headers: { Range: 'bytes=0-99' } })
+    const playback = await musicFetch(origin + found.url, { headers: { Range: 'bytes=0-99' } })
     assert.equal(playback.status, 206)
     assert.equal((await playback.arrayBuffer()).byteLength, 100)
     assert.equal(audioRequests, count)
-    assert.equal((await fetch(origin + found.url.replace('username=_open', 'username=other'))).status, 401)
-    const storedLyric = await (await fetch(origin + '/api/music/lyric?source=wy&songmid=88888')).json()
+    assert.equal((await musicFetch(origin + found.url.replace('username=_open', 'username=other'))).status, 401)
+    const storedLyric = await (await musicFetch(origin + '/api/music/lyric?source=wy&songmid=88888')).json()
     assert.equal(storedLyric.lyric, lyric)
     await stop(); await start()
-    const restored = await (await fetch(origin + checkUrl)).json()
+    const restored = await (await musicFetch(origin + checkUrl)).json()
     assert.equal(restored.exists, true)
     const restoredDirs = await (await fetch(origin + '/api/music/cache/directories', { headers: admin })).json()
     assert.equal(restoredDirs.data.cacheDirectory, path.join(cacheDirectory, 'cache', '_open'))
@@ -142,18 +169,29 @@ test('完整接口：配置持久化、队列下载、本地播放、缓存绝�
     await sleep(200)
     assert.equal(audioRequests, count)
 
-    // 使用播放器实际续签及请求函数，复现服务重启导致登录 Token 失效。
-    const store = new Map([['lx_sync_user', 'admin'], ['lx_sync_pass', 'lx-user-test'], ['lx_user_token', 'expired-before-restart'], ['lx_admin_password', 'lx-system-test']])
+    // 已失效会话不能用保存的密码自动续签；重新登录后可恢复下载。
+    const store = new Map([['lx_sync_user', 'admin'], ['lx_user_token', 'expired-before-restart'], ['lx_admin_password', 'lx-system-test']])
     const context = vm.createContext({ window: {}, console, fetch: (url, options) => fetch(origin + url, options),
       localStorage: { getItem: key => store.get(key) || null, setItem: (key, value) => store.set(key, value), removeItem: key => store.delete(key) } })
-    const frontend = fs.readFileSync(path.join(project, 'public/music/app.js'), 'utf8')
+    let redirected = false
+    context.window.AccountSession = {
+      getToken: () => store.get('lx_user_token'),
+      verify: async () => { const response = await fetch(origin + '/api/user/auth/verify', { headers: { 'x-user-token': store.get('lx_user_token') } }); const result = await response.json(); return result.valid ? result : null },
+      redirect: () => { redirected = true },
+    }
+    const frontend = fs.readFileSync(path.join(project, 'client/music/app.js'), 'utf8')
     const headersStart = frontend.indexOf('function getUserAuthHeaders()')
     vm.runInContext("let userToken = localStorage.getItem('lx_user_token');\n" + frontend.slice(headersStart, frontend.indexOf('window.getUserAuthHeaders = getUserAuthHeaders;', headersStart)), context)
-    const refreshStart = frontend.indexOf('let userTokenRefreshPromise = null;')
+    const refreshStart = frontend.indexOf('async function ensureUserAuthToken(')
     vm.runInContext(frontend.slice(refreshStart, frontend.indexOf('window.fetchDownloadWithAuth = fetchDownloadWithAuth;', refreshStart)), context)
     const namedTask = { ...tasks[0], id: 'named_download' }
     const expiredHeaders = { ...admin, 'x-user-name': 'admin', 'x-user-token': 'expired-before-restart' }
     assert.equal((await post('/api/music/cache/queue', { tasks: [namedTask] }, expiredHeaders)).status, 401)
+    await assert.rejects(() => context.fetchDownloadWithAuth('/api/music/cache/queue', { method: 'POST', body: JSON.stringify({ tasks: [namedTask] }) }), /登录已失效/)
+    assert.equal(redirected, true)
+    const renewed = await (await post('/api/user/login', { username: 'admin', password: 'lx-user-test', rememberMe: true })).json()
+    store.set('lx_user_token', renewed.token)
+    vm.runInContext("userToken = localStorage.getItem('lx_user_token')", context)
     assert.equal((await context.fetchDownloadWithAuth('/api/music/cache/queue', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tasks: [namedTask] }) })).status, 200)
     assert.notEqual(store.get('lx_user_token'), 'expired-before-restart')
     for (let i = 0; i < 100; i++) {

@@ -1,12 +1,13 @@
-/** 服务器指定目录下载的单元与真实 HTTP 文件测试。 @author jingyh */
+/** 服务器指定目录下载的单元与真实 HTTP 文件测试。 @author yahyaoo */
 const { test, before, after } = require('node:test')
 const assert = require('node:assert/strict')
 const fs = require('node:fs')
 const path = require('node:path')
 const os = require('node:os')
 const http = require('node:http')
-const downloads = require('../server/server/serverDownloads')
-const fileCache = require('../server/server/fileCache')
+const downloads = require('../dist/server/server/serverDownloads')
+const fileCache = require('../dist/server/server/fileCache')
+const { readDocument, closeStorage } = require('../dist/server/application/persistence/storage')
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'lx-download-test-'))
 const lyric = '[00:00.00]中文歌词测试\n[00:01.00]服务器下载验证'
 const frame = Buffer.alloc(417)
@@ -33,6 +34,7 @@ before(async () => {
 })
 after(async () => {
   await new Promise(resolve => server.close(resolve))
+  closeStorage(path.join(root, 'data'))
   assert.ok(root.startsWith(os.tmpdir()))
   fs.rmSync(root, { recursive: true, force: true })
 })
@@ -102,7 +104,7 @@ test('默认内嵌中文歌词，真实标签回读，无外部歌词文件', as
   await run('embedded')
   const result = downloads.check(song('embedded'), '_open', '320k', true)
   assert.equal(result.exists, true)
-  const index = JSON.parse(fs.readFileSync(path.join(root, 'data/runtime/server-downloads.json')))
+  const index = readDocument(path.join(root, 'data/runtime/server-downloads.json')).value
   const item = index.find(i => i.identity === 'wy:embedded')
   assert.equal(path.basename(item.filename), item.filename)
   const { MusicTagger } = require('music-tag-native')
@@ -115,7 +117,7 @@ test('默认内嵌中文歌词，真实标签回读，无外部歌词文件', as
 })
 test('外部 LRC 使用 UTF-8，与音频同名；重复下载不再请求音源', async () => {
   await run('external', 'external', origin + '/redirect')
-  const index = JSON.parse(fs.readFileSync(path.join(root, 'data/runtime/server-downloads.json')))
+  const index = readDocument(path.join(root, 'data/runtime/server-downloads.json')).value
   const item = index.find(i => i.identity === 'wy:external')
   assert.equal(fs.readFileSync(path.join(item.root, item.lyricFilename), 'utf8'), lyric)
   assert.equal(item.lyricFilename, item.filename.replace(/\.[^.]+$/, '.lrc'))
@@ -180,7 +182,7 @@ test('无歌词仍可下载，内嵌失败报错而不登记完成', async () =>
   downloads.initialize({ lyric: async () => lyric, embed: fileCache.embedLyricsIntoFile })
 })
 test('文件失效回退；缓存自定义绝对目录与原目录行为隔离', async () => {
-  const index = JSON.parse(fs.readFileSync(path.join(root, 'data/runtime/server-downloads.json')))
+  const index = readDocument(path.join(root, 'data/runtime/server-downloads.json')).value
   const item = index.find(i => i.identity === 'wy:no-lyric')
   fs.unlinkSync(path.join(item.root, item.filename))
   assert.equal(downloads.check(song('no-lyric'), '_open').exists, false)

@@ -1,0 +1,3 @@
+#!/bin/bash
+# 客户端升级不安装服务端依赖，保留共享空间连接配置。 @author yahyaoo
+exit 0

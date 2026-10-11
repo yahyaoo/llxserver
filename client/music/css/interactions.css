@@ -1,0 +1,117 @@
+/** 共享交互反馈：悬停轻量高亮、按下反馈和键盘焦点。 @author jingyh @date 2026-10-10 */
+:root {
+    --interaction-hover: color-mix(in srgb, var(--text-main) 6%, transparent);
+    --interaction-selected: color-mix(in srgb, var(--c-500) 12%, transparent);
+}
+/* 低优先级兜底覆盖弹窗等页面外的控件，既有按钮主题和悬停样式继续优先。 */
+:where(button, [role="button"], .cs-trigger, .cs-option, .theme-image-actions label) {
+    transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease,
+        box-shadow 160ms ease, transform 160ms ease, opacity 160ms ease;
+}
+:where(button, [role="button"]):where(:not(:disabled):hover) { background-color: var(--interaction-hover); }
+.music-shell :is(button, [role="button"], .grid.grid-cols-12, .cs-trigger),
+#main-sidebar :is(a, button, div[onclick]),
+#view-player-detail button, .cs-option {
+    transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease,
+        box-shadow 160ms ease, transform 160ms ease, opacity 160ms ease;
+}
+:root #main-navigation :is(a, div[onclick], .playlist-sidebar-item):hover,
+:root .music-shell :is(.settings-nav-item, .settings-collapse, .main-navigation-collapse, .theme-more):hover {
+    background: var(--interaction-hover) !important;
+    color: var(--c-600);
+}
+:root #main-navigation .active-tab:hover,
+:root .music-shell .settings-nav-item.is-active:hover { background: var(--interaction-selected) !important; }
+:root .music-shell #view-leaderboard .leaderboard-navigation-item:hover { background: var(--interaction-hover) !important; }
+:root .music-shell :is(.theme-option, .appearance-option):hover {
+    border-color: color-mix(in srgb, var(--c-500) 45%, var(--border-dim));
+    background: var(--interaction-hover) !important;
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--c-500) 7%, transparent);
+    transform: translateY(-1px);
+}
+:root .music-shell :is(.theme-option, .appearance-option)[data-active="true"]:hover { background: var(--interaction-selected) !important; }
+:root .music-shell :is(.theme-image-actions button, .theme-image-actions label):hover { background: var(--interaction-selected); }
+.music-shell .cs-trigger:hover { border-color: var(--c-400); }
+.music-shell button:not(:disabled):active,
+#main-sidebar :is(a, button, div[onclick]):active,
+#view-player-detail button:not(:disabled):active { transform: scale(.985); }
+.music-shell button:focus-visible,
+#main-sidebar :is(a, button, div[onclick]):focus-visible,
+#view-player-detail button:focus-visible { outline: 2px solid var(--c-500); outline-offset: 2px; }
+.music-shell button:disabled { transform: none; }
+/* 操作始终可见；窄屏允许换行，避免增加喜欢按钮后挤出歌曲行。 */
+.music-shell .song-row-actions { opacity: 1; flex-wrap: wrap; gap: .5px; row-gap: 2px; }
+.song-row-actions > button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 22px;
+    min-height: 27px;
+    padding: 4px;
+    border-radius: 8px;
+    flex-shrink: 0;
+}
+.song-row-actions > button:hover { box-shadow: inset 0 0 0 1px var(--c-400); }
+.song-row-actions > button:not(:disabled):hover > i { animation: song-action-hop 380ms ease-out; }
+/* 歌手、专辑和在线歌单卡片同样默认展示已有操作。 */
+:root .music-shell :is(button[id^="singer-fav-"], button[id^="singer-dislike-"],
+    button[id^="album-fav-"], button[id^="album-dislike-"], .artist-album-download-btn,
+    .artist-album-favorite-btn, .lib-fav-btn, .lib-album-download-btn) { opacity: 1; }
+:root .music-shell :is(button[id^="singer-fav-"], button[id^="singer-dislike-"],
+    button[id^="album-fav-"], button[id^="album-dislike-"], .artist-album-download-btn,
+    .artist-album-favorite-btn, .lib-fav-btn, .lib-album-download-btn):hover > i { animation: song-action-hop 380ms ease-out; }
+@keyframes song-action-hop {
+    0%, 100% { transform: translateY(0); }
+    35% { transform: translateY(-4px) rotate(-8deg); }
+    65% { transform: translateY(-1px) rotate(5deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .song-row-actions > button > i,
+    :is(button[id^="singer-fav-"], button[id^="singer-dislike-"], button[id^="album-fav-"],
+        button[id^="album-dislike-"], .artist-album-download-btn, .artist-album-favorite-btn,
+        .lib-fav-btn, .lib-album-download-btn) > i { animation: none !important; }
+    :where(button, [role="button"], .cs-trigger, .cs-option, .theme-image-actions label) { transition: none !important; transform: none !important; }
+    .music-shell :is(button, [role="button"], .grid.grid-cols-12, .cs-trigger),
+    #main-sidebar :is(a, button, div[onclick]),
+    #view-player-detail button, .cs-option { transition: none; transform: none !important; }
+}
+/* 歌曲封面操作统一使用渐显蒙层；触屏设备保留整行点击。作者：jingyh */
+.song-cover { position: relative; overflow: hidden; border-radius: 0.5rem; }
+.song-cover-play {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(145deg, rgb(0 0 0 / 24%), rgb(0 0 0 / 55%));
+    color: white;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 220ms ease;
+}
+@media (hover: hover) and (pointer: fine) and (min-width: 768px) {
+    :is(.song-row,.grid.grid-cols-12,.recent-song,.download-task-row):hover .song-cover-play,
+    :is(.song-row,.grid.grid-cols-12,.recent-song,.download-task-row):focus-within .song-cover-play,
+    .song-cover:hover .song-cover-play,
+    .song-cover:focus-visible .song-cover-play,
+    button:focus-visible > .song-cover .song-cover-play { opacity: 1; }
+}
+@media (max-width: 767px), (hover: none), (pointer: coarse) {
+    .song-cover-play { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .song-cover-play { transition: none; }
+}
+.song-audio-spec { font-size: 10px; opacity: 0.72; white-space: nowrap; flex-shrink: 0; }
+.song-metadata-row { flex-wrap: wrap; row-gap: 3px; }
+.lm-song-cover { flex-shrink: 0; margin: 0 16px 0 12px; width: 48px; height: 48px; cursor: pointer; }
+.lm-song-cover > :is(img, div) { width: 100%; height: 100%; margin: 0; }
+.recent-song-cover { display: block; width: 48px; height: 48px; }
+.recent-song-specs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+@media (max-width: 767px) {
+    .lm-song-cover { width: 40px; height: 40px; margin: 0 10px 0 2px; }
+    .recent-song-cover { width: 36px; height: 36px; }
+}
+#view-search[data-favorites-view="true"] #song-search-controls,
+#view-search[data-favorites-view="true"] #gl-local-search-bar,
+#view-search[data-favorites-view="true"] button[onclick="window.ListSearch.toggleBar()"] { display: none; }

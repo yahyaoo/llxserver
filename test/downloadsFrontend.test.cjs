@@ -1,0 +1,30 @@
+/** 下载浮层、权限与服务器原文件入口回归。 @author jingyh */
+const { test } = require('node:test'), assert = require('node:assert/strict')
+const fs = require('node:fs'), vm = require('node:vm')
+function runtime(choice) {
+ const tasks=[],downloads=[]
+ const window={DownloadOptions:{anchor:()=>null,choose:async()=>choice},SystemDownloadManager:{addTasks:async items=>tasks.push(...items)},downloadLibraryFile:item=>{downloads.push(item);return true}}
+ const context=vm.createContext({window,localStorage:{getItem:()=>null},isUserLoggedIn:()=>true,currentPlaylist:[],getSelectableQualityOrder:()=>['320k'],getQualityOptionLabel:()=> '高品质',buildQualityOptionLabels:async()=>['高品质'],showError(){},showInfo(){}})
+ const source=fs.readFileSync('client/music/js/single_song_ops.js','utf8')
+ vm.runInContext(source.slice(source.indexOf('async function authorizeDownloadTarget('),source.indexOf('async function batchDownloadFromList(')),context)
+ return {context,tasks,downloads}
+}
+test('取消浮层不登记任务，公开账号权限拒绝也不登记',async()=>{
+ const r=runtime(null);assert.equal(await r.context.downloadSong({id:1,name:'测试'}),false);assert.equal(r.tasks.length,0)
+ const restricted=runtime({target:'服务器下载',quality:'320k'});restricted.context.window.currentListData={username:'_open'};restricted.context.window.lx_config={'user.enablePublicRestriction':true,'user.enablePublicNonAdminServerCache':false};restricted.context.window.handleAdminAuth=async()=>false
+ assert.equal(await restricted.context.downloadSong({id:1,name:'测试'}),false);assert.equal(restricted.tasks.length,0)
+})
+test('音乐库直接取服务器文件，不创建云端或浏览器解析任务',async()=>{
+ const r=runtime(null);assert.equal(await r.context.downloadSong({id:1,isLocal:true,_localFilename:'中文 音乐.mp3'}),true);assert.equal(r.downloads.length,1);assert.equal(r.tasks.length,0)
+})
+test('服务器文件 URL 携带登录令牌，支持缓存和自定义子目录，保留原文件名',()=>{
+ const links=[]
+ const document={addEventListener(){},createElement:()=>({click(){links.push(this)},remove(){}}),body:{appendChild(){}}}
+ const window={addEventListener(){},getUserAuthHeaders:()=>({'x-user-name':'alice','x-user-token':'test-token'})}
+ vm.runInNewContext(fs.readFileSync('client/music/views/downloads/DownloadOptions.js','utf8'),{window,document,URLSearchParams})
+ window.downloadLibraryFile({filename:'中文 空格.mp3',folder:'cache'})
+ window.downloadLibraryFile({filename:'专辑/歌曲.flac'},{username:'alice',custom:true})
+ const cache=new URL(links[0].href,'http://localhost'),custom=new URL(links[1].href,'http://localhost')
+ assert.equal(decodeURIComponent(cache.pathname),'/api/music/cache/file/alice/中文 空格.mp3');assert.equal(cache.searchParams.get('folder'),'cache');assert.equal(cache.searchParams.get('token'),'test-token')
+ assert.equal(custom.pathname,'/api/music/custom/file');assert.equal(custom.searchParams.get('filename'),'专辑/歌曲.flac');assert.equal(links[1].download,'歌曲.flac')
+})
