@@ -9,28 +9,29 @@ test('切换用户保留各自目录草稿，恢复原值后移除草稿', () =>
   const source = fs.readFileSync(path.join(__dirname, '../client/app.js'), 'utf8')
   const methods = source.slice(source.indexOf('    renderCustomDirectoryFields() {'), source.indexOf('    /** 预览文件名模板'))
   const fields = {
-    'config-custom-dir-user': { value: 'admin' }, 'config-custom-dir-path': {},
+    'config-custom-dir-user': { value: 'admin' }, 'config-music-directories': { rows: [], replaceChildren() { this.rows=[] } },
     'config-custom-dir-enabled': {}, 'config-custom-dir-status': {},
   }
-  const context = vm.createContext({ document: { getElementById: id => fields[id] } })
+  const context = vm.createContext({ document: { getElementById: id => fields[id], querySelectorAll: () => fields['config-music-directories'].rows } })
   vm.runInContext('class TestSettings {' + methods + '} globalThis.TestSettings = TestSettings', context)
   const app = new context.TestSettings()
+  app.appendMusicDirectory = directory => { const input={value:directory.path}, frequency={value:directory.scanMinutes}; fields['config-music-directories'].rows.push({input,querySelector:selector=>selector==='[data-music-path]'?input:frequency}) }
   app.users = [{ name: 'admin', customMusicDir: '/original', enableCustomMusicDir: false }, { name: 'alice', customMusicDir: '/alice', enableCustomMusicDir: false }]
   app.customDirectoryDrafts = new Map()
   app.renderCustomDirectoryFields()
-  fields['config-custom-dir-path'].value = '/changed-admin'
+  fields['config-music-directories'].rows[0].input.value = '/changed-admin'
   fields['config-custom-dir-enabled'].checked = true
   app.updateCustomDirectoryDraft()
   fields['config-custom-dir-user'].value = 'alice'
   app.renderCustomDirectoryFields()
-  fields['config-custom-dir-path'].value = '/changed-alice'
+  fields['config-music-directories'].rows[0].input.value = '/changed-alice'
   app.updateCustomDirectoryDraft()
   fields['config-custom-dir-user'].value = 'admin'
   app.renderCustomDirectoryFields()
-  assert.equal(fields['config-custom-dir-path'].value, '/changed-admin')
+  assert.equal(fields['config-music-directories'].rows[0].input.value, '/changed-admin')
   assert.equal(fields['config-custom-dir-enabled'].checked, true)
   assert.equal(app.customDirectoryDrafts.size, 2)
-  fields['config-custom-dir-path'].value = '/original'
+  fields['config-music-directories'].rows[0].input.value = '/original'
   fields['config-custom-dir-enabled'].checked = false
   app.updateCustomDirectoryDraft()
   assert.equal(app.customDirectoryDrafts.size, 1)

@@ -1,3 +1,5 @@
+import { getMusicDirectories, checkDirectory, renameMusicDirectoryIndex } from '../../application/library/MusicDirectoryService'
+import { repositories } from '../../application/persistence/storage'
 import type { RequestContext, ServerRuntime } from '../../common/http/RequestContext'
 /** 管理用户维护、用户空间迁移与同步连接处理所需的应用依赖契约。 @author yahyaoo */
 export type UserServiceRuntime = Pick<ServerRuntime, 'readBody' | 'path' | 'checkAndCreateDir' | 'saveUsers' | 'storageFs' | 'getSyncDownloadData' | 'migrateSyncStorage' | 'wss' | 'SYNC_CLOSE_CODE' | 'renameUserSpace' | 'migrateUserData' | 'finishRenameUserSpace' | 'userSessions'>
@@ -27,12 +29,13 @@ export async function handleUsers(context: RequestContext, runtime: UserServiceR
             password: u.password,
             enableCustomMusicDir: u.enableCustomMusicDir ?? false,
             customMusicDir: u.customMusicDir || '',
+            directories: getMusicDirectories(u.name, true),
             allowOperateCustomMusicDir: u.allowOperateCustomMusicDir ?? false,
             allowWriteCustomMusicDir: u.allowWriteCustomMusicDir ?? false,
             enableAutoDownload: u.enableAutoDownload ?? false,
           }))
           if (global.lx.config['user.enablePublicFavorites']) {
-            users.unshift({ name: '_open', password: '', enableCustomMusicDir: false, customMusicDir: '', allowOperateCustomMusicDir: false, allowWriteCustomMusicDir: false, enableAutoDownload: false })
+            users.unshift({ directories: [], name: '_open', password: '', enableCustomMusicDir: false, customMusicDir: '', allowOperateCustomMusicDir: false, allowWriteCustomMusicDir: false, enableAutoDownload: false })
           }
           res.writeHead(200, {
             'Content-Type': 'application/json',
@@ -42,7 +45,7 @@ export async function handleUsers(context: RequestContext, runtime: UserServiceR
           return
         }
         if (req.method === 'POST') {
-          void readBody(req).then(body => {
+          void readBody(req).then(async body => {
             try {
               const { name, password } = JSON.parse(body)
               if (!name || !password) {
@@ -78,7 +81,7 @@ export async function handleUsers(context: RequestContext, runtime: UserServiceR
           return
         }
         if (req.method === 'PUT') {
-          void readBody(req).then(body => {
+          void readBody(req).then(async body => {
             try {
               const { name, newName, password, enableCustomMusicDir, customMusicDir, allowOperateCustomMusicDir, allowWriteCustomMusicDir, enableAutoDownload } = JSON.parse(body)
               if (!name) {
@@ -95,7 +98,7 @@ export async function handleUsers(context: RequestContext, runtime: UserServiceR
 
               const user = global.lx.config.users[userIdx]
 
-              const handleFinalUpdate = () => {
+              const handleFinalUpdate = async () => {
                 const oldEnabled = !!user.enableCustomMusicDir
                 const oldCustomDir = (user.customMusicDir || '').trim()
 
@@ -114,8 +117,7 @@ export async function handleUsers(context: RequestContext, runtime: UserServiceR
                       return
                     }
                     try {
-                      storageFs.mkdirSync(trimmedMusicDir, { recursive: true })
-                      storageFs.accessSync(trimmedMusicDir, storageFs.constants.R_OK)
+                      await checkDirectory(trimmedMusicDir)
                     } catch (e: any) {
                       res.writeHead(422, { 'Content-Type': 'application/json' })
                       res.end(JSON.stringify({ success: false, error: `自定义音乐目录无效或无法访问 (${trimmedMusicDir}): ${e.message || e}` }))
@@ -131,7 +133,13 @@ export async function handleUsers(context: RequestContext, runtime: UserServiceR
                 }
                 if (password) user.password = password
                 if (enableCustomMusicDir !== undefined) user.enableCustomMusicDir = !!enableCustomMusicDir
-                if (customMusicDir !== undefined) user.customMusicDir = finalMusicDir
+                if (customMusicDir !== undefined) {
+                  const current = getMusicDirectories(user.name, true)
+                  const dirs = finalMusicDir ? [{ path: finalMusicDir, id: require('node:crypto').createHash('sha256').update(path.resolve(finalMusicDir)).digest('hex').slice(0,16), scanMinutes: current[0]?.scanMinutes || 30 }, ...current.slice(1).filter(item => item.path !== finalMusicDir)] : current.slice(1)
+                  repositories().admin.saveMusicDirectories(user.name, dirs)
+                  ;(user as any).musicDirectoriesMigrated = true
+                  user.customMusicDir = dirs[0]?.path || ''
+                }
                 if (allowOperateCustomMusicDir !== undefined) user.allowOperateCustomMusicDir = !!allowOperateCustomMusicDir
                 if (allowWriteCustomMusicDir !== undefined) user.allowWriteCustomMusicDir = !!allowWriteCustomMusicDir
                 if (enableAutoDownload !== undefined) user.enableAutoDownload = !!enableAutoDownload
@@ -183,15 +191,17 @@ export async function handleUsers(context: RequestContext, runtime: UserServiceR
 
                 // 3. 稍作延迟等待 Socket 释放和可能的异步操作完成 (Windows 友好)
                 // 增加到 500ms 以确保稳定性
-                setTimeout(() => {
+                setTimeout(async () => {
                   try {
                     // 4. 迁移物理数据
                     migrateUserData(name, newName)
+                    renameMusicDirectoryIndex(name, newName)
 
                     // 5. 更新内存中的用户信息 (全局配置)
+                    repositories().admin.renameMusicDirectories(name, newName)
                     user.name = newName
 
-                    handleFinalUpdate()
+                    await handleFinalUpdate()
                   } catch (err: any) {
                     console.error(`[用户管理] 迁移用户数据失败: ${err.message}`)
                     res.writeHead(500)
@@ -202,7 +212,7 @@ export async function handleUsers(context: RequestContext, runtime: UserServiceR
                   }
                 }, 500)
               } else {
-                handleFinalUpdate()
+                await handleFinalUpdate()
               }
             } catch (e) {
               console.error('[用户管理] 重命名用户发生异常:', e)
@@ -213,7 +223,7 @@ export async function handleUsers(context: RequestContext, runtime: UserServiceR
           return
         }
         if (req.method === 'DELETE') {
-          void readBody(req).then(body => {
+          void readBody(req).then(async body => {
             try {
               // 修改：同时支持单个 name 和批量 names，以及 deleteData 参数
               const { name, names, deleteData } = JSON.parse(body)
@@ -250,6 +260,7 @@ dataPath: string }[] = []
                     }
                   }
                   runtime.userSessions.revokeUser(targetName)
+                  repositories().admin.saveMusicDirectories(targetName, [])
                   global.lx.config.users.splice(idx, 1)
                   deletedCount++
                 }

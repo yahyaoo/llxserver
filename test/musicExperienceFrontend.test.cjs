@@ -4,6 +4,20 @@ const assert = require('node:assert/strict')
 const fs = require('node:fs'), path = require('node:path'), vm = require('node:vm')
 const { PlaybackTracker, playCount, sortByPlayCount } = require('../client/music/js/play_statistics.js')
 
+test('旧本地记录按当前账号重建目录及下载 URL，不复用保存时的令牌', () => {
+  const context = vm.createContext({ window: { getUserAuthHeaders: () => ({ 'x-user-name': 'alice', 'x-user-token': 'current-token' }) },
+    document: { documentElement: {}, addEventListener() {} }, URL, URLSearchParams, location: { origin: 'http://localhost' } })
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '../client/music/js/music_experience.js'), 'utf8'), context)
+  for (const download of [false, true]) {
+    const item = { id: 'local-1', source: 'custom', isLocal: true, _localFilename: '@directory/song.wav', _localFolder: 'custom', _isCustomDir: true,
+      url: '/api/music/custom/file?token=expired', hasCover: false, coverType: 'none', ...(download ? { serverDownloadId: 'download-1', _localFolder: 'download' } : {}) }
+    const result = context.window.MusicExperience.playable(item), url = new URL(result.url, 'http://localhost')
+    assert.equal(url.searchParams.get('token'), 'current-token')
+    assert.equal(url.pathname, download ? '/api/music/server-download/file/download-1' : '/api/music/custom/file')
+    assert.equal(url.searchParams.get(download ? 'username' : 'user'), 'alice')
+  }
+})
+
 /** 模拟媒体事件与真实经过时间，验证播放时长不依赖进度条位置。 */
 function playbackFixture() {
   let clock = 0

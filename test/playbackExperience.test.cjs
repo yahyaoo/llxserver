@@ -6,6 +6,35 @@ const path = require('node:path');
 const vm = require('node:vm');
 const read = file => fs.readFileSync(path.join(__dirname, '..', file), 'utf8').replace(/\r\n/g, '\n');
 
+test('播放器从本地定位信息重建认证地址，恢复播放无需先请求在线音源', async () => {
+    const source = read('client/music/app.js'), start = source.indexOf('    if ((song.isLocal', source.indexOf('async function fetchSongUrl('));
+    const block = source.slice(start, source.indexOf('\n    const shouldBypassServerCache', start));
+    const context = vm.createContext({ song: { isLocal: true, url: '/api/music/custom/file?token=expired', name: '本地歌曲' }, quality: 'flac', isRetry: false,
+        window: { MusicExperience: { playable: song => ({ ...song, url: '/api/music/custom/file?token=current' }) } }, console: { log() {} }, applyAutoProxy: async url => url });
+    const result = await vm.runInContext('(async function(){' + block + '})()', context);
+    assert.equal(result.url, '/api/music/custom/file?token=current');
+});
+
+test('等待元数据期间清除恢复信息或切换歌曲，不再异常或跳到旧进度', () => {
+    const source = read('client/music/app.js');
+    const start = source.indexOf('        if (noPlay) {', source.indexOf('playbackTracker.prepare(playbackSong'));
+    const block = source.slice(start, source.indexOf('\n        try {', start));
+    const prepare = () => {
+        let metadata;
+        const audio = { currentTime: 0, addEventListener(name, callback) { metadata = callback; } };
+        const context = vm.createContext({ window: { _resumeInfo: { time: 15 } }, audio, noPlay: true,
+            currentLoadingRequestId: 1, thisRequestId: 1, setPlayerStatus() {}, updatePlayButton() {} });
+        vm.runInContext('(function(){' + block + '})()', context);
+        return { context, audio, fire: () => metadata() };
+    };
+    const normal = prepare(); normal.fire(); assert.equal(normal.audio.currentTime, 15);
+    assert.equal(normal.context.window._resumeInfo, undefined);
+    const cleared = prepare(); delete cleared.context.window._resumeInfo;
+    assert.doesNotThrow(cleared.fire); assert.equal(cleared.audio.currentTime, 0);
+    const switched = prepare(); switched.context.currentLoadingRequestId = 2;
+    switched.fire(); assert.equal(switched.audio.currentTime, 0);
+});
+
 /** 可控时钟和最小 DOM，执行真实组件而不连接播放器与网络。 */
 function fixture() {
     let now = 0, next = 0, reduced = false;

@@ -41,17 +41,6 @@ const config: LX.Config = {
 
   'frontend.password': '123456',
 
-  // WebDAV 配置
-  'webdav.enable': false,
-  'webdav.url': '',
-  'webdav.username': '',
-  'webdav.password': '',
-  'webdav.syncPath': '/lx-sync', // 增量同步远程路径
-  'webdav.backupPath': '/lx-sync-backups', // 全量备份远程路径
-  'sync.interval': 60, // 同步间隔（分钟）默认1小时
-  'sync.backupInterval': 24, // 全量备份间隔（小时）默认24小时
-  'webdav.excludeCache': false, // 是否排除缓存目录 (data/<user>/cache) 的同步与备份
-  'webdav.excludeMusic': false, // 是否排除音乐下载目录 (data/<user>/music) 的同步与备份
 
 
   // 每日导出当前 SQLite 业务配置为可手动导入的本地备份文件。

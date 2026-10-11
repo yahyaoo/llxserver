@@ -24,6 +24,20 @@ export class AdminRepository extends SqliteDocumentRepository {
   renameMusicDirectories(previous: string, next: string): void {
     this.database.prepare('UPDATE server_user_music_directory SET username = ? WHERE username = ?').run(next, previous)
   }
+  /** 导出全部目录配置，供业务 ZIP 备份恢复。 */
+  exportMusicDirectories(): Array<{ username: string; id: string; path: string; scanMinutes: number }> {
+    return this.database.prepare('SELECT username, id, path, scan_minutes AS scanMinutes FROM server_user_music_directory ORDER BY username, sort_order').all()
+  }
+  /** 在单个事务中恢复目录子表，旧备份不调用此方法。 */
+  restoreMusicDirectories(rows: Array<{ username: string; id: string; path: string; scanMinutes: number }>): void {
+    this.transaction(() => {
+      this.database.prepare('DELETE FROM server_user_music_directory').run()
+      const groups = new Map<string, typeof rows>()
+      for (const row of rows) groups.set(row.username, [...(groups.get(row.username) || []), row])
+      const insert = this.database.prepare('INSERT INTO server_user_music_directory(username, id, path, scan_minutes, sort_order) VALUES (?, ?, ?, ?, ?)')
+      for (const [username, directories] of groups) directories.forEach((row, order) => insert.run(username, row.id, row.path, row.scanMinutes, order))
+    })
+  }
 
   /** 读取账号令牌总开关；空值表示尚未迁移旧数据。 */
   readApiTokenEnabled(username: string): boolean | undefined {

@@ -757,7 +757,7 @@
                     <select id="setting-server-cache-location"
                         onchange="selectServerCacheLocation(this.value)"
                         class="lm-select !w-full !py-2.5">
-                        <option value="data">DATA_PATH (WebDAV同步)</option>
+                        <option value="data">服务器数据路径</option>
                         <option value="root">运行目录 (仅本地)</option>
                         <option value="custom">自定义目录（输入绝对路径）</option>
                     </select>

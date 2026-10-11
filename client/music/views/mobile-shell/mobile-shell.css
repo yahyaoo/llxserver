@@ -91,3 +91,10 @@
 @media (prefers-reduced-motion: reduce) {
     #mobile-nav-cover { animation: none; }
 }
+
+/* 手机端限制叠层模糊和列表重绘，交互只动画合成与颜色属性。 */
+@media (max-width: 767px) {
+    #mobile-page-header, #mobile-bottom-nav { backdrop-filter: blur(min(var(--surface-blur, 24px), 10px)); }
+    #lm-list-container [data-lm-row-index] { content-visibility: auto; contain-intrinsic-size: auto 100px; }
+    #view-localmusic button, #main-navigation a { transition-property: color, background-color, border-color, opacity, transform; }
+}

@@ -4,9 +4,9 @@
 
 ## Configuration Loading Hierarchy and Execution Priority
 
-洛洛雪音乐 has built a unified basic model skeleton (located in `server/defaultConfig.ts`). During the initialization of the service instance, the configuration parser will streamingly distribute parameters to the **service-side underlying environment** (such as network binding, WebDAV settings, etc.) and the **front-end running environment** (injected into the browser execution sandbox `/js/config.js`) respectively.
+洛洛雪音乐 has built a unified basic model skeleton (located in `server/defaultConfig.ts`). During the initialization of the service instance, the configuration parser will streamingly distribute parameters to the **service-side underlying environment** (such as network binding and storage settings) and the **front-end running environment** (injected into the browser execution sandbox `/js/config.js`) respectively.
 
-Business configuration is stored in the admin SQLite database. Startup loads stored values over defaults from `server/defaultConfig.ts`, then applies the existing environment variable overrides and persists the effective configuration. WebDAV restore writes business documents back to SQL and reloads them.
+Business configuration is stored in the admin SQLite database. Startup loads stored values over defaults from `server/defaultConfig.ts`, then applies the existing environment variable overrides and persists the effective configuration. Local ZIP restore writes business documents back to SQL and reloads them.
 
 `config.js` contains `server.database.adminPath`, `server.database.musicPath` and `client.xxx` connection settings. `CONFIG_PATH` selects this bootstrap file. Database paths are relative to `DATA_PATH` unless absolute. Editing old business fields in this file no longer changes configuration; explicitly upload a static old configuration through System Config → Database and Migration. See the [deployment configuration](https://github.com/yahyaoo/llxserver/blob/dev/deploy/README.md) for the environment variable overrides.
 
@@ -60,20 +60,9 @@ This module involves monitoring the status of connected clients and isolation sp
 | `ENABLE_CACHE_SIZE_LIMIT` | `false` | Boolean | **Enable automatic cache cleanup**. If enabled, the system will monitor and limit the total user cache size, and automatically delete oldest files (LRU) when the limit is reached. |
 | `CACHE_SIZE_LIMIT` | `2000` | Integer | **Cache size limit (MB)**. The threshold at which the auto-cleanup mechanism is triggered. |
 
-### III. WebDAV Configuration
+### III. User Music Directories
 
-The underlying periodic polling asynchronous daemon of the service will only be fully awakened if the following environment variable group is authorized (especially the `WEBDAV_URL` link effectively takes effect):
-
-| Environment Variable Mapping Key (ENV) | System Default Value | Data Type | Scope and Applicable Scenarios |
-| :------------------- | :--------- | :------- | :------------------------------------------------------------------------------------------------------------- |
-| `WEBDAV_URL` | `''` | String | Various complete URIs with standard WebDAV protocol gateway interfaces (including HTTPS declaration), for example: `https://dav.jianguoyun.com/dav/Sync`. |
-| `WEBDAV_USERNAME` | `''` | String | Authorization identification name used for WebDAV service node handshake authentication. |
-| `WEBDAV_PASSWORD` | `''` | String | Remote WebDAV gateway access key (highly recommended to use an independent application-specific authorization password to reduce secondary leakage risks). |
-| `SYNC_INTERVAL` | `60` | Integer | Cold shrinking timed parameters (unit: minutes) that trigger full thermal backup and pull comparison synchronization flow periods. |
-
-> 🔖 **Stateful Resurrection and Initialization Mechanism**:
-> 1. **Cloud-First Restoration**: If this set of variables is detected at startup, the system will prioritize attempting to pull archives from the cloud.
-> 2. **Environment-Driven Persistence**: If the cloud config is empty (e.g., first deployment in Docker/Cloud), the system will **automatically persist effective business configuration to SQLite and upload its exported business document to the cloud** for initialization. This ensures you can establish the initial cloud data solely through environment variables.
+Each account supports multiple existing directories. Read/write access is checked before saving. Each directory has a scan interval of 1–1440 minutes (default 30). The music library includes user directories, downloads and cache, with manual background scanning and progress.
 
 ### IV. Web-side Composite Media Playback Space Protection Logic
 

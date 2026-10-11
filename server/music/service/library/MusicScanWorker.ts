@@ -16,7 +16,8 @@ async function walk(root, current, files) {
   }
 }
 async function run() {
-  const groups = [], errors = [], items = [];
+  const selected = new Set(workerData.directories.map(directory => directory.id));
+  const groups = [], errors = [], items = workerData.previous.filter(item => !selected.has(item.directoryId));
   for (const directory of workerData.directories) {
     const files = [];
     try { await walk(directory.path, directory.path, files); groups.push({directory, files}); total += files.length; }
@@ -31,7 +32,7 @@ async function run() {
     try {
       const stat = await fs.promises.stat(full), lyric = full.slice(0, -ext.length) + '.lrc';
       const hasLyric = fs.existsSync(lyric);
-      if (existing && existing.size === stat.size && existing.mtime === stat.mtimeMs && existing.hasLyric === hasLyric) items.push(existing);
+      if (existing && existing.size === stat.size && existing.mtime === stat.mtimeMs && existing.hasLyric === hasLyric && typeof existing.hasCover === 'boolean') items.push(existing);
       else {
         let tagger, metadata = {};
         try {
@@ -44,16 +45,19 @@ async function run() {
         const lossless = ['.flac','.wav','.ape'].includes(ext);
         const quality = lossless ? ((metadata.bitDepth > 16 || metadata.sampleRate > 48000) ? 'flac24bit' : 'flac')
           : metadata.bitrate >= 240 ? '320k' : metadata.bitrate >= 170 ? '192k' : '128k';
-        const fallback = path.basename(full, ext).split(' - ');
-        const id = existing?.id || 'custom_' + crypto.createHash('md5').update(filename).digest('hex');
+        const baseName = path.basename(full, ext), standard = baseName.split('_-_');
+        const fallback = baseName.split(' - ');
+        const standardSource = standard.length >= 5 ? standard[2] : '';
+        const standardId = standardSource ? (standard[3].startsWith(standardSource + '_') ? standard[3] : standardSource + '_' + standard[3]) : '';
+        const id = existing?.id || standardId || 'custom_' + crypto.createHash('md5').update(filename).digest('hex');
         const seconds = Math.round((metadata.duration || 0) / 1000);
-        items.push({ ...existing, id, songmid: existing?.songmid || id, name: metadata.title || existing?.name || fallback[0],
-          singer: metadata.artist || existing?.singer || fallback[1] || '未知歌手', album: metadata.album || existing?.album || '',
+        items.push({ ...existing, id, songmid: existing?.songmid || id, name: metadata.title || existing?.name || (standardSource ? standard[0] : fallback[0]),
+          singer: metadata.artist || existing?.singer || (standardSource ? standard[1] : fallback[1]) || '未知歌手', album: metadata.album || existing?.album || '',
           interval: seconds ? Math.floor(seconds / 60) + ':' + String(seconds % 60).padStart(2,'0') : existing?.interval || '',
-          source: existing?.source || 'custom', quality, filename, directoryId: directory.id, folder: 'custom',
+          source: existing?.source || standardSource || 'custom', quality, filename, directoryId: directory.id, folder: 'custom',
           subPath: path.dirname(relative) === '.' ? '' : path.dirname(relative).replace(/\\/g, '/'),
           mtime: stat.mtimeMs, size: stat.size, ext: ext.slice(1), hasLyric, hasEmbedLyric: metadata.hasEmbedLyric,
-          hasCover: metadata.hasCover || existing?.hasCover, coverType: metadata.hasCover ? 'embedded' : existing?.coverType || 'none',
+          hasCover: !!(metadata.hasCover || existing?.hasCover), coverType: metadata.hasCover ? 'embedded' : existing?.coverType || 'none',
           bitrate: metadata.bitrate, sampleRate: metadata.sampleRate, bitDepth: metadata.bitDepth });
       }
     } catch (error) { if (existing) items.push(existing); errors.push({ file: filename, message: error.code || error.message }); }

@@ -1010,44 +1010,9 @@ async function checkAndUpdateCustomDirUI() {
         window.userEnableAutoDownload = false;
     }
 
-    const switchContainer = document.getElementById('custom-dir-switch-container');
-    const customDirSwitch = document.getElementById('user-custom-dir-switch');
-    if (switchContainer) {
-        const isUser = !!localUserToken;
-        if (isUser && userEnableCustomDir) {
-            switchContainer.classList.remove('hidden');
-            switchContainer.classList.add('flex');
-
-            const cachedActive = localStorage.getItem('lx_custom_dir_active') === 'true';
-            if (customDirSwitch) {
-                customDirSwitch.checked = cachedActive;
-                if (cachedActive) {
-                    if (window.CustomDirManager && typeof window.CustomDirManager.setActive === 'function') {
-                        window.CustomDirManager.setActive(true);
-                    } else if (window.LocalMusicManager && typeof window.LocalMusicManager.toggleCustomDirMode === 'function') {
-                        window.LocalMusicManager.toggleCustomDirMode(true);
-                    }
-                }
-            }
-        } else {
-            switchContainer.classList.add('hidden');
-            switchContainer.classList.remove('flex');
-
-            // 如果用户注销，则取消激活状态
-            if (!isUser || !userEnableCustomDir) {
-                if (customDirSwitch && customDirSwitch.checked) {
-                    customDirSwitch.checked = false;
-                    localStorage.setItem('lx_custom_dir_active', 'false');
-                    if (window.CustomDirManager && typeof window.CustomDirManager.setActive === 'function') {
-                        window.CustomDirManager.setActive(false);
-                    } else if (window.LocalMusicManager && typeof window.LocalMusicManager.toggleCustomDirMode === 'function') {
-                        window.LocalMusicManager.toggleCustomDirMode(false);
-                    }
-                }
-            }
-        }
-    }
-
+    localStorage.removeItem('lx_custom_dir_active');
+    if (window.CustomDirManager) window.CustomDirManager.isActive = false;
+    if (window.LocalMusicManager) window.LocalMusicManager.isCustomDirMode = false;
     // 更新同步下载按钮的可见状态
     updateSyncDownloadBtnVisibility();
 }
@@ -5301,7 +5266,8 @@ async function fetchSongUrl(song, quality, isRetry = false, isSilent = false, op
     // 0. 本地文件/带有本地播放 URL 的歌曲：直接播放本地文件，无需走在线 API 解析
     if ((song.isLocal || song.url?.startsWith('/api/music/cache/file/')) && song.url && !isRetry) {
         console.log(`[Cache] Direct Local File Hit: ${song.name}`);
-        let localUrl = await applyAutoProxy(song.url, song);
+        const localSong = window.MusicExperience?.playable(song) || song;
+        let localUrl = await applyAutoProxy(localSong.url, localSong);
         return { url: localUrl, sourceType: 'server_cache', quality: song.quality || quality };
     }
 
@@ -6011,8 +5977,8 @@ async function showServerDirectories() {
                 <div class="p-5 space-y-4 max-h-[75vh] overflow-y-auto custom-scrollbar">
                     <!-- Current Status Badges -->
                     <div class="flex flex-wrap gap-2 text-xs">
-                        <span class="px-2.5 py-1 rounded-md font-medium ${data.isWebDAVSynced ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-900' : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700'} flex items-center gap-1.5">
-                            <i class="fas ${data.isWebDAVSynced ? 'fa-cloud' : 'fa-laptop'} text-xs"></i>
+                        <span class="px-2.5 py-1 rounded-md font-medium bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700 flex items-center gap-1.5">
+                            <i class="fas fa-laptop text-xs"></i>
                             位置: ${data.rootType}
                         </span>
 
@@ -6044,7 +6010,7 @@ async function showServerDirectories() {
                     <div class="text-xs text-gray-500 dark:text-gray-400 p-3 rounded-lg bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-900/40 flex items-start gap-2">
                         <i class="fas fa-info-circle text-amber-500 mt-0.5 shrink-0"></i>
                         <div class="space-y-1">
-                            <div>• <strong>缓存位置</strong>：选择「DATA_PATH」会将文件存放于 WebDAV 同步目录下，备份时可一并打包；选择「运行目录」则仅保存在当前服务器本地。</div>
+                            <div>• <strong>缓存位置</strong>：缓存位置由服务端配置，音乐库同时展示用户音乐目录、下载和缓存中的歌曲。</div>
                         </div>
                     </div>
                 </div>
@@ -6540,9 +6506,12 @@ async function playSong(song, index, forceQuality = null, noPlay = false, isRetr
         if (noPlay) {
             setPlayerStatus('', false);
             updatePlayButton(false);
-            if (window._resumeInfo && window._resumeInfo.time > 0) {
+            const resumeInfo = window._resumeInfo;
+            if (resumeInfo && resumeInfo.time > 0) {
                 audio.addEventListener('loadedmetadata', () => {
-                    audio.currentTime = window._resumeInfo.time;
+                    // 恢复信息可能在等待元数据时被新播放请求清除或替换。
+                    if (thisRequestId !== currentLoadingRequestId || window._resumeInfo !== resumeInfo) return;
+                    audio.currentTime = resumeInfo.time;
                     delete window._resumeInfo;
                 }, { once: true });
             }
@@ -9040,9 +9009,9 @@ function updateDetailInfo(song) {
  * @returns {Promise<boolean>} 是否成功获取并应用了内嵌歌词
  */
 async function fetchEmbedLyricForLocalSong(song, silent = false) {
-    const filename = song._localFilename;
+    const filename = song._localFilename || song.customFilename || song.filename;
     const username = song._localUsername || '';
-    const isCustomDir = !!song._isCustomDir;
+    const isCustomDir = !!song._isCustomDir || song.folder === 'custom' || !!song.isCustomFile;
 
     // 显示加载状态（若非静默模式）
     if (!silent) {
@@ -9118,7 +9087,7 @@ async function fetchLyric(song, quality = null) {
     }
 
     // 如果还是没有必要的数据，检查是否为本地文件（可尝试读取内嵌歌词）
-    if (!songmid || !source) {
+    if (!songmid || !source || source === 'custom' || source === 'local') {
         // [新增] 本地未关联歌曲：优先尝试读取音频文件内嵌歌词
         if (song.isLocal && song._localFilename) {
             console.log('[Lyric] 本地未关联歌曲，尝试读取内嵌歌词:', song._localFilename);
@@ -10913,7 +10882,17 @@ function switchSyncMode(mode) {
 }
 
 //同步设置
-async function pushSettingsToServer(force = false) {
+let settingsPushTimer = null;
+/** 普通设置立即本地生效，合并变更后上报；手动保存仍等待服务端确认。 */
+function pushSettingsToServer(force = false) {
+    if (force) { clearTimeout(settingsPushTimer); settingsPushTimer = null; return submitSettingsToServer(true); }
+    clearTimeout(settingsPushTimer);
+    settingsPushTimer = setTimeout(() => { settingsPushTimer = null; void submitSettingsToServer(); }, 15000);
+    return Promise.resolve();
+}
+window.addEventListener('music-account-changed', () => { clearTimeout(settingsPushTimer); settingsPushTimer = null; });
+document.addEventListener('visibilitychange', () => { if (document.hidden && settingsPushTimer) { clearTimeout(settingsPushTimer); settingsPushTimer = null; void submitSettingsToServer(); } });
+async function submitSettingsToServer(force = false) {
     if (!force && !settings.saveAccountSettingsToFile) return;
     // Only local sync mode supports this for now
     if (localStorage.getItem('lx_sync_mode') !== 'local' && !window.lx_config?.['user.enablePublicRestriction'] && !force) return;
@@ -14246,6 +14225,9 @@ function cleanSongData(song) {
     if (song.url) cleanSong.url = song.url;
     if (song.folder) cleanSong.folder = song.folder;
     if (song.filename) cleanSong.filename = song.filename;
+    for (const key of ['_localFilename', '_localUsername', '_localFolder', '_isCustomDir', 'customFilename', 'isCustomFile', 'serverDownloadId', 'directoryId', 'quality', 'types', 'bitDepth', 'sampleRate', 'bitrate', 'hasCover', 'coverType']) {
+        if (song[key] !== undefined) cleanSong[key] = song[key];
+    }
 
     // Remove undefined keys
     const removeUndefined = (obj) => {
@@ -14538,6 +14520,12 @@ async function changeCommentPage(delta) {
 
 async function fetchComments() {
     const song = getActiveSongInfo();
+    if (song && ['custom', 'local', 'unknown'].includes(song.source)) {
+        const list = document.getElementById('comment-list');
+        if (list) list.textContent = '本地歌曲关联平台歌曲后可查看评论';
+        document.getElementById('comment-loader')?.classList.add('hidden');
+        return;
+    }
     if (!song || isCommentLoading) {
         console.log('[Comment] Fetch skipped:', { hasSong: !!song, isLoading: isCommentLoading });
         return;

@@ -151,11 +151,11 @@ CREATE TABLE IF NOT EXISTS server_api_token (
 CREATE INDEX IF NOT EXISTS idx_server_api_token_user ON server_api_token (username);
 -- 用户音乐目录子表：稳定标识防止不同目录的同名歌曲相互覆盖。
 CREATE TABLE IF NOT EXISTS server_user_music_directory (
-  username TEXT NOT NULL,
-  id TEXT NOT NULL,
-  path TEXT NOT NULL,
-  scan_minutes INTEGER NOT NULL DEFAULT 30 CHECK(scan_minutes BETWEEN 1 AND 1440),
-  sort_order INTEGER NOT NULL,
+  username TEXT NOT NULL, -- 所属账号名称
+  id TEXT NOT NULL, -- 目录稳定标识
+  path TEXT NOT NULL, -- 服务器绝对路径
+  scan_minutes INTEGER NOT NULL DEFAULT 30 CHECK(scan_minutes BETWEEN 1 AND 1440), -- 扫描间隔分钟数
+  sort_order INTEGER NOT NULL, -- 用户配置顺序
   PRIMARY KEY(username, id),
   UNIQUE(username, path)
 );

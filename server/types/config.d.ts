@@ -164,55 +164,7 @@ declare namespace LX {
      */
     'frontend.password'?: string
 
-    /**
-     * 是否启用 WebDAV 同步服务
-     */
-    'webdav.enable'?: boolean
 
-    /**
-     * WebDAV URL
-     */
-    'webdav.url'?: string
-
-    /**
-     * WebDAV 用户名
-     */
-    'webdav.username'?: string
-
-    /**
-     * WebDAV 密码
-     */
-    'webdav.password'?: string
-
-    /**
-     * WebDAV 增量同步远端路径（默认 /lx-sync）
-     */
-    'webdav.syncPath'?: string
-
-    /**
-     * WebDAV 全量备份远端路径（默认 /lx-sync-backups）
-     */
-    'webdav.backupPath'?: string
-
-    /**
-     * 同步间隔(分钟)
-     */
-    'sync.interval'?: number
-
-    /**
-     * 全量备份间隔(小时)，默认 24
-     */
-    'sync.backupInterval'?: number
-
-    /**
-     * 是否排除缓存目录 (data/<user>/cache) 的增量同步与全量备份
-     */
-    'webdav.excludeCache'?: boolean
-
-    /**
-     * 是否排除音乐下载目录 (data/<user>/music) 的增量同步与全量备份
-     */
-    'webdav.excludeMusic'?: boolean
 
     /**
      * 是否启用本地配置备份（每日导出 SQL 业务配置，保留指定天数）

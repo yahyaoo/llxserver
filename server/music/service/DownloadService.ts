@@ -633,8 +633,8 @@ export async function getMusicCacheDirectories(context: RequestContext, runtime:
             cacheDirectory: cacheDir,
             downloadDirectory: onlyDownloadQuery ? downloadDir : cacheDir,
             rawDownloadDirectory: downloadDir,
-            rootType: path.isAbsolute(effectiveLocation) ? '自定义目录' : (effectiveLocation === 'data' ? 'DATA_PATH (WebDAV同步)' : '运行目录 (仅本地)'),
-            isWebDAVSynced: effectiveLocation === 'data'
+            rootType: path.isAbsolute(effectiveLocation) ? '自定义目录' : (effectiveLocation === 'data' ? '缓存目录' : '运行目录 (仅本地)'),
+            isLocalStorage: true
           }
         }))
         return

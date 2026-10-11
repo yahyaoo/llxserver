@@ -23,7 +23,7 @@
 | `server/*/model/dto` | 数据写入参数；不引入原接口必填字段 |
 | `server/*/model/vo` | 数据访问返回模型；原 HTTP 响应仍使用既有结构 |
 | `server/common` | 公共字段、请求上下文、令牌契约、通用 SQLite 文档仓储 |
-| `server/integrations` | 第三方音乐平台、脚本执行、更新查询、WebDAV、压缩包适配 |
+| `server/integrations` | 第三方音乐平台、脚本执行、更新查询、压缩包适配 |
 | `sql/admin`、`sql/music` | 两库各自的建表 SQL |
 
 所有命名保持类/模型 PascalCase、方法 camelCase、模块职责明确。SQL 表和列采用小写下划线，管理表前缀 `admin_`，播放器表前缀 `music_`。JSDoc 描述使用中文，作者 `yahyaoo`。

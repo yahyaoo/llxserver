@@ -1,3 +1,4 @@
+import { readMusicMetadata } from '../library/MusicMetadataWorker'
 /** 服务器缓存服务：用户目录、歌曲与封面索引、下载、歌词、元信息和容量清理。 @author yahyaoo */
 import storageFs from '../../../application/persistence/documentFileSystem'
 
@@ -53,7 +54,7 @@ export const CACHE_ROOTS = {
 }
 
 let currentCacheLocation = CACHE_ROOTS.ROOT
-const CACHE_LIST_SYNC_TTL = 30 * 1000
+const CACHE_LIST_SYNC_TTL = 30 * 60 * 1000
 const cacheListSyncState: Map<string, { /** 最近一次同步时间。 */
 lastSync: number,
 pending?: Promise<void> }> = new Map()
@@ -969,7 +970,8 @@ item: CacheItem }>()
                     }
 
                     if (needsCoverCheck) {
-                        const hasEmbeddedCover = readEmbeddedCoverState(filePath)
+                        const coverMetadata = await readMusicMetadata(filePath, stats.size + ':' + stats.mtimeMs, 'metadata')
+                        const hasEmbeddedCover = !!coverMetadata?.pictures?.length
                         const hasExternalCover = !hasEmbeddedCover && hasCachedCover(file, normalizedUsername, stats)
                         const coverType: CacheItem['coverType'] = hasEmbeddedCover
                             ? 'embedded'
@@ -991,8 +993,8 @@ item: CacheItem }>()
                     if (!existing.interval || existing.quality === 'unknown' || !existing.bitrate || existing.hasEmbedLyric === undefined || existing.metadataWritable === undefined || qualityCorrectionNeeded) {
                         let tagger: any
                         try {
-                            tagger = new MusicTagger()
-                            tagger.loadPath(filePath)
+                            tagger = await readMusicMetadata(filePath, stats.size + ':' + stats.mtimeMs, 'metadata')
+                            if (!tagger) throw new Error('无法读取标签')
                             // 若为 local 未关联文件，元数据优先校准歌名歌手
                             if (existing.source === 'local' || !existing.source) {
                                 if (tagger.title) existing.name = tagger.title
@@ -1022,7 +1024,7 @@ item: CacheItem }>()
                             existing.metadataError = getMetadataUnsupportedMessage(existing.audioContainer)
                             existing.hasEmbedLyric = false
                         } finally {
-                            try { if (tagger) tagger.dispose() } catch (e) { }
+                            try { if (tagger) tagger.dispose?.() } catch (e) { }
                         }
                         updated = true
                     }
@@ -1040,8 +1042,8 @@ item: CacheItem }>()
                     const audioContainer = detectAudioContainer(filePath)
 
                     try {
-                        const tagger = new MusicTagger()
-                        tagger.loadPath(filePath)
+                        const tagger = await readMusicMetadata(filePath, stats.size + ':' + stats.mtimeMs, 'metadata')
+                            if (!tagger) throw new Error('无法读取标签')
                         // ① 优先从 ID3 读取元数据
                         if (tagger.title) songName = tagger.title
                         if (tagger.artist) singer = tagger.artist
@@ -1061,7 +1063,7 @@ item: CacheItem }>()
                         hasEmbedLyric = !!(lyricsInTag && lyricsInTag.trim().length > 10)
                         metadataWritable = true
 
-                        tagger.dispose()
+                        tagger.dispose?.()
                     } catch (e: any) {
                         metadataError = getMetadataUnsupportedMessage(audioContainer)
                     }
@@ -1173,7 +1175,7 @@ export const getCacheList = async (username?: string) => {
 
     const syncKey = `${currentCacheLocation}:${normalizedUsername}`
     const syncState = cacheListSyncState.get(syncKey) || { lastSync: 0 }
-    const mustSync = !hasCacheIndex || !hasMusicIndex
+    const mustSync = (!hasCacheIndex || !hasMusicIndex) && !syncState.lastSync
     const shouldSync = mustSync || Date.now() - syncState.lastSync > CACHE_LIST_SYNC_TTL
 
     if (shouldSync) {
@@ -1183,12 +1185,14 @@ export const getCacheList = async (username?: string) => {
                 .finally(() => { syncState.pending = undefined })
             cacheListSyncState.set(syncKey, syncState)
         }
-        await syncState.pending
+        if (mustSync) await syncState.pending
     }
 
     const cacheItems = indexManager.getAll(normalizedUsername, 'cache')
     const musicItems = indexManager.getAll(normalizedUsername, 'music')
-    const items = [...cacheItems, ...musicItems]
+    const other = currentCacheLocation === CACHE_ROOTS.DATA ? CACHE_ROOTS.ROOT : CACHE_ROOTS.DATA
+    const extra = [...indexManager.getAll(normalizedUsername, 'cache', other), ...indexManager.getAll(normalizedUsername, 'music', other)]
+    const items = [...cacheItems, ...musicItems, ...extra.filter(item => ![...cacheItems, ...musicItems].some(existing => existing.id === item.id && existing.quality === item.quality && existing.folder === item.folder))]
 
     return items.map(item => ({
         ...item,
@@ -1204,7 +1208,7 @@ export const getCacheList = async (username?: string) => {
             img: item.img,
             interval: item.interval,
             type: item.quality, // Compatibility
-            types: {} // To be filled if needed
+            types: { [item.quality]: {} } // 文件实际音质
         },
         hasLyric: item.hasLyric || !!item.lyricFilename
     }))
@@ -2905,13 +2909,15 @@ export const serveCacheFile = (req: http.IncomingMessage, res: http.ServerRespon
         currentCacheLocation,
         currentCacheLocation === CACHE_ROOTS.DATA ? CACHE_ROOTS.ROOT : CACHE_ROOTS.DATA
     ]
-    const roots = ['cache', 'music']
+    const requestedFolder = new URL(req.url || '/', 'http://localhost').searchParams.get('folder')
+    const roots = requestedFolder === 'cache' || requestedFolder === 'music' ? [requestedFolder] : ['cache', 'music']
     let filePath = ''
     const normalizedUsername = (username && username !== '_open' && username !== 'default') ? username : '_open'
     for (const loc of locations) {
         for (const folder of roots) {
             const dir = getCacheDir(normalizedUsername, folder === 'music', loc)
-            const checkPath = path.join(dir, filename) // [Fix] Allow subfolders
+            const checkPath = path.resolve(dir, filename)
+            if (!checkPath.startsWith(path.resolve(dir) + path.sep)) continue
             if (storageFs.existsSync(checkPath)) { filePath = checkPath; break }
         }
         if (filePath) break
@@ -2926,17 +2932,20 @@ export const serveCacheFile = (req: http.IncomingMessage, res: http.ServerRespon
     const range = req.headers.range
     if (range) {
         const parts = range.replace(/bytes=/, "").split("-")
-        const start = parseInt(parts[0], 10)
-        const end = parts[1] ? parseInt(parts[1], 10) : stat.size - 1
+        const start = parts[0] ? Number(parts[0]) : Math.max(0, stat.size - Number(parts[1]))
+        const end = parts[0] && parts[1] ? Math.min(Number(parts[1]), stat.size - 1) : stat.size - 1
+        if (!/^bytes=\d*-\d*$/.test(range) || !Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start < 0 || start > end || start >= stat.size) {
+            res.writeHead(416, { 'Content-Range': 'bytes */' + stat.size }); res.end(); return
+        }
         const chunksize = (end - start) + 1
         res.writeHead(206, {
             'Content-Range': `bytes ${start}-${end}/${stat.size}`,
             'Accept-Ranges': 'bytes', 'Content-Length': chunksize, 'Content-Type': contentType,
         })
-        storageFs.createReadStream(filePath, { start, end }).pipe(res)
+        if (req.method === 'HEAD') res.end(); else storageFs.createReadStream(filePath, { start, end }).pipe(res)
     } else {
         res.writeHead(200, { 'Content-Length': stat.size, 'Content-Type': contentType, 'Accept-Ranges': 'bytes' })
-        storageFs.createReadStream(filePath).pipe(res)
+        if (req.method === 'HEAD') res.end(); else storageFs.createReadStream(filePath).pipe(res)
     }
 }
 

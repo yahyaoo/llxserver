@@ -1,3 +1,4 @@
+import { resolveMusicFile } from '../../application/library/MusicDirectoryService'
 import type { RequestContext, ServerRuntime } from '../../common/http/RequestContext'
 import { removeMatchedDislikes } from './dislike/removeMatched'
 /** 音乐搜索、歌手专辑查询、自定义歌曲维护和不喜欢规则所需的应用依赖契约。 @author yahyaoo */
@@ -21,13 +22,9 @@ export async function postMusicCustomSync(context: RequestContext, runtime: Disc
           res.end(JSON.stringify({ success: false, message: 'Unauthorized' }))
           return
         }
-        void customMusicManager.syncCustomIndex(verified).then(() => {
-          res.writeHead(200, { 'Content-Type': 'application/json' })
-          res.end(JSON.stringify({ success: true, message: 'Sync completed' }))
-        }).catch(err => {
-          res.writeHead(500, { 'Content-Type': 'application/json' })
-          res.end(JSON.stringify({ success: false, message: err.message }))
-        })
+        const scan = customMusicManager.ensureMusicScan(verified, true)
+        res.writeHead(202, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ success: true, scan }))
         return
 
 }
@@ -283,9 +280,9 @@ export async function getMusicCustomEmbedLyric(context: RequestContext, runtime:
         try {
           const customDir = customMusicManager.getCustomMusicDir(verified)
           if (!customDir) throw new Error('未配置自定义目录')
-          const filePath = path.resolve(customDir, filename)
+          const filePath = resolveMusicFile(verified, filename)
           // 安全检查：防止路径穿越
-          if (!filePath.startsWith(path.resolve(customDir))) throw new Error('非法路径')
+          if (!filePath) throw new Error('非法路径')
           if (!storageFs.existsSync(filePath)) {
             res.writeHead(404, { 'Content-Type': 'application/json' })
             res.end(JSON.stringify({ success: false, message: '文件不存在' }))

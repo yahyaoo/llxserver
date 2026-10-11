@@ -1,3 +1,4 @@
+import { getMusicDirectories, validateDirectories, checkDirectory } from '../library/MusicDirectoryService'
 import { ApiTokenStore } from '../auth/ApiTokenStore'
 import { handleAccount } from '../../music/service/AccountService'
 import { UserSessionStore, USER_SESSION_COOKIE, ADMIN_SESSION_COOKIE, ADMIN_USERNAME } from '../auth/UserSessionStore'
@@ -577,6 +578,7 @@ const saveUsers = () => {
       'list.addMusicLocationType': u['list.addMusicLocationType'],
       enableCustomMusicDir: u.enableCustomMusicDir,
       customMusicDir: u.customMusicDir,
+      musicDirectoriesMigrated: (u as any).musicDirectoriesMigrated,
       allowOperateCustomMusicDir: u.allowOperateCustomMusicDir,
       allowWriteCustomMusicDir: u.allowWriteCustomMusicDir,
       enableAutoDownload: u.enableAutoDownload,
@@ -592,23 +594,22 @@ const saveUsers = () => {
 }
 
 /** 统一保存目录前完成全部校验，仅允许修改现有用户的目录字段。 @author yahyaoo */
-const validateCustomDirectoryUpdates = (value: unknown) => {
+const validateCustomDirectoryUpdates = async (value: unknown) => {
   if (value === undefined) return []
   if (!Array.isArray(value) || value.length > global.lx.config.users.length) throw new Error('用户歌曲目录配置格式错误')
   const names = new Set<string>()
-  return value.map(entry => {
-    if (!entry || typeof entry.name !== 'string' || typeof entry.customMusicDir !== 'string' || typeof entry.enableCustomMusicDir !== 'boolean' || names.has(entry.name)) throw new Error('用户歌曲目录配置格式错误')
+  const result = []
+  for (const entry of value) {
+    if (!entry || typeof entry.name !== 'string' || typeof entry.enableCustomMusicDir !== 'boolean' || names.has(entry.name)) throw new Error('用户歌曲目录配置格式错误')
     const user = global.lx.config.users.find(user => user.name === entry.name)
     if (!user) throw new Error('目录所属用户不存在')
     names.add(entry.name)
-    const directory = entry.customMusicDir.trim()
-    if (entry.enableCustomMusicDir && !directory) throw new Error(`用户 ${entry.name} 启用歌曲目录时必须填写绝对路径`)
-    if (directory) {
-      if (!path.isAbsolute(directory) || /[<>"|?*\x00-\x1f]/.test(directory)) throw new Error(`用户 ${entry.name} 的歌曲目录必须是有效绝对路径`)
-      try { storageFs.mkdirSync(directory, { recursive: true }); storageFs.accessSync(directory, storageFs.constants.R_OK) } catch { throw new Error(`用户 ${entry.name} 的歌曲目录无法访问，请检查路径与应用目录权限`) }
-    }
-    return { user, directory, enabled: entry.enableCustomMusicDir, oldDirectory: user.customMusicDir || '', oldEnabled: !!user.enableCustomMusicDir }
-  })
+    const values = entry.directories ?? (entry.customMusicDir?.trim() ? [{ path: entry.customMusicDir, scanMinutes: 30 }] : [])
+    const directories = await validateDirectories(entry.name, values)
+    if (entry.enableCustomMusicDir && !directories.length) throw new Error('启用歌曲目录时必须填写目录')
+    result.push({ user, directories, directory: directories[0]?.path || '', enabled: entry.enableCustomMusicDir, oldDirectory: user.customMusicDir || '', oldEnabled: !!user.enableCustomMusicDir })
+  }
+  return result
 }
 
 /** [新增] 服务器内部热重载数据 */
@@ -628,18 +629,6 @@ const reloadServerData = async () => {
         }
       }
 
-      // 如果有 WebDAV 同步实例，手动同步其配置
-      if (global.lx.webdavSync) {
-        global.lx.webdavSync.updateConfig({
-          url: global.lx.config['webdav.url'],
-          username: global.lx.config['webdav.username'],
-          password: global.lx.config['webdav.password'],
-          syncPath: global.lx.config['webdav.syncPath'],
-          backupPath: global.lx.config['webdav.backupPath'],
-          interval: global.lx.config['sync.interval'],
-          backupInterval: global.lx.config['sync.backupInterval'],
-        })
-      }
       startupLog.info(`Config re-loaded and merged from ${configPath}.`)
     } catch (err: any) {
       startupLog.error('Failed to reload config file:', err.message)
@@ -1911,6 +1900,25 @@ enabled?: boolean } = {}
       }
 
       // 7. Get Detailed Cache List
+      if (pathname === '/api/music/directories/check' && req.method === 'POST') {
+        if (req.headers['x-frontend-auth'] !== global.lx.config['frontend.password']) { res.writeHead(401); res.end('Unauthorized'); return }
+        try { const body = JSON.parse(await readBody(req)); const directory = await checkDirectory(body.path); res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ success: true, path: directory, message: '目录读写检测通过' })) }
+        catch (error: any) { res.writeHead(422, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ success: false, message: error.message })) }
+        return
+      }
+      if (pathname === '/api/music/server-download/remove' && req.method === 'POST') {
+        const username = verifyUserAuth(req)
+        if (!username) { res.writeHead(401); res.end('Unauthorized'); return }
+        try { const body = JSON.parse(await readBody(req)); if (!Array.isArray(body.ids) || body.ids.some((id: any) => typeof id !== 'string')) throw new Error('文件标识格式错误'); const deletedCount = serverDownloads.removeLibraryItems(body.ids, username); res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ success: true, deletedCount })) }
+        catch (error: any) { res.writeHead(400, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ success: false, message: error.message })) }
+        return
+      }
+      if (pathname === '/api/music/library/scan' && (req.method === 'GET' || req.method === 'POST')) {
+        const username = verifyUserAuth(req)
+        if (!username) { res.writeHead(401); res.end('Unauthorized'); return }
+        const scan = req.method === 'POST' ? customMusicManager.ensureMusicScan(username, true) : customMusicManager.getScanStatus(username)
+        res.writeHead(req.method === 'POST' ? 202 : 200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify({ success: true, scan })); return
+      }
       if (pathname === '/api/music/cache/list' && req.method === 'GET') {
         await musicPlaylistController.getMusicCacheList({ req, res, pathname, urlObj, ip }, serverRuntime)
         return
@@ -1990,7 +1998,6 @@ enabled?: boolean } = {}
         return
       }
 
-      // [New] WebDAV/Base Location switch
       if (pathname === '/api/music/cache/switch-base' && req.method === 'POST') {
         await musicDownloadController.postMusicCacheSwitchBase({ req, res, pathname, urlObj, ip }, serverRuntime)
         return
@@ -2351,57 +2358,12 @@ enabled?: boolean } = {}
         return
       }
 
-      // WebDAV Test Connection API
-      if (pathname === '/api/webdav/test' && req.method === 'POST') {
-        await adminBackupController.postWebdavTest({ req, res, pathname, urlObj, ip }, serverRuntime)
-        return
-      }
 
-      // WebDAV Sync File API
-      if (pathname === '/api/webdav/sync-file' && req.method === 'POST') {
-        await adminBackupController.postWebdavSyncFile({ req, res, pathname, urlObj, ip }, serverRuntime)
-        return
-      }
 
-      // WebDAV Backup API
-      if (pathname === '/api/webdav/backup' && req.method === 'POST') {
-        await adminBackupController.postWebdavBackup({ req, res, pathname, urlObj, ip }, serverRuntime)
-        return
-      }
-      // WebDAV Sync All Files API
-      if (pathname === '/api/webdav/sync' && req.method === 'POST') {
-        await adminBackupController.postWebdavSync({ req, res, pathname, urlObj, ip }, serverRuntime)
-        return
-      }
 
-      // WebDAV Backups List API
-      if (pathname === '/api/webdav/backups' && req.method === 'GET') {
-        await adminBackupController.getWebdavBackups({ req, res, pathname, urlObj, ip }, serverRuntime)
-        return
-      }
 
-      // WebDAV Delete Backup API
-      if (pathname === '/api/webdav/backup' && req.method === 'DELETE') {
-        await adminBackupController.deleteWebdavBackup({ req, res, pathname, urlObj, ip }, serverRuntime)
-        return
-      }
 
-      // WebDAV Restore API
-      if (pathname === '/api/webdav/restore' && req.method === 'POST') {
-        await adminBackupController.postWebdavRestore({ req, res, pathname, urlObj, ip }, serverRuntime)
-        return
-      }
 
-      // WebDAV Logs API
-      if (pathname === '/api/webdav/logs' && req.method === 'GET') {
-        await adminBackupController.getWebdavLogs({ req, res, pathname, urlObj, ip }, serverRuntime)
-        return
-      }
-      // WebDAV Progress SSE API
-      if (pathname === '/api/webdav/progress' && req.method === 'GET') {
-        await adminBackupController.getWebdavProgress({ req, res, pathname, urlObj, ip }, serverRuntime)
-        return
-      }
       // [新增] 本地备份下载 API
       if (pathname === '/api/backup/download' && req.method === 'GET') {
         await adminBackupController.getBackupDownload({ req, res, pathname, urlObj, ip }, serverRuntime)
@@ -2547,45 +2509,6 @@ enabled?: boolean } = {}
     perMessageDeflate: false,
   }) as unknown as LX.SocketServer
 
-  // WebDAV Sync Progress & Log Broadcast
-  if (global.lx.webdavSync) {
-    // 移除旧的监听器以防重复添加
-    global.lx.webdavSync.removeAllListeners('progress')
-    global.lx.webdavSync.removeAllListeners('log')
-
-    global.lx.webdavSync.on('progress', (data: any) => {
-      // Broadcast to WebSocket clients
-      if (wss) {
-        const msg = JSON.stringify({ type: 'webdav_progress', data })
-        for (const client of wss.clients) {
-          if (client.readyState === WebSocket.OPEN) {
-            client.send(msg)
-          }
-        }
-      }
-      // Broadcast to SSE clients
-      const sseMsg = `data: ${JSON.stringify(data)}\n\n`
-      for (const client of sseClients) {
-        client.write(sseMsg)
-      }
-    })
-
-    global.lx.webdavSync.on('log', (log: any) => {
-      const data = { type: 'sync_log', log }
-      if (wss) {
-        const msg = JSON.stringify({ type: 'webdav_log', data })
-        for (const client of wss.clients) {
-          if (client.readyState === WebSocket.OPEN) {
-            client.send(msg)
-          }
-        }
-      }
-      const sseMsg = `data: ${JSON.stringify(data)}\n\n`
-      for (const client of sseClients) {
-        client.write(sseMsg)
-      }
-    })
-  }
 
   wss.on('connection', function (socket: any, request) {
     socket.isReady = false

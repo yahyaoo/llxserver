@@ -38,7 +38,7 @@ window.SystemConfigurationView = class SystemConfigurationView {
         const groups = [
             { label: '服务与访问', items: ['基本配置', '代理配置', '前端访问配置', '用户路径配置', '访问路径配置'] },
             { label: '音乐与缓存', items: ['自定义歌曲目录', '服务器下载配置', '权限与缓存限制', 'Subsonic 协议配置'] },
-            { label: '同步与数据', items: ['WebDAV 同步配置', '备份与恢复', '数据库与迁移', '版本更新'] },
+            { label: '同步与数据', items: ['用户音乐目录', '备份与恢复', '数据库与迁移', '版本更新'] },
         ];
         groups.forEach(group => {
             const section = document.createElement('section');

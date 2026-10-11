@@ -729,21 +729,7 @@
                                     首</span>
                             </div>
                             <div id="lm-directory-controls" class="flex items-center gap-1 md:gap-2 order-3 md:order-2">
-                                <div id="lm-location-container"
-                                    class="flex items-center gap-0.5 md:gap-1 bg-gray-100/50 dark:bg-gray-700/30 p-0.5 rounded-lg border t-border-main scale-90 md:scale-100 origin-left">
-                                    <select id="lm-location-select" onchange="window.LocalMusicManager.changeLocation()"
-                                        class="lm-select !w-16 md:!w-20 !py-0.5 !text-[9px] md:!text-[10px] !px-1">
-                                        <option value="root">根目录</option>
-                                        <option value="data">数据目录</option>
-                                    </select>
-                                    <div class="h-3 w-[1px] bg-gray-300 dark:bg-gray-600"></div>
-                                    <button id="lm-subpath-btn" onclick="window.LocalMusicManager.openSubPathModal()"
-                                        class="text-[9px] md:text-[10px] t-text-main hover:text-[var(--c-500)] disabled:opacity-30 flex items-center gap-1 px-1">
-                                        <i class="fas fa-folder text-[9px] md:text-[10px]"></i>
-                                        <span id="lm-subpath-text"
-                                            class="max-w-[40px] md:max-w-[60px] truncate">全部</span>
-                                    </button>
-                                </div>
+                                <button type="button" id="library-scan-button" onclick="LocalMusicManager.scanLibrary()" class="px-3 py-1 rounded-lg border t-border-main text-xs"><i class="fas fa-sync-alt"></i> 扫描</button><span id="library-scan-progress" role="status" aria-live="polite" class="text-xs t-text-muted"></span>
                                 <button id="lm-sync-download-btn"
                                     onclick="window.LocalMusicManager.openSyncDownloadModal()"
                                     class="hidden text-[9px] md:text-[10px] font-bold px-1.5 md:px-2 py-0.5 rounded-lg bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500 hover:text-white transition-all inline-flex items-center gap-1 cursor-pointer shrink-0 whitespace-nowrap w-auto self-center h-fit"
@@ -1058,11 +1044,6 @@
                                         class="text-[11px] md:text-xs px-2.5 py-1.5 bg-orange-500 hover:bg-orange-600 text-white rounded-lg shadow-sm transition-all font-medium whitespace-nowrap flex items-center gap-1.5">
                                         <i class="fas fa-exchange-alt"></i>移动目录
                                     </button>
-                                    <button id="lm-batch-sync-btn"
-                                        onclick="window.LocalMusicManager.batchSwitchBaseLocation()"
-                                        class="text-[11px] md:text-xs px-2.5 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-lg shadow-sm transition-all font-medium whitespace-nowrap flex items-center gap-1.5">
-                                        <i class="fas fa-cloud-upload-alt"></i>云端同步
-                                    </button>
                                     <button onclick="window.LocalMusicManager.batchDownloadToDevice()"
                                         class="text-[11px] md:text-xs px-2.5 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg shadow-sm transition-all font-medium whitespace-nowrap flex items-center gap-1.5">
                                         <i class="fas fa-download"></i>保存
@@ -1099,7 +1080,7 @@
                         class="flex-1 overflow-y-auto p-2 space-y-1 custom-scrollbar pb-20 rounded-b-xl border border-t-0 t-border-main t-bg-panel">
                         <div class="text-center py-20 text-gray-500 animate-fade-in">
                             <i class="fas fa-circle-notch fa-spin text-4xl mb-4 text-emerald-500"></i>
-                            <p class="font-bold tracking-wider">正在加载本地音乐...</p>
+                            <p class="font-bold tracking-wider">正在加载音乐库...</p>
                         </div>
                     </div>
                     <div id="lm-pagination"
@@ -2972,6 +2953,7 @@
     <script src="js/common_ui.js"></script>
     <script src="js/sync_download.js"></script>
     <script src="views/recent/RecentView.js"></script>
+    <script src="js/deferred_writes.js"></script>
     <script src="js/music_experience.js"></script>
     <script src="js/play_statistics.js"></script>
     <script src="components/playback-experience/index.js"></script>

@@ -243,38 +243,6 @@ if (envParams.LIST_ADD_MUSIC_LOCATION_TYPE) {
 if (envParams.FRONTEND_PASSWORD) {
   global.lx.config['frontend.password'] = envParams.FRONTEND_PASSWORD
 }
-if (envParams.WEBDAV_ENABLE !== undefined) {
-  setBoolConfig('webdav.enable', envParams.WEBDAV_ENABLE)
-}
-if (envParams.WEBDAV_URL) {
-  global.lx.config['webdav.url'] = envParams.WEBDAV_URL
-}
-if (envParams.WEBDAV_USERNAME) {
-  global.lx.config['webdav.username'] = envParams.WEBDAV_USERNAME
-}
-if (envParams.WEBDAV_PASSWORD) {
-  global.lx.config['webdav.password'] = envParams.WEBDAV_PASSWORD
-}
-if (envParams.WEBDAV_SYNC_PATH) {
-  global.lx.config['webdav.syncPath'] = envParams.WEBDAV_SYNC_PATH
-}
-if (envParams.WEBDAV_BACKUP_PATH) {
-  global.lx.config['webdav.backupPath'] = envParams.WEBDAV_BACKUP_PATH
-}
-if (envParams.SYNC_INTERVAL) {
-  const interval = parseInt(envParams.SYNC_INTERVAL)
-  if (!isNaN(interval)) global.lx.config['sync.interval'] = interval
-}
-if (envParams.BACKUP_INTERVAL) {
-  const backupInterval = parseInt(envParams.BACKUP_INTERVAL)
-  if (!isNaN(backupInterval)) global.lx.config['sync.backupInterval'] = backupInterval
-}
-if (envParams.WEBDAV_EXCLUDE_CACHE !== undefined) {
-  setBoolConfig('webdav.excludeCache', envParams.WEBDAV_EXCLUDE_CACHE)
-}
-if (envParams.WEBDAV_EXCLUDE_MUSIC !== undefined) {
-  setBoolConfig('webdav.excludeMusic', envParams.WEBDAV_EXCLUDE_MUSIC)
-}
 
 if (envParams.USER_ENABLE_PATH !== undefined) {
   setBoolConfig('user.enablePath', envParams.USER_ENABLE_PATH)
@@ -664,73 +632,6 @@ require('./utils/migrate').default(global.lx.dataPath, global.lx.userPath)
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { startServer } = require('./server')
-
-// 初始化 WebDAV 同步
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const { createWebDavGateway } = require('./integrations/webdav/WebDavGateway') as typeof import('./integrations/webdav/WebDavGateway')
-const webdavSync = createWebDavGateway({
-  enable: global.lx.config['webdav.enable'],
-  url: global.lx.config['webdav.url'],
-  username: global.lx.config['webdav.username'],
-  password: global.lx.config['webdav.password'],
-  syncPath: global.lx.config['webdav.syncPath'],
-  backupPath: global.lx.config['webdav.backupPath'],
-  interval: global.lx.config['sync.interval'],
-  backupInterval: global.lx.config['sync.backupInterval'],
-  excludeCache: global.lx.config['webdav.excludeCache'],
-  excludeMusic: global.lx.config['webdav.excludeMusic'],
-}, global.lx.dataPath)
-
-
-// 导出 webdavSync 实例供全局使用
-global.lx.webdavSync = webdavSync
-
-// 如果配置了 WebDAV，在启动时尝试从远程恢复
-if (webdavSync.isConfigured()) {
-  console.log('[WebDAV] 已配置 WebDAV，正在尝试从远端恢复数据...')
-  void webdavSync.restoreFromRemote().then(async (success: boolean) => {
-    if (success) {
-      console.log('[WebDAV] 数据已成功从 WebDAV 恢复')
-
-      // 云端恢复写回 SQL 文档后，再从管理库刷新运行配置。
-      try { margeConfig(global.lx.configPath) }
-      catch (error) { console.error('[WebDAV] 恢复后加载 SQL 配置失败:', error) }
-
-      // 2. 重新加载 users.json
-      const usersJsonPath = path.join(global.lx.dataPath, 'users.json')
-      if (storageFs.existsSync(usersJsonPath)) {
-        try {
-          const users = JSON.parse(storageFs.readFileSync(usersJsonPath, 'utf-8'))
-          if (Array.isArray(users)) {
-            console.log('[WebDAV] 从恢复的 users.json 重新加载用户列表')
-            global.lx.config.users = users.map(u => ({ ...u, dataPath: '' }))
-
-            // 重新初始化用户目录
-            // eslint-disable-next-line @typescript-eslint/no-var-requires
-            const { getUserDirname } = require('./user')
-            for (const user of global.lx.config.users) {
-              const dataPath = path.join(global.lx.userPath, getUserDirname(user.name))
-              checkAndCreateDir(dataPath)
-              user.dataPath = dataPath
-            }
-          }
-        } catch (err) {
-          console.error('[WebDAV] 恢复后重新加载 users.json 失败:', err)
-        }
-      }
-
-      // 3. 重新加载所有自定义源 (解决前端显示加载中/旧源问题)
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const { initUserApis } = require('./integrations/custom-source/CustomSourceGateway')
-      console.log('[WebDAV] 正在重新初始化自定义源...')
-      await initUserApis()
-    }
-    // 启动自动同步
-    webdavSync.startAutoSync()
-  })
-} else {
-  console.log('[WebDAV] 未配置 WebDAV，跳过远端恢复')
-}
 
 // [新增] 确保数据目录下的 _open 及 _open/library 目录存在 (用于公共受限资源 & 公开收藏)
 const openDir = path.join(global.lx.userPath, '_open')

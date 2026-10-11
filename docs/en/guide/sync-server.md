@@ -57,12 +57,9 @@ Used for directly reviewing user synchronization data on the web page side.
 - **Playlist Detail Review**: You can browse all classified music lists, song information and favorite records saved on the server.
 - **Snapshots and Rollback**: The system will automatically save historical snapshots (Snapshot) of playlist data when synchronization changes occur. When a client mistakenly clears or abnormally overwrites, you can download previous complete data here, or perform a one-click rollback restoration directly against the server.
 
-### 4. WebDAV Backup and Synchronization (WebDAV Backup)
+### 4. Local Backup and Restore
 
-Used for periodically packaging and transmitting server-side data to third-party WebDAV storage.
-
-- **Periodic Backup**: After configuring and enabling a WebDAV account, the server will start a timed task (default every 60 minutes) to package and upload all current user records to the specified network disk.
-- **Automatic Pull Recovery**: When starting on a brand new server with empty data for the first time, if it is detected that WebDAV environment variables are filled, the server side will first download the latest backup file from the network disk and overwrite it to the local, thereby completing the import and recovery of old data.
+Download or restore a ZIP from the administration page. It includes business documents and music directory configuration, excluding database files, bootstrap configuration and external music files.
 
 ### 5. System Settings and Maintenance
 

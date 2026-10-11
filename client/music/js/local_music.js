@@ -881,28 +881,40 @@ window.LocalMusicManager = {
         }, 300);
     },
 
-    async refresh() {
-        const btn = document.querySelector('button[title="同步并刷新"] i');
-        if (btn) btn.classList.add('fa-spin');
-
+    async scanLibrary() {
         try {
-            // First trigger sync on server
-            if (typeof showInfo === 'function') showInfo('正在同步物理文件...');
-            const syncRes = await fetch('/api/music/cache/sync', {
-                method: 'POST',
-                headers: window.getUserAuthHeaders ? window.getUserAuthHeaders() : {}
-            });
-            const syncResult = await syncRes.json();
-            if (!syncResult.success) {
-                console.warn('Sync failed:', syncResult.message);
-            }
-        } catch (e) {
-            console.error('Sync request error:', e);
-        }
-
-        await this.fetchData();
-        if (btn) btn.classList.remove('fa-spin');
+            const response = await fetch('/api/music/library/scan', { method: 'POST', headers: window.getUserAuthHeaders() });
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.message || '请登录后扫描音乐库');
+            this.showScanProgress(result.scan);
+        } catch (error) { showError(error.message); }
     },
+
+    showScanProgress(scan) {
+        clearTimeout(this.scanPollTimer);
+        const progress = document.getElementById('library-scan-progress');
+        const running = scan?.status === 'running';
+        if (progress) progress.textContent = running ? '扫描中 ' + scan.percent + '%（' + scan.completed + '/' + scan.total + '）' : scan?.status === 'error' ? '扫描结束，部分目录读取失败，请检查权限' : scan?.status === 'completed' ? '扫描完成' : '';
+        if (running && !this.originalData.length) {
+            const container = document.getElementById('lm-list-container');
+            if (container) container.innerHTML = '<div class="text-center py-20 t-text-muted"><i class="fas fa-circle-notch fa-spin text-3xl"></i><p>首次扫描音乐库 ' + Number(scan.percent || 0) + '%</p></div>';
+        }
+        if (running) {
+            const owner = this.getCurrentUsername();
+            this.scanPollTimer = setTimeout(async () => {
+                if (owner !== this.getCurrentUsername()) return;
+                try {
+                    const response = await fetch('/api/music/library/scan', { headers: window.getUserAuthHeaders(), cache: 'no-store' });
+                    if (!response.ok) return;
+                    const result = await response.json();
+                    this.showScanProgress(result.scan);
+                    if (result.scan.status !== 'running') await this.fetchData(true);
+                } catch { if (owner === this.getCurrentUsername()) this.showScanProgress(scan); }
+            }, 1000);
+        }
+    },
+
+    async refresh() { await this.scanLibrary(); await this.fetchData(true); },
 
     toggleFilterPanel() {
         const panel = document.getElementById('lm-filter-panel');
@@ -1009,7 +1021,7 @@ window.LocalMusicManager = {
                 container.innerHTML = `
                     <div class="text-center py-20 text-gray-500 animate-fade-in">
                         <i class="fas fa-circle-notch fa-spin text-4xl mb-4 text-emerald-500"></i>
-                        <p class="font-bold tracking-wider">正在加载本地音乐...</p>
+                        <p class="font-bold tracking-wider">正在加载音乐库...</p>
                     </div>`;
             }
         }
@@ -1043,6 +1055,7 @@ window.LocalMusicManager = {
                 // Sort by mtime initially descending
                 this.originalData.sort((a, b) => (b.mtime || 0) - (a.mtime || 0));
                 this.applyFilters();
+                this.showScanProgress(result.scan);
                 this.pruneRemasterSelection();
                 if (document.getElementById('lm-remaster-modal')?.classList.contains('flex')) {
                     this.renderRemasterSelection();
@@ -1370,7 +1383,7 @@ window.LocalMusicManager = {
                                 <i class="fas fa-music t-text-muted text-xs"></i>
                              </div>`;
             {
-                const coverUrl = window.MusicExperience.coverUrl({ ...item, isCustomDir: this.isCustomDirMode }) || '/music/assets/logo.svg';
+                const coverUrl = window.MusicExperience.coverUrl({ ...item, isCustomDir: item.folder === 'custom' }) || '/music/assets/logo.svg';
                 coverHtml = `<img data-src="${this.escapeAttr(coverUrl)}" data-lm-cover-index="${index}" src="/music/assets/logo.svg" loading="lazy" fetchpriority="low" class="lazy-image lm-cover-image is-placeholder w-10 h-10 md:w-12 md:h-12 rounded-lg object-cover shadow-sm flex-shrink-0 border t-border-main mr-2.5 md:mr-4 ml-0.5 md:ml-3">`;
             }
 
@@ -1381,7 +1394,7 @@ window.LocalMusicManager = {
                 return d.toLocaleDateString() + ' ' + d.toLocaleTimeString().slice(0, 5);
             };
 
-            const folderIcon = item.folder === 'music' ? '<i class="fas fa-download text-blue-500 mr-1" title="下载目录"></i>' : '<i class="fas fa-hdd text-emerald-500 mr-1" title="缓存目录"></i>';
+            const folderIcon = item.folder === 'custom' ? '<i class="fas fa-folder text-emerald-500 mr-1" title="音乐目录"></i>' : (item.folder === 'music' || item.folder === 'download') ? '<i class="fas fa-download text-blue-500 mr-1" title="下载目录"></i>' : '<i class="fas fa-hdd text-emerald-500 mr-1" title="缓存目录"></i>';
 
             html += `
             <div class="grid grid-cols-12 gap-2 md:gap-4 p-3 md:p-2 items-center rounded-xl hover:t-bg-item-hover transition-all t-border-main border-b last:border-b-0 group relative ${isSelected ? 't-bg-item-hover ring-1 ring-emerald-500/30' : ''}" data-lm-row-index="${index}">
@@ -1496,7 +1509,7 @@ window.LocalMusicManager = {
                         <i class="fas fa-plus text-[10px]"></i>
                     </button>
                     <!-- Deletion from single operations -->
-                    ${(!this.isCustomDirMode || !!window.userAllowOperateCustomDir) ? `
+                    ${(item.folder !== 'custom' || !!window.userAllowOperateCustomDir) ? `
                     <button data-lm-action="delete" data-lm-index="${index}"
                             class="w-7 h-7 flex items-center justify-center rounded-full t-bg-main border t-border-main t-text-muted hover:text-red-500 hover:border-red-300 transition-all shadow-sm shrink-0" title="删除">
                         <i class="far fa-trash-alt text-[10px]"></i>
@@ -1759,49 +1772,27 @@ window.LocalMusicManager = {
         }
     },
 
-    playItem(index) {
-        const item = this.displayData[index];
-        if (!item) return;
-
-        // Transform into songInfo for global player
+    /** 所有文件来源统一构造播放对象，音质采用实际文件信息。 */
+    librarySong(item) {
         const username = this.getCurrentUsername();
-        const authToken = (window.getUserAuthHeaders ? window.getUserAuthHeaders()['x-user-token'] : null) || window.AccountSession.getToken() || '';
+        const token = window.getUserAuthHeaders?.()['x-user-token'] || '';
+        const custom = item.folder === 'custom';
+        const query = '?user=' + encodeURIComponent(username) + (token ? '&token=' + encodeURIComponent(token) : '');
+        const url = item.serverDownloadId ? '/api/music/server-download/file/' + encodeURIComponent(item.serverDownloadId) + query.replace('?user=', '?username=') : custom ? '/api/music/custom/file' + query + '&filename=' + encodeURIComponent(item.filename)
+            : '/api/music/cache/file/' + encodeURIComponent(username) + '/' + encodeURIComponent(item.filename) + query + '&folder=' + item.folder;
+        return { ...item.songInfo, id: item.songInfo?.id || (item.source && item.songmid ? item.source + '_' + item.songmid : item.id), quality: item.quality, type: item.quality, types: { [item.quality]: {} }, hasCover: item.hasCover, coverType: item.coverType,
+            bitrate: item.bitrate, bitDepth: item.bitDepth, sampleRate: item.sampleRate, url,
+            pic: item.hasCover === false ? '/music/assets/logo.svg' : item.serverDownloadId ? item.songInfo?.img || '/music/assets/logo.svg' : '/api/music/' + (custom ? 'custom' : 'cache') + '/cover' + query + '&filename=' + encodeURIComponent(item.filename),
+            isLocal: true, isCustomFile: custom, customFilename: custom ? item.filename : undefined,
+            folder: item.folder, serverDownloadId: item.serverDownloadId, _isCustomDir: custom,
+            _localFilename: item.filename, _localFolder: item.folder, _localUsername: username };
+    },
 
-        // Important: Use existing checkCache via global logic if possible, 
-        // or directly supply local URL
-        const songInfo = {
-            ...item.songInfo,
-            // Reconstruct full URL locally
-            url: `/api/music/cache/file/${encodeURIComponent(username)}/${encodeURIComponent(item.filename)}?folder=${item.folder}${authToken ? `&token=${encodeURIComponent(authToken)}` : ''}`,
-            pic: `/api/music/cache/cover?filename=${encodeURIComponent(item.filename)}&user=${encodeURIComponent(username)}${authToken ? `&token=${encodeURIComponent(authToken)}` : ''}`,
-            isLocal: true,
-            folder: item.folder,
-            _localFilename: item.filename,
-            _localFolder: item.folder || 'cache',
-            _localUsername: username
-        };
-
-        // If 'app.js' exposes playSong(song), we use it.
-        // We might want to construct a playlist of local tracks.
-        const playlist = this.displayData.map(d => ({
-            ...d.songInfo,
-            url: `/api/music/cache/file/${encodeURIComponent(username)}/${encodeURIComponent(d.filename)}?folder=${d.folder}${authToken ? `&token=${encodeURIComponent(authToken)}` : ''}`,
-            pic: `/api/music/cache/cover?filename=${encodeURIComponent(d.filename)}&user=${encodeURIComponent(username)}${authToken ? `&token=${encodeURIComponent(authToken)}` : ''}`,
-            isLocal: true,
-            // 附加本地文件定位信息，供 fetchLyric 读取内嵌歌词（未关联歌曲时优先使用）
-            _localFilename: d.filename,
-            _localFolder: d.folder || 'cache',
-            _localUsername: username
-        }));
-
-        if (typeof window.updatePlaylist === 'function') {
-            window.updatePlaylist(playlist, index, 'local_all');
-        } else if (typeof window.playSong === 'function') {
-            // Fallback for older versions
-            window.playSong(songInfo, index);
-        } else {
-            console.error('Playback functions are not defined globally.');
-        }
+    playItem(index) {
+        if (!this.displayData[index]) return;
+        const playlist = this.displayData.map(item => this.librarySong(item));
+        if (typeof window.updatePlaylist === 'function') window.updatePlaylist(playlist, index, 'local_all');
+        else window.playSong(playlist[index], index);
     },
 
     async deleteSingle(index) {
@@ -1877,6 +1868,16 @@ window.LocalMusicManager = {
                 delete headers['x-user-token'];
                 delete headers['x-user-password'];
             }
+            const custom = items.filter(item => item.folder === 'custom'), downloads = items.filter(item => item.folder === 'download');
+            if (custom.length || downloads.length) {
+                const responses = [];
+                if (custom.length) responses.push(await fetch('/api/music/custom/remove', { method: 'POST', headers, body: JSON.stringify({ filenames: custom.map(item => item.filename) }) }));
+                if (downloads.length) responses.push(await fetch('/api/music/server-download/remove', { method: 'POST', headers, body: JSON.stringify({ ids: downloads.map(item => item.serverDownloadId) }) }));
+                for (const response of responses) { const result = await response.json(); if (!response.ok || !result.success) throw new Error(result.message || '删除失败'); }
+                items = items.filter(item => item.folder !== 'custom' && item.folder !== 'download');
+                await this.fetchData(true);
+                if (!items.length) { this.selectedItems.clear(); this.updateBatchUI(); return; }
+            }
             const res = await fetch('/api/music/cache/remove', {
                 method: 'POST',
                 headers,
@@ -1916,14 +1917,14 @@ window.LocalMusicManager = {
         let fail = 0;
 
         for (const item of targets) {
-            if (!item.songInfo || !item.songInfo.source || item.songInfo.source === 'unknown' || item.songInfo.source === 'local') {
+            if (!item.songInfo || !item.songInfo.source || ['unknown', 'local', 'custom'].includes(item.songInfo.source) || item.folder === 'download') {
                 fail++;
                 continue;
             }
             try {
                 // If single_song_ops exposes requestServerLyricCache
                 if (typeof window.requestServerLyricCache === 'function') {
-                    const synced = await window.requestServerLyricCache(item.songInfo, item.quality, true);
+                    const synced = await window.requestServerLyricCache({ ...item.songInfo, filename: item.filename, folder: item.folder }, item.quality, true);
                     if (!synced) {
                         fail++;
                         continue;
@@ -1945,98 +1946,41 @@ window.LocalMusicManager = {
     },
 
     async batchEmbedLyric() {
-        const targetFilenames = this.getSelectedFilenames();
-        if (targetFilenames.length === 0) {
-            if (typeof showError === 'function') showError('请先选择要嵌入歌词的文件');
-            return;
-        }
+        return this.writeLibraryTags('embedLyric');
+    },
 
-        if (typeof showSelect === 'function') {
-            if (!(await showSelect('嵌入歌词到文件',
-                `将对选中的 ${targetFilenames.length} 首歌曲嵌入歌词到 USLT 标签。\n` +
-                `• 已有歌词标签的歌曲将跳过\n` +
-                `• 有 .lrc 文件的直接读取嵌入\n` +
-                `• 没有 .lrc 文件的将尝试从网络获取\n\n确定继续吗?`
-            ))) return;
-        }
-
+    /** 按真实文件来源调用标签接口，避免同名文件被误操作。 */
+    async writeLibraryTags(action) {
+        const selected = this.getSelectedEntries();
+        if (!selected.length) { showError('请先选择文件'); return; }
+        const unsupported = selected.filter(item => item.folder === 'download');
+        const custom = selected.filter(item => item.folder === 'custom');
+        if (custom.length && !window.userAllowWriteCustomDir) { showError('未开启自定义目录写入权限'); return; }
+        if (unsupported.length) showInfo(`已跳过 ${unsupported.length} 个独立下载文件，该下载位置暂不支持标签维护`);
+        const targets = selected.filter(item => item.folder !== 'download');
+        if (!targets.length) return;
+        if (typeof showSelect === 'function' && !await showSelect('更新文件标签', `确定处理 ${targets.length} 个文件吗？`)) return;
         try {
-            if (typeof showInfo === 'function') showInfo('正在嵌入歌词，请稍候...');
-            const res = await fetch('/api/music/cache/embedLyric', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...(window.getUserAuthHeaders ? window.getUserAuthHeaders() : {})
-                },
-                body: JSON.stringify({ filenames: targetFilenames })
-            });
-
-            const result = await res.json();
-            if (result.success) {
-                const { successCount = 0, skippedCount = 0, failCount = 0 } = result;
-                if (typeof showInfo === 'function') {
-                    showInfo(`嵌入完成：成功 ${successCount} 首，跳过（已有） ${skippedCount} 首，失败 ${failCount} 首`);
-                }
-                // 打印详情供排查
-                if (result.details && result.details.length > 0) {
-                    const failed = result.details.filter(d => d.status === 'fail');
-                    if (failed.length > 0) {
-                        console.warn('[EmbedLyric] 失败详情:', failed);
-                        const firstFailure = failed[0];
-                        if (typeof showError === 'function') {
-                            showError(`有 ${failed.length} 首无法嵌入：${firstFailure.filename} - ${firstFailure.reason || '未知原因'}`);
-                        }
-                    }
-                }
-                await this.refresh();
-            } else {
-                throw new Error(result.message || '服务器返回错误');
+            let success = 0, fail = 0;
+            for (const kind of ['custom', 'cache']) {
+                const items = targets.filter(item => (item.folder === 'custom' ? 'custom' : 'cache') === kind);
+                if (!items.length) continue;
+                const response = await fetch(`/api/music/${kind}/${action}`, { method: 'POST', headers: { ...window.getUserAuthHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify({ filenames: items.map(item => item.filename) }) });
+                const result = await response.json();
+                if (!response.ok || !result.success) throw new Error(result.message || '更新失败');
+                success += result.successCount || 0; fail += result.failCount || 0;
             }
-        } catch (e) {
-            if (typeof showError === 'function') showError('嵌入歌词失败: ' + e.message);
-            console.error('[EmbedLyric] Error:', e);
-        }
+            showInfo(`处理完成：成功 ${success} 项，失败 ${fail} 项`);
+            await this.fetchData(true);
+        } catch (error) { showError(error.message); }
     },
 
     async batchUpdateMetadata() {
-        const targets = this.getSelectedEntries();
-        const targetFilenames = targets.map(item => item.filename);
-
-        if (targets.length === 0) {
-            if (typeof showInfo === 'function') showInfo('请先选择需要补全元信息的文件');
-            return;
-        }
-
-        if (typeof showSelect === 'function') {
-            if (!(await showSelect('补全元信息', `确定要向服务器请求补全这 ${targets.length} 个文件的元信息(包含封面与ID3标签)吗?`))) return;
-        } else {
-            if (!confirm(`确定要补全这 ${targets.length} 个文件的元信息吗?`)) return;
-        }
-
-        try {
-            if (typeof showInfo === 'function') showInfo('正在处理，请稍候...');
-            const res = await fetch('/api/music/cache/updateMetadata', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...(window.getUserAuthHeaders ? window.getUserAuthHeaders() : {})
-                },
-                body: JSON.stringify({ filenames: targetFilenames })
-            });
-
-            const result = await res.json();
-            if (result.success) {
-                if (typeof showInfo === 'function') showInfo(`元信息补全完成。成功 ${result.successCount} 项，失败 ${result.failCount} 项`);
-                this.refresh();
-            } else {
-                throw new Error(result.message || 'Server returned error');
-            }
-        } catch (e) {
-            if (typeof showError === 'function') showError('补全元信息失败: ' + e.message);
-        }
+        return this.writeLibraryTags('updateMetadata');
     },
 
     async batchSwitchFolder() {
+        if (this.getSelectedEntries().some(item => ['custom', 'download'].includes(item.folder))) { showError('目录转移仅支持缓存目录中的文件，请单独选择缓存文件'); return; }
         const selectedEntries = this.getSelectedEntries();
         if (selectedEntries.length === 0) {
             if (typeof showError === 'function') showError('请先选择要移动的文件');
@@ -2141,7 +2085,8 @@ window.LocalMusicManager = {
 
     downloadSingle(index) {
         const item = this.displayData[index];
-        if (item) window.downloadLibraryFile(item, { username: this.getCurrentUsername(), custom: false });
+        if (item?.serverDownloadId) { const link = document.createElement('a'); link.href = this.librarySong(item).url; link.download = item.filename; link.click(); return; }
+        if (item) window.downloadLibraryFile(item, { username: this.getCurrentUsername(), custom: item.folder === 'custom' });
     },
 
     batchDownloadToDevice() {
@@ -2158,7 +2103,8 @@ window.LocalMusicManager = {
         // Use a slight delay to prevent browser from blocking multiple downloads
         targets.forEach((item, idx) => {
             setTimeout(() => {
-                window.downloadLibraryFile(item, { username, custom: false });
+                if (item.serverDownloadId) { const link = document.createElement('a'); link.href = this.librarySong(item).url; link.download = item.filename; link.click(); }
+                else window.downloadLibraryFile(item, { username, custom: item.folder === 'custom' });
             }, idx * 500);
         });
 
@@ -2958,9 +2904,7 @@ window.LocalMusicManager = {
     },
 
     getRemasterSelectableItems() {
-        if (this.remasterSource === 'custom' && window.CustomDirManager && Array.isArray(window.CustomDirManager.originalData)) {
-            return window.CustomDirManager.originalData;
-        }
+        if (this.remasterSource === 'custom') return window.userAllowOperateCustomDir ? this.originalData.filter(item => item.folder === 'custom') : [];
         return this.originalData.filter(item => item.folder === 'music');
     },
 
@@ -3120,7 +3064,8 @@ window.LocalMusicManager = {
             return;
         }
         // 初始化数据源：默认跟随当前视图模式，但可在模态框内独立切换
-        const isCustomDirActive = !!(window.CustomDirManager && window.CustomDirManager.isActive);
+        const selected = this.getSelectedEntries();
+        const isCustomDirActive = selected.some(item => item.folder === 'custom') || (!selected.length && !this.originalData.some(item => item.folder === 'music') && this.originalData.some(item => item.folder === 'custom'));
         if (isCustomDirActive && !window.userAllowOperateCustomDir) {
             // 自定义目录无权限时，降级到本地模式而非拒绝打开
             this.remasterSource = 'local';
@@ -3134,9 +3079,7 @@ window.LocalMusicManager = {
             // 同步当前主列表的勾选项目到洗版选择列表中
             this.remasterSelectedItems.clear();
             if (this.remasterSource === 'custom') {
-                if (window.CustomDirManager && window.CustomDirManager.selectedItems && window.CustomDirManager.selectedItems.size > 0) {
-                    window.CustomDirManager.selectedItems.forEach(filename => this.remasterSelectedItems.add(filename));
-                }
+                selected.filter(item => item.folder === 'custom').forEach(item => this.remasterSelectedItems.add(item.filename));
             } else {
                 if (this.selectedItems && this.selectedItems.size > 0) {
                     const musicSelected = this.getSelectedEntries().filter(item => item.folder === 'music');

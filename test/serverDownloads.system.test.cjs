@@ -147,6 +147,9 @@ test('完整接口：配置持久化、队列下载、本地播放、缓存绝�
     }
     assert.equal(completed.status, 'finished', completed.errorMsg + '\n' + logs.slice(-1500))
     assert.equal(completed.serverDownload, true)
+    const library = await (await musicFetch(origin + '/api/music/cache/list')).json()
+    const libraryDownload = library.data.find(item => item.serverDownloadId)
+    assert.ok(libraryDownload.songInfo.id, '下载歌曲在音乐库中有稳定播放标识')
     assert.ok(fs.readdirSync(directory).includes('系统测试歌曲 - 测试歌手 - 320k - Unknown Album.mp3'), '空模板沿用当前歌曲命名方式')
     assert.ok(fs.readdirSync(directory).some(f => f.endsWith('.lrc')))
     const checkUrl = '/api/music/server-download/check?source=wy&songmid=88888&quality=320k'
@@ -213,6 +216,7 @@ test('完整接口：配置持久化、队列下载、本地播放、缓存绝�
 
     const customDirectory = path.join(root, '用户自定义歌曲')
     const aliceDirectory = path.join(root, 'alice歌曲')
+    fs.mkdirSync(customDirectory, { recursive: true }); fs.mkdirSync(aliceDirectory, { recursive: true })
     const putUser = body => fetch(origin + '/api/users', { method: 'PUT', headers: admin, body: JSON.stringify(body) })
     assert.equal((await putUser({ name: 'admin', customMusicDir: '../bad', enableCustomMusicDir: true })).status, 422)
     let user = (await (await fetch(origin + '/api/users', { headers: admin })).json()).find(u => u.name === 'admin')
@@ -244,9 +248,15 @@ test('完整接口：配置持久化、队列下载、本地播放、缓存绝�
     assert.equal((await (await fetch(origin + '/api/config', { headers: admin })).json())['update.hasToken'], false)
     const restoredAlice = (await (await fetch(origin + '/api/users', { headers: admin })).json()).find(u => u.name === 'alice')
     assert.equal(restoredAlice.customMusicDir, aliceDirectory)
+    await context.fetchDownloadWithAuth('/api/music/custom/list')
+    for (let attempt = 0; attempt < 100; attempt++) {
+      const progress = await (await context.fetchDownloadWithAuth('/api/music/library/scan')).json()
+      if (progress.scan.status !== 'running') break
+      await new Promise(resolve => setTimeout(resolve, 50))
+    }
     const customList = await (await context.fetchDownloadWithAuth('/api/music/custom/list')).json()
     assert.equal(customList.success, true)
-    assert.ok(customList.data.some(song => song.filename === '测试歌曲.mp3'), '播放器应读取后台保存的用户歌曲目录')
+    assert.ok(customList.data.some(song => song.filename.endsWith('/测试歌曲.mp3')), '播放器应读取后台保存的用户歌曲目录')
     assert.equal(audioRequests, beforePlayback)
   } finally {
     await stop()

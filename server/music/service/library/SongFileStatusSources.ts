@@ -1,3 +1,4 @@
+import { resolveMusicFile } from '../../../application/library/MusicDirectoryService'
 import { hasIndexedAudio } from './SongFileIntegrity'
 import * as fileCache from '../cache/FileCacheService'
 import * as customMusic from './CustomMusicService'
@@ -17,18 +18,8 @@ async function loadCatalog(username: string): Promise<SongFileCatalog> {
   const downloaded = serverDownloads.getAvailableIdentities(username)
   const cacheItems = await fileCache.getCacheList(username)
   const cache = cacheItems.filter(item => hasIndexedAudio(fileCache.getCacheDir(username, item.folder === 'music'), item))
-  const root = customMusic.getCustomMusicDir(username)
-  let custom: SongFileCatalog['custom'] = []
-  if (root) {
-    let scan = customScans.get(username)
-    if (!scan || scan.root !== root) { scan = { root, time: 0 }; customScans.set(username, scan) }
-    if (!scan.pending && Date.now() - scan.time >= 10000) {
-      const current = scan
-      current.pending = customMusic.syncCustomIndex(username, true).then(() => { current.time = Date.now() }).finally(() => { current.pending = undefined })
-    }
-    if (scan.pending) await scan.pending
-    custom = (await customMusic.getCustomMusicList(username)).filter(item => hasIndexedAudio(root, item))
-  }
+  customMusic.ensureMusicScan(username)
+  const custom = (await customMusic.getCustomMusicList(username)).filter(item => !!resolveMusicFile(username, item.filename))
   return { downloaded, cache, custom }
 }
 

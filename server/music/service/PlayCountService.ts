@@ -36,7 +36,7 @@ export class PlayCountService {
       const previous = items.find(item => String(item.id) === String(song.id) && item.source === song.source)
       if (previous?.lastPlaybackId === song.playbackId) return items
       const clean: any = {}
-      for (const key of ['id', 'songmid', 'songId', 'name', 'singer', 'source', 'albumName', 'albumId', 'interval', 'quality', 'type', 'types', 'isLocal', '_localLibraryItem', 'filename', 'folder', 'isCustomDir', 'hasCover', 'mtime']) {
+      for (const key of ['id', 'songmid', 'songId', 'name', 'singer', 'source', 'albumName', 'albumId', 'interval', 'quality', 'type', 'types', 'isLocal', '_localLibraryItem', 'filename', 'folder', 'isCustomDir', 'hasCover', 'mtime', 'serverDownloadId', 'customFilename', 'isCustomFile']) {
         if (song[key] !== undefined) clean[key] = song[key]
       }
       // 展示元数据兼容收藏歌曲的 meta 字段；不参与次数计算。

@@ -1,4 +1,5 @@
 import type { RequestContext, ServerRuntime } from '../../common/http/RequestContext'
+import { getLibraryItems } from './download/ServerDownloadService'
 import { validatePlaylistCover } from './playlist/cover'
 /** 用户歌单、历史快照、缓存列表和平台歌单查询所需的应用依赖契约。 @author yahyaoo */
 export type PlaylistServiceRuntime = Pick<ServerRuntime, 'verifyUserAuth' | 'getUserSpace' | 'getUserDirname' | 'path' | 'storageFs' | 'readBody' | 'getUserConfig' | 'startupLog' | 'fileCache' | 'customMusicManager' | 'musicSdk' | 'normalizeSongInfo'>
@@ -726,7 +727,7 @@ export async function getMusicCacheList(context: RequestContext, runtime: Playli
   const { verifyUserAuth, fileCache } = runtime
 
         const targetUserParam = urlObj.searchParams.get('user')
-        const reqUsername = targetUserParam || (req.headers['x-user-name'] as string) || ''
+        const reqUsername = targetUserParam || (req.headers['x-user-name'] as string) || verifyUserAuth(req) || ''
         const auth = req.headers['x-frontend-auth']
         const isAdmin = !!(auth && auth === global.lx.config['frontend.password'])
         const isPublic = !reqUsername || reqUsername === 'default' || reqUsername === '_open' || targetUserParam === '_open'
@@ -756,12 +757,13 @@ export async function getMusicCacheList(context: RequestContext, runtime: Playli
           }
           username = verified
         }
-        void fileCache.getCacheList(username).then(list => {
+        void Promise.all([fileCache.getCacheList(username), username === '_open' ? Promise.resolve([]) : runtime.customMusicManager.getCustomMusicList(username)]).then(([cached, custom]) => {
+          const list = [...cached, ...custom, ...getLibraryItems(username)]
           res.writeHead(200, {
             'Content-Type': 'application/json',
             'Cache-Control': 'no-cache, no-store, must-revalidate',
           })
-          res.end(JSON.stringify({ success: true, data: list }))
+          res.end(JSON.stringify({ success: true, data: list, scan: runtime.customMusicManager.getScanStatus(username) }))
         }).catch(err => {
           res.writeHead(500)
           res.end(err.message)

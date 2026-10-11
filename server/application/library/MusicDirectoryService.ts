@@ -1,15 +1,22 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import crypto from 'node:crypto'
-import { repositories } from '../../../application/persistence/storage'
-import { getUserConfig } from '../../../user'
+import { repositories } from '../persistence/storage'
+import storageFs from '../persistence/documentFileSystem'
 
 export interface MusicDirectory { id: string; path: string; scanMinutes: number }
 
+/** 账号重命名时迁移音乐库索引，保留已有平台关联。 */
+export function renameMusicDirectoryIndex(previous: string, next: string): void {
+  const index = (name: string) => path.join(global.lx.dataPath, 'library', crypto.createHash('sha256').update(name).digest('hex'), 'custom_index.json')
+  const source = index(previous), target = index(next)
+  if (storageFs.existsSync(source)) storageFs.renameSync(source, target)
+}
+
 /** 读取子表并一次性迁移旧单目录配置，目录清空后不会重新导入。 */
-export function getMusicDirectories(username: string): MusicDirectory[] {
-  const user = getUserConfig(username)
-  if (!user || !user.enableCustomMusicDir) return []
+export function getMusicDirectories(username: string, includeDisabled = false): MusicDirectory[] {
+  const user = global.lx.config.users.find(user => user.name === username)
+  if (!user) return []
   const repository = repositories().admin
   let directories = repository.readMusicDirectories(username)
   if (!(user as any).musicDirectoriesMigrated) {
@@ -19,7 +26,7 @@ export function getMusicDirectories(username: string): MusicDirectory[] {
     }
     ;(user as any).musicDirectoriesMigrated = true
   }
-  return directories
+  return includeDisabled || user.enableCustomMusicDir ? directories : []
 }
 
 /** 实际读取和创建临时文件检测权限；失败时要求管理员赋予目录读写权限。 */
@@ -61,7 +68,7 @@ export async function validateDirectories(username: string, values: unknown): Pr
 }
 
 /** 根据目录标识安全定位文件，并拒绝越界及符号链接逃逸。 */
-export function resolveMusicFile(username: string, filename: string): string | null {
+export function resolveMusicFile(username: string, filename: string, allowMissing = false): string | null {
   const directories = getMusicDirectories(username)
   const match = /^@([a-f0-9]{16})\/(.+)$/.exec(filename)
   const directory = match ? directories.find(item => item.id === match[1]) : directories[0]
@@ -70,7 +77,8 @@ export function resolveMusicFile(username: string, filename: string): string | n
   const resolved = path.resolve(directory.path, relative)
   if (!resolved.startsWith(directory.path + path.sep)) return null
   try {
-    const actual = fs.realpathSync(resolved), root = fs.realpathSync(directory.path)
+    const actual = fs.existsSync(resolved) ? fs.realpathSync(resolved) : allowMissing ? path.join(fs.realpathSync(path.dirname(resolved)), path.basename(resolved)) : ''
+    const root = fs.realpathSync(directory.path)
     return actual.startsWith(root + path.sep) ? actual : null
   } catch { return null }
 }

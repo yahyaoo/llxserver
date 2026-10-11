@@ -110,7 +110,7 @@ body.player-feature-open :is(#mobile-page-header, #mobile-bottom-nav) { display:
         padding: env(safe-area-inset-top) 24px env(safe-area-inset-bottom); pointer-events: none;
         opacity: 0; visibility: hidden; transform: scale(.97);
         transition: opacity 260ms ease, transform 260ms ease, visibility 260ms;
-        background: color-mix(in srgb, var(--bg-panel) 74%, transparent); backdrop-filter: blur(32px);
+        background: color-mix(in srgb, var(--bg-panel) 74%, transparent); backdrop-filter: blur(12px);
         isolation: isolate; overflow: hidden;
     }
     #view-player-detail #lyrics-wrapper::before {
