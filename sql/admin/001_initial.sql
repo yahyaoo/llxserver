@@ -149,3 +149,13 @@ CREATE TABLE IF NOT EXISTS server_api_token (
   disabled INTEGER NOT NULL CHECK (disabled IN (0, 1)) -- 单个令牌禁用标志
 );
 CREATE INDEX IF NOT EXISTS idx_server_api_token_user ON server_api_token (username);
+-- 用户音乐目录子表：稳定标识防止不同目录的同名歌曲相互覆盖。
+CREATE TABLE IF NOT EXISTS server_user_music_directory (
+  username TEXT NOT NULL,
+  id TEXT NOT NULL,
+  path TEXT NOT NULL,
+  scan_minutes INTEGER NOT NULL DEFAULT 30 CHECK(scan_minutes BETWEEN 1 AND 1440),
+  sort_order INTEGER NOT NULL,
+  PRIMARY KEY(username, id),
+  UNIQUE(username, path)
+);
