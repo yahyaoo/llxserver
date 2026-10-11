@@ -1,0 +1,136 @@
+name: Publish Verified Release Assets
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 已合并到 main 的正式版本标签
+        required: true
+        type: string
+      artifacts_run_id:
+        description: 九个平台角色构建均成功的 Build and Release run ID
+        required: true
+        type: string
+  workflow_call:
+    inputs:
+      release_tag:
+        required: true
+        type: string
+      artifacts_run_id:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-assets-${{ inputs.release_tag }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      actions: read
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      RELEASE_TAG: ${{ inputs.release_tag }}
+      SOURCE_RUN_ID: ${{ inputs.artifacts_run_id }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refs/tags/${{ inputs.release_tag }}
+          fetch-depth: 0
+      - name: Verify source and successful builds
+        run: |
+          [[ "$SOURCE_RUN_ID" =~ ^[0-9]+$ ]]
+          git merge-base --is-ancestor HEAD origin/main
+          node -e 'if (process.env.RELEASE_TAG !== "v" + require("./package.json").version || !/^v\d+\.\d+\.\d+$/.test(process.env.RELEASE_TAG)) throw new Error("正式标签与源码版本不一致")'
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID" > "$RUNNER_TEMP/source-run.json"
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID/jobs?per_page=100" > "$RUNNER_TEMP/source-jobs.json"
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import subprocess
+          root = Path(os.environ['RUNNER_TEMP'])
+          run = json.loads((root / 'source-run.json').read_text())
+          assert run['head_sha'] == subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
+          assert run['head_branch'] == os.environ['RELEASE_TAG']
+          assert run['path'] == '.github/workflows/release.yml'
+          jobs = json.loads((root / 'source-jobs.json').read_text())['jobs']
+          builds = [j for j in jobs if j['name'] == 'packages' or j['name'].startswith('build_desktop / Build (')]
+          assert len(builds) == 10
+          assert all(j['status'] == 'completed' and j['conclusion'] == 'success' for j in builds)
+          PY
+      - uses: actions/download-artifact@v4
+        with:
+          path: downloaded_artifacts
+          run-id: ${{ inputs.artifacts_run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Prepare unique ASCII asset names and checksums
+        run: |
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+          import shutil
+          directory = Path('release_assets')
+          directory.mkdir()
+          for artifact in Path('downloaded_artifacts').iterdir():
+              files = [p for p in artifact.rglob('*') if p.is_file()]
+              assert files
+              if artifact.name != 'release-node-packages':
+                  assert len(files) == 1
+                  assert artifact.name.startswith('llxserver-') and artifact.name.isascii()
+              for source in files:
+                  name = source.name if artifact.name == 'release-node-packages' else artifact.name + '-' + os.environ['RELEASE_TAG'] + source.suffix
+                  assert name.isascii()
+                  target = directory / name
+                  assert not target.exists(), name
+                  shutil.copyfile(source, target)
+          files = sorted(directory.iterdir())
+          assert sum(p.suffix == '.fpk' for p in files) == 3
+          assert sum(p.suffix == '.zip' for p in files) == 3
+          info = dict(line.split('=', 1) for line in (directory / 'BUILD_INFO.txt').read_text().splitlines())
+          assert info['channel'] == 'release' and info['tag'] == os.environ['RELEASE_TAG']
+          assert info['commit'] == json.loads((Path(os.environ['RUNNER_TEMP']) / 'source-run.json').read_text())['head_sha']
+          (directory / 'SHA256SUMS').write_text(''.join(hashlib.sha256(p.read_bytes()).hexdigest() + '  ' + p.name + '\n' for p in files), encoding='utf-8')
+          PY
+          (cd release_assets && sha256sum --check SHA256SUMS)
+      - name: Create draft and upload all packages
+        run: |
+          gh release create "$RELEASE_TAG" --verify-tag --draft --title "洛洛雪音乐 $RELEASE_TAG" --notes-file "deploy/fnos/releases/$RELEASE_TAG.md" release_assets/*
+          gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" > "$RUNNER_TEMP/releases.json"
+      - name: Verify downloaded asset bytes and publish by release ID
+        run: |
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+          import subprocess
+          root = Path(os.environ['RUNNER_TEMP'])
+          matches = [r for r in json.loads((root / 'releases.json').read_text()) if r['tag_name'] == os.environ['RELEASE_TAG']]
+          assert len(matches) == 1
+          release = matches[0]
+          assert release['draft'] and not release['prerelease']
+          assets = {a['name']: a for a in release['assets']}
+          files = list(Path('release_assets').iterdir())
+          assert set(assets) == {p.name for p in files}
+          for path in files:
+              asset = assets[path.name]
+              expected = hashlib.sha256(path.read_bytes()).hexdigest()
+              assert asset['size'] == path.stat().st_size, path.name
+              assert asset['digest'] == 'sha256:' + expected, path.name
+              downloaded = root / 'verified-asset'
+              with downloaded.open('wb') as output:
+                  subprocess.run(['gh', 'api', 'repos/' + os.environ['GITHUB_REPOSITORY'] + '/releases/assets/' + str(asset['id']), '-H', 'Accept: application/octet-stream'], stdout=output, check=True)
+              assert hashlib.sha256(downloaded.read_bytes()).hexdigest() == expected, path.name
+              downloaded.unlink()
+          subprocess.run(['gh', 'api', '--method', 'PATCH', 'repos/' + os.environ['GITHUB_REPOSITORY'] + '/releases/' + str(release['id']), '-F', 'draft=false', '-f', 'make_latest=true'], stdout=subprocess.DEVNULL, check=True)
+          print('发布完成：' + release['html_url'])
+          PY

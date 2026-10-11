@@ -27,3 +27,7 @@
 此前页面浏览器验证见 mobile-player-redesign-test-report.md 和 ui-followup-artwork-test-report.md；本次版本与发布配置修改未重跑页面浏览器测试。实际 NAS 安装和外部音源播放未在本机验证。
 
 正式发布由 PR 合并后的 main 提交构建；GitHub 构建与附件校验结果以对应 Actions run 和 BUILD_INFO.txt 为准。
+
+## 发布附件修复
+
+首次正式构建的 ZIP/FPK 和九个桌面构建均通过。GitHub 上传会移除中文附件名，使不同角色的桌面附件变成相同名称，导致草稿上传返回 422。发布流程改为从 artifact 名称生成包含角色、平台和架构的 ASCII 附件名；未公开的部分草稿可清理后重试。独立发布入口核对原 run 的提交、标签和十个成功构建任务，复用其产物并按 Release ID 回读草稿附件，不覆盖正式标签或已公开版本。
