@@ -77,3 +77,14 @@
     #main-sidebar.main-navigation:not(.translate-x-0) { transform: translateX(calc(-100% - 24px)); }
 }
 
+/* 排序图标仅在移入或键盘操作时显示，保留占位避免歌单名称跳动。作者：jingyh */
+.playlist-sidebar-item .favorite-sidebar-drag-handle {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .18s ease;
+}
+.playlist-sidebar-item:hover .favorite-sidebar-drag-handle,
+.playlist-sidebar-item:focus-within .favorite-sidebar-drag-handle {
+    opacity: 1;
+    pointer-events: auto;
+}

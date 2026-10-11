@@ -29,6 +29,7 @@ export class ListManage {
     const listData = JSON.stringify(await this.getListData())
     this.listDataManage.persistFavorites()
     this.listDataManage.persistCovers()
+    this.listDataManage.persistPlaylists()
     const md5 = toMD5(listData)
     const snapshotInfo = await this.snapshotDataManage.getSnapshotInfo()
     console.log(md5, snapshotInfo.latest)

@@ -434,7 +434,7 @@ const detectImageMime = (data: Buffer | Uint8Array) => {
     return null
 }
 
-const readCoverCache = (filename: string, username: string, stats?: Stats) => {
+export const readCoverCache = (filename: string, username: string, stats?: Stats) => {
     const candidates = [getCoverCachePaths(filename, username, stats), getLegacyCoverCachePaths(filename, username, stats)]
     for (const candidate of candidates) {
         try {
@@ -458,7 +458,7 @@ const hasCachedCover = (filename: string, username: string, stats?: Stats) => {
     return !!readCoverCache(filename, username, stats)
 }
 
-const writeCoverCache = (filename: string, username: string, data: Buffer | Uint8Array, mime: string, stats?: Stats) => {
+export const writeCoverCache = (filename: string, username: string, data: Buffer | Uint8Array, mime: string, stats?: Stats) => {
     const coverData = Buffer.from(data)
     const detectedMime = detectImageMime(coverData)
     if (!detectedMime) return false
@@ -1490,7 +1490,7 @@ export const linkLocalFile = async (oldFilename: string, songInfo: any, username
 }
 
 
-const downloadCoverImage = async (imageUrl: string, redirects = 0): Promise<{
+export const downloadCoverImage = async (imageUrl: string, redirects = 0): Promise<{
 data: Buffer; /** 音频媒体类型。 */
 mime: string } | null> => {
     if (!hasUsableRemoteCover(imageUrl) || redirects > 3) return null
@@ -1578,7 +1578,8 @@ export const getCacheCover = async (filename: string, username?: string) => {
                     stats = storageFs.statSync(filePath)
                     const cachedCover = readCoverCache(filename, normalizedUsername, stats)
                     if (cachedCover) {
-                        setIndexCoverState(filename, normalizedUsername, 'cached', stats, loc)
+                          const indexed = indexManager.getAll(normalizedUsername, folder, loc).find(item => item.filename === filename)
+                          setIndexCoverState(filename, normalizedUsername, indexed?.coverType === 'embedded' ? 'embedded' : 'cached', stats, loc)
                         return cachedCover
                     }
                 } catch (e) {

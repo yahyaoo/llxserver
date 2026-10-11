@@ -6,7 +6,7 @@
  * @date 2026-10-11
  */
 (() => {
-    const records = new Map(), widgets = new Set();
+    const records = new Map(), widgets = new Set(), buttonStates = new WeakMap();
     const controls = 'button,input,textarea,select,a.btn-primary,a.btn-secondary,a.btn-quick,[role="button"],.elfinder-button:not(.elfinder-button-search)';
     const { createApp, h, shallowReactive } = window.Vue;
     const library = window.ElementPlus;
@@ -37,6 +37,11 @@
 
     /** 统一按钮类型，保留导航选中态、纯图标按钮以及原来绑定的点击处理器。 */
     function button(source) {
+        // 图片封面与磁贴自有布局，保留原生按钮语义，避免圆形内边距挤压图片。
+        if (source.matches('.player-cover-button,.playlist-add-tile,.song-cover-button,.recent-play-button,.download-cover-button')) return;
+        const state = source.className.split(/\s+/).filter(name => !/^(el-button(?:--.*)?|lx-el-button|lx-el-navigation|is-circle|is-text|is-disabled)$/.test(name)).join(' ') + ':' + !!source.disabled;
+        if (buttonStates.get(source) === state) return;
+        buttonStates.set(source, state);
         source.classList.add('el-button', 'lx-el-button');
         // 手机音乐库复用桌面菜单节点，移出 nav 后仍按稳定 ID 保留导航语义。
         const navigation = source.matches('.settings-nav-item,.settings-collapse,.theme-option,.appearance-option,.nav-item,.system-settings-item,.lb-board-item,[data-view],[data-settings-target],a[id^="tab-"],nav a,.sidebar a');
@@ -44,7 +49,7 @@
         copy.querySelectorAll('i,svg,.setting-tooltip-trigger').forEach(node => node.remove());
         const iconOnly = !copy.textContent.trim();
         const primary = !navigation && /btn-primary|auth-submit|settings-action(?!-secondary)|lm-btn|bg-(emerald|pink|blue)-[56]00|bg-gradient/.test(source.className);
-        const danger = !navigation && /btn-danger|btn-logout|bg-red|bg-rose|text-red|text-rose/.test(source.className);
+        const danger = !navigation && source.className.split(/\s+/).some(name => /^(btn-danger|btn-logout|bg-(red|rose)-|text-(red|rose)-)/.test(name));
         source.classList.toggle('lx-el-navigation', navigation);
         source.classList.toggle('is-circle', iconOnly);
         source.classList.toggle('el-button--primary', primary && !danger);
@@ -193,7 +198,7 @@
         changes.forEach(change => {
             if (change.target.closest?.('.lx-element-widget,.el-overlay,.el-message,.el-popper')) return;
             if (change.type === 'childList') { change.addedNodes.forEach(node => scan(node)); if (change.target.closest?.('select')) pending.add(change.target.closest('select')); }
-            else { const source = change.target; if (source.matches?.('button,a,[role="button"]') && !source.classList.contains('lx-el-button')) button(source); if (records.has(source)) pending.add(source); }
+            else { const source = change.target; if (source.matches?.('button,a,[role="button"]')) button(source); if (records.has(source)) pending.add(source); }
         });
         pending.forEach(source => records.get(source)?.sync());
         records.forEach((record, source) => {

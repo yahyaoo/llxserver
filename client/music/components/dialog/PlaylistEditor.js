@@ -9,6 +9,10 @@
         return safeImage(resolved || song?.meta?.picUrl || song?.picUrl || song?.img || song?.pic || song?.album?.picUrl) || placeholder;
     }
     function attach(image, list) {
+        if (window.MusicExperience && window.LibraryArtwork) {
+            window.LibraryArtwork.attach(image, [safeImage(list?.cover), ...window.MusicExperience.coverCandidates(list?.list?.[0])].filter(Boolean));
+            return;
+        }
         const backup = fallback(list);
         let step = 0;
         image.onerror = () => {

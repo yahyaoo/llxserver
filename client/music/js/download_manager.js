@@ -630,15 +630,11 @@ class DownloadManager {
 
     // Helper to get song cover
     getSongCover(song) {
-        if (!song) return '/music/assets/logo.svg';
-        return song.img || song.pic ||
-            (song.meta && (song.meta.picUrl || song.meta.img)) ||
-            (song.album && (song.album.picUrl || song.album.img)) ||
-            '/music/assets/logo.svg';
+        return window.MusicExperience?.coverUrl(song) || '/music/assets/logo.svg';
     }
 
     getSongInfoForServer(song) {
-        const cover = this.getSongCover(song);
+        const cover = window.MusicExperience?.coverReference(song) || this.getSongCover(song);
         const normalizedCover = cover && cover !== '/music/assets/logo.svg' ? cover : '';
         return {
             ...song,
@@ -1475,6 +1471,17 @@ class DownloadManager {
         }
     }
 
+    /** 下载行复用当前歌曲对象，不从上方页面读取封面或播放状态。 */
+    playTask(taskId) {
+        const task = this.tasks.find(item => item.id === taskId);
+        if (task?.song) window.updatePlaylist([window.MusicExperience.playable(task.song)], 0, 'downloads', false);
+    }
+
+    dislikeTask(taskId) {
+        const task = this.tasks.find(item => item.id === taskId);
+        if (task?.song) window.toggleDislikeSong(task.song);
+    }
+
     renderTaskHtml(task) {
         const coverSrc = this.getSongCover(task.song);
         const sourceName = {
@@ -1550,24 +1557,25 @@ class DownloadManager {
         // Always show delete button mostly
         if (task.status !== 'downloading' || isServerTask) {
             actionBtnHTML += `
-                <button onclick="window.SystemDownloadManager.deleteTask('${task.id}')" class="w-8 h-8 rounded-full border border-red-100 text-red-400 hover:bg-red-50 hover:text-red-500 flex items-center justify-center transition-colors ml-1 shadow-sm" title="移除任务">
+                <button onclick="window.SystemDownloadManager.deleteTask('${task.id}')" class="w-8 h-8 rounded-full border t-border-main t-text-muted hover:t-bg-item-hover flex items-center justify-center transition-colors ml-1 shadow-sm" title="移除任务">
                     <i class="fas fa-trash-alt text-xs"></i>
                 </button>
             `;
         } else {
             actionBtnHTML += `
-                <button onclick="window.SystemDownloadManager.deleteTask('${task.id}')" class="w-8 h-8 rounded-full border border-red-100 text-red-400 hover:bg-red-50 hover:text-red-500 flex items-center justify-center transition-colors ml-1 shadow-sm" title="取消下载">
+                <button onclick="window.SystemDownloadManager.deleteTask('${task.id}')" class="w-8 h-8 rounded-full border t-border-main t-text-muted hover:t-bg-item-hover flex items-center justify-center transition-colors ml-1 shadow-sm" title="取消下载">
                     <i class="fas fa-times text-xs"></i>
                 </button>
             `;
         }
 
-        return `<div id="dl-task-${task.id}" class="download-task-row">
-            <div class="download-task-song"><img src="${this.escapeHtml(coverSrc)}" alt="" loading="lazy"><div><strong>${this.escapeHtml(task.song.name)}</strong><small>${this.escapeHtml(task.song.singer)} · ${this.escapeHtml(sourceName || '')}</small></div></div>
+        const disliked = !!window.DislikeManager?.isDisliked?.(task.song);
+        return `<div id="dl-task-${task.id}" class="download-task-row song-row">
+            <div class="download-task-song"><button type="button" class="song-cover download-cover-button" onclick="window.SystemDownloadManager.playTask('${task.id}')" title="播放"><img src="${this.escapeHtml(coverSrc)}" alt="" loading="lazy"><span class="song-cover-play"><i class="fas fa-play"></i></span></button><div><strong>${this.escapeHtml(task.song.name)}</strong><small>${this.escapeHtml(task.song.singer)} · ${this.escapeHtml(sourceName || '')}</small><span class="song-metadata-row">${window.SongMetadata?.render(task.song) || ''}</span></div></div>
             <span class="download-task-destination">${isServerTask ? '服务器' : '此设备'}</span>
             <span class="download-task-quality">${this.escapeHtml(qualityLabel)}</span>
             <div class="download-task-status"><span title="${this.escapeHtml(task.errorMsg || statusText)}">${this.escapeHtml(task.errorMsg || statusText)}</span><small>${speedText}</small><div class="download-task-progress"><span style="width:${Math.max(0, Math.min(100, Number(progressWidth) || 0))}%"></span></div></div>
-            <div class="download-task-actions">${isServerTask && !task.serverDownload && task.status === 'finished' && task.hasLyric === false ? `<button onclick="window.SystemDownloadManager.retryLyric('${task.id}')" class="w-8 h-8 text-pink-500" title="补全歌词"><i class="fas fa-file-audio"></i></button>` : ''}<button onclick="window.SystemDownloadManager.addTaskToPlaylist('${task.id}')" class="w-8 h-8 rounded-full text-emerald-500" title="添加到歌单"><i class="fas fa-plus"></i></button>${actionBtnHTML}</div>
+            <div class="download-task-actions song-row-actions">${window.SongActions?.renderLoveButton(task.song) || ''}<button type="button" onclick="window.SystemDownloadManager.dislikeTask('${task.id}')" class="${disliked ? 'text-red-500' : 't-text-muted'}" title="${disliked ? '取消不喜欢' : '不喜欢'}"><i class="fas fa-thumbs-down"></i></button>${isServerTask && !task.serverDownload && task.status === 'finished' && task.hasLyric === false ? `<button onclick="window.SystemDownloadManager.retryLyric('${task.id}')" class="w-8 h-8 text-pink-500" title="补全歌词"><i class="fas fa-file-audio"></i></button>` : ''}<button onclick="window.SystemDownloadManager.addTaskToPlaylist('${task.id}')" class="w-8 h-8 rounded-full text-emerald-500" title="添加到歌单"><i class="fas fa-plus"></i></button>${actionBtnHTML}</div>
         </div>`;
     }
 
@@ -1600,6 +1608,10 @@ class DownloadManager {
             ${visibleTasks.map(t => this.renderTaskHtml(t)).join('')}
             <div style="height: ${bottomSpacer}px;"></div>
         `;
+        visibleTasks.forEach(task => {
+            const image = document.getElementById(`dl-task-${task.id}`)?.querySelector('.download-task-song img');
+            if (image) window.LibraryArtwork.bind(image, task.song);
+        });
 
         const firstTaskEl = this.listContainer.querySelector('[id^="dl-task-"]');
         if (firstTaskEl) {
@@ -1638,6 +1650,8 @@ class DownloadManager {
         div.innerHTML = this.renderTaskHtml(task);
         const newEl = div.firstElementChild;
         taskEl.parentNode.replaceChild(newEl, taskEl);
+        const image = newEl.querySelector('.download-task-song img');
+        if (image) window.LibraryArtwork.bind(image, task.song);
         // 触发标题滚动检测
         if (typeof applyMarqueeChecks === 'function') applyMarqueeChecks();
     }

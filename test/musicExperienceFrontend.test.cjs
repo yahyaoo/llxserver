@@ -89,7 +89,7 @@ test('最近播放显示表头、次数及正确播放顺序，音乐库详情�
   const nodes = new Map(['recent-list', 'recent-title', 'recent-meta', 'recent-clear'].map(id => [id, element()]))
   let playlist, bound
   const window = { PlayStatistics: { sortByPlayCount, playCount }, LibraryArtwork: { attach() {} },
-    MusicExperience: { playable: song => song }, SongFileStatus: { update(host, items, selector) { bound = { items, selector } } },
+    MusicExperience: { playable: song => song, coverCandidates: () => [] }, SongFileStatus: { update(host, items, selector) { bound = { items, selector } } },
     updatePlaylist(songs, index) { playlist = { songs, index } } }
   vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../client/music/views/recent/RecentView.js'), 'utf8'), {
     window, document: { getElementById: id => nodes.get(id), createElement: element },

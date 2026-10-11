@@ -7,6 +7,19 @@ function bridge() {
   vm.runInNewContext(fs.readFileSync(path.join(root, 'client/music/assets/element/element-controls.js'), 'utf8'), context)
   return context.window.ElementControls
 }
+test('悬停红色不把中性按钮识别为危险按钮，真正选中时仍保留红色', () => {
+  const api = bridge()
+  const make = className => {
+    const classes = new Set(className.split(' '))
+    return { className, disabled: false, type: 'button', dataset: {}, closest: () => null,
+      matches: query => query.startsWith('button,'), cloneNode: () => ({ textContent: '', querySelectorAll: () => [] }),
+      classList: { add: (...values) => values.forEach(value => classes.add(value)), remove: (...values) => values.forEach(value => classes.delete(value)), toggle: (key, value) => value ? classes.add(key) : classes.delete(key), contains: key => classes.has(key) } }
+  }
+  const neutral = make('text-gray-400 hover:bg-red-50 hover:text-red-500')
+  api.upgrade(neutral); assert.equal(neutral.classList.contains('el-button--danger'), false)
+  const active = make('text-red-500 hover:bg-red-50')
+  api.upgrade(active); assert.equal(active.classList.contains('el-button--danger'), true)
+})
 test('属性同步保持原生描述符和原有 setter，释放后恢复', () => {
   let value = '初始', writes = 0, notifications = 0
   const source = Object.create({ get value() { return value }, set value(next) { value = String(next); writes++ } })

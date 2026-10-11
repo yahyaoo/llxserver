@@ -1373,15 +1373,8 @@ window.LocalMusicManager = {
             let coverHtml = `<div class="w-10 h-10 md:w-12 md:h-12 rounded-lg bg-gray-100/50 flex-shrink-0 flex items-center justify-center border t-border-main mr-2.5 md:mr-4 ml-0.5 md:ml-3">
                                 <i class="fas fa-music t-text-muted text-xs"></i>
                              </div>`;
-            if (item.hasCover) {
-                const authToken = (window.getUserAuthHeaders ? window.getUserAuthHeaders()['x-user-token'] : null) || (window.AccountSession ? window.AccountSession.getToken() : localStorage.getItem('lx_user_token')) || '';
-                const coverVersion = [
-                    item.coverCheckedVersion || 0,
-                    Math.round(item.coverCheckedMtime || item.mtime || 0),
-                    item.coverCheckedSize || item.size || 0,
-                    1
-                ].join('-');
-                const coverUrl = `/api/music/cache/cover?filename=${encodeURIComponent(item.filename)}&user=${encodeURIComponent(username)}${authToken ? `&token=${encodeURIComponent(authToken)}` : ''}&v=${encodeURIComponent(coverVersion)}`;
+            {
+                const coverUrl = window.MusicExperience.coverUrl({ ...item, isCustomDir: this.isCustomDirMode }) || '/music/assets/logo.svg';
                 coverHtml = `<img data-src="${this.escapeAttr(coverUrl)}" data-lm-cover-index="${index}" src="/music/assets/logo.svg" loading="lazy" fetchpriority="low" class="lazy-image lm-cover-image is-placeholder w-10 h-10 md:w-12 md:h-12 rounded-lg object-cover shadow-sm flex-shrink-0 border t-border-main mr-2.5 md:mr-4 ml-0.5 md:ml-3">`;
             }
 
@@ -1524,10 +1517,8 @@ window.LocalMusicManager = {
         container.innerHTML = html;
         window.SongFileStatus?.update(container, page.list);
         container.querySelectorAll('.lm-cover-image').forEach(img => {
-            img.addEventListener('error', () => {
-                const index = parseInt(img.dataset.lmCoverIndex || '', 10);
-                this.handleCoverLoadError(index, img);
-            }, { once: true });
+            const index = parseInt(img.dataset.lmCoverIndex || '', 10);
+            window.LibraryArtwork.bind(img, { ...this.displayData[index], isCustomDir: this.isCustomDirMode });
         });
         if (typeof window.lazyLoadImages === 'function') {
             window.lazyLoadImages(container);

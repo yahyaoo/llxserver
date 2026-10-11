@@ -3246,7 +3246,7 @@ function renderArtistSongsUI(list, page) {
                     <!-- Title -->
                     <div class="col-span-7 sm:col-span-5 md:col-span-4 lg:col-span-4 flex items-center gap-3 min-w-0 pr-2">
                         <div class="song-cover w-10 h-10 md:w-12 md:h-12 rounded-lg overflow-hidden flex-shrink-0 shadow-sm relative">
-                            <img src="${item.img || '/music/assets/logo.svg'}" 
+                            <img src="${getImgUrl(item)}"
                                  onerror="this.src='/music/assets/logo.svg'" 
                                  class="w-full h-full object-cover">
                             <div class="song-cover-play">
@@ -3319,6 +3319,7 @@ function renderArtistSongsUI(list, page) {
         </div>
     `;
     content.innerHTML = html;
+    content.querySelectorAll('.song-cover img').forEach((image, index) => window.LibraryArtwork.bind(image, indexedDisplayList[index].item));
     window.SongFileStatus?.update(content, indexedDisplayList.map(obj => obj.item));
 
     // Init Marquee if needed (though we use truncate here)
@@ -4250,16 +4251,7 @@ window.enterArtist = enterArtist;
 
 // Helper for loose image paths
 function getImgUrl(item) {
-    if (!item) return '/music/assets/logo.svg';
-    const s = item;
-    // 优先从标准 meta 获取
-    if (s.meta && s.meta.picUrl) return s.meta.picUrl;
-    // 兼容各种 SDK 的原始字段
-    return s.img || s.pic || s.picUrl || s.picture ||
-        (s.album && (s.album.picUrl || s.album.img || s.album.pic)) ||
-        (s.al && (s.al.picUrl || s.al.img)) ||
-        (s.meta && (s.meta.img || s.meta.pic)) ||
-        '/music/assets/logo.svg';
+    return window.MusicExperience.coverUrl(item) || '/music/assets/logo.svg';
 }
 window.getImgUrl = getImgUrl;
 
@@ -4587,7 +4579,7 @@ function renderResults(list) {
                     <i class="fas fa-thumbs-down w-3.5 h-3.5 flex items-center justify-center"></i>
                 </button>
                 ${currentSearchScope !== 'network' && window.currentViewingListId !== 'dislike_songs' ? `
-                <button class="delete-song-btn p-1 sm:p-1.5 hover:bg-red-50 rounded-lg text-red-600 transition-colors"
+                <button class="delete-song-btn p-1 sm:p-1.5 hover:t-bg-item-hover rounded-lg t-text-muted transition-colors"
                         title="删除">
                     <i class="fas fa-trash w-3.5 h-3.5 flex items-center justify-center"></i>
                 </button>
@@ -4610,6 +4602,7 @@ function renderResults(list) {
             };
         }
 
+        window.LibraryArtwork.bind(row.querySelector('.song-cover img'), item);
         container.appendChild(row);
     });
 
@@ -4794,6 +4787,11 @@ function lazyLoadImages(root = document) {
     const loadImage = (img) => {
         const src = img.getAttribute('data-src');
         if (!src) return;
+        if (img.dataset.artworkCandidates) {
+            img.removeAttribute('data-src');
+            window.LibraryArtwork.attach(img, JSON.parse(img.dataset.artworkCandidates));
+            return;
+        }
         if (img.src && img.src.includes('logo.svg')) {
             img.classList.add('is-placeholder');
         }
@@ -6875,29 +6873,7 @@ window.updatePlaylist = updatePlaylist;
 // 全局图片设置助手，处理占位图逻辑
 window.setImg = (id, src) => {
     const el = document.getElementById(id);
-    if (el) {
-        // 如果是从占位图切换到真实图片，保留滤镜直到加载完成
-        if (el.src.includes('logo.svg') && src && !src.includes('logo.svg')) {
-            el.classList.add('is-placeholder');
-            const handleLoad = () => {
-                el.classList.remove('is-placeholder');
-                el.removeEventListener('load', handleLoad);
-                el.removeEventListener('error', handleLoad); // 失败也移除
-            };
-            el.addEventListener('load', handleLoad);
-            el.addEventListener('error', handleLoad);
-        } else if (src && src.includes('logo.svg')) {
-            el.classList.add('is-placeholder');
-        } else {
-            el.classList.remove('is-placeholder');
-        }
-
-        if (src) el.src = src;
-        el.onerror = () => {
-            el.src = '/music/assets/logo.svg';
-            el.classList.add('is-placeholder');
-        };
-    }
+    if (el) window.LibraryArtwork.attach(el, src);
 };
 
 /** 播放爱心仅表示我的喜爱，复用直接喜欢操作，避免打开歌单选择弹框。 @author jingyh */
@@ -6969,11 +6945,10 @@ function updatePlayerInfo(song, actualQuality) {
     // 触发滚动检测
     applyMarqueeChecks();
 
-    const imgUrl = getImgUrl(song);
-
-    setImg('player-cover', imgUrl);
-    setImg('sidebar-cover', imgUrl);
-    setImg('detail-cover', imgUrl);
+    const artwork = window.MusicExperience.coverCandidates(song);
+    setImg('player-cover', artwork);
+    setImg('sidebar-cover', artwork);
+    setImg('detail-cover', artwork);
     window.playbackExperience.transitionTrack(song);
 
     // Sidebar Mini Info
@@ -11871,7 +11846,6 @@ function renderMyLists(data) {
                 <i class="fas fa-grip-vertical text-xs"></i>
             </span>
             <i class="fas ${icon} w-5 text-center t-text-muted sidebar-item-icon flex-shrink-0"></i>
-            ${typeof listObj !== 'string' ? '<button type="button" class="playlist-row-more" aria-label="歌单操作" aria-haspopup="menu" aria-expanded="false"><i class="fas fa-ellipsis-h"></i></button>' : ''}
             <div class="playlist-name-wrapper ml-1.5 flex-1 min-w-0 overflow-hidden" title="${safeName}">
                 <span class="playlist-name-text truncate block w-full select-none">${safeName}</span>
             </div>
@@ -11883,7 +11857,7 @@ function renderMyLists(data) {
                     <button type="button" class="action-btn flex-shrink-0" title="导出歌单到本地" aria-label="导出歌单到本地" onclick="exportPlaylistToLocal('${id}', event)">
                         <i class="fas fa-download text-[10px]"></i>
                     </button>
-
+                    ${typeof listObj !== 'string' ? '<button type="button" class="action-btn playlist-row-more" aria-label="歌单操作" aria-haspopup="menu" aria-expanded="false"><i class="fas fa-ellipsis-h"></i></button>' : ''}
                 </div>
             </div>
         `;
@@ -11947,12 +11921,6 @@ function renderMyLists(data) {
         { id: '__lib_albums__', type: 'lib', el: createLibItem('__lib_albums__', '专辑', 'fa-compact-disc', 'lib-album-count', handleAlbumLibraryClick) }
     );
 
-    if (data.defaultList) {
-        const defaultItem = createItem('default', '默认列表', 'fa-list', data.defaultList.length);
-        defaultItem.classList.add('ignore-sort');
-        defaultItem.querySelector('.favorite-sidebar-drag-handle')?.remove();
-        sidebarItems.push({ id: 'default', type: 'system', el: defaultItem });
-    }
     if (data.loveList) {
         // 内层 ♥ 喜爱列表，命名为「我的喜爱」以与外层「我的收藏」折叠面板区分
         sidebarItems.push({ id: 'love', type: 'system', el: createItem('love', '我的喜爱', 'fa-heart', data.loveList.length) });
@@ -11966,8 +11934,6 @@ function renderMyLists(data) {
 
     const collectionItems = sidebarItems.filter(item => ['__lib_artists__', '__lib_albums__', 'love', '__public_favorites__'].includes(item.id));
     getOrderedFavoriteSidebarItems(collectionItems).forEach(item => container.appendChild(item.el));
-    const defaultItem = sidebarItems.find(item => item.id === 'default');
-    if (defaultItem) playlists.appendChild(defaultItem.el);
     getOrderedFavoriteSidebarItems(sidebarItems.filter(item => item.type === 'user')).forEach(item => playlists.appendChild(item.el));
 
     // Removed old dislike injection
@@ -11990,6 +11956,10 @@ function handleListClick(listId, skipAutoUpdate = false, preservePage = false) {
     exitListSecondaryModes();
 
     if (!currentListData) return;
+    // 旧播放缓存可能仍引用协议默认列表；页面只展示实际存在的普通歌单。作者：jingyh
+    if (!['love', 'dislike_songs'].includes(listId) && !currentListData.userList?.some(list => list.id === listId)) {
+        listId = currentListData.userList?.[0]?.id || 'love';
+    }
 
     if (!skipAutoUpdate) {
         // Selections belong to the previously rendered list. Keeping them here makes
@@ -12015,10 +11985,7 @@ function handleListClick(listId, skipAutoUpdate = false, preservePage = false) {
     let list = [];
     let title = '';
 
-    if (listId === 'default') {
-        list = currentListData.defaultList;
-        title = '默认列表';
-    } else if (listId === 'love') {
+    if (listId === 'love') {
         list = currentListData.loveList;
         title = '我的喜爱';
     } else if (listId === 'dislike_songs') {
@@ -14053,50 +14020,26 @@ function renderPlaylistAddGrid() {
 
     listContainer.innerHTML = '';
 
-    // Helper to create grid item
-    const createGridItem = (listId, listName, count, isIncluded) => {
-        const btn = document.createElement('button');
-        // Base styles
-        let className = "relative h-14 rounded-lg text-sm font-bold transition-all duration-200 flex items-center justify-center gap-1 shadow-sm overflow-hidden ";
-
-        // Active/Inactive styles (Highlight only in single-song mode)
-        if (!isBatch && isIncluded) {
-            className += "bg-red-500 text-white shadow-md scale-[1.02] ring-2 ring-red-200";
-        } else {
-            className += "bg-emerald-50 text-emerald-500 hover:bg-emerald-100 hover:shadow";
-        }
-
-        btn.className = className;
-        btn.onclick = () => handleTogglePlaylist(listId, btn); // Use handler wrapper
-
-        btn.innerHTML = `
-            <span class="truncate max-w-[80%]">${escapeHtmlText(listName)}</span>
-            ${(!isBatch && isIncluded) ? '<i class="fas fa-check text-xs ml-1 opacity-80"></i>' : ''}
-        `;
-        return btn;
-    };
-
     const activeListData = isUserLoggedIn() ? (window.myPersonalListData || currentListData) : currentListData;
-
-
-    // 2. User Lists
-    if (activeListData.userList) {
-        activeListData.userList.forEach(list => {
-            const isIncluded = !isBatch && targetId && list.list.some(s => s.id === targetId);
-            listContainer.appendChild(createGridItem(list.id, list.name, list.list.length, isIncluded));
-        });
+    for (const list of activeListData.userList || []) {
+        const included = !isBatch && targetId && list.list.some(song => song.id === targetId);
+        const button = document.createElement('button');
+        button.type = 'button'; button.className = 'playlist-add-tile';
+        button.setAttribute('aria-pressed', String(!!included));
+        button.onclick = () => handleTogglePlaylist(list.id, button);
+        const image = document.createElement('img'); image.alt = '';
+        window.PlaylistEditor.attach(image, list);
+        const caption = document.createElement('span'); caption.className = 'playlist-add-caption';
+        caption.textContent = list.name;
+        const count = document.createElement('small'); count.textContent = list.list.length + ' 首';
+        button.append(image, caption, count);
+        if (included) { const mark = document.createElement('i'); mark.className = 'fas fa-check playlist-add-check'; button.append(mark); }
+        listContainer.append(button);
     }
-
-    // 3. Create New List Dash Box
-    const createNewBtn = document.createElement('button');
-    createNewBtn.className = "h-14 rounded-lg text-xs font-bold border-2 border-dashed border-gray-300 dark:border-gray-600 text-gray-500 hover:text-emerald-500 hover:border-emerald-400 transition-all flex items-center justify-center gap-2 t-bg-main/20 hover:t-bg-main/50 shadow-sm";
-    createNewBtn.innerHTML = `
-        <i class="fas fa-plus"></i> 新建歌单
-    `;
-    createNewBtn.onclick = () => {
-        handleCreateList();
-    };
-    listContainer.appendChild(createNewBtn);
+    const create = document.createElement('button'); create.type = 'button';
+    create.className = 'playlist-add-tile playlist-add-create';
+    create.innerHTML = '<span class="playlist-add-plus"><i class="fas fa-plus"></i></span><span class="playlist-add-caption">新建歌单</span>';
+    create.onclick = () => handleCreateList(); listContainer.append(create);
 }
 
 function hasPlaylistData(data) {
@@ -14260,7 +14203,7 @@ function cleanSongData(song) {
     let albumName = sourceMeta.albumName || song.albumName || song.album?.name || '';
 
     // 3. Resolve Pic URL
-    let picUrl = sourceMeta.picUrl || song.picUrl || song.img || song.album?.cover;
+    let picUrl = window.MusicExperience.coverReference(song);
 
     // Common Meta
     const meta = {

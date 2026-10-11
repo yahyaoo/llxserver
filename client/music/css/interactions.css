@@ -90,6 +90,8 @@
     transition: opacity 220ms ease;
 }
 @media (hover: hover) and (pointer: fine) and (min-width: 768px) {
+    :is(.song-row,.grid.grid-cols-12,.recent-song,.download-task-row):hover .song-cover-play,
+    :is(.song-row,.grid.grid-cols-12,.recent-song,.download-task-row):focus-within .song-cover-play,
     .song-cover:hover .song-cover-play,
     .song-cover:focus-visible .song-cover-play,
     button:focus-visible > .song-cover .song-cover-play { opacity: 1; }

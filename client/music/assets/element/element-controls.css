@@ -52,7 +52,7 @@
 @media (min-width: 640px) { .lx-element-ui .lx-el-button.hidden.sm\:flex { display: flex !important; } }
 @media (min-width: 768px) { .lx-element-ui .lx-el-button.hidden.md\:flex { display: flex !important; } }
 @media (min-width: 1024px) { .lx-element-ui .lx-el-button.hidden.lg\:flex { display: flex !important; } }
-.lx-element-ui .lx-el-button.el-button--primary { --el-button-bg-color: var(--el-color-primary); --el-button-border-color: var(--el-color-primary); --el-button-text-color: #fff; --el-button-hover-bg-color: var(--el-color-primary-light-3); --el-button-hover-border-color: var(--el-color-primary-light-3); --el-button-hover-text-color: #fff; }
+.lx-element-ui .lx-el-button.el-button--primary { --el-button-bg-color: var(--el-color-primary); --el-button-border-color: var(--el-color-primary); --el-button-text-color: var(--theme-on-accent, #fff); --el-button-hover-bg-color: var(--el-color-primary); --el-button-hover-border-color: var(--el-color-primary); --el-button-hover-text-color: var(--theme-on-accent, #fff); }
 .lx-element-ui .lx-el-button.el-button--danger { --el-button-bg-color: var(--el-color-danger-light-9); --el-button-border-color: var(--el-color-danger-light-7); --el-button-text-color: var(--el-color-danger); --el-button-hover-bg-color: var(--el-color-danger); --el-button-hover-border-color: var(--el-color-danger); --el-button-hover-text-color: #fff; }
 .lx-element-ui .lx-el-button:hover { background: var(--el-button-hover-bg-color) !important; color: var(--el-button-hover-text-color) !important; border-color: var(--el-button-hover-border-color) !important; }
 .lx-element-ui .lx-el-button:disabled { opacity: .5; cursor: not-allowed !important; }

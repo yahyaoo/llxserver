@@ -17,7 +17,7 @@
 #player-footer.floating-player {
     position: fixed;
     inset: auto 0 max(18px, env(safe-area-inset-bottom));
-    width: min(960px, calc(100% - 48px));
+    width: min(880px, calc(100% - 48px));
     min-height: 78px;
     margin: 0 auto;
     padding: 10px 20px;
@@ -61,7 +61,8 @@ body:not(.player-detail-open):not(:has(#view-player-detail:not(.hidden))) #playe
 #player-footer #btn-play:hover { color: var(--c-500); }
 #player-song-info { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
 .player-track { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.player-cover-button { width: 40px; height: 40px; border-radius: 8px; overflow: hidden; flex-shrink: 0; }
+.player-cover-button { display: block; width: 40px; height: 40px; padding: 0; border: 0; background: transparent; border-radius: 8px; overflow: hidden; flex-shrink: 0; }
+.player-cover-button img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .player-track-copy { min-width: 0; flex: 1; }
 .player-bar-lyrics { flex: 1; min-width: 0; font-size: 12px; line-height: 20px; overflow: hidden; }
 .player-bar-lyrics > div { height: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

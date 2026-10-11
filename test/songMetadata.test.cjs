@@ -24,7 +24,7 @@ test('已选音质使用对应文件大小；仅能力声明不伪造参数', ()
 })
 
 test('归一化和本地收藏保留实际文件参数', () => {
-  const app = read('app.js'), context = {}
+  const app = read('app.js'), context = { window: { MusicExperience: { coverReference: () => null } } }
   vm.runInNewContext(app.slice(app.indexOf('function cleanSongData(song)'), app.indexOf('// Modified handler for Grid Buttons')), context)
   const song = context.cleanSongData({ id: 'wy_1', songmid: '1', source: 'wy', name: '测试', size: 4096, bitDepth: 24, sampleRate: 192000 })
   assert.deepEqual(Array.from(metadata.values(song)), ['4 KB', '24bit', '192kHz'])

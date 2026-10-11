@@ -31,12 +31,60 @@
         }
         return song;
     };
-    const coverUrl = item => {
-        if (!item) return null;
-        if (!item.filename) return item.pic || item.img || null;
-        if (item.hasCover === false) return null;
-        const params = new URLSearchParams({ filename: item.filename, user: accountName(), folder: item.folder || 'music', v: String(item.mtime || '') });
-        return `/api/music/${item.isCustomDir || item.folder === 'custom' ? 'custom' : 'cache'}/cover?${params}`;
+    /** 所有歌曲列表和播放器共用候选顺序：本地文件、歌曲字段、当前账号已有歌单。 */
+    const coverCandidates = item => {
+        if (!item) return [];
+        const song = { ...item.songInfo, ...item }, candidates = [];
+        const add = value => {
+            if (typeof value !== 'string' || !/^(https?:\/\/|\/(?!\/)|data:image\/(?:png|jpeg|webp|gif);base64,|blob:)/i.test(value) || value.includes('/assets/logo.svg')) return;
+            if (value.startsWith('/api/music/')) {
+                const url = new URL(value, location.origin), auth = window.getUserAuthHeaders?.() || {};
+                url.searchParams.delete('password'); url.searchParams.delete('auth'); url.searchParams.delete('token');
+                url.searchParams.set('user', accountName());
+                if (auth['x-user-token']) url.searchParams.set('token', auth['x-user-token']);
+                value = url.pathname + url.search;
+            }
+            if (!candidates.includes(value)) candidates.push(value);
+        };
+        const fields = value => {
+            for (const url of [value.meta?.picUrl, value.img, value.pic, value.picUrl, value.picture, value.meta?.img, value.meta?.pic, value.meta?.albumPic, value.meta?.cover, value.album?.picUrl, value.album?.img, value.album?.pic, value.album?.cover, value.al?.picUrl, value.al?.img, value.otherSource?.meta?.picUrl]) add(url);
+        };
+        const filename = song.filename || song._localFilename;
+        if (filename) {
+            const folder = song.folder || song._localFolder || 'music';
+            const params = new URLSearchParams({ filename, user: accountName(), folder, v: String(song.mtime || '') });
+            add(`/api/music/${song.isCustomDir || song._isCustomDir || folder === 'custom' ? 'custom' : 'cache'}/cover?${params}`);
+        }
+        fields(song);
+        // 旧历史丢失封面时按平台和歌曲标识补齐；不读取页面 DOM，也不跨账号取数据。
+        const data = window.myPersonalListData || window.currentListData;
+        if (song.id != null && song.source && data) {
+            const lists = [data.loveList, data.defaultList, ...(data.userList || []).map(list => list.list)];
+            for (const list of lists) {
+                const match = list?.find(value => String(value.id) === String(song.id) && value.source === song.source);
+                if (match) fields(match);
+            }
+        }
+        const remote = candidates.filter(url => /^https?:\/\//.test(url));
+        if (song.source && song.id != null && (remote.length || song.artworkCached || song.artworkUrl)) {
+            const params = new URLSearchParams({ source: song.source, id: String(song.id), user: accountName() });
+            for (const url of remote.slice(0, 8)) params.append('url', url);
+            const auth = window.getUserAuthHeaders?.() || {};
+            if (auth['x-user-token']) params.set('token', auth['x-user-token']);
+            candidates.splice(filename ? 1 : 0, 0, '/api/music/artwork?' + params);
+        }
+        return candidates;
+    };
+    const coverUrl = item => coverCandidates(item)[0] || null;
+    /** 保存和下载元数据优先保留音源地址；运行时认证参数不进入歌单或任务文档。 */
+    const coverReference = item => {
+        const candidates = coverCandidates(item);
+        const value = candidates.find(url => /^https?:\/\//.test(url)) || candidates[0];
+        if (!value) return null;
+        if (!value.startsWith('/api/music/')) return value;
+        const url = new URL(value, location.origin);
+        for (const key of ['token', 'password', 'auth']) url.searchParams.delete(key);
+        return url.pathname + url.search;
     };
 
     /** 应用外观；颜色和透明度共用 CSS 变量，背景图片只由认证请求获取。 */
@@ -84,7 +132,7 @@
     window.MusicExperience = {
         get account() { return account; },
         get value() { return { ...value }; },
-        playable, coverUrl,
+        playable, coverUrl, coverCandidates, coverReference,
         playItem(item) { const song = playable(item); window.updatePlaylist([song], 0, 'local_all', false); },
         openCollection(name, items) { window.switchTab('recent', false); window.RecentView.show(name, items); },
         async accountChanged() {

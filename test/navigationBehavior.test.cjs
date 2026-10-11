@@ -55,21 +55,21 @@ test('收起的桌面主导航点击不喜欢，展开主导航及子树，不�
 
 test('收藏与歌单均初始化排序，拖动后合并保存两组顺序并可重新渲染恢复', async () => {
   const { nodes, context, sorts, stored, calls } = fixture()
-  context.currentListData = { defaultList: [], loveList: [], userList: [{ id: 'a', name: 'A', list: [] }, { id: 'b', name: 'B', list: [] }] }
+  context.currentListData = { defaultList: [], loveList: [], userList: [{ id: 'seeded', name: '默认列表', list: [] }, { id: 'a', name: 'A', list: [] }, { id: 'b', name: 'B', list: [] }] }
   context.renderMyLists(context.currentListData)
   const favorites = nodes.get('my-lists-container'), playlists = nodes.get('playlist-lists-container')
   assert.ok(sorts.has(favorites)); assert.ok(sorts.has(playlists))
   const ids = c => c.children.map(n => n.getAttribute('data-sidebar-sort-id'))
   favorites.children.unshift(favorites.children.pop())
   await sorts.get(favorites).options.onEnd()
-  assert.deepEqual(JSON.parse(stored.lx_settings).favoriteSidebarOrder, ['love', '__lib_artists__', '__lib_albums__', 'default', 'a', 'b'])
+  assert.deepEqual(JSON.parse(stored.lx_settings).favoriteSidebarOrder, ['love', '__lib_artists__', '__lib_albums__', 'seeded', 'a', 'b'])
   assert.equal(calls.includes('lists-save'), false)
-  playlists.children = [playlists.children[0], playlists.children[2], playlists.children[1]]
+  playlists.children = [playlists.children[2], playlists.children[0], playlists.children[1]]
   await sorts.get(playlists).options.onEnd()
-  assert.deepEqual(JSON.parse(stored.lx_settings).favoriteSidebarOrder, ['love', '__lib_artists__', '__lib_albums__', 'default', 'b', 'a'])
-  assert.deepEqual(Array.from(context.currentListData.userList, item => item.id), ['b', 'a'])
+  assert.deepEqual(JSON.parse(stored.lx_settings).favoriteSidebarOrder, ['love', '__lib_artists__', '__lib_albums__', 'b', 'seeded', 'a'])
+  assert.deepEqual(Array.from(context.currentListData.userList, item => item.id), ['b', 'seeded', 'a'])
   context.renderMyLists(context.currentListData)
   assert.deepEqual(ids(favorites), ['love', '__lib_artists__', '__lib_albums__'])
-  assert.deepEqual(ids(playlists), ['default', 'b', 'a'])
-  assert.equal(sorts.get(playlists).options.onMove({ related: playlists.children[0] }), false)
+  assert.deepEqual(ids(playlists), ['b', 'seeded', 'a'])
+  assert.equal(sorts.get(playlists).options.onMove({ related: playlists.children[1] }), true)
 })

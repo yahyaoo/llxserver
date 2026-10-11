@@ -36,7 +36,7 @@ export class PlayCountService {
       const previous = items.find(item => String(item.id) === String(song.id) && item.source === song.source)
       if (previous?.lastPlaybackId === song.playbackId) return items
       const clean: any = {}
-      for (const key of ['id', 'songmid', 'songId', 'name', 'singer', 'source', 'albumName', 'albumId', 'interval', 'quality', 'type', 'types', 'isLocal', '_localLibraryItem', 'filename', 'folder', 'isCustomDir']) {
+      for (const key of ['id', 'songmid', 'songId', 'name', 'singer', 'source', 'albumName', 'albumId', 'interval', 'quality', 'type', 'types', 'isLocal', '_localLibraryItem', 'filename', 'folder', 'isCustomDir', 'hasCover', 'mtime']) {
         if (song[key] !== undefined) clean[key] = song[key]
       }
       // 展示元数据兼容收藏歌曲的 meta 字段；不参与次数计算。
@@ -44,9 +44,12 @@ export class PlayCountService {
         const value = song[key] ?? song.meta?.[key]
         if (value !== undefined) clean[key] = value
       }
-      for (const key of ['pic', 'img', 'url']) {
-        if (typeof song[key] === 'string' && /^(https?:\/\/|\/api\/music\/)/.test(song[key])) {
-          const url = new URL(song[key], 'http://local')
+      // 平台封面通常位于 meta，规范化后保存，避免历史记录丢图；认证参数不落库。
+      const picture = [song.meta?.picUrl, song.img, song.pic, song.picUrl, song.picture, song.meta?.img, song.meta?.pic, song.album?.picUrl, song.album?.img, song.album?.pic, song.album?.cover, song.al?.picUrl, previous?.pic]
+        .find(value => typeof value === 'string' && /^(https?:\/\/|\/api\/music\/)/.test(value))
+      for (const [key, value] of [['pic', picture], ['img', song.img], ['url', song.url]]) {
+        if (typeof value === 'string' && /^(https?:\/\/|\/api\/music\/)/.test(value)) {
+          const url = new URL(value, 'http://local')
           for (const param of ['token', 'password', 'auth']) url.searchParams.delete(param)
           clean[key] = url.origin === 'http://local' ? url.pathname + url.search : url.toString()
         }

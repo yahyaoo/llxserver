@@ -16,14 +16,14 @@
     margin: 0 !important; border-bottom: 1px solid var(--border-main);
     background: var(--bg-panel); border-radius: 14px 14px 0 0;
 }
-.lx-dialog-heading::before { content: ''; position: absolute; left: 10px; top: 16px; width: 3px; height: 16px; border-radius: 1px; background: #3159db; }
+.lx-dialog-heading::before { content: ''; position: absolute; left: 10px; top: 16px; width: 3px; height: 16px; border-radius: 1px; background: var(--c-500); }
 .lx-dialog-heading .lx-dialog-title { font-size: 16px !important; line-height: 24px; font-weight: 600; margin: 0 !important; min-width: 0; }
 .lx-dialog-heading .lx-dialog-close { position: absolute; right: 8px; top: 8px; width: 32px; height: 32px; padding: 0 !important; display: grid; place-items: center; border-radius: 8px; color: var(--text-muted); }
 /* 关闭按钮沿用弹框尺寸，不受全局 Element 按钮最小高度和边框覆盖。 */
 :root .lx-dialog-heading .lx-dialog-close { min-height: 32px; height: 32px; width: 32px; border: 0 !important; border-radius: 8px !important; background: transparent !important; color: var(--text-muted) !important; }
 :root .lx-dialog-heading .lx-dialog-close:hover { background: var(--bg-item-hover) !important; color: var(--text-main) !important; }
 .lx-dialog-close:hover { background: var(--bg-item-hover); color: var(--text-main); }
-.lx-dialog-close:focus-visible { outline: 2px solid #3159db; outline-offset: -2px; }
+.lx-dialog-close:focus-visible { outline: 2px solid var(--c-500); outline-offset: -2px; }
 .lx-dialog-close i { font-size: 16px !important; }
 .lx-dialog-panel > .lx-dialog-section { padding: 10px !important; margin: 0 !important; min-height: 0; }
 .lx-dialog-panel > .lx-dialog-section:has(#custom-timer-input) { overflow-y: auto; }

@@ -29,12 +29,13 @@
             host.append(header);
             if (!entries.length) { const empty = document.createElement('div'); empty.className = 'recent-empty'; empty.innerHTML = '<i class="far fa-clock"></i><strong>还没有播放记录</strong><span>成功播放超过 10 秒后，歌曲会出现在这里</span>'; host.append(empty); return; }
             entries.slice(0, count).forEach((song, index) => {
-                const row = document.createElement('button'); row.className = 'recent-song'; row.type = 'button';
+                const row = document.createElement('div'); row.className = 'recent-song song-row';
                 const number = document.createElement('span'); number.className = 'recent-number'; number.textContent = String(index + 1).padStart(2, '0');
-                const img = document.createElement('img'); img.alt = ''; window.LibraryArtwork.attach(img, song.filename ? window.MusicExperience.coverUrl(song) : song.pic || song.img);
-                const cover = document.createElement('span'); cover.className = 'song-cover recent-song-cover';
+                const img = document.createElement('img'); img.alt = ''; window.LibraryArtwork.attach(img, window.MusicExperience.coverCandidates(song));
+                const cover = document.createElement('button'); cover.type = 'button'; cover.className = 'song-cover recent-song-cover recent-play-button'; cover.title = '播放';
                 const overlay = document.createElement('span'); overlay.className = 'song-cover-play'; overlay.innerHTML = '<i class="fas fa-play"></i>';
                 cover.append(img, overlay);
+                cover.onclick = event => { event.stopPropagation(); this.play(index); };
                 const info = document.createElement('span'); info.className = 'recent-song-info';
                 const name = document.createElement('strong'); name.className = 'song-file-title'; name.textContent = song.name;
                 const singer = document.createElement('small'); singer.textContent = song.singer || '未知歌手'; info.append(name, singer);

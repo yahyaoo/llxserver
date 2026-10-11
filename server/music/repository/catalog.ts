@@ -1,6 +1,10 @@
 import type { DocumentTable } from '../../common/persistence/SqliteDocumentRepository'
 /** 播放器表映射，仅依赖公共持久化契约。 @author yahyaoo */
 export const musicTables: DocumentTable[] = [
+  /** 歌曲展示封面缓存；不改变内嵌元数据和歌词判断。 */
+  { table: 'client_song_artwork', matches: filename => /song-artwork\.json$/.test(filename) },
+  /** 普通歌单及歌曲，默认列表作为普通记录仅初始化一次。 */
+  { table: 'client_playlist', matches: filename => /(?:^|\/)playlists\.json$/.test(filename) },
   /** 按账号隔离的自定义歌单封面，图片内容随 SQLite 一起迁移。 */
   { table: 'client_playlist_cover', matches: filename => /playlist-covers\.json$/.test(filename) },
   /** 独立喜爱歌曲，与普通歌单快照分开存储。 */

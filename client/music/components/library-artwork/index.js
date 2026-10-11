@@ -1,33 +1,50 @@
 /** 歌手头像与音乐封面缓存组件；按账号隔离，使用现有认证请求。 @author jingyh @date 2026-10-10 */
 (() => {
-    const pending = new Map();
-    let account = '';
-    const safeUrl = value => typeof value === 'string' && /^(https?:\/\/|\/api\/music\/)/.test(value) ? value : null;
+    const versions = new WeakMap();
+    let generation = 0;
+    const safeUrl = value => typeof value === 'string' && /^(https?:\/\/|\/(?!\/)|data:image\/(?:png|jpeg|webp|gif);base64,|blob:)/i.test(value) ? value : null;
     window.LibraryArtwork = {
-        async attach(image, value) {
-            image.src = '/music/assets/logo.svg';
-            image.onerror = () => { image.onerror = null; image.src = '/music/assets/logo.svg'; };
-            const url = safeUrl(value);
-            if (!url) return;
-            const owner = window.getUserAuthHeaders?.()['x-user-name'] || '_open';
-            if (owner !== account) this.clear();
-            account = owner;
-            const key = owner + ':' + url;
-            if (!pending.has(key)) {
-                pending.set(key, (async () => {
-                    const response = await fetch(url, { headers: url.startsWith('/') ? window.getUserAuthHeaders() : {} });
-                    if (!response.ok) throw new Error('封面不可用');
-                    const blob = await response.blob();
-                    if (!blob.type.startsWith('image/')) throw new Error('封面格式不正确');
-                    return URL.createObjectURL(blob);
-                })().catch(() => null));
-            }
-            const source = await pending.get(key);
-            if (source && account === owner && image.isConnected) image.src = source;
-            // 限制内存缓存，长时间检索不会无限积累图片。
-            if (pending.size > 160) { const first = pending.keys().next().value; pending.get(first).then(url => { if (url) URL.revokeObjectURL(url); }); pending.delete(first); }
+        /** 接入已有延迟加载图片；候选顺序与播放栏相同。 */
+        bind(image, song) {
+            const candidates = window.MusicExperience.coverCandidates(song);
+            image.dataset.artworkCandidates = JSON.stringify(candidates);
+            const url = candidates[0] || '/music/assets/logo.svg';
+            if (image.dataset.src) image.dataset.src = url;
+            else this.attach(image, candidates);
+            let index = 0;
+            image.onerror = () => {
+                const next = candidates[++index] || '/music/assets/logo.svg';
+                if (next.includes('/assets/logo.svg')) image.onerror = null;
+                image.classList?.toggle('is-placeholder', next.includes('/assets/logo.svg')); image.src = next;
+            };
         },
-        clear() { pending.forEach(task => task.then(url => { if (url) URL.revokeObjectURL(url); })); pending.clear(); },
+        async attach(image, value) {
+            const revision = {}, epoch = generation;
+            versions.set(image, revision);
+            const candidates = (Array.isArray(value) ? value : [value]).map(safeUrl).filter(Boolean);
+            candidates.push('/music/assets/logo.svg');
+            let index = 0;
+            // 在线图片直接使用 img，避免 fetch 跨域失败；本地接口通过当前账号令牌认证。
+            const next = () => {
+                if (versions.get(image) !== revision || generation !== epoch) return;
+                let url = candidates[index++];
+                if (!url) { image.onerror = null; return; }
+                if (url.startsWith('/api/music/')) {
+                    const parsed = new URL(url, location.origin), auth = window.getUserAuthHeaders?.() || {};
+                    parsed.searchParams.delete('token');
+                    if (auth['x-user-token']) parsed.searchParams.set('token', auth['x-user-token']);
+                    url = parsed.pathname + parsed.search;
+                }
+                image.classList?.toggle('is-placeholder', url.includes('/assets/logo.svg'));
+                image.src = url;
+            };
+            image.onerror = next;
+            image.onload = () => {
+                if (versions.get(image) === revision && generation === epoch) image.classList?.toggle('is-placeholder', image.src.includes('/assets/logo.svg'));
+            };
+            next();
+        },
+        clear() { generation++; },
     };
     window.addEventListener('music-account-changed', () => window.LibraryArtwork.clear());
 })();

@@ -1140,7 +1140,7 @@ const handleStartServer = async (port = 9527, ip = '0.0.0.0') => await new Promi
     // 远程账号通过当前入口访问远端接口，Cookie 与管理员凭据不转发。
     // 已有播放器音频链接携带会话令牌，沿用其访问方式。
     const mediaToken = urlObj.searchParams.get('token')
-    if (mediaToken && !req.headers['x-user-token'] && !parseCookies(req.headers.cookie)[USER_SESSION_COOKIE] && /^\/api\/music\/(cache|custom|server-download)\//.test(pathname)) req.headers['x-user-token'] = mediaToken
+    if (mediaToken && !req.headers['x-user-token'] && !parseCookies(req.headers.cookie)[USER_SESSION_COOKIE] && (/^\/api\/music\/(cache|custom|server-download)\//.test(pathname) || pathname === '/api/music/artwork')) req.headers['x-user-token'] = mediaToken
     const accountToken = (req.headers['x-user-token'] as string) || /^Bearer (.+)$/i.exec(req.headers.authorization || '')?.[1] || parseCookies(req.headers.cookie)[USER_SESSION_COOKIE]
     const accountSession = accountToken ? userSessions.get(accountToken) : undefined
     const accountApi = pathname.startsWith('/api/')
@@ -1674,7 +1674,7 @@ enabled?: boolean } = {}
       // ─────────────────────────────────────────────────────────────────────
 
 
-      if (['/api/user/appearance', '/api/user/appearance/background', '/api/user/recent', '/api/music/library/search', '/api/music/library/avatar'].includes(pathname)) {
+      if (['/api/user/appearance', '/api/user/appearance/background', '/api/user/recent', '/api/music/library/search', '/api/music/library/avatar', '/api/music/artwork'].includes(pathname)) {
         await handleExperience({ req, res, pathname, urlObj, ip }, serverRuntime)
         return
       }

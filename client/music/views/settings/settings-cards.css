@@ -2,7 +2,7 @@
 :root #view-settings .settings-content .settings-section-frame { padding: 0 !important; margin-top: 0 !important; border: 0; }
 :root #view-settings .settings-content .settings-section-card { padding: 0 !important; border: 1px solid var(--border-main) !important; border-radius: 14px !important; background: var(--bg-panel) !important; box-shadow: none !important; overflow: visible; }
 .settings-card-header { display: flex; align-items: center; gap: 16px; padding: 22px 24px; margin: 0 !important; border-bottom: 1px solid var(--border-main); border-radius: 14px 14px 0 0; background: color-mix(in srgb, var(--c-500) 3%, var(--bg-panel)); }
-.settings-card-icon { display: grid; place-items: center; width: 44px; height: 44px; flex: 0 0 44px; border-radius: 12px; background: var(--c-500); color: #fff; font-size: 19px; }
+.settings-card-icon { display: grid; place-items: center; width: 44px; height: 44px; flex: 0 0 44px; border-radius: 12px; background: var(--c-500); color: var(--theme-on-accent, #fff); font-size: 19px; }
 .settings-card-heading-text { min-width: 0; }
 :root #view-settings .settings-card-header h3 { display: block !important; margin: 0 !important; padding: 0 !important; color: var(--text-main); font-size: 16px; font-weight: 600; line-height: 1.5; }
 .settings-card-header p { margin: 4px 0 0; font-size: 13px; line-height: 1.5; color: var(--text-muted); }

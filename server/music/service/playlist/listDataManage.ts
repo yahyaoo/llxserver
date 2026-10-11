@@ -3,6 +3,7 @@ import { arrPush, arrPushByPosition, arrUnshift } from '../../../utils/common'
 import { LIST_IDS } from '../../../constants'
 import { type SnapshotDataManage } from './snapshotDataManage'
 import { FavoriteRepository } from '../../repository/FavoriteRepository'
+import { PlaylistRepository } from '../../repository/PlaylistRepository'
 import { repositories } from '../../../application/persistence/storage'
 import path from 'node:path'
 
@@ -18,6 +19,8 @@ export class ListDataManage {
   initPromise: Promise<void>
   /** 独立喜爱存储；loveList 仅作为洛雪同步协议的兼容字段。 */
   private readonly favorites: FavoriteRepository
+  /** 独立普通歌单存储，默认列表是其中一条可删除记录。 */
+  private readonly playlists: PlaylistRepository
   /** 用户封面文档作用域，不依赖数据库的物理位置。 */
   private readonly coverKey: string
 
@@ -29,6 +32,7 @@ export class ListDataManage {
   constructor(snapshotDataManage: SnapshotDataManage) {
     this.snapshotDataManage = snapshotDataManage
     this.favorites = new FavoriteRepository(repositories().music, snapshotDataManage.userDataManage.userDir)
+    this.playlists = new PlaylistRepository(repositories().music, snapshotDataManage.userDataManage.userDir)
     this.coverKey = path.join(snapshotDataManage.userDataManage.userDir, 'playlist-covers.json')
 
     let listData: LX.Sync.List.ListData | null
@@ -39,7 +43,8 @@ export class ListDataManage {
       for (const list of listData.userList) if (list.cover === undefined && covers[list.id] !== undefined) list.cover = covers[list.id]
       this.allMusicList.set(LIST_IDS.DEFAULT, listData.defaultList)
       this.allMusicList.set(LIST_IDS.LOVE, this.favorites.initialize(listData.loveList || []))
-      this.userLists.push(...listData.userList.map(({ list, ...l }) => {
+      const playlists = this.playlists.initialize(listData.userList, listData.defaultList)
+      this.userLists.push(...playlists.map(({ list, ...l }) => {
         this.allMusicList.set(l.id, list)
         return l
       }))
@@ -70,6 +75,7 @@ export class ListDataManage {
     }))
     this.persistFavorites()
     this.persistCovers()
+    this.persistPlaylists()
   }
 
   /** 原子替换当前歌单封面映射；删除歌单同时移除独立封面记录。 */
@@ -79,6 +85,8 @@ export class ListDataManage {
 
   /** 在同步快照提交前持久化喜爱，覆盖洛雪与 Subsonic 的现有歌曲增删及排序入口。 @author jingyh */
   persistFavorites = () => this.favorites.save(this.allMusicList.get(LIST_IDS.LOVE) ?? [])
+  /** 保存普通歌单及歌曲，兼容同步、历史恢复与网页现有操作入口。@author jingyh */
+  persistPlaylists = () => this.playlists.save(this.userLists.map(l => ({ ...l, list: this.allMusicList.get(l.id) ?? [] })))
   /**
  * 读取当前用户的默认列表、收藏列表和自定义歌单数据。
  * @author yahyaoo

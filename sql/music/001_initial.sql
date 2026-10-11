@@ -1,7 +1,33 @@
 -- 播放器独立数据库；作者 yahyaoo。
 -- 记录字段统一使用 snake_case，扩展值保留全部原 JSON 字段与顺序。
+-- 普通歌单及有序歌曲；默认列表仅在账号初始化时创建，作者 jingyh。
+CREATE TABLE IF NOT EXISTS client_playlist (
+  document_key TEXT NOT NULL, -- 账号目录作用域，随数据库迁移保持稳定
+  record_key TEXT NOT NULL, -- 普通歌单标识
+  sort_order INTEGER NOT NULL, -- 歌单显示顺序
+  value_json TEXT NOT NULL CHECK (json_valid(value_json)), -- 完整歌单、封面和歌曲列表
+  playlist_name TEXT GENERATED ALWAYS AS (json_extract(value_json, '$.name')) VIRTUAL, -- 可直接查询的歌单名称
+  created_at INTEGER NOT NULL, -- 创建时间，Unix 毫秒
+  updated_at INTEGER NOT NULL, -- 更新时间，Unix 毫秒
+  PRIMARY KEY (document_key, record_key)
+);
+CREATE INDEX IF NOT EXISTS idx_client_playlist_order ON client_playlist (document_key, sort_order);
+
 -- 独立喜爱歌曲；作者 jingyh。账号作用域与排序沿用文档仓储，不包含喜爱人数字段。
 -- 自定义歌单封面；cover 可直接查询，数据地址随数据库迁移。
+-- 歌曲展示封面缓存，与音频内嵌标签状态分离。
+CREATE TABLE IF NOT EXISTS client_song_artwork (
+  document_key TEXT NOT NULL, -- 账号文档作用域
+  record_key TEXT NOT NULL, -- 平台及歌曲标识的摘要
+  sort_order INTEGER NOT NULL, -- 缓存记录顺序
+  value_json TEXT NOT NULL CHECK (json_valid(value_json)), -- 展示封面缓存信息，不包含内嵌标签状态
+  has_cover INTEGER GENERATED ALWAYS AS (json_extract(value_json, '$.hasCover')) VIRTUAL, -- 可查询的图片已有状态
+  created_at INTEGER NOT NULL, -- 创建时间，毫秒
+  updated_at INTEGER NOT NULL, -- 更新时间，毫秒
+  PRIMARY KEY (document_key, record_key)
+);
+CREATE INDEX IF NOT EXISTS idx_client_song_artwork_order ON client_song_artwork (document_key, sort_order);
+
 CREATE TABLE IF NOT EXISTS client_playlist_cover (
   document_key TEXT NOT NULL, -- 账号目录作用域，随数据目录迁移保持稳定
   record_key TEXT NOT NULL, -- 歌单标识

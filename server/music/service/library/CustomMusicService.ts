@@ -533,6 +533,16 @@ export const getCustomCover = async (filename: string, username: string) => {
     const filePath = resolveSafePath(customDir, filename)
     if (!filePath || !storageFs.existsSync(filePath)) return null
 
+    const stats = storageFs.statSync(filePath), item = customIndexManager.load(username).get(filename)
+    // 只回写封面可用来源，标签缺失和内嵌歌词状态由原扫描逻辑判断。
+    const remember = (coverType: CustomCacheItem['coverType']) => {
+        if (!item) return
+        item.hasCover = true; item.coverType = coverType
+        customIndexManager.save(username)
+    }
+    const cached = fileCache.readCoverCache('custom/' + filename, username, stats)
+    if (cached) { remember(item?.coverType === 'embedded' ? 'embedded' : 'cached'); return cached }
+
     let tagger: any
     try {
         tagger = new MusicTagger()
@@ -543,6 +553,9 @@ export const getCustomCover = async (filename: string, username: string) => {
                 if (pic && pic.data) {
                     const data = Buffer.from(pic.data)
                     const mime = detectImageMime(data) || pic.mimeType || 'image/jpeg'
+                    if (!detectImageMime(data)) continue
+                    fileCache.writeCoverCache('custom/' + filename, username, data, mime, stats)
+                    remember('embedded')
                     return { data, mime }
                 }
             }
@@ -550,6 +563,10 @@ export const getCustomCover = async (filename: string, username: string) => {
     } catch (e) {
     } finally {
         try { if (tagger) tagger.dispose() } catch (e) { }
+    }
+    if (item?.img && /^https?:\/\//.test(item.img)) {
+        const remote = await fileCache.downloadCoverImage(item.img)
+        if (remote && fileCache.writeCoverCache('custom/' + filename, username, remote.data, remote.mime, stats)) { remember('cached'); return remote }
     }
     return null
 }
