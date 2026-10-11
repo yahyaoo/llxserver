@@ -42,7 +42,8 @@ body > .flex.flex-1 { z-index: 1; }
     background: transparent; pointer-events: none;
 }
 .top-search-host, .top-actions-host { pointer-events: auto; }
-/* 顶部音乐库搜索跨页面显示；全屏播放页由独立播放页样式统一隐藏顶部栏。作者：jingyh */
+/* 在线搜索页已有独立搜索框，仅该页隐藏顶部音乐库搜索，其他页面继续显示。作者：jingyh */
+body:has(#view-search[data-online-search="true"]:not(.hidden)) .library-search { display: none; }
 #view-search:not([data-online-search="true"]) #song-search-controls { display: none !important; }
 .top-search-host { display: flex; align-items: center; gap: 8px; width: min(460px, 48%); min-width: 0; }
 .library-search { position: relative; width: 100%; }
@@ -74,7 +75,7 @@ body > .flex.flex-1 { z-index: 1; }
     flex-shrink: 0;
 }
 :root #music-top-bar :is(.top-icon-button, .top-mobile-nav) { width: 36px; padding: 0 !important; display: grid; place-items: center; }
-:root #music-top-bar :is(.top-icon-button, .top-mobile-nav, .header-menu-trigger):hover { background: var(--bg-item-hover) !important; color: var(--c-500) !important; }
+:root #music-top-bar :is(.top-icon-button, .top-mobile-nav, .header-menu-trigger):hover { background: var(--bg-item-hover) !important; color: var(--theme-readable-accent) !important; }
 :root #music-top-bar .hidden { display: none !important; }
 #header-user-display { min-width: 0; max-width: 160px; }
 #header-username { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

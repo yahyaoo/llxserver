@@ -967,8 +967,7 @@ window.LocalMusicManager = {
         if (subPathText) subPathText.innerText = '\u5168\u90e8';
 
         localStorage.removeItem(this.cacheKey);
-        const activeDot = document.getElementById('lm-filter-active-dot');
-        if (activeDot) activeDot.classList.add('hidden');
+        for (const id of ['lm-filter-active-dot', 'lm-filter-active-dot-desktop']) document.getElementById(id)?.classList.add('hidden');
         if (apply) this.applyFilters();
     },
 
@@ -1208,12 +1207,9 @@ window.LocalMusicManager = {
         });
 
         // 4. Update UI Indicator
-        const dot = document.getElementById('lm-filter-active-dot');
         const hasActiveFilters = this.searchKeyword || this.quickSearchKeyword || this.filterQuality.size > 0 || this.filterFolder !== 'all' || this.filterStatus.size > 0 || this.filterSource.size > 0;
-        if (dot) {
-            if (hasActiveFilters) dot.classList.remove('hidden');
-            else dot.classList.add('hidden');
-        }
+        // 两种布局共用实际筛选状态；红点不表示通知或错误。作者：jingyh
+        for (const id of ['lm-filter-active-dot', 'lm-filter-active-dot-desktop']) document.getElementById(id)?.classList.toggle('hidden', !hasActiveFilters);
 
         // 同步所有 select 的 active 状态（非 all 时背景高亮）
         this._syncSelectActive('lm-folder-select');

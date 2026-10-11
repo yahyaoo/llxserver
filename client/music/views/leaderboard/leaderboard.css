@@ -39,7 +39,7 @@
 .leaderboard-sidebar-heading {
     display: flex; align-items: center; justify-content: space-between;
     flex-shrink: 0; padding: 0 14px 18px;
-    color: #000; font-size: 22px; font-weight: 700;
+    color: var(--text-main); font-size: 22px; font-weight: 700;
 }
 .leaderboard-sidebar-heading button, .leaderboard-mobile-toggle { display: none; }
 .music-shell #view-leaderboard #lb-boards-list {
@@ -55,7 +55,7 @@
 .leaderboard-navigation-number { width: 24px; flex-shrink: 0; text-align: center; font-size: 13px; font-variant-numeric: tabular-nums; }
 .leaderboard-navigation-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #view-leaderboard .leaderboard-navigation-item {
-    color: #000 !important; background: transparent !important; box-shadow: none;
+    color: var(--text-main) !important; background: transparent !important; box-shadow: none;
 }
 #view-leaderboard .leaderboard-navigation-item.active-option {
     font-weight: 600; box-shadow: none;

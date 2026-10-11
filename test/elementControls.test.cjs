@@ -7,6 +7,14 @@ function bridge() {
   vm.runInNewContext(fs.readFileSync(path.join(root, 'client/music/assets/element/element-controls.js'), 'utf8'), context)
   return context.window.ElementControls
 }
+test('任意实色背景选取对比更高的黑白前景，浅色和深色极值都可读', () => {
+  const api = bridge()
+  assert.equal(api.accentForeground(255, 255, 255), '#000000')
+  assert.equal(api.accentForeground(0, 0, 0), '#ffffff')
+  assert.equal(api.accentForeground(245, 158, 11), '#000000')
+  assert.equal(api.accentForeground(16, 185, 129), '#000000')
+  assert.equal(api.accentForeground(30, 41, 59), '#ffffff')
+})
 test('悬停红色不把中性按钮识别为危险按钮，真正选中时仍保留红色', () => {
   const api = bridge()
   const make = className => {
@@ -19,6 +27,16 @@ test('悬停红色不把中性按钮识别为危险按钮，真正选中时仍�
   api.upgrade(neutral); assert.equal(neutral.classList.contains('el-button--danger'), false)
   const active = make('text-red-500 hover:bg-red-50')
   api.upgrade(active); assert.equal(active.classList.contains('el-button--danger'), true)
+})
+test('悬停和半透明底色不误判主按钮，实色按钮保留主按钮语义', () => {
+  const api = bridge()
+  for (const [className, primary] of [['hover:bg-emerald-500', false], ['hover:bg-blue-500', false], ['bg-emerald-500/10', false], ['dark:bg-emerald-500', false], ['lm-btn-secondary', false], ['bg-emerald-500', true], ['btn-primary', true], ['settings-action', true]]) {
+    const classes = new Set(className.split(' '))
+    const source = { className, dataset: {}, closest: () => null, matches: query => query.startsWith('button,'), cloneNode: () => ({ textContent: '', querySelectorAll: () => [] }),
+      classList: { add: (...keys) => keys.forEach(key => classes.add(key)), remove: key => classes.delete(key), toggle: (key, value) => value ? classes.add(key) : classes.delete(key) } }
+    api.upgrade(source)
+    assert.equal(classes.has('el-button--primary'), primary, className)
+  }
 })
 test('属性同步保持原生描述符和原有 setter，释放后恢复', () => {
   let value = '初始', writes = 0, notifications = 0

@@ -8,6 +8,8 @@
     color-scheme: light;
     /* Base Transition */
     --theme-transition: 0.3s ease;
+    /* 强调文字与背景配色分开，浅色主题也保持文字可读。作者：jingyh */
+    --theme-readable-accent: color-mix(in srgb, var(--c-500) 25%, var(--text-main));
 
     /* Light Mode Grays (Default) */
     --bg-main: #f9fafb;
@@ -22,7 +24,7 @@
     /* gray-800 */
     --text-muted: #4b5563;
     /* gray-600 */
-    --text-dim: #9ca3af;
+    --text-dim: #6b7280;
     /* gray-400 */
     --border-main: #f1f1f1;
     /* gray-100 */
@@ -46,7 +48,7 @@
     /* gray-50 */
     --text-muted: #d1d5db;
     /* gray-300 */
-    --text-dim: #6b7280;
+    --text-dim: #a1a9b7;
     /* gray-500 */
     --border-main: #374151;
     /* gray-700 */
@@ -66,7 +68,7 @@
         --bg-glass: rgba(31, 41, 55, 0.7);
         --text-main: #f9fafb;
         --text-muted: #d1d5db;
-        --text-dim: #6b7280;
+        --text-dim: #a1a9b7;
         --border-main: #374151;
         --border-dim: #4b5563;
         --shadow-main: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -2px rgba(0, 0, 0, 0.3);
@@ -243,8 +245,7 @@
 :root:is([data-theme="white"], [data-theme="black"]) :is([class~="bg-emerald-500"], [class~="bg-emerald-600"]).text-white {
     color: var(--theme-on-accent) !important;
 }
-:root:is([data-theme="white"], [data-theme="black"]) :is(.active-option, .active-option i, .active-option span,
-    .lm-filter-tag.active, .lm-select.active, .cs-wrapper.highlight .cs-trigger,
+:root:is([data-theme="white"], [data-theme="black"]) :is(.lm-filter-tag.active, .lm-select.active, .cs-wrapper.highlight .cs-trigger,
     .cs-wrapper.highlight .cs-trigger-icon, .cs-option.selected) {
     color: var(--theme-on-accent) !important;
 }
@@ -313,6 +314,33 @@ i {
 .t-text-dim {
     color: var(--text-dim) !important;
 }
+/* 普通灰色文案与图标遵循外观，选中导航使用独立的可读强调色。作者：jingyh */
+:root.music-appearance :is(.text-gray-400,.text-gray-500) { color: var(--text-muted); }
+:root.music-appearance :is(.active-tab,.active-sub-item,.active-tab i,.active-tab span) { color: var(--theme-readable-accent) !important; }
+:root.music-appearance #main-sidebar h1 { color: var(--theme-readable-accent); }
+:root.music-appearance #header-account-trigger i { color: var(--theme-readable-accent); }
+:root.music-appearance #player-footer #play-mode-btn { color: var(--theme-readable-accent); }
+/* 强调文字及辅助图标使用可读色；实色背景保留独立前景，避免主题色叠在自身上。 */
+:root.music-appearance :is(.text-emerald-400,.text-emerald-500,.text-emerald-600) { color: var(--theme-readable-accent) !important; }
+:root.music-appearance :is([class~="bg-emerald-500"],[class~="bg-emerald-600"]).text-white,
+:root.music-appearance .lm-filter-tag.active { color: var(--theme-on-accent) !important; }
+:root.music-appearance :is(.settings-nav-heading,.setting-tooltip-trigger,.setting-tooltip-trigger > i) { color: var(--text-muted) !important; }
+:root.music-appearance :is(.text-yellow-600,.text-orange-500,.text-pink-400) { color: #9a3412; }
+:root.music-appearance.dark :is(.text-yellow-600,.text-orange-500,.text-pink-400) { color: #fdba74; }
+:root.music-appearance .text-red-500:not(.lx-el-button) { color: #b91c1c; }
+:root.music-appearance.dark .text-red-500:not(.lx-el-button) { color: #fca5a5; }
+:root.music-appearance .t-badge-blue { color: #1d4ed8; }
+:root.music-appearance.dark .t-badge-blue { color: #93c5fd; }
+:root.music-appearance #view-search .rank.bg-gradient-to-r { color: #171717 !important; }
+:root.music-appearance #about-content a { color: var(--theme-readable-accent) !important; }
+:root.music-appearance #about-content a[style*="background"] { color: #171717 !important; }
+:root.music-appearance #storage-usage-info { background: var(--bg-item-hover); color: var(--text-main) !important; }
+:root.music-appearance #settings-section-cache .bg-yellow-50 { background: var(--bg-panel); color: var(--text-muted); }
+:root.music-appearance #settings-section-logs :is(.text-red-500,.text-red-400) { color: var(--text-main); }
+:root.music-appearance :is(.recent-empty > i,#account-avatar-preview > i) { color: var(--theme-readable-accent); }
+/* 可阅读内容不再叠加低透明度，禁用控件仍由原控件状态区分。 */
+:root.music-appearance :is(span,p,i).t-text-muted:is(.opacity-20,.opacity-30,.opacity-50,.opacity-60,.opacity-70),
+:root.music-appearance :is(i.fa-inbox,i.fa-box-open):not([aria-hidden="true"]) { opacity: 1; }
 
 .t-border-main {
     border-color: var(--border-main) !important;

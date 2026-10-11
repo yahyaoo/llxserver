@@ -275,6 +275,20 @@ test('组件加载先于依赖其节点的模块，保留唯一控件 ID 和有�
   for (const match of template.matchAll(/\bonclick="([^"]+)"/g)) new vm.Script(match[1])
 })
 
+test('音质标签沿用洛雪配色，实际无损与高解析度不混淆', () => {
+  const context = vm.createContext({ window: {} })
+  const start = appSource.indexOf('function getQualityTags(')
+  const end = appSource.indexOf('window.getSourceTag = getSourceTag;', start)
+  vm.runInContext(appSource.slice(start, end), context)
+  const lossless = context.getQualityTags({ quality: 'flac' })
+  assert.match(lossless, /t-badge-green/)
+  assert.match(lossless, />无损<\/span>/)
+  assert.match(context.getQualityTags({ quality: 'hires' }), /t-badge-yellow/)
+  assert.match(context.getSourceTag('kg'), /t-badge-blue/)
+  assert.match(context.getSourceTag('tx'), /t-badge-green/)
+  assert.equal(context.getQualityTags({ types: [{ type: 'hires', isPlatformQuality: true }] }), '')
+})
+
 test('移除底栏画布后详情页频谱独立初始化，旧底栏设置不影响页面布局', () => {
   const canvases = [], styles = {}, events = {}, waveInstances = []
   const canvas = { style: styles, getBoundingClientRect: () => ({ width: 120, height: 80 }), getContext: () => ({ clearRect() {} }) }

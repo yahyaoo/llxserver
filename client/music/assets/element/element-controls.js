@@ -12,6 +12,31 @@
     const library = window.ElementPlus;
     document.documentElement.classList.add('lx-element-ui');
 
+    /** 按 WCAG 相对亮度比较深浅前景，实色按钮不能固定使用白字。 @author jingyh */
+    function accentForeground(red, green, blue) {
+        const channels = [red, green, blue].map(value => value / 255).map(value => value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4);
+        const light = channels.reduce((sum, value, index) => sum + value * [0.2126, 0.7152, 0.0722][index], 0);
+        return (light + 0.05) / 0.05 > 1.05 / (light + 0.05) ? '#000000' : '#ffffff';
+    }
+
+    /** 只观察根主题变量，签名去重避免写入对比色后重复处理自身变更。 */
+    function observeThemeContrast() {
+        const root = document.documentElement, canvas = document.createElement('canvas');
+        canvas.width = canvas.height = 1;
+        const context = canvas.getContext('2d');
+        let lastColor;
+        const sync = () => {
+            const color = getComputedStyle(root).getPropertyValue('--c-500').trim() || getComputedStyle(root).getPropertyValue('--accent-primary').trim() || '#ec4899';
+            if (lastColor === color) return;
+            lastColor = color;
+            context.fillStyle = color; context.fillRect(0, 0, 1, 1);
+            const [red, green, blue] = context.getImageData(0, 0, 1, 1).data;
+            root.style.setProperty('--theme-on-accent', accentForeground(red, green, blue));
+        };
+        new MutationObserver(sync).observe(root, { attributes: true, attributeFilter: ['data-theme', 'data-appearance', 'data-appearance-mode', 'class', 'style'] });
+        sync();
+    }
+
     /** 根据控件位置获取可读名称，去掉帮助提示内容，供键盘和读屏使用。 */
     function labelText(source) {
         let label = source.labels?.[0] || source.closest('label');
@@ -48,7 +73,8 @@
         const copy = source.cloneNode(true);
         copy.querySelectorAll('i,svg,.setting-tooltip-trigger').forEach(node => node.remove());
         const iconOnly = !copy.textContent.trim();
-        const primary = !navigation && /btn-primary|auth-submit|settings-action(?!-secondary)|lm-btn|bg-(emerald|pink|blue)-[56]00|bg-gradient/.test(source.className);
+        // 仅实色主按钮使用强调色；hover、dark 和透明度修饰不能决定默认按钮类型。
+        const primary = !navigation && source.className.split(/\s+/).some(name => /^(btn-primary|auth-submit|settings-action|lm-btn|bg-(emerald|pink|blue)-[56]00|bg-gradient-to-\w+)$/.test(name));
         const danger = !navigation && source.className.split(/\s+/).some(name => /^(btn-danger|btn-logout|bg-(red|rose)-|text-(red|rose)-)/.test(name));
         source.classList.toggle('lx-el-navigation', navigation);
         source.classList.toggle('is-circle', iconOnly);
@@ -192,7 +218,7 @@
         root.querySelectorAll(controls).forEach(upgrade);
     }
     function closeAll() { widgets.forEach(source => records.get(source)?.close?.()); }
-    window.ElementControls = { upgrade, scan, sync: source => records.get(source)?.sync(), closeAll, watchProperty, commit };
+    window.ElementControls = { upgrade, scan, sync: source => records.get(source)?.sync(), closeAll, watchProperty, commit, accentForeground };
     const observer = new MutationObserver(changes => {
         const pending = new Set();
         changes.forEach(change => {
@@ -232,6 +258,6 @@
             inputPattern: options.inputPattern, inputValidator: options.inputValidator, closeOnClickModal: false, zIndex: 20000, appendTo: appendTo(),
         }).then(result => result.value?.trim() || null, () => null);
     }
-    function start() { dialogs(); scan(document); observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['disabled', 'readonly', 'hidden', 'style', 'value', 'checked', 'min', 'max', 'step'] }); }
+    function start() { observeThemeContrast(); dialogs(); scan(document); observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'disabled', 'readonly', 'hidden', 'style', 'value', 'checked', 'min', 'max', 'step'] }); }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
 })();

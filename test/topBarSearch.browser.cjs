@@ -7,12 +7,18 @@ async page => {
   const input = page.locator('#library-search-input')
   for (const width of [1440, 900]) {
     await page.setViewportSize({ width, height: 900 })
-    for (const tab of ['recent', 'favorites', 'songlist', 'leaderboard', 'localmusic', 'settings', 'search']) {
+    for (const tab of ['recent', 'favorites', 'songlist', 'leaderboard', 'localmusic', 'settings']) {
       await page.evaluate(tab => switchTab(tab), tab)
       check(await input.isVisible(), `${width}px ${tab} 顶部搜索可见`)
       const bounds = await input.boundingBox()
       check(bounds.width > 40 && bounds.x >= 0 && bounds.x + bounds.width <= width, `${width}px ${tab} 搜索框未越界`)
     }
+    await page.evaluate(() => switchTab('search'))
+    check(!await input.isVisible(), `${width}px 在线搜索页隐藏顶部搜索`)
+    check(await page.locator('#search-input').isVisible(), `${width}px 在线搜索页保留页面搜索框`)
+    check(await page.locator('.header-actions').isVisible(), `${width}px 在线搜索页保留右侧操作区`)
+    await page.evaluate(() => handleListClick(currentListData.userList[0].id))
+    check(await input.isVisible(), `${width}px 歌单复用搜索页面时仍显示顶部搜索`)
   }
   // 手机使用独立页面顶部，不应因桌面搜索框修复重新显示桌面栏。
   await page.setViewportSize({ width: 390, height: 900 })

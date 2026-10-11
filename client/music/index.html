@@ -2076,8 +2076,8 @@
                         <i class="fas fa-list text-emerald-500"></i>
                         播放队列
                     </h3>
-                    <button onclick="scrollToCurrentSongInQueue()" title="定位当前播放"
-                        class="w-6 h-6 flex items-center justify-center text-emerald-500 hover:bg-emerald-500/10 rounded-full transition-all">
+                    <button id="queue-locate-button" onclick="scrollToCurrentSongInQueue()" title="定位当前播放" aria-label="定位当前播放"
+                        class="queue-locate-button w-6 h-6 flex items-center justify-center rounded-full transition-all">
                         <i class="fas fa-crosshairs text-xs"></i>
                     </button>
                 </div>
@@ -2115,7 +2115,7 @@
         </div>
 
         <!-- List Area -->
-        <div id="queue-list" class="flex-1 overflow-y-auto no-scrollbar custom-scrollbar p-2 space-y-1">
+        <div id="queue-list" class="flex-1 min-h-0 overflow-y-auto custom-scrollbar p-2 space-y-1">
             <!-- Items injected by JS -->
         </div>
     </div>

@@ -16,8 +16,8 @@ window.LXPlayerBarTemplate = String.raw`
                 </button>
                 <div class="player-track-copy">
                     <div class="player-title-row">
-                        <div id="player-source"></div>
                         <div id="player-title" class="font-bold truncate dynamic-marquee min-w-0 w-fit" data-text="暂无播放">暂无播放</div>
+                        <div id="player-source"></div>
                     </div>
                     <div id="player-artist" class="truncate dynamic-marquee min-w-0 w-fit" data-text="选择一首歌曲播放">选择一首歌曲播放</div>
                 </div>

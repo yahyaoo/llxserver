@@ -13,6 +13,14 @@
 .playback-experience-slider:disabled { opacity: .4; cursor: default; }
 .playback-experience-help { font-size: 12px; color: var(--text-muted); margin-top: 8px; }
 #queue-settings-button[aria-expanded='true'] { color: var(--c-500); background: var(--bg-item-hover); border-radius: 8px; }
+/* 定位图标在默认、悬停及键盘焦点状态都保持清晰，不继承通用主色按钮的白字。作者：jingyh */
+:root #queue-drawer #queue-locate-button { color: var(--text-main) !important; background: var(--bg-item-hover) !important; border: 1px solid var(--border-dim) !important; }
+:root #queue-drawer #queue-locate-button:hover,
+:root #queue-drawer #queue-locate-button:focus-visible { color: var(--theme-readable-accent) !important; background: color-mix(in srgb, var(--c-500) 14%, var(--bg-panel)) !important; }
+#queue-list { scrollbar-width: thin; scrollbar-color: var(--text-dim) transparent; scrollbar-gutter: stable; }
+#queue-list::-webkit-scrollbar { width: 6px; display: block; }
+#queue-list::-webkit-scrollbar-thumb { background: var(--text-dim); border-radius: 6px; }
+#queue-list::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
 #queue-list .queue-track-active { animation: queue-track-enter 420ms cubic-bezier(.22,.7,.3,1); }
 @keyframes queue-track-enter { from { transform: translateX(12px); background-color: color-mix(in srgb, var(--c-500) 25%, transparent); } to { transform: translateX(0); background-color: var(--bg-item-hover); } }
 @media (prefers-reduced-motion: reduce) { #queue-list .queue-track-active { animation: none; } }
