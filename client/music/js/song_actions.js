@@ -47,11 +47,17 @@
             if (window.SyncManager?.mode === 'remote' && window.SyncManager.client) {
                 await window.SyncManager.push(next);
             } else {
-                const response = await fetch('/api/user/list' + (!isUserLoggedIn() ? '?user=_open' : ''), {
-                    method: 'POST', headers: { ...getUserAuthHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify(next)
+                const response = await fetch('/api/user/favorites' + (!isUserLoggedIn() ? '?user=_open' : ''), {
+                    method: 'POST', headers: { ...getUserAuthHeaders(), 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ song: cleaned, loved: willLove, location: window.CONFIG?.['list.addMusicLocationType'] })
                 });
                 if (!response.ok) throw new Error(await response.text() || '保存喜欢失败');
+                const saved = await response.json();
+                if (!saved.success || !Array.isArray(saved.items)) throw new Error(saved.error || '保存喜欢失败');
+                next.loveList = saved.items;
             }
+            // 请求期间切换账号时，旧账号的结果不能刷新当前界面。
+            if (data !== activeData()) return;
             data.loveList = next.loveList;
             await window.ListStore.set(data).catch(error => console.warn('[SongActions] 本地缓存保存失败:', error));
             renderMyLists(currentListData);

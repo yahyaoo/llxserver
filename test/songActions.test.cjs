@@ -88,7 +88,11 @@ function loveFixture() {
     isUserLoggedIn: () => true, cleanSongData: value => ({ ...value, id: 'wy_' + value.songmid }),
     ensurePlaylistDataAvailable: async () => personal, getUserAuthHeaders: () => ({ 'x-user-token': 'alice' }),
     addMusicByConfiguredLocation: (list, value) => list.push(value), renderMyLists() {}, showSuccess() {}, showError: value => errors.push(value),
-    fetch: async (url, options) => { writes.push({ url, ...options }); return { ok: !fail, text: async () => '保存失败' } },
+    fetch: async (url, options) => {
+      writes.push({ url, ...options }); const input = JSON.parse(options.body)
+      const items = input.loved ? [...personal.loveList, input.song] : personal.loveList.filter(item => item.id !== input.song.id)
+      return { ok: !fail, text: async () => '保存失败', json: async () => ({ success: true, items }) }
+    },
   })
   vm.runInContext(fs.readFileSync(path.join(__dirname, '../client/music/js/song_actions.js'), 'utf8'), context)
   return { api: window.SongActions, personal, publicData, writes, errors, fail: () => { fail = true } }
@@ -97,8 +101,9 @@ test('喜欢直接保存个人列表、不重复，第二次点击取消', async
   const f = loveFixture(); await f.api.toggleLove(song)
   assert.equal(f.personal.loveList.length, 1)
   assert.equal(f.publicData.loveList.length, 0)
-  assert.equal(f.writes[0].url, '/api/user/list')
-  assert.equal(JSON.parse(f.writes[0].body).loveList[0].id, 'wy_1')
+  assert.equal(f.writes[0].url, '/api/user/favorites')
+  assert.equal(JSON.parse(f.writes[0].body).song.id, 'wy_1')
+  assert.equal(JSON.parse(f.writes[0].body).loved, true)
   assert.equal(f.api.isLoved(song), true)
   await f.api.toggleLove(song)
   assert.equal(f.personal.loveList.length, 0)
@@ -110,6 +115,50 @@ test('喜欢保存失败保持原列表，特殊字符不会破坏按钮属性',
   assert.equal(f.personal.loveList.length, 0); assert.equal(f.errors.length, 1)
   const odd = { ...song, name: `引号'\"<>&歌曲` }, html = f.api.renderLoveButton(odd)
   assert.equal(JSON.parse(decodeURIComponent(html.match(/data-love-song="([^"]+)"/)[1])).name, odd.name)
+})
+
+/** 播放控件复用已验证的喜欢操作，不进入歌单选择弹框。 @author jingyh */
+function playerLoveFixture() {
+  const f = loveFixture(), attributes = {}, classes = new Set(), iconClasses = new Set(['fas'])
+  const button = { setAttribute: (key, value) => { attributes[key] = value },
+    classList: { add: key => classes.add(key), remove: key => classes.delete(key) },
+    querySelector: () => ({ classList: { add: key => iconClasses.add(key), remove: key => iconClasses.delete(key) } }) }
+  let modalCalls = 0
+  const context = vm.createContext({ window: { SongActions: f.api }, document: { getElementById: () => button },
+    openPlaylistAddModal: () => { modalCalls++ } })
+  const source = fs.readFileSync(path.join(__dirname, '../client/music/app.js'), 'utf8')
+  const helper = source.match(/function updatePlayerLoveButton\(song\) \{[\s\S]*?\n\}/)
+  assert.ok(helper, '播放爱心需要独立刷新入口')
+  vm.runInContext(helper[0], context)
+  const refresh = () => context.updatePlayerLoveButton(song)
+  refresh()
+  return { ...f, button, attributes, classes, iconClasses, refresh, modalCalls: () => modalCalls }
+}
+
+test('播放爱心直接加入我的喜爱，再次点击取消且不打开歌单弹框', async () => {
+  const f = playerLoveFixture()
+  f.personal.userList.push({ id: 'other', list: [song] }); f.refresh()
+  assert.equal(f.attributes['aria-pressed'], 'false', '收藏在其他歌单中不算喜欢')
+  assert.equal(f.iconClasses.has('far'), true)
+  await f.button.onclick({ stopPropagation() {} }); f.refresh()
+  assert.equal(f.personal.loveList[0].id, song.id)
+  assert.equal(f.attributes['aria-pressed'], 'true')
+  assert.equal(f.button.title, '取消喜欢')
+  assert.equal(f.classes.has('text-red-500'), true)
+  await f.button.onclick({ stopPropagation() {} }); f.refresh()
+  assert.equal(f.personal.loveList.length, 0)
+  assert.equal(f.personal.userList[0].list.length, 1)
+  assert.equal(f.attributes['aria-pressed'], 'false')
+  assert.equal(f.modalCalls(), 0)
+})
+
+test('播放爱心保存失败不点亮红心，不打开弹框', async () => {
+  const f = playerLoveFixture(); f.fail()
+  await f.button.onclick({ stopPropagation() {} }); f.refresh()
+  assert.equal(f.personal.loveList.length, 0)
+  assert.equal(f.classes.has('text-red-500'), false)
+  assert.equal(f.errors.length, 1)
+  assert.equal(f.modalCalls(), 0)
 })
 test('歌手与专辑保存立即刷新统计', async () => {
   const app = fs.readFileSync(path.join(__dirname, '../client/music/app.js'), 'utf8')

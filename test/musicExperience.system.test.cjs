@@ -18,7 +18,7 @@ test('真实 HTTP：搜索分组、头像缓存、主题上传与丢失回退、
     child.stdout.on('data', chunk => { logs += chunk }); child.stderr.on('data', chunk => { logs += chunk })
     for (let i = 0; i < 180; i++) {
       if (child.exitCode !== null) throw new Error('启动失败：' + logs.slice(-3500))
-      try { const loggedIn = await fetch(origin + '/api/login', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ password: 'experience-test' }) }); if (loggedIn.ok) { admin['x-admin-token'] = (await loggedIn.json()).token; return } } catch {}
+      try { const loggedIn = await fetch(origin + '/api/login', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ password: 'experience-test' }) }); if (loggedIn.ok) { admin['x-admin-token'] = (await loggedIn.json()).token; return } if (i === 179) logs += '\n登录探测：' + loggedIn.status + ' ' + await loggedIn.text() } catch (error) { if (i === 179) logs += '\n登录探测：' + error.message }
       await sleep(100)
     }
     throw new Error('启动超时：' + logs.slice(-3500))
@@ -37,14 +37,38 @@ test('真实 HTTP：搜索分组、头像缓存、主题上传与丢失回退、
     assert.equal((await fetch(origin + '/api/user/recent', { headers: { 'x-user-name': 'alice', 'x-user-token': 'invalid' } })).status, 401)
     let value = await json('/api/user/appearance', alice)
     assert.equal(value.recentLimit, 100)
+    // 通过真实路由验证所有新增配色和外观，避免发布包仍使用旧选项白名单。作者：jingyh
+    for (const theme of ['white', 'black', 'zhulv', 'jiqing', 'xinghuang', 'zhuhong', 'shizhuhong']) {
+      for (const appearance of ['pure-white', 'pure-black']) {
+        value = await json('/api/user/appearance', alice, 'PUT', { ...value, theme, appearance })
+        assert.equal(value.theme, theme); assert.equal(value.appearance, appearance)
+        const restored = await json('/api/user/appearance', alice)
+        assert.equal(restored.theme, theme); assert.equal(restored.appearance, appearance)
+      }
+    }
+    const bobAppearance = await json('/api/user/appearance', bob)
+    await json('/api/user/appearance', bob, 'PUT', { ...bobAppearance, theme: 'black', appearance: 'pure-black' })
+    await json('/api/user/appearance', bob, 'PUT', { ...bobAppearance, theme: 'white', appearance: 'pure-white' })
     value = await json('/api/user/appearance', alice, 'PUT', { ...value, username: 'bob', theme: 'custom', color: '#234567', opacity: 1, glassBlur: 0, recentLimit: 2 })
     assert.equal(value.opacity, 1); assert.equal(value.glassBlur, 0)
     assert.equal((await json('/api/user/appearance', bob)).glassBlur, 60)
-    for (const id of ['one', 'two', 'three', 'two']) await json('/api/user/recent', alice, 'POST', { id, source: 'wy', name: '中文歌曲' + id, singer: '歌手' })
+    const qualified = id => ({ id, source: 'wy', name: '中文歌曲' + id, singer: '歌手', playbackSucceeded: true, playedSeconds: 10.01, playbackId: require('node:crypto').randomUUID() })
+    for (const patch of [{ playedSeconds: 10 }, { playbackSucceeded: false }, { playbackId: '' }]) {
+      const rejected = await fetch(origin + '/api/user/recent', { method: 'POST', headers: { ...alice, 'Content-Type': 'application/json' }, body: JSON.stringify({ ...qualified('rejected'), ...patch }) })
+      assert.equal(rejected.status, 400)
+    }
+    assert.deepEqual((await json('/api/user/recent', alice)).items, [])
+    for (const id of ['one', 'two', 'three', 'two']) await json('/api/user/recent', alice, 'POST', qualified(id))
+    const repeat = qualified('two')
+    await json('/api/user/recent', alice, 'POST', repeat)
+    await json('/api/user/recent', alice, 'POST', repeat)
+    // 刚播放过的三号次数较少，展示仍应把二号排在前面。
+    await json('/api/user/recent', alice, 'POST', qualified('three'))
+    assert.deepEqual((await json('/api/user/recent', alice)).items.map(song => song.playCount), [3, 2])
     assert.deepEqual((await json('/api/user/recent', alice)).items.map(song => song.id), ['two', 'three'])
     assert.deepEqual((await json('/api/user/recent', { ...alice, 'x-user-name': 'bob' })).items.map(song => song.id), ['two', 'three'])
     assert.deepEqual((await json('/api/user/recent', bob)).items, [])
-    assert.equal((await json('/api/user/appearance', bob)).theme, 'pink')
+    assert.equal((await json('/api/user/appearance', bob)).theme, 'white')
     const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/lXcAAAAASUVORK5CYII=', 'base64')
     let response = await fetch(origin + '/api/user/appearance/background', { method: 'POST', headers: alice, body: png }); assert.equal(response.status, 200); const { file } = await response.json()
     value = await json('/api/user/appearance', alice, 'PUT', { ...value, background: { file, x: 20, y: 80, blur: 12 } })
@@ -71,17 +95,22 @@ test('真实 HTTP：搜索分组、头像缓存、主题上传与丢失回退、
     const db = new Database(path.join(data, 'database/music.sqlite'), { readonly: true })
     try {
     assert.ok(db.prepare('SELECT count(*) AS n FROM client_recent_play').get().n === 2)
+    const stored = db.prepare('SELECT value_json FROM client_recent_play').all().map(row => JSON.parse(row.value_json))
+    assert.deepEqual(stored.map(item => item.playCount).sort(), [2, 3])
     assert.ok(db.prepare('SELECT count(*) AS n FROM client_appearance').get().n > 0)
     assert.equal(db.prepare("SELECT count(*) AS n FROM client_appearance WHERE record_key = 'recentLimit'").get().n, 0)
     const aliceRecentKey = 'data:users/alice_' + require('node:crypto').createHash('md5').update('alice').digest('hex').slice(0, 6) + '/recent-setting.json'
     assert.equal(db.prepare("SELECT value_json FROM client_recent_setting WHERE record_key = 'maxRecords' AND document_key = ?").get(aliceRecentKey).value_json, '2')
     } finally { db.close() }
     await stop(); await start(); const reauthenticated = await login('alice')
+    const restoredBob = await json('/api/user/appearance', await login('bob'))
+    assert.equal(restoredBob.theme, 'white'); assert.equal(restoredBob.appearance, 'pure-white')
     assert.equal((await json('/api/user/appearance', reauthenticated)).background.file, file)
     assert.equal((await json('/api/user/appearance', reauthenticated)).recentLimit, 2)
     assert.equal((await json('/api/user/appearance', reauthenticated)).opacity, 1)
     assert.equal((await json('/api/user/appearance', reauthenticated)).glassBlur, 0)
     assert.equal((await json('/api/user/recent', reauthenticated)).items.length, 2)
+    assert.deepEqual((await json('/api/user/recent', reauthenticated)).items.map(song => song.playCount), [3, 2])
     fs.unlinkSync(path.join(cache, 'theme-backgrounds', file))
     value = await json('/api/user/appearance', reauthenticated); assert.equal(value.theme, 'pink'); assert.equal(value.background, null)
     await json('/api/user/recent', reauthenticated, 'DELETE'); assert.deepEqual((await json('/api/user/recent', reauthenticated)).items, [])

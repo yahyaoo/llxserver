@@ -214,8 +214,8 @@
 .settings-content input[type="range"] { max-width: 360px; min-width: 0; }
 .settings-content [data-settings-section] > .grid > .col-span-full { grid-column: 1 / -1; }
 .settings-content [data-settings-section] > .grid > div {
-    padding: 18px 0; border: 0; border-bottom: 1px solid var(--content-divider);
-    border-radius: 0; min-width: 0;
+    padding: 20px; border: 1px solid var(--border-main);
+    border-radius: 12px; min-width: 0;
 }
 .settings-content .theme-editor { margin-top: 20px; }
 .settings-content .theme-editor label { max-width: 640px; min-height: 46px; }
@@ -298,6 +298,53 @@
 .settings-action { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 42px; padding: 10px 20px; border-radius: 10px; border: 1px solid var(--c-500); background: var(--c-500); color: #fff; font-size: 14px; font-weight: 600; cursor: pointer; }
 .settings-action:hover { background: var(--c-600); }
 .settings-action:disabled { opacity: .5; cursor: default; }
+/* Element 风格的分组卡片和三列栅格，控件宽度由列宽决定。 @author jingyh */
+:root #view-settings .settings-content :is(.settings-form-card, [data-settings-section] > .grid > div) {
+    border: 1px solid var(--border-main) !important;
+    border-radius: 12px !important;
+    background: color-mix(in srgb, var(--bg-panel) 75%, transparent) !important;
+    box-shadow: none !important;
+}
+.account-settings-card { padding: 24px; }
+.account-card-heading { padding-bottom: 18px; margin-bottom: 22px; border-bottom: 1px solid var(--border-main); }
+.account-card-heading h3 { font-size: 16px; font-weight: 600; color: var(--text-main); }
+.account-card-heading p { margin-top: 6px; font-size: 13px; color: var(--text-muted); }
+.account-fields-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; align-items: start; }
+.account-fields-grid > * { min-width: 0; }
+.account-avatar-field { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.account-field-hint { display: block; width: 100%; font-size: 12px; color: var(--text-muted); line-height: 1.5; }
+.account-form-actions { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-top: 22px; }
+.account-form-actions p, .account-password-dialog [role="status"] { font-size: 13px; color: var(--text-muted); overflow-wrap: anywhere; }
+.settings-content .account-fields-grid input { width: 100% !important; max-width: 100%; }
+.settings-content #account-username:disabled {
+    cursor: not-allowed; color: var(--text-dim); -webkit-text-fill-color: var(--text-dim);
+    background: var(--bg-item-hover) !important; border-color: var(--border-main); opacity: 1;
+}
+.settings-action-secondary { background: var(--bg-panel); border-color: var(--border-main); color: var(--text-muted); }
+.settings-action-secondary:hover { background: var(--bg-item-hover); border-color: var(--c-400); color: var(--c-600); }
+.settings-content :is(.settings-text-input, input[type="text"], input[type="password"], input[type="url"], textarea),
+.account-password-dialog .settings-text-input { border-radius: 8px; background: var(--bg-panel); border-color: var(--border-main); font-size: 14px; }
+.account-password-dialog {
+    width: min(460px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow-y: auto;
+    margin: auto; padding: 24px; border: 1px solid var(--border-main); border-radius: 16px;
+    background: var(--bg-panel); color: var(--text-main); box-shadow: 0 24px 80px rgb(0 0 0 / 25%);
+}
+.account-password-dialog::backdrop { background: rgb(0 0 0 / 40%); backdrop-filter: blur(4px); }
+.account-dialog-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 24px; }
+.account-dialog-heading h2 { font-size: 20px; font-weight: 600; }
+.account-dialog-heading p { margin-top: 6px; font-size: 13px; color: var(--text-muted); }
+.account-dialog-close { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 8px; color: var(--text-muted); }
+.account-password-dialog form { display: flex; flex-direction: column; gap: 18px; }
+.account-password-dialog .settings-field { display: flex; flex-direction: column; gap: 8px; font-size: 14px; }
+.account-password-dialog .settings-text-input { margin: 0; min-height: 42px; }
+.account-password-dialog .settings-text-input:focus-visible { outline: 2px solid var(--c-500); outline-offset: 2px; }
+.account-dialog-actions { display: flex; justify-content: flex-end; gap: 12px; padding-top: 6px; }
+@media (max-width: 1199px) { .account-fields-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 639px) {
+    .account-fields-grid { grid-template-columns: minmax(0, 1fr); gap: 18px; }
+    .account-settings-card { padding: 18px; }
+    .account-password-dialog { padding: 20px; }
+}
 .settings-content .setting-tooltip-trigger:focus-within .setting-tooltip-content { visibility: visible; opacity: 1; pointer-events: auto; }
 #account-avatar-preview { width: 64px; height: 64px; flex-shrink: 0; }
 .avatar-crop-dialog { padding: 24px; width: min(420px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); overflow-y: auto; border: 1px solid var(--border-main); border-radius: 18px; background: var(--bg-panel); color: var(--text-main); }

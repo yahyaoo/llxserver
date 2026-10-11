@@ -5,6 +5,7 @@
 */
 
 :root {
+    color-scheme: light;
     /* Base Transition */
     --theme-transition: 0.3s ease;
 
@@ -32,6 +33,7 @@
 
 /* Dark Mode Overrides */
 :root[data-appearance="dark"] {
+    color-scheme: dark;
     --bg-main: #111827;
     /* gray-900 */
     --bg-panel: #1f2937;
@@ -55,7 +57,8 @@
 
 /* System Preference (Default if no data-appearance is set) */
 @media (prefers-color-scheme: dark) {
-    :root:not([data-appearance="light"]) {
+    :root:not([data-appearance]) {
+        color-scheme: dark;
         --bg-main: #111827;
         --bg-panel: #1f2937;
         --bg-item-hover: #374151;
@@ -69,6 +72,34 @@
         --shadow-main: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -2px rgba(0, 0, 0, 0.3);
     }
 }
+
+/* 纯色外观保留层次边框与文字对比，背景不再混入主题色。作者：jingyh */
+:root[data-appearance-mode="pure-white"] {
+    --bg-main: #fff;
+    --bg-panel: #fff;
+    --bg-item-hover: #f5f5f5;
+    --bg-header: rgb(255 255 255 / 80%);
+    --bg-glass: rgb(255 255 255 / 70%);
+    --text-main: #171717;
+    --text-muted: #525252;
+    --text-dim: #737373;
+    --border-main: #e5e5e5;
+    --border-dim: #d4d4d4;
+}
+:root[data-appearance-mode="pure-black"] {
+    --bg-main: #000;
+    --bg-panel: #000;
+    --bg-item-hover: #1a1a1a;
+    --bg-header: rgb(0 0 0 / 80%);
+    --bg-glass: rgb(0 0 0 / 70%);
+    --text-main: #fafafa;
+    --text-muted: #d4d4d4;
+    --text-dim: #a3a3a3;
+    --border-main: #262626;
+    --border-dim: #404040;
+}
+:root[data-appearance-mode="pure-white"] body.t-bg-main,
+:root[data-appearance-mode="pure-black"] body.t-bg-main { background: var(--bg-main) !important; }
 
 /* 默认樱花粉；没有保存主题时也提供完整变量，避免首次绘制闪回其他颜色。 */
 :root:not([data-theme]),
@@ -165,6 +196,64 @@
     --c-900: #881337;
     --c-950: #4c0519;
     --logo-filter: hue-rotate(20deg);
+}
+
+/* 黑白主题使用中性色阶；浅底上的白色强调适当加深，保证文字与控件可见。作者：jingyh */
+:root[data-theme="white"],
+:root[data-theme="black"] {
+    --c-50: #fafafa;
+    --c-100: #f5f5f5;
+    --c-200: #e5e5e5;
+    --c-300: #d4d4d4;
+    --c-400: #a3a3a3;
+    --c-500: #737373;
+    --c-600: #525252;
+    --c-700: #404040;
+    --c-800: #262626;
+    --c-900: #171717;
+    --c-950: #0a0a0a;
+    --theme-on-accent: #fff;
+    --logo-filter: grayscale(1);
+}
+:root[data-theme="black"] {
+    --c-400: #525252;
+    --c-500: #000;
+    --c-600: #171717;
+    --c-700: #262626;
+}
+:root.dark[data-theme="white"],
+:root[data-theme="white"] #view-player-detail:is([data-player-background="blur"], [data-player-background="artist"], [data-player-background="dark"]) {
+    --c-400: #f5f5f5;
+    --c-500: #fff;
+    --c-600: #e5e5e5;
+    --c-700: #d4d4d4;
+    --theme-on-accent: #171717;
+    --logo-filter: grayscale(1) brightness(1.6);
+}
+:root.dark[data-theme="black"],
+:root[data-theme="black"] #view-player-detail:is([data-player-background="blur"], [data-player-background="artist"], [data-player-background="dark"]) {
+    --c-400: #e5e5e5;
+    --c-500: #d4d4d4;
+    --c-600: #d4d4d4;
+    --c-700: #a3a3a3;
+    --theme-on-accent: #171717;
+    --logo-filter: grayscale(1) brightness(1.4);
+}
+/* 实色主按钮及开关使用强调色的对比色，避免深色外观下出现白底白字。作者：jingyh */
+:root:is([data-theme="white"], [data-theme="black"]) :is([class~="bg-emerald-500"], [class~="bg-emerald-600"]).text-white {
+    color: var(--theme-on-accent) !important;
+}
+:root:is([data-theme="white"], [data-theme="black"]) :is(.active-option, .active-option i, .active-option span,
+    .lm-filter-tag.active, .lm-select.active, .cs-wrapper.highlight .cs-trigger,
+    .cs-wrapper.highlight .cs-trigger-icon, .cs-option.selected) {
+    color: var(--theme-on-accent) !important;
+}
+:root:is([data-theme="white"], [data-theme="black"]) .peer:checked + [class~="peer-checked:bg-emerald-500"]::after {
+    background-color: var(--theme-on-accent) !important;
+    border-color: var(--theme-on-accent) !important;
+}
+:root:is([data-theme="white"], [data-theme="black"]) .player-detail-spectrum[aria-checked="true"] .player-detail-switch::before {
+    background: var(--theme-on-accent);
 }
 
 /* Utilities for transition */

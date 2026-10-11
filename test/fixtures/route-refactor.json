@@ -85,7 +85,7 @@
     "method": "postMusicUserListAdd",
     "route": "/api/music/user/list/add",
     "condition": "pathname === '/api/music/user/list/add' && req.method === 'POST'",
-    "baselineDigest": "01dba4a2bf2074a54a3ae10e860cbaedf45a54bc790f34dba592ce46e18b9e95"
+    "baselineDigest": "4744a5656b3f6a6741d833ace12e3ea8b725b5f741e355b5fc9db8cdedb390a6"
   },
   {
     "group": "musicPlaylist",
@@ -149,7 +149,7 @@
     "method": "postUserList",
     "route": "/api/user/list",
     "condition": "pathname === '/api/user/list' && req.method === 'POST'",
-    "baselineDigest": "68b29364929094e72569410d5e981d5f708dbc1f3fba857a543eec8b7ced6df3"
+    "baselineDigest": "213e2d9e7264e69e33beb9fabebb1c4d65511fdc997873b4db70a497f7d7ce41"
   },
   {
     "group": "musicLibrary",

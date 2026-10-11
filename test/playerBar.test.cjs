@@ -47,6 +47,7 @@ function createContext() {
   })
   const volumeFunctions = appSource.slice(appSource.indexOf('let currentVolume ='), appSource.indexOf('// ========== 播放模式'))
   const changeVolume = appSource.slice(appSource.indexOf('function changeVolume(delta)'), appSource.indexOf('// 注册全局键盘监听'))
+  vm.runInContext(read('client/music/components/playback-experience/index.js'), context)
   vm.runInContext(read('client/music/components/player-bar/template.js'), context)
   vm.runInContext(read('client/music/components/player-bar/index.js'), context)
   vm.runInContext(volumeFunctions + changeVolume, context)
@@ -74,6 +75,61 @@ test('更多与音量面板互斥，重复点击关闭，无效入口保留当�
   assert.equal(get('player-volume-popover').hidden, true)
 })
 
+test('底栏普通位置打开播放页，按钮、进度、音量和弹框不触发导航', () => {
+  const { context, get } = createContext()
+  let opened = 0
+  context.window.toggleLyrics = () => opened++
+  const click = selector => get('player-footer').events.click({ target: { closest: () => selector ? {} : null } })
+  click(null)
+  assert.equal(opened, 1)
+  for (const target of ['button', 'a', 'input', 'slider', 'progress', 'popover']) click(target)
+  assert.equal(opened, 1)
+  context.isLyricViewOpen = true
+  click(null)
+  assert.equal(opened, 1, '已打开时点击普通区域不关闭播放页')
+  context.window.playerBar.destroy()
+  assert.equal(get('player-footer').events.click, undefined)
+})
+
+test('双行歌词同步前进、跳转和末尾，换歌清空旧歌词', () => {
+  const { context, get } = createContext()
+  const bar = context.window.playerBar
+  bar.setLyrics([{ text: '第一句' }, { text: '第二句' }, { text: '第三句' }])
+  assert.equal(get('player-lyric-current').textContent, '第一句')
+  assert.equal(get('player-lyric-next').textContent, '第二句')
+  bar.updateLyrics(1)
+  assert.equal(get('player-lyric-current').textContent, '第二句')
+  assert.equal(get('player-lyric-next').textContent, '第三句')
+  bar.updateLyrics(2)
+  assert.equal(get('player-lyric-next').textContent, '')
+  bar.updateLyrics(0)
+  assert.equal(get('player-lyric-current').textContent, '第一句')
+  bar.setTrack({ id: 'next', name: '下一首' })
+  assert.equal(get('player-lyric-current').textContent, '暂无歌词')
+  assert.equal(get('player-lyric-next').textContent, '')
+  bar.setLyrics([], '暂无歌词')
+  assert.equal(get('player-lyric-current').textContent, '暂无歌词')
+})
+
+test('未加载音频和直播时长不进入拖动，松开前时长失效也不写无效进度', () => {
+  const context = vm.createContext({ audio: { duration: NaN, currentTime: 0 }, Number, Math, handleDragMove() {} })
+  const start = appSource.slice(appSource.indexOf('function startDragging('), appSource.indexOf('function stopDragging('))
+  const stop = appSource.slice(appSource.indexOf('function stopDragging('), appSource.indexOf('function handleDragMove('))
+  vm.runInContext('let isDragging = null, dragPercentage = .5, lastSeekPct = -1;\n' + start + stop, context)
+  for (const duration of [NaN, Infinity, 0]) {
+    context.audio.duration = duration
+    context.startDragging({ type: 'mousedown' }, 'progress')
+    assert.equal(vm.runInContext('isDragging', context), null)
+    vm.runInContext("isDragging = 'progress'", context)
+    context.stopDragging()
+    assert.equal(context.audio.currentTime, 0)
+  }
+  context.audio.duration = 100
+  context.startDragging({ type: 'mousedown' }, 'progress')
+  context.stopDragging()
+  assert.equal(context.audio.currentTime, 50)
+})
+
 test('面板内部调节不会关闭，点击操作、外部点击和 Esc 正确关闭', () => {
   const { context, get, documentEvents } = createContext()
   context.window.togglePlayerPopover('volume')
@@ -98,7 +154,11 @@ test('音量百分比、图标与无障碍数值同步，沿用轨道调节和�
   assert.equal(get('volume-percent').textContent, '0%')
   assert.match(get('volume-icon').className, /volume-mute/)
   context.toggleMute()
+  let cancelled = false
+  context.window.playbackExperience.pendingFade = { timer: null, resolve: completed => { cancelled = !completed } }
+  context.clearInterval = () => {}
   context.setVolume({ clientX: 40 })
+  assert.equal(cancelled, true, '手动调音量结束旧渐变等待')
   assert.equal(context.audio.muted, false)
   assert.equal(context.audio.volume, 0.3)
   assert.equal(get('volume-percent').textContent, '30%')
@@ -118,7 +178,11 @@ test('滑块方向键只调音量，Home/End 有效且不越界', () => {
   const { context, get } = createContext()
   let prevented = 0, stopped = 0
   const key = key => get('volume-container').events.keydown({ key, preventDefault: () => prevented++, stopPropagation: () => stopped++ })
+  let cancelled = false
+  context.window.playbackExperience.pendingFade = { timer: null, resolve: completed => { cancelled = !completed } }
+  context.clearInterval = () => {}
   key('ArrowRight')
+  assert.equal(cancelled, true, '键盘调音量取消渐变')
   assert.equal(context.audio.muted, false)
   assert.equal(get('volume-percent').textContent, '80%')
   key('End'); key('ArrowUp')

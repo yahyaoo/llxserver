@@ -1,5 +1,30 @@
 -- 播放器独立数据库；作者 yahyaoo。
 -- 记录字段统一使用 snake_case，扩展值保留全部原 JSON 字段与顺序。
+-- 独立喜爱歌曲；作者 jingyh。账号作用域与排序沿用文档仓储，不包含喜爱人数字段。
+-- 自定义歌单封面；cover 可直接查询，数据地址随数据库迁移。
+CREATE TABLE IF NOT EXISTS client_playlist_cover (
+  document_key TEXT NOT NULL, -- 账号目录作用域，随数据目录迁移保持稳定
+  record_key TEXT NOT NULL, -- 歌单标识
+  sort_order INTEGER NOT NULL, -- 封面记录顺序
+  value_json TEXT NOT NULL CHECK (json_valid(value_json)), -- 图片内容或兼容旧图片地址
+  cover TEXT GENERATED ALWAYS AS (json_extract(value_json, '$')) VIRTUAL, -- 可直接查询的封面字段
+  created_at INTEGER NOT NULL, -- 记录创建时间，毫秒
+  updated_at INTEGER NOT NULL, -- 记录更新时间，毫秒
+  PRIMARY KEY (document_key, record_key)
+);
+CREATE INDEX IF NOT EXISTS idx_client_playlist_cover_order ON client_playlist_cover (document_key, sort_order);
+
+CREATE TABLE IF NOT EXISTS client_favorite_song (
+  document_key TEXT NOT NULL, -- 账号作用域键，随数据目录迁移保持稳定
+  record_key TEXT NOT NULL, -- 文档内歌曲记录标识
+  sort_order INTEGER NOT NULL, -- 歌曲显示顺序，从零开始
+  value_json TEXT NOT NULL CHECK (json_valid(value_json)), -- 完整歌曲及文件大小、音频参数等元数据
+  created_at INTEGER NOT NULL, -- 记录创建时间，Unix 毫秒
+  updated_at INTEGER NOT NULL, -- 记录更新时间，Unix 毫秒
+  PRIMARY KEY (document_key, record_key)
+);
+CREATE INDEX IF NOT EXISTS idx_client_favorite_song_order ON client_favorite_song (document_key, sort_order);
+
 CREATE TABLE IF NOT EXISTS client_storage_document (
   table_name TEXT NOT NULL, -- 所属业务表名
   document_key TEXT NOT NULL, -- 文档作用域键；用户文档包含账号目录，随数据目录迁移保持稳定

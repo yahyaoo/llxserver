@@ -24,6 +24,14 @@
 #main-navigation > ul > li > :is(a, div[onclick]) {
     min-height: 46px; margin: 2px 0; padding: 12px 14px; border-radius: 12px;
 }
+/* 导航保持整行左对齐，Element 仅提供交互状态，不改变行内布局。 */
+:root #main-navigation > ul > li > a {
+    display: flex; justify-content: flex-start; gap: 0;
+    border: 0 !important; border-radius: 12px !important; background: transparent !important;
+}
+:root #main-navigation > ul > li > a.justify-between { justify-content: space-between; }
+:root #main-navigation .hidden { display: none !important; }
+:root #main-navigation > ul > li > a.active-tab { background: color-mix(in srgb, var(--c-500) 12%, var(--bg-panel)) !important; }
 #main-navigation .active-tab {
     border-right: 0;
     background: color-mix(in srgb, var(--c-500) 12%, var(--bg-panel));
@@ -34,6 +42,11 @@
     color: var(--text-muted); font-size: 14px; text-align: left;
 }
 .main-navigation-collapse:hover { color: var(--text-main); }
+:root #main-sidebar .main-navigation-collapse {
+    min-height: 46px; height: 46px; width: auto; margin: 6px 12px 0 !important; padding: 14px !important;
+    border: 0 !important; border-top: 1px solid var(--border-main) !important; border-radius: 0 !important;
+    background: transparent !important; justify-content: flex-start;
+}
 .main-navigation-collapse:focus-visible, #main-navigation :is(a, div[onclick]):focus-visible {
     outline: 2px solid var(--c-500); outline-offset: -2px;
 }
@@ -54,6 +67,8 @@
     .navigation-collapsed #main-navigation > ul > li > :is(a, div[onclick]) {
         justify-content: center; padding-left: 0; padding-right: 0;
     }
+    :root .navigation-collapsed #main-navigation > ul > li > a { justify-content: center; padding-left: 0; padding-right: 0; }
+    :root #main-sidebar.navigation-collapsed .main-navigation-collapse { justify-content: center; padding: 14px 0 !important; margin-inline: 7px !important; }
     .navigation-collapsed .main-navigation-collapse { justify-content: center; padding: 14px 0; margin-inline: 7px; }
     .navigation-collapsed .main-navigation-collapse i { transform: rotate(180deg); }
 }

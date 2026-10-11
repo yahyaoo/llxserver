@@ -33,7 +33,7 @@ test('158 个非配置路由保持原执行语句，160 个原路由条件顺序
     const statements = [...handler.body.body]
     while (statements[0]?.type === 'VariableDeclaration' && statements[0].declarations.length === 1 && ['context', 'runtime'].includes(statements[0].declarations[0].init?.name)) statements.shift()
     const body = statements.map(node => source.slice(node.start, node.end)).join('\n')
-    // 本次需求明确修改配置持久化与配置备份还原；其余处理器继续固定原语句基线。
+    // 配置持久化与备份还原单独验证；歌单基线已更新喜爱隔离及封面校验，其余路由保持原基线。作者：jingyh
     const changedConfigurationHandlers = ['handleConfig', 'postConfigBackupsRestore']
     if (!(route.file === 'src/admin/service/ConfigurationService.ts' && changedConfigurationHandlers.includes(route.method))) assert.equal(digest(body), route.baselineDigest, route.file + ':' + route.method)
     const next = http.indexOf('if (' + route.condition + ')', position)

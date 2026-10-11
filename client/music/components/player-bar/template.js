@@ -21,6 +21,10 @@ window.LXPlayerBarTemplate = String.raw`
                     </div>
                     <div id="player-artist" class="truncate dynamic-marquee min-w-0 w-fit" data-text="选择一首歌曲播放">选择一首歌曲播放</div>
                 </div>
+                <div class="player-bar-lyrics" aria-label="同步歌词">
+                    <div id="player-lyric-current">暂无歌词</div>
+                    <div id="player-lyric-next"></div>
+                </div>
             </div>
             <div class="player-progress">
                 <span id="time-current" class="player-time">00:00</span>
@@ -109,7 +113,7 @@ window.LXPlayerBarTemplate = String.raw`
                 </div>
 
 
-            <button id="player-like-btn" class="player-icon-button text-gray-300 hover:text-red-500 transition-colors" title="收藏歌曲" aria-label="收藏歌曲"><i class="fas fa-heart"></i></button>
+            <button id="player-like-btn" class="player-icon-button text-gray-300 hover:text-red-500 transition-colors" title="加入我的喜爱" aria-label="加入我的喜爱" aria-pressed="false"><i class="far fa-heart"></i></button>
             <button class="player-icon-button" onclick="toggleQueueDrawer()" title="播放队列" aria-label="播放队列"><i class="fas fa-list-ul"></i></button>
             <div class="player-popover-anchor player-volume-anchor" data-player-popover>
                 <button id="player-volume-btn" class="player-icon-button" onclick="togglePlayerPopover('volume')" title="音量" aria-label="音量" aria-expanded="false" aria-controls="player-volume-popover"><i id="volume-icon" class="fas fa-volume-up w-4"></i></button>

@@ -4,7 +4,7 @@
  */
 
 // Available Themes
-const THEMES = ['pink', 'emerald', 'blue', 'amber', 'violet', 'rose', 'custom', 'zhulv', 'jiqing', 'xinghuang', 'zhuhong', 'shizhuhong'];
+const THEMES = ['pink', 'emerald', 'blue', 'amber', 'violet', 'rose', 'white', 'black', 'custom', 'zhulv', 'jiqing', 'xinghuang', 'zhuhong', 'shizhuhong'];
 
 // Initialize Theme & Appearance
 function initTheme() {
@@ -39,9 +39,12 @@ function setTheme(themeName, save = true) {
 }
 
 function setAppearance(mode, save = true) {
-    const validModes = ['light', 'dark', 'system'];
+    const validModes = ['light', 'dark', 'pure-white', 'pure-black', 'system'];
     if (!validModes.includes(mode)) return;
 
+    // 纯色外观复用现有明暗适配，独立记录模式供背景覆盖与两个入口同步使用。作者：jingyh
+    document.documentElement.setAttribute('data-appearance-mode', mode);
+    const baseMode = mode === 'pure-white' ? 'light' : mode === 'pure-black' ? 'dark' : mode;
     // Apply to Root
     if (mode === 'system') {
         document.documentElement.removeAttribute('data-appearance');
@@ -53,8 +56,8 @@ function setAppearance(mode, save = true) {
             document.documentElement.classList.remove('dark');
         }
     } else {
-        document.documentElement.setAttribute('data-appearance', mode);
-        if (mode === 'dark') {
+        document.documentElement.setAttribute('data-appearance', baseMode);
+        if (baseMode === 'dark') {
             document.documentElement.classList.add('dark');
         } else {
             document.documentElement.classList.remove('dark');
@@ -73,7 +76,7 @@ function setAppearance(mode, save = true) {
 }
 
 function updateThemeSelectionUI(activeTheme) {
-    const names = { pink: '樱花粉', emerald: '森之韵', blue: '深海谧', amber: '暖阳愿', violet: '紫微星', rose: '绯红月' };
+    const names = { pink: '樱花粉', emerald: '森之韵', blue: '深海谧', amber: '暖阳愿', violet: '紫微星', rose: '绯红月', white: '纯白', black: '黑色' };
     const label = document.getElementById('header-theme-label');
     if (label) label.textContent = window.ThemeControls?.colors.find(item => item[0] === activeTheme)?.[1] || (activeTheme === 'custom' ? '自定义' : names[activeTheme] || names.pink);
     document.querySelectorAll('.theme-option').forEach(btn => {

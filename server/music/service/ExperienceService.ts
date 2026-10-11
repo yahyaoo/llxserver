@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import crypto from 'node:crypto'
 import type { ExperienceRepository } from '../repository/ExperienceRepository'
+import { PlayCountService } from './PlayCountService'
 
 /** 音乐体验配置与搜索分组业务。 @author jingyh @date 2026-10-10 */
 export const DEFAULT_EXPERIENCE = {
@@ -10,7 +11,7 @@ export const DEFAULT_EXPERIENCE = {
   background: null as null | { file: string; x: number; y: number; blur: number },
 }
 export type Experience = typeof DEFAULT_EXPERIENCE
-const themes = ['pink', 'emerald', 'blue', 'amber', 'violet', 'rose', 'custom', 'zhulv', 'jiqing', 'xinghuang', 'zhuhong', 'shizhuhong']
+const themes = ['pink', 'emerald', 'blue', 'amber', 'violet', 'rose', 'white', 'black', 'custom', 'zhulv', 'jiqing', 'xinghuang', 'zhuhong', 'shizhuhong']
 const number = (value: unknown, min: number, max: number, fallback: number) => typeof value === 'number' && Number.isFinite(value) ? Math.min(max, Math.max(min, value)) : fallback
 
 /** 校验客户端输入；不接受绝对路径、越界数值或任意 CSS 内容。 */
@@ -20,7 +21,7 @@ export function normalizeExperience(input: any): Experience {
   if (background && !/^[a-f0-9]{64}\.(png|jpg|webp|gif)$/.test(background.file || '')) throw new Error('背景文件标识无效')
   return {
     theme: themes.includes(input.theme) ? input.theme : 'pink',
-    appearance: ['light', 'dark', 'system'].includes(input.appearance) ? input.appearance : 'system',
+    appearance: ['light', 'dark', 'pure-white', 'pure-black', 'system'].includes(input.appearance) ? input.appearance : 'system',
     color: /^#[a-f0-9]{6}$/i.test(input.color || '') ? input.color : '#ec4899',
     opacity: number(input.opacity, 0, 1, 0.18),
     glassBlur: number(input.glassBlur, 0, 100, 60),
@@ -66,38 +67,20 @@ export function putExperience(repository: ExperienceRepository, cacheDir: string
     const { recentLimit, ...theme } = value
     repository.write('client_appearance', 'appearance.json', theme)
     repository.write('client_recent_setting', 'recent-setting.json', { maxRecords: recentLimit })
-    repository.write('client_recent_play', 'recent-play.json', getRecent(repository).slice(0, value.recentLimit))
+    const recent = getRecent(repository).sort((a, b) => (b.playedAt || 0) - (a.playedAt || 0))
+    repository.write('client_recent_play', 'recent-play.json', recent.slice(0, value.recentLimit))
   })
   return value
 }
 
-/** 返回按最近播放时间倒序保存的账号歌曲列表。 */
+/** 返回按正常播放次数降序排列的账号歌曲列表。 */
 export function getRecent(repository: ExperienceRepository): any[] {
-  return repository.read('client_recent_play', 'recent-play.json', [])
+  return new PlayCountService(repository).get()
 }
 
-/** 同曲重播移至首位；只保留播放器实际需要的歌曲字段，剔除临时认证参数。 */
+/** 委托公共统计服务记录有效播放，沿用账号历史保存上限。 */
 export function recordRecent(repository: ExperienceRepository, cacheDir: string, song: any): any[] {
-  if (!song || typeof song.name !== 'string' || !song.name.trim() || !song.id || typeof song.source !== 'string') throw new Error('歌曲信息不完整')
-  const clean: any = {}
-  for (const key of ['id', 'songmid', 'songId', 'name', 'singer', 'source', 'albumName', 'albumId', 'interval', 'quality', 'type', 'types', 'isLocal', '_localLibraryItem', 'filename', 'folder', 'isCustomDir']) {
-    if (song[key] !== undefined) clean[key] = song[key]
-  }
-  for (const key of ['pic', 'img', 'url']) {
-    if (typeof song[key] === 'string' && /^(https?:\/\/|\/api\/music\/)/.test(song[key])) {
-      const url = new URL(song[key], 'http://local')
-      for (const param of ['token', 'password', 'auth']) url.searchParams.delete(param)
-      clean[key] = url.origin === 'http://local' ? url.pathname + url.search : url.toString()
-    }
-  }
-  clean.playedAt = Date.now()
-  return repository.transaction(() => {
-    const recent = getRecent(repository).filter(item => !(String(item.id) === String(clean.id) && item.source === clean.source))
-    recent.unshift(clean)
-    const saved = recent.slice(0, getExperience(repository, cacheDir).recentLimit)
-    repository.write('client_recent_play', 'recent-play.json', saved)
-    return saved
-  })
+  return new PlayCountService(repository).record(song, getExperience(repository, cacheDir).recentLimit)
 }
 
 /** 歌手分组缓存组件：支持多人演唱，头像优先使用歌手收藏元数据。 */

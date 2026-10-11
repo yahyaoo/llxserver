@@ -209,11 +209,11 @@ window.LeaderboardManager = (function () {
                 </div>
                 <!-- 封面 + 歌名 -->
                 <div class="col-span-7 sm:col-span-5 md:col-span-4 lg:col-span-4 flex items-center gap-3 min-w-0 pr-2">
-                    <div class="w-10 h-10 md:w-12 md:h-12 flex-shrink-0 relative rounded-lg overflow-hidden shadow-sm border t-border-main group-hover:shadow-md transition-all group-hover:scale-105 duration-300">
+                    <div class="song-cover w-10 h-10 md:w-12 md:h-12 flex-shrink-0 relative rounded-lg overflow-hidden shadow-sm border t-border-main group-hover:shadow-md transition-all group-hover:scale-105 duration-300">
                         <img data-src="${imgUrl}" src="/music/assets/logo.svg"
                              class="lazy-image w-full h-full object-cover dynamic-logo is-placeholder"
                              onerror="this.src='/music/assets/logo.svg'; this.classList.add('is-placeholder');">
-                        <div class="absolute inset-0 bg-black/20 hidden group-hover:flex items-center justify-center transition-all">
+                        <div class="song-cover-play">
                             <i class="fas fa-play text-white text-xs"></i>
                         </div>
                     </div>
@@ -221,7 +221,7 @@ window.LeaderboardManager = (function () {
                         <div class="song-file-title font-bold text-sm t-text-main group-hover:text-emerald-500 transition-colors">
                             ${window.createMarqueeHtml ? window.createMarqueeHtml(song.name) : `<span class="truncate">${song.name}</span>`}
                         </div>
-                        <div class="flex items-center gap-1 mt-0.5 overflow-hidden">
+                        <div class="song-metadata-row flex items-center gap-1 mt-0.5">
                             ${window.getSourceTag ? window.getSourceTag(song.source || state.source) : ''}
                             ${window.getQualityTags ? window.getQualityTags(song) : ''}
                             <div class="md:hidden flex-1 min-w-0">
@@ -248,11 +248,6 @@ window.LeaderboardManager = (function () {
                 <!-- 操作 -->
                 <div class="song-row-actions col-span-4 sm:col-span-3 md:col-span-2 lg:col-span-2 flex items-center justify-end gap-0 sm:gap-1">
                     ${window.SongActions?.renderLoveButton(song) || ''}
-                    <button class="p-0.5 sm:p-1.5 hover:bg-emerald-50 rounded-lg text-emerald-600 transition-colors"
-                            title="播放"
-                            onclick="event.stopPropagation(); window.LeaderboardManager.playSong(${index})">
-                        <i class="fas fa-play w-3.5 h-3.5 flex items-center justify-center"></i>
-                    </button>
                     <button class="p-0.5 sm:p-1.5 hover:bg-blue-50 rounded-lg text-blue-600 transition-colors"
                             title="下载"
                             onclick="event.stopPropagation(); downloadSong(${JSON.stringify(song).replace(/"/g, '&quot;')})">

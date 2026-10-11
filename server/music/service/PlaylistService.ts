@@ -1,4 +1,5 @@
 import type { RequestContext, ServerRuntime } from '../../common/http/RequestContext'
+import { validatePlaylistCover } from './playlist/cover'
 /** 用户歌单、历史快照、缓存列表和平台歌单查询所需的应用依赖契约。 @author yahyaoo */
 export type PlaylistServiceRuntime = Pick<ServerRuntime, 'verifyUserAuth' | 'getUserSpace' | 'getUserDirname' | 'path' | 'storageFs' | 'readBody' | 'getUserConfig' | 'startupLog' | 'fileCache' | 'customMusicManager' | 'musicSdk' | 'normalizeSongInfo'>
 /** 用户歌单、历史快照、缓存列表和平台歌单查询服务。 @author yahyaoo */
@@ -393,6 +394,12 @@ export async function postMusicUserListAdd(context: RequestContext, runtime: Pla
           try {
             const { listId, musicInfos, location } = JSON.parse(body)
 
+            if (listId === 'love') {
+              res.writeHead(400)
+              res.end('我的喜爱不是歌单，请使用喜欢接口')
+              return
+            }
+
             if (!listId || !Array.isArray(musicInfos)) {
               res.writeHead(400)
               res.end('参数错误:需要listId和musicInfos数组')
@@ -680,9 +687,19 @@ export async function postUserList(context: RequestContext, runtime: PlaylistSer
         void readBody(req).then(async body => {
           try {
             const listData = JSON.parse(body)
+            if (Array.isArray(listData?.userList) && listData.userList.some((list: any) => list && !validatePlaylistCover(list.cover))) {
+              res.writeHead(400, { 'Content-Type': 'application/json' })
+              res.end(JSON.stringify({ success: false, error: '封面无效，仅支持不超过 5MB 的 JPG、PNG、WEBP 图片' }))
+              return
+            }
+            if (!Array.isArray(listData?.defaultList) || !Array.isArray(listData?.userList) || listData.userList.some((list: any) => !list || ['love', 'default', 'temp'].includes(list.id) || !Array.isArray(list.list))) {
+              res.writeHead(400, { 'Content-Type': 'application/json' })
+              res.end(JSON.stringify({ success: false, error: '普通歌单数据无效，不能包含喜爱保留标识' }))
+              return
+            }
             const userSpace = getUserSpace(username!)
             // Restore ensures consistency with the provided snapshot
-            await userSpace.listManage.listDataManage.restore(listData)
+            await userSpace.listManage.listDataManage.restore(listData, true)
             // Create a snapshot after update
             await userSpace.listManage.createSnapshot()
 

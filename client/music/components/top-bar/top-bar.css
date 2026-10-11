@@ -42,6 +42,9 @@ body > .flex.flex-1 { z-index: 1; }
     background: transparent; pointer-events: none;
 }
 .top-search-host, .top-actions-host { pointer-events: auto; }
+/* 在线搜索以外隐藏顶部检索，保留手机导航按钮。 */
+body:not(:has(#view-search[data-online-search="true"]:not(.hidden))) .library-search { display: none; }
+#view-search:not([data-online-search="true"]) #song-search-controls { display: none !important; }
 .top-search-host { display: flex; align-items: center; gap: 8px; width: min(460px, 48%); min-width: 0; }
 .library-search { position: relative; width: 100%; }
 .library-search-input, .header-actions {
@@ -57,8 +60,26 @@ body > .flex.flex-1 { z-index: 1; }
 .library-search-input input { background: transparent; color: var(--text-main); outline: none; width: 100%; min-width: 0; font-size: 14px; }
 .library-search-input input::placeholder { color: var(--text-muted); }
 .header-actions { min-height: 52px; padding: 5px 8px; gap: 5px; }
+/* 胶囊采用稳定的主题底色，滚动的文字与卡片不会透出成局部色块。 @author jingyh */
+:root.music-appearance #music-top-bar .header-actions {
+    background: color-mix(in srgb, var(--bg-panel) calc(var(--surface-opacity) * 100%), var(--bg-main)) !important;
+    isolation: isolate;
+}
 .header-actions .header-menu-trigger { border: 0; border-radius: 22px; white-space: nowrap; }
 .header-avatar { height: 32px; width: 32px; }
+/* 保留顶部胶囊的控件布局，避免通用 Element 按钮样式覆盖尺寸和隐藏状态。 */
+:root #music-top-bar :is(.top-icon-button, .top-mobile-nav, .header-menu-trigger) {
+    min-height: 36px; height: 36px; padding: 0 10px !important; gap: 8px;
+    border: 0 !important; border-radius: 22px !important;
+    background: transparent !important; color: var(--text-muted) !important;
+    flex-shrink: 0;
+}
+:root #music-top-bar :is(.top-icon-button, .top-mobile-nav) { width: 36px; padding: 0 !important; display: grid; place-items: center; }
+:root #music-top-bar :is(.top-icon-button, .top-mobile-nav, .header-menu-trigger):hover { background: var(--bg-item-hover) !important; color: var(--c-500) !important; }
+:root #music-top-bar .hidden { display: none !important; }
+#header-user-display { min-width: 0; max-width: 160px; }
+#header-username { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+:root #music-top-bar .header-avatar { display: grid; place-items: center; flex-shrink: 0; }
 .top-icon-button, .top-mobile-nav { display: grid; place-items: center; height: 36px; width: 36px; border-radius: 50%; color: var(--text-muted); }
 .top-icon-button:hover, .top-mobile-nav:hover { color: var(--c-500); background: var(--bg-item-hover); }
 .library-search-results { position: absolute; top: 64px; left: 0; width: min(560px, calc(100vw - 40px)); max-height: calc(100dvh - 210px); overflow-y: auto; border-radius: 24px; border: 1px solid var(--border-dim); background: color-mix(in srgb, var(--bg-panel) 90%, transparent); backdrop-filter: blur(var(--surface-blur, 24px)); -webkit-backdrop-filter: blur(var(--surface-blur, 24px)); box-shadow: 0 20px 65px rgb(0 0 0 / 20%); padding: 14px; color: var(--text-main); }
@@ -115,6 +136,7 @@ body > .flex.flex-1 { z-index: 1; }
     .top-search-host { width: auto; flex: 1; }
     #header-theme-label, #header-account-label, #header-user-display, #sleep-timer-trigger, #pwa-install-btn span { display: none !important; }
     .header-actions .header-menu-trigger { padding: 6px; }
+    :root #music-top-bar .header-menu-trigger { padding: 0 6px !important; }
     .theme-menu { width: min(344px, calc(100vw - 32px)); position: fixed; right: 16px; top: 84px; }
 }
 @media (max-width: 520px) {

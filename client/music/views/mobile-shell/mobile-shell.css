@@ -1,0 +1,74 @@
+/* 手机页面以音乐库为中心，底部胶囊与安全区均留出滚动空间。 @author jingyh */
+#mobile-page-header, #mobile-bottom-nav, #mobile-pages { display: none; }
+@media (max-width: 767px) {
+    body { --mobile-nav-clearance: calc(110px + env(safe-area-inset-bottom)); }
+    .music-shell { --top-bar-clearance: calc(88px + env(safe-area-inset-top)); }
+    #music-top-bar, #main-sidebar.main-navigation, #mobile-sidebar-backdrop,
+    #player-footer.floating-player { display: none !important; }
+    #mobile-pages { display: contents; }
+    #mobile-page-header {
+        position: absolute; z-index: 46; inset: 0 0 auto; display: flex;
+        align-items: center; justify-content: space-between; gap: 12px;
+        padding: calc(16px + env(safe-area-inset-top)) 18px 12px;
+        background: color-mix(in srgb, var(--bg-main) 90%, transparent);
+        backdrop-filter: blur(var(--surface-blur, 24px));
+    }
+    #mobile-page-header h1 { font-size: 20px; font-weight: 700; text-align: center; }
+    #mobile-page-header button { width: 44px; height: 44px; display: grid; place-items: center; border: 1px solid var(--border-dim); border-radius: 50%; background: var(--bg-panel); font-size: 18px; }
+    .mobile-page { position: absolute; inset: 0; overflow-y: auto; overscroll-behavior: contain; padding: calc(var(--top-bar-clearance) + 12px) 16px var(--mobile-nav-clearance); scroll-padding-block: var(--top-bar-clearance) var(--mobile-nav-clearance); }
+    .mobile-card { margin-bottom: 18px; border: 1px solid var(--border-dim); border-radius: 22px; background: var(--bg-panel); overflow: hidden; }
+    .mobile-menu-list > li > :is(a, div[onclick]), .mobile-menu-row { min-height: 58px; width: 100%; display: flex; align-items: center; gap: 14px; padding: 16px 18px; font-size: 16px; text-align: left; margin: 0; border-radius: 0; }
+    :root #mobile-pages .mobile-menu-list > li > a,
+    :root #mobile-pages .mobile-menu-row { justify-content: flex-start !important; border: 0 !important; border-radius: 0 !important; background: transparent !important; box-shadow: none !important; min-height: 58px !important; height: auto !important; padding: 16px 18px !important; font-size: 16px !important; }
+    :root #mobile-pages .mobile-menu-list > li > a > span { margin-left: 0; }
+    :root #mobile-bottom-nav button { border: 0 !important; border-radius: 50% !important; background: transparent !important; box-shadow: none !important; padding: 0 !important; }
+    :root #mobile-bottom-nav button.is-active { color: var(--c-600); background: color-mix(in srgb, var(--c-500) 15%, transparent) !important; }
+    :root #mobile-bottom-nav .mobile-now-playing { border: 2px solid var(--border-main) !important; }
+    .mobile-menu-list > li:not(:last-child), .mobile-card > .mobile-menu-row:not(:last-child) { border-bottom: 1px solid var(--border-dim); }
+    :root #mobile-pages .mobile-card > .mobile-menu-row:not(:last-child) { border-bottom: 1px solid var(--border-dim) !important; }
+    .mobile-menu-list :is(a, div[onclick]) i:first-child, .mobile-menu-row > i:first-child { color: var(--c-500); width: 24px; text-align: center; font-size: 20px; }
+    .mobile-menu-row > span { flex: 1; }
+    .mobile-menu-row > i:last-child { font-size: 12px; color: var(--text-muted); }
+    .mobile-menu-list .active-tab { border-right: 0; }
+    .mobile-menu-list #favorites-children, .mobile-menu-list #dislike-children { padding: 0 10px; background: transparent; }
+    .mobile-menu-list .playlist-sidebar-item { min-height: 46px; margin: 3px 0; font-size: 14px; }
+    .mobile-menu-list .playlist-group-heading { padding: 16px 18px 10px; font-size: 16px; color: var(--text-main); }
+    #mobile-library-playlists #playlist-lists-container { padding: 0 10px 12px; }
+    .mobile-profile { display: flex; align-items: center; gap: 14px; width: 100%; padding: 20px 18px; text-align: left; }
+    .mobile-profile-avatar { display: grid; place-items: center; width: 58px; height: 58px; flex-shrink: 0; border-radius: 50%; background: var(--c-100); color: var(--c-600); font-size: 24px; }
+    .mobile-profile-avatar img { width: 100%; height: 100%; border-radius: inherit; object-fit: cover; }
+    :root #mobile-pages .mobile-profile-avatar { display: grid; place-items: center; }
+    .mobile-profile-copy { flex: 1; min-width: 0; }
+    .mobile-profile-copy strong, .mobile-profile-copy small { display: block; overflow: hidden; text-overflow: ellipsis; }
+    .mobile-profile-copy strong { font-size: 19px; }
+    .mobile-profile-copy small { color: var(--text-muted); margin-top: 5px; }
+    :root #mobile-pages .mobile-profile { border-radius: 22px !important; padding: 20px 18px !important; height: auto !important; }
+    :root #mobile-pages .mobile-profile-copy,
+    :root #mobile-pages .mobile-profile-copy strong,
+    :root #mobile-pages .mobile-profile-copy small { display: block !important; text-align: left; }
+    :root #mobile-page-header button { width: 44px !important; height: 44px !important; padding: 0 !important; border-radius: 50% !important; }
+    .mobile-home-placeholder { min-height: 55vh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; text-align: center; }
+    .mobile-home-placeholder img { width: 80px; height: 80px; border-radius: 22px; }
+    .mobile-home-placeholder h2 { font-size: 24px; font-weight: 700; }
+    .mobile-home-placeholder p { color: var(--text-muted); }
+    .mobile-home-placeholder button { padding: 12px 18px; border-radius: 12px; background: var(--bg-panel); color: var(--c-600); }
+    #mobile-bottom-nav { position: fixed; z-index: 60; left: 50%; bottom: calc(14px + env(safe-area-inset-bottom)); transform: translateX(-50%); display: flex; align-items: center; justify-content: space-around; width: min(420px, calc(100% - 32px)); min-height: 70px; padding: 6px 10px; border: 1px solid var(--border-dim); border-radius: 40px; background: color-mix(in srgb, var(--bg-panel) 90%, transparent); backdrop-filter: blur(var(--surface-blur, 24px)); box-shadow: 0 8px 30px rgb(0 0 0 / 12%); }
+    #mobile-bottom-nav button { width: 56px; height: 56px; flex-shrink: 0; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; color: var(--text-muted); }
+    #mobile-bottom-nav button > i { font-size: 21px; }
+    #mobile-bottom-nav button > span:not(.mobile-playing-indicator) { font-size: 9px; }
+    #mobile-bottom-nav .is-active { color: var(--c-600); background: color-mix(in srgb, var(--c-500) 15%, transparent); }
+    #mobile-bottom-nav .mobile-now-playing { position: relative; width: 48px; height: 48px; margin-left: 6px; border: 2px solid var(--border-main); }
+    #mobile-nav-cover { width: 40px; height: 40px; object-fit: cover; border-radius: 50%; }
+    .mobile-playing-indicator { display: none; position: absolute; bottom: 0; right: 0; width: 10px; height: 10px; border: 2px solid var(--bg-panel); background: var(--c-500); border-radius: 50%; }
+    .is-playing .mobile-playing-indicator { display: block; }
+    #mobile-bottom-nav button:focus-visible, #mobile-page-header button:focus-visible, .mobile-menu-row:focus-visible, .mobile-profile:focus-visible { outline: 2px solid var(--c-500); outline-offset: -2px; }
+    body.player-detail-open #mobile-page-header, body.player-detail-open #mobile-bottom-nav,
+    body:has(#view-player-detail:not(.hidden)) #mobile-page-header,
+    body:has(#view-player-detail:not(.hidden)) #mobile-bottom-nav { display: none; }
+    .music-shell :is(#view-search, #view-songlist, #songlist-detail-view, #view-localmusic, #view-leaderboard, #view-recent) { padding-bottom: var(--mobile-nav-clearance) !important; }
+    .music-shell .settings-shell { padding-top: var(--top-bar-clearance); padding-bottom: var(--mobile-nav-clearance); }
+    .mobile-settings-detail .settings-sidebar, .mobile-settings-detail .settings-mobile-toggle { display: none !important; }
+    .mobile-settings-detail .settings-content { padding: 10px 16px !important; }
+    #view-player-detail .player-transport { align-items: center !important; }
+    #view-player-detail #player-detail-container { padding-top: calc(68px + env(safe-area-inset-top)) !important; padding-bottom: calc(20px + env(safe-area-inset-bottom)) !important; }
+}

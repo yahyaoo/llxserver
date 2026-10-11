@@ -27,6 +27,8 @@ export class ListManage {
  */
   createSnapshot = async () => {
     const listData = JSON.stringify(await this.getListData())
+    this.listDataManage.persistFavorites()
+    this.listDataManage.persistCovers()
     const md5 = toMD5(listData)
     const snapshotInfo = await this.snapshotDataManage.getSnapshotInfo()
     console.log(md5, snapshotInfo.latest)

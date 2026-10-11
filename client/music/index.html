@@ -44,12 +44,23 @@
     <link rel="stylesheet" href="views/player-detail/player-detail.css">
     <link rel="stylesheet" href="views/leaderboard/leaderboard.css">
     <link rel="stylesheet" href="components/theme-controls/appearance.css">
+    <link rel="stylesheet" href="components/playback-experience/playback-experience.css">
     <link rel="stylesheet" href="css/page-surfaces.css">
     <link rel="stylesheet" href="components/song-file-status/style.css">
     <link rel="stylesheet" href="views/player-detail/appearance.css">
     <link rel="stylesheet" href="css/interactions.css">
     <link rel="stylesheet" href="css/popovers.css">
     <link rel="stylesheet" href="views/downloads/downloads.css">
+    <link rel="stylesheet" href="components/dialog/dialog.css">
+    <link rel="stylesheet" href="views/mobile-shell/mobile-shell.css">
+    <link rel="stylesheet" href="assets/element/element-plus.css">
+    <link rel="stylesheet" href="assets/element/element-controls.css">
+    <script src="assets/element/vue.global.prod.js" defer></script>
+    <script src="assets/element/element-plus.min.js" defer></script>
+    <script src="assets/element/zh-cn.min.js" defer></script>
+    <link rel="stylesheet" href="views/settings/settings-cards.css">
+    <script src="views/settings/SettingsCards.js" defer></script>
+    <script src="assets/element/element-controls.js" defer></script>
 </head>
 
 <body class="t-bg-main h-screen flex flex-col overflow-hidden t-text-main font-sans">
@@ -83,7 +94,7 @@
                 <div id="view-search"
                     class="absolute inset-0 flex flex-col px-2 pt-2 md:px-6 md:pt-6 pb-44 md:pb-32 overflow-hidden transition-all duration-300">
                     <!-- Search Input Area -->
-                    <div class="flex flex-col md:flex-row gap-2 md:gap-4 mb-4 md:mb-6">
+                    <div id="song-search-controls" class="flex flex-col md:flex-row gap-2 md:gap-4 mb-4 md:mb-6">
                         <!-- Search Input -->
                         <div class="flex-1 relative">
                             <i class="fas fa-search absolute left-4 top-3.5 t-text-muted"></i>
@@ -212,9 +223,6 @@
                                     title="返回列表">
                                     <i class="fas fa-arrow-left text-xs"></i>
                                 </button>
-                                <button id="gl-sort-hash-btn" onclick="toggleGlobalSortMode()"
-                                    class="font-mono font-bold text-gray-500 hover:text-emerald-500 hover:bg-emerald-500/10 px-1 py-0.5 rounded transition-all cursor-pointer select-none"
-                                    title="点击进入/退出歌单排序模式">#</button>
                                 <div class="flex items-center gap-1">
                                     <button id="gl-sort-icon-btn" onclick="toggleGlobalSortMode()"
                                         class="text-[10px] text-emerald-600 hover:text-emerald-700 p-0.5" title="歌曲排序">
@@ -583,9 +591,6 @@
                                     class="grid grid-cols-12 gap-2 md:gap-4 px-5 py-3 border-b t-border-main t-bg-main text-gray-500 text-xs font-bold uppercase tracking-wider items-center flex-shrink-0 pr-6">
                                     <div
                                         class="col-span-1 sm:col-span-1 text-center font-mono flex items-center justify-center gap-1 sm:gap-2">
-                                        <button id="sl-sort-hash-btn" onclick="window.SongListManager.toggleSortMode()"
-                                            class="font-mono text-gray-400 hover:text-violet-500 transition-colors cursor-pointer"
-                                            title="点击进入排序模式">#</button>
                                         <div class="flex items-center gap-1">
                                             <button onclick="toggleBatchMode()"
                                                 class="text-[10px] text-emerald-600 hover:text-emerald-700"
@@ -713,7 +718,7 @@
                     class="absolute inset-0 flex flex-col px-2 pt-2 md:px-6 md:pt-6 pb-44 md:pb-32 hidden opacity-0 transition-all duration-300 overflow-hidden">
 
                     <!-- Settings and Filters Area -->
-                    <div
+                    <div id="lm-toolbar"
                         class="grid grid-cols-[auto_1fr] md:flex md:flex-row md:items-center justify-between gap-1.5 md:gap-3 mb-1.5 md:mb-2 shrink-0 px-1">
                         <div class="contents md:flex md:items-center md:justify-start md:w-auto md:gap-2">
                             <div class="flex items-baseline gap-1 md:gap-1.5 order-1">
@@ -722,7 +727,7 @@
                                     class="text-[9px] md:text-[10px] t-text-muted opacity-60 whitespace-nowrap">共 0
                                     首</span>
                             </div>
-                            <div class="flex items-center gap-1 md:gap-2 order-3 md:order-2">
+                            <div id="lm-directory-controls" class="flex items-center gap-1 md:gap-2 order-3 md:order-2">
                                 <div id="lm-location-container"
                                     class="flex items-center gap-0.5 md:gap-1 bg-gray-100/50 dark:bg-gray-700/30 p-0.5 rounded-lg border t-border-main scale-90 md:scale-100 origin-left">
                                     <select id="lm-location-select" onchange="window.LocalMusicManager.changeLocation()"
@@ -1075,7 +1080,6 @@
                         class="grid grid-cols-12 gap-2 md:gap-4 p-4 border t-border-main t-bg-main text-gray-500 text-[10px] sm:text-xs font-bold uppercase tracking-wider shrink-0 mt-2 rounded-t-xl">
                         <div class="col-span-1 text-center font-mono flex items-center justify-center">
                             <div class="flex items-center gap-1">
-                                <span>#</span>
                                 <button onclick="window.LocalMusicManager.toggleBatchMode()"
                                     class="text-[10px] text-emerald-600 hover:text-emerald-700" title="批量操作">
                                     <i class="fas fa-tasks"></i>
@@ -1327,7 +1331,6 @@
             <div class="p-6 border-b t-border-main flex justify-between items-center t-bg-main rounded-t-2xl">
                 <div>
                     <h3 class="text-xl font-bold t-text-main">自定义源管理</h3>
-                    <div id="modal-source-scope-info" class="mt-1"></div>
                     <p class="text-sm text-gray-500 mt-1">管理和配置第三方音乐源脚本</p>
                 </div>
                 <button onclick="closeCustomSourceModal()"
@@ -1393,15 +1396,9 @@
             id="edit-source-modal-content">
             <!-- Header -->
             <div class="p-5 border-b t-border-main flex justify-between items-center t-bg-main rounded-t-2xl">
-                <div class="min-w-0 pr-3">
-                    <div class="flex items-center gap-2">
-                        <span
-                            class="p-1.5 rounded-lg bg-emerald-50 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400">
-                            <i class="fas fa-sliders-h text-sm"></i>
-                        </span>
+                <div class="edit-source-title-line">
                         <h3 class="text-lg font-bold t-text-main truncate" id="edit-source-modal-title">编辑音源平台</h3>
-                    </div>
-                    <div class="flex items-center gap-2 mt-1.5 text-xs t-text-muted truncate">
+                    <div class="edit-source-title-detail t-text-muted">
                         <span id="edit-source-modal-name"
                             class="font-medium text-emerald-600 dark:text-emerald-400 truncate"></span>
                         <span id="edit-source-modal-version"
@@ -1415,9 +1412,9 @@
             </div>
 
             <!-- Body -->
-            <div class="p-5 overflow-y-auto max-h-[60vh] custom-scrollbar space-y-4">
+            <div class="source-platform-body p-5 overflow-y-auto max-h-[60vh] custom-scrollbar space-y-4">
                 <div
-                    class="flex items-center justify-between text-xs t-text-muted bg-gray-50 dark:bg-neutral-800/60 p-3 rounded-xl border t-border-main">
+                    class="source-platform-notice flex items-center justify-between text-xs t-text-muted bg-gray-50 dark:bg-neutral-800/60 p-3 rounded-xl border t-border-main">
                     <div class="flex items-center gap-2">
                         <i class="fas fa-info-circle text-blue-500"></i>
                         <span>关闭某平台后，将不再通过此音源解析该平台的歌曲。</span>
@@ -2087,6 +2084,11 @@
                 </p>
             </div>
             <div class="flex items-center gap-2">
+                <button id="queue-settings-button" onclick="window.playbackExperience.toggleQueueSettings()"
+                    title="播放队列设置" aria-label="播放队列设置" aria-expanded="false" aria-controls="queue-settings-panel"
+                    class="p-2 t-text-muted hover:text-emerald-500 transition-colors">
+                    <i class="fas fa-sliders-h"></i>
+                </button>
                 <button onclick="clearQueue()" title="清空队列"
                     class="p-2 t-text-muted hover:text-red-500 transition-colors">
                     <i class="fas fa-trash-alt"></i>
@@ -2097,6 +2099,13 @@
                 </button>
             </div>
         </div>
+
+        <section id="queue-settings-panel" aria-label="播放队列外观" hidden>
+            <label for="queue-opacity-slider" class="playback-experience-label">队列背景不透明度<output id="queue-opacity-value">95%</output></label>
+            <input id="queue-opacity-slider" type="range" min="0" max="1" step="0.01" value="0.95"
+                class="playback-experience-slider" oninput="window.playbackExperience.syncOpacity(this.value)" onchange="updateSetting('queueOpacity', this.value)">
+            <p class="playback-experience-help">值越大越清晰，与设置页同步。</p>
+        </section>
 
         <!-- Toolbar (Optional, e.g., Filter or Sort Tip) -->
         <div id="queue-tip"
@@ -2940,6 +2949,7 @@
     <script src="views/leaderboard/LeaderboardView.js"></script>
     <script src="js/leaderboard_manager.js"></script>
     <script src="js/dislike_manager.js"></script>
+    <script src="js/song_metadata.js"></script>
     <script src="js/song_actions.js"></script>
     <script src="components/player-bar/template.js"></script>
     <script src="components/player-bar/index.js"></script>
@@ -2962,7 +2972,13 @@
     <script src="js/sync_download.js"></script>
     <script src="views/recent/RecentView.js"></script>
     <script src="js/music_experience.js"></script>
+    <script src="js/play_statistics.js"></script>
+    <script src="components/playback-experience/index.js"></script>
     <script src="app.js"></script>
+    <script src="components/dialog/DialogChrome.js"></script>
+    <link rel="stylesheet" href="components/dialog/playlist-editor.css">
+    <script src="components/dialog/PlaylistEditor.js"></script>
+    <script src="views/mobile-shell/MobileShell.js"></script>
 </body>
 
 <!-- 同步下载面板 Modal -->

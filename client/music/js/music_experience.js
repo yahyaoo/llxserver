@@ -42,7 +42,7 @@
     /** 应用外观；颜色和透明度共用 CSS 变量，背景图片只由认证请求获取。 */
     function apply() {
         setTheme(value.theme, false); setAppearance(value.appearance, false);
-        const custom = value.theme === 'custom' || !['pink', 'emerald', 'blue', 'amber', 'violet', 'rose'].includes(value.theme);
+        const custom = value.theme === 'custom' || !['pink', 'emerald', 'blue', 'amber', 'violet', 'rose', 'white', 'black'].includes(value.theme);
         const color = value.theme === 'custom' ? value.color : window.ThemeControls.colors.find(item => item[0] === value.theme)?.[2] || '#ec4899';
         for (const shade of [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950]) {
             if (custom) root.style.setProperty('--c-' + shade, shade < 500 ? blend(color, 255, (500 - shade) / 500) : blend(color, 0, (shade - 500) / 650));
@@ -136,15 +136,16 @@
                 await this.change({ background: { file: data.file, x: 50, y: 50, blur: 0 } });
             } catch (error) { report(error); }
         },
-        record(song, quality) {
+        record(song, quality, playback) {
             const owner = accountName(), auth = headers();
-            const data = { ...song, quality };
+            const data = { ...song, quality, ...playback };
             // 本地播放路径上的实际文件名补入历史，重启后仍可重建认证 URL。
             if (song.isLocal && song.url) { const parsed = new URL(song.url, location.origin); const match = parsed.pathname.match(/\/api\/music\/(cache|custom)\/file\/[^/]+\/(.+)/); if (match) { data.filename = decodeURIComponent(match[2]); data.folder = parsed.searchParams.get('folder') || 'music'; data.isCustomDir = match[1] === 'custom'; } }
             recorded = recorded.catch(() => {}).then(() => fetch('/api/user/recent', { method: 'POST', headers: auth, body: JSON.stringify(data) })).then(response => {
                 if (!response.ok) throw new Error('最近播放记录保存失败');
                 if (owner === accountName() && !document.getElementById('view-recent').classList.contains('hidden')) window.RecentView.load();
             }).catch(report);
+            return recorded;
         },
     };
 

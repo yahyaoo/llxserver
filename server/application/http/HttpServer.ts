@@ -22,6 +22,7 @@ import { repositories } from '../persistence/storage'
 import { browserList } from '../../music/controller/BrowserStorageController'
 import * as adminUserController from '../../admin/controller/UserController'
 import * as musicPlaylistController from '../../music/controller/PlaylistController'
+import * as musicFavoriteController from '../../music/controller/FavoriteController'
 import * as musicAuthenticationController from '../../music/controller/AuthenticationController'
 import * as musicLibraryController from '../../music/controller/LibraryController'
 import * as musicDownloadController from '../../music/controller/DownloadController'
@@ -1548,6 +1549,11 @@ enabled?: boolean } = {}
       // [新增] Get User List (User Auth)
       if (pathname === '/api/user/list' && req.method === 'GET') {
         await musicPlaylistController.getUserList({ req, res, pathname, urlObj, ip }, serverRuntime)
+        return
+      }
+
+      if (pathname === '/api/user/favorites' && (req.method === 'GET' || req.method === 'POST')) {
+        await musicFavoriteController.favorites({ req, res, pathname, urlObj, ip }, serverRuntime)
         return
       }
 

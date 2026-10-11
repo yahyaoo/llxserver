@@ -75,3 +75,41 @@
     #main-sidebar :is(a, button, div[onclick]),
     #view-player-detail button, .cs-option { transition: none; transform: none !important; }
 }
+/* 歌曲封面操作统一使用渐显蒙层；触屏设备保留整行点击。作者：jingyh */
+.song-cover { position: relative; overflow: hidden; border-radius: 0.5rem; }
+.song-cover-play {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(145deg, rgb(0 0 0 / 24%), rgb(0 0 0 / 55%));
+    color: white;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 220ms ease;
+}
+@media (hover: hover) and (pointer: fine) and (min-width: 768px) {
+    .song-cover:hover .song-cover-play,
+    .song-cover:focus-visible .song-cover-play,
+    button:focus-visible > .song-cover .song-cover-play { opacity: 1; }
+}
+@media (max-width: 767px), (hover: none), (pointer: coarse) {
+    .song-cover-play { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .song-cover-play { transition: none; }
+}
+.song-audio-spec { font-size: 10px; opacity: 0.72; white-space: nowrap; flex-shrink: 0; }
+.song-metadata-row { flex-wrap: wrap; row-gap: 3px; }
+.lm-song-cover { flex-shrink: 0; margin: 0 16px 0 12px; width: 48px; height: 48px; cursor: pointer; }
+.lm-song-cover > :is(img, div) { width: 100%; height: 100%; margin: 0; }
+.recent-song-cover { display: block; width: 48px; height: 48px; }
+.recent-song-specs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+@media (max-width: 767px) {
+    .lm-song-cover { width: 40px; height: 40px; margin: 0 10px 0 2px; }
+    .recent-song-cover { width: 36px; height: 36px; }
+}
+#view-search[data-favorites-view="true"] #song-search-controls,
+#view-search[data-favorites-view="true"] #gl-local-search-bar,
+#view-search[data-favorites-view="true"] button[onclick="window.ListSearch.toggleBar()"] { display: none; }

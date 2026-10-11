@@ -2,6 +2,9 @@
 import { arrPush, arrPushByPosition, arrUnshift } from '../../../utils/common'
 import { LIST_IDS } from '../../../constants'
 import { type SnapshotDataManage } from './snapshotDataManage'
+import { FavoriteRepository } from '../../repository/FavoriteRepository'
+import { repositories } from '../../../application/persistence/storage'
+import path from 'node:path'
 
 /** 维护歌单定义和歌曲映射，实现歌单及歌曲增删改与排序。 @author yahyaoo */
 export class ListDataManage {
@@ -13,6 +16,10 @@ export class ListDataManage {
   allMusicList = new Map<string, LX.Music.MusicInfo[]>()
 
   initPromise: Promise<void>
+  /** 独立喜爱存储；loveList 仅作为洛雪同步协议的兼容字段。 */
+  private readonly favorites: FavoriteRepository
+  /** 用户封面文档作用域，不依赖数据库的物理位置。 */
+  private readonly coverKey: string
 
   /**
  * 绑定用户歌单目录并初始化列表与歌曲映射。
@@ -21,17 +28,22 @@ export class ListDataManage {
  */
   constructor(snapshotDataManage: SnapshotDataManage) {
     this.snapshotDataManage = snapshotDataManage
+    this.favorites = new FavoriteRepository(repositories().music, snapshotDataManage.userDataManage.userDir)
+    this.coverKey = path.join(snapshotDataManage.userDataManage.userDir, 'playlist-covers.json')
 
     let listData: LX.Sync.List.ListData | null
     this.initPromise = this.snapshotDataManage.getSnapshotInfo().then(async (snapshotInfo) => {
       if (snapshotInfo.latest) listData = await this.snapshotDataManage.getSnapshot(snapshotInfo.latest)
       if (!listData) listData = { defaultList: [], loveList: [], userList: [] }
+      const covers = (repositories().music.read('client_playlist_cover', this.coverKey)?.value || {}) as Record<string, string>
+      for (const list of listData.userList) if (list.cover === undefined && covers[list.id] !== undefined) list.cover = covers[list.id]
       this.allMusicList.set(LIST_IDS.DEFAULT, listData.defaultList)
-      this.allMusicList.set(LIST_IDS.LOVE, listData.loveList)
+      this.allMusicList.set(LIST_IDS.LOVE, this.favorites.initialize(listData.loveList || []))
       this.userLists.push(...listData.userList.map(({ list, ...l }) => {
         this.allMusicList.set(l.id, list)
         return l
       }))
+      this.persistCovers()
     })
   }
   /**
@@ -39,17 +51,34 @@ export class ListDataManage {
  * @param listData 默认、收藏及自定义歌单数据。
  * @author yahyaoo
  */
-  restore = async (listData: LX.Sync.List.ListData) => {
+  restore = async (listData: LX.Sync.List.ListData, preserveFavorites = false) => {
+    await this.initPromise
+    // 旧同步客户端没有封面字段时保留自定义图片，显式空字符串仍表示移除。
+    if (preserveFavorites) for (const list of listData.userList) {
+      if (list.cover === undefined) list.cover = this.userLists.find(item => item.id === list.id)?.cover
+    }
+    // 普通歌单保存不能用客户端旧快照覆盖独立喜爱；同步和显式恢复仍支持完整数据。
+    const favorites = preserveFavorites ? (this.allMusicList.get(LIST_IDS.LOVE) ?? []) : listData.loveList
     this.allMusicList.clear()
     this.userLists = []
 
     this.allMusicList.set(LIST_IDS.DEFAULT, listData.defaultList)
-    this.allMusicList.set(LIST_IDS.LOVE, listData.loveList)
+    this.allMusicList.set(LIST_IDS.LOVE, favorites)
     this.userLists.push(...listData.userList.map(({ list, ...l }) => {
       this.allMusicList.set(l.id, list)
       return l
     }))
+    this.persistFavorites()
+    this.persistCovers()
   }
+
+  /** 原子替换当前歌单封面映射；删除歌单同时移除独立封面记录。 */
+  persistCovers = () => repositories().music.write('client_playlist_cover', this.coverKey, JSON.stringify(
+    Object.fromEntries(this.userLists.filter(list => list.cover !== undefined).map(list => [list.id, list.cover]))
+  ))
+
+  /** 在同步快照提交前持久化喜爱，覆盖洛雪与 Subsonic 的现有歌曲增删及排序入口。 @author jingyh */
+  persistFavorites = () => this.favorites.save(this.allMusicList.get(LIST_IDS.LOVE) ?? [])
   /**
  * 读取当前用户的默认列表、收藏列表和自定义歌单数据。
  * @author yahyaoo
@@ -105,6 +134,7 @@ export class ListDataManage {
     source,
     sourceListId,
     locationUpdateTime,
+    cover,
   }: LX.List.UserListInfo, position: number) => {
     if (position < 0 || position >= this.userLists.length) {
       this.userLists.push({
@@ -113,6 +143,7 @@ export class ListDataManage {
         source,
         sourceListId,
         locationUpdateTime,
+        cover,
       })
     } else {
       this.userLists.splice(position, 0, {
@@ -121,6 +152,7 @@ export class ListDataManage {
         source,
         sourceListId,
         locationUpdateTime,
+        cover,
       })
     }
   }
@@ -136,6 +168,7 @@ export class ListDataManage {
     sourceListId,
     // meta,
     locationUpdateTime,
+    cover,
   }: LX.List.UserListInfo & {
 meta?: { /** 条目唯一标识。 */
 id?: string } }) => {
@@ -154,6 +187,7 @@ id?: string } }) => {
         targetList.source = source
         targetList.sourceListId = sourceListId
         targetList.locationUpdateTime = locationUpdateTime
+        if (cover !== undefined) targetList.cover = cover
         break
     }
   }
@@ -225,7 +259,9 @@ id?: string } }) => {
  * 批量创建自定义歌单并通知歌单变更。
  * @author yahyaoo
  */
-  userListCreate = async ({ name, id, source, sourceListId, position, locationUpdateTime }: {
+  userListCreate = async ({ name, id, source, sourceListId, position, locationUpdateTime, cover }: {
+    /** 自定义封面内容或图片地址。 */
+    cover?: string
     /** 记录显示名称。 */
     name: string
     /** 业务记录标识。 */
@@ -241,6 +277,7 @@ id?: string } }) => {
   }) => {
     if (this.userLists.some(item => item.id == id)) return
     const newList: LX.List.UserListInfo = {
+      cover,
       name,
       id,
       source,
@@ -314,6 +351,7 @@ id?: string } }) => {
    * @param listId
    */
   getListMusics = async (listId: string): Promise<LX.Music.MusicInfo[]> => {
+    await this.initPromise
     if (!listId || !this.allMusicList.has(listId)) return []
     return this.allMusicList.get(listId) as LX.Music.MusicInfo[]
   }

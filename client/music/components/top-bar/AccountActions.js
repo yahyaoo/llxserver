@@ -13,7 +13,7 @@
                     <button id="header-account-trigger" class="header-menu-trigger" onclick="toggleHeaderDropdown('header-account-menu')" aria-expanded="false" aria-controls="header-account-menu" aria-label="账户菜单"><span class="header-avatar"><i class="fas fa-user"></i></span><span id="header-account-label">账户</span><span id="header-user-display" class="hidden items-center"><span id="header-username"></span></span></button>
                     <div id="header-account-menu" class="header-dropdown-panel account-menu hidden" data-header-menu data-header-trigger="header-account-trigger">
                         <button onclick="closeHeaderDropdowns(); openAccountSettings()"><i class="fas fa-user-cog"></i>账号设置</button>
-                        <button onclick="closeHeaderDropdowns(); openAccountSettings(true)"><i class="fas fa-key"></i>修改密码</button>
+                        <button onclick="closeHeaderDropdowns(); openAccountPasswordDialog()"><i class="fas fa-key"></i>修改密码</button>
                         <button id="header-sync-logout" class="hidden account-logout" onclick="closeHeaderDropdowns(); handleHeaderLogout(event)"><i class="fas fa-sign-out-alt"></i>退出登录</button>
 
                     </div>

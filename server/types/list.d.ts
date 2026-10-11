@@ -3,6 +3,8 @@ declare namespace LX {
     interface UserListInfo {
       id: string
       name: string
+      /** 歌单自定义封面；空值使用第一首歌曲封面。 */
+      cover?: string
       // list: LX.Music.MusicInfo[]
       source?: LX.OnlineSource
       sourceListId?: string

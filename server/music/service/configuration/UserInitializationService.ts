@@ -28,6 +28,8 @@ export const defaultPlayerSettings = {
   autoResume: true,
   showSidebarSongInfo: false,
   enableCrossfade: true,
+  crossfadeDuration: 1000,
+  queueOpacity: 0.95,
   keepScreenAwake: true,
   enableKeyboardShortcuts: true,
   showLyricTranslation: true,

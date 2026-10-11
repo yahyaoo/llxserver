@@ -77,11 +77,12 @@
 
 
 /**
- * 跳转至管理后台
+ * 在新标签页打开管理后台，保留当前播放器和音乐播放。
+ * @author jingyh
  */
 function goToAdmin() {
     var adminPath = (window.CONFIG && window.CONFIG['admin.path']) || '/music';
-    location.href = adminPath;
+    window.open(adminPath, '_blank', 'noopener,noreferrer');
 }
 
 /**

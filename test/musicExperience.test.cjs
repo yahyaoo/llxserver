@@ -13,7 +13,21 @@ function fixture(work) {
   const db = createMusicRepository(root), alice = new ExperienceRepository(db, path.join(root, 'users/alice')), bob = new ExperienceRepository(db, path.join(root, 'users/bob'))
   try { work({ root, db, alice, bob }) } finally { db.close(); fs.rmSync(root, { recursive: true, force: true }) }
 }
-const song = id => ({ id, source: 'wy', name: '歌曲' + id, singer: '周杰伦', albumName: '测试专辑', url: '/api/music/cache/file/alice/song.flac?token=secret&folder=music', pic: '/api/music/cache/cover?filename=song.flac&token=secret' })
+const song = id => ({ id, source: 'wy', name: '歌曲' + id, singer: '周杰伦', albumName: '测试专辑', url: '/api/music/cache/file/alice/song.flac?token=secret&folder=music', pic: '/api/music/cache/cover?filename=song.flac&token=secret', playbackSucceeded: true, playedSeconds: 10.01, playbackId: require('node:crypto').randomUUID() })
+
+/** 新主题经过真实账号存储往返校验，防止被旧白名单还原。 @author jingyh */
+test('黑白主题和纯色外观保存后原样读回，其他账号保持默认', () => fixture(({ root, alice, bob }) => {
+  for (const theme of ['white', 'black']) for (const appearance of ['pure-white', 'pure-black']) {
+    const value = service.putExperience(alice, root, { ...service.DEFAULT_EXPERIENCE, theme, appearance })
+    assert.equal(value.theme, theme); assert.equal(value.appearance, appearance)
+    assert.equal(service.getExperience(alice, root).theme, theme)
+    assert.equal(service.getExperience(alice, root).appearance, appearance)
+  }
+  assert.equal(service.getExperience(bob, root).theme, 'pink')
+  assert.equal(service.getExperience(bob, root).appearance, 'system')
+  const invalid = service.normalizeExperience({ theme: 'unknown', appearance: 'unknown' })
+  assert.equal(invalid.theme, 'pink'); assert.equal(invalid.appearance, 'system')
+}))
 
 test('默认 100 条、重播去重置顶、账号隔离及立即裁剪', () => fixture(({ root, alice, bob }) => {
   assert.equal(service.getExperience(alice, root).recentLimit, 100)
@@ -21,12 +35,43 @@ test('默认 100 条、重播去重置顶、账号隔离及立即裁剪', () => 
   assert.equal(service.getRecent(alice).length, 100)
   service.recordRecent(alice, root, song('6'))
   assert.equal(service.getRecent(alice)[0].id, '6')
+  assert.equal(service.getRecent(alice)[0].playCount, 2)
   assert.equal(service.getRecent(alice).filter(item => item.id === '6').length, 1)
   assert.deepEqual(service.getRecent(bob), [])
   assert.ok(!JSON.stringify(service.getRecent(alice)).includes('secret'))
   service.putExperience(alice, root, { ...service.DEFAULT_EXPERIENCE, recentLimit: 2 })
   assert.equal(service.getRecent(alice).length, 2)
   assert.equal(service.getExperience(bob, root).recentLimit, 100)
+}))
+
+test('只有成功且严格超过十秒才计数，重复上报不累加，不信任客户端次数', () => fixture(({ root, alice }) => {
+  for (const patch of [{ playedSeconds: 0 }, { playedSeconds: 10 }, { playedSeconds: NaN }, { playedSeconds: Infinity }, { playedSeconds: '11' }, { playbackSucceeded: false }, { playbackSucceeded: undefined }, { playbackId: '' }]) {
+    assert.throws(() => service.recordRecent(alice, root, { ...song('a'), ...patch }), /超过 10 秒/)
+  }
+  assert.deepEqual(service.getRecent(alice), [])
+  const first = { ...song('a'), playCount: 999 }
+  service.recordRecent(alice, root, first)
+  service.recordRecent(alice, root, first)
+  assert.equal(service.getRecent(alice)[0].playCount, 1)
+  service.recordRecent(alice, root, song('a'))
+  assert.equal(service.getRecent(alice)[0].playCount, 2)
+  assert.equal(service.getRecent(alice)[0].playbackSucceeded, undefined)
+}))
+
+test('次数降序、同次数按时间降序，旧记录从零累计，历史裁剪按最近时间', () => fixture(({ root, alice, bob }) => {
+  alice.write('client_recent_play', 'recent-play.json', [
+    { ...song('old'), playCount: 9, playedAt: 1 },
+    { ...song('new'), playCount: 1, playedAt: 3 },
+    { ...song('legacy'), playedAt: 2 },
+    { ...song('tie'), playCount: 1, playedAt: 2 },
+  ])
+  assert.deepEqual(service.getRecent(alice).map(item => item.id), ['old', 'new', 'tie', 'legacy'])
+  assert.equal(service.getRecent(alice).find(item => item.id === 'legacy').playCount, 0)
+  service.recordRecent(alice, root, song('legacy'))
+  assert.equal(service.getRecent(alice).find(item => item.id === 'legacy').playCount, 1)
+  assert.deepEqual(service.getRecent(bob), [])
+  service.putExperience(alice, root, { ...service.DEFAULT_EXPERIENCE, recentLimit: 2 })
+  assert.deepEqual(service.getRecent(alice).map(item => item.id), ['legacy', 'new'])
 }))
 
 test('主题色、透明度与图片入库持久化，丢图回退；非法路径不允许保存', () => fixture(({ root, db, alice }) => {

@@ -1,0 +1,18 @@
+/** 队列背景独立于全局玻璃，控件文字保持实色；切歌过渡只作用于呈现。 @author jingyh @date 2026-10-11 */
+:root:root #queue-drawer {
+    background: color-mix(in srgb, var(--bg-panel) calc(var(--queue-opacity, .95) * 100%), transparent) !important;
+    color: var(--text-main);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+}
+#queue-settings-panel { margin: 12px 16px; padding: 16px; border: 1px solid var(--border-main); border-radius: 16px; background: var(--bg-panel); }
+#queue-settings-panel[hidden] { display: none; }
+.playback-experience-label { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 13px; color: var(--text-main); }
+.playback-experience-label output { font-variant-numeric: tabular-nums; color: var(--c-500); font-weight: 700; }
+.playback-experience-slider { display: block; width: 100%; height: 20px; margin: 12px 0 4px; accent-color: var(--c-500); cursor: pointer; }
+.playback-experience-slider:disabled { opacity: .4; cursor: default; }
+.playback-experience-help { font-size: 12px; color: var(--text-muted); margin-top: 8px; }
+#queue-settings-button[aria-expanded='true'] { color: var(--c-500); background: var(--bg-item-hover); border-radius: 8px; }
+#queue-list .queue-track-active { animation: queue-track-enter 420ms cubic-bezier(.22,.7,.3,1); }
+@keyframes queue-track-enter { from { transform: translateX(12px); background-color: color-mix(in srgb, var(--c-500) 25%, transparent); } to { transform: translateX(0); background-color: var(--bg-item-hover); } }
+@media (prefers-reduced-motion: reduce) { #queue-list .queue-track-active { animation: none; } }

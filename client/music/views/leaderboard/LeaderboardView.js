@@ -132,7 +132,6 @@
                             <div
                                 class="flex-shrink-0 grid grid-cols-12 gap-2 md:gap-4 px-5 py-2.5 border-b t-border-main t-bg-panel/80 text-gray-500 text-[10px] md:text-xs font-bold uppercase tracking-wider items-center pr-6">
                                 <div class="col-span-1 text-center flex items-center justify-center gap-1">
-                                    <span>#</span>
                                     <div class="flex items-center gap-0.5 md:gap-1 ml-0.5">
                                         <button onclick="toggleLbBatchMode()"
                                             class="text-[10px] md:text-xs text-emerald-600 hover:text-emerald-700"

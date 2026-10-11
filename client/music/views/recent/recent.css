@@ -6,13 +6,15 @@
 .recent-view-actions { display: flex; gap: 8px; }
 .recent-view-actions button { border-radius: 22px; padding: 10px 18px; font-size: 13px; background: color-mix(in srgb, var(--bg-panel) calc(var(--surface-opacity) * 100%), transparent); }
 .recent-view-actions button:first-child { color: white; background: var(--c-600); }
-.recent-song { display: grid; grid-template-columns: 26px 48px minmax(120px, 1.4fr) minmax(80px, 1fr) 110px; gap: 16px; align-items: center; width: 100%; padding: 12px 16px; border-radius: 14px; text-align: left; }
+.recent-song, .recent-table-header { display: grid; grid-template-columns: 26px 48px minmax(120px, 1.4fr) minmax(80px, 1fr) 110px; gap: 16px; align-items: center; width: 100%; padding: 12px 16px; text-align: left; }
+.recent-song { border-radius: 14px; }
+.recent-table-header { font-size: 12px; color: var(--text-muted); border-bottom: 1px solid var(--border-main); margin-bottom: 8px; }
 .recent-song:hover { background: color-mix(in srgb, var(--bg-panel) calc(var(--surface-opacity) * 100%), transparent); }
 .recent-song img { width: 48px; height: 48px; object-fit: cover; border-radius: 10px; }
 .recent-number { font-size: 12px; color: var(--text-dim); }
 .recent-song-info { min-width: 0; }
 .recent-song-info strong, .recent-song-info small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.recent-song-info strong { font-size: 14px; font-weight: 500; }
+.recent-song-info strong { display: flex; align-items: center; gap: .375rem; font-size: 14px; font-weight: 500; }
 .recent-song-info small { color: var(--text-muted); font-size: 12px; margin-top: 6px; }
 .recent-album { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--text-muted); font-size: 13px; }
 .recent-time { text-align: right; color: var(--text-muted); font-size: 12px; }
@@ -24,7 +26,8 @@
 @media (max-width: 700px) {
     .recent-view { padding: 8px 12px 160px; }
     .recent-view-header { align-items: start; flex-direction: column; gap: 16px; }
-    .recent-song { grid-template-columns: 36px minmax(80px, 1fr) 90px; gap: 10px; padding: 10px; }
+    .recent-song, .recent-table-header { grid-template-columns: 36px minmax(0, 1fr) 56px 82px; gap: 8px; padding: 10px; }
     .recent-song img { width: 36px; height: 36px; }
-    .recent-number, .recent-album { display: none; }
+    .recent-number { display: none; }
+    .recent-album, .recent-time { font-size: 11px; }
 }

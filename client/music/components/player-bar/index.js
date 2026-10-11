@@ -8,6 +8,12 @@
     class PlayerBar {
         constructor() {
             this.root = null;
+            this.lyricLines = [];
+            this.onBarClick = event => {
+                if (event.target.closest('button, a, input, select, [role="slider"], .player-progress-track, [data-player-popover]')) return;
+                if (typeof isLyricViewOpen !== 'undefined' && isLyricViewOpen) return;
+                if (!document.body.classList.contains('player-detail-open')) window.toggleLyrics();
+            };
             this.onLayoutChange = () => this.updateScrollClearance();
             this.onDocumentClick = event => {
                 if (!event.target.closest('[data-player-popover]')) this.closePopovers();
@@ -34,6 +40,7 @@
             this.destroy();
             root.innerHTML = window.LXPlayerBarTemplate;
             this.root = root;
+            document.getElementById('player-footer').addEventListener('click', this.onBarClick);
             root.classList.add('player-bar-host');
             document.body.classList.add('player-bar-floating');
             document.getElementById('player-volume-popover').inert = true;
@@ -74,6 +81,7 @@
         /** 卸载组件并释放事件，不更改音频状态。 */
         destroy() {
             if (!this.root) return;
+            document.getElementById('player-footer')?.removeEventListener('click', this.onBarClick);
             document.removeEventListener('click', this.onDocumentClick);
             document.removeEventListener('keydown', this.onDocumentKeydown);
             document.getElementById('volume-container')?.removeEventListener('keydown', this.onVolumeKeydown);
@@ -88,6 +96,36 @@
             this.root.classList.remove('player-bar-host');
             document.body.classList.remove('player-bar-floating');
             this.root = null;
+        }
+
+        /** 换歌或重载歌词时清空旧内容；底栏复用详情页的歌词时间轴。 */
+        setTrack(song) {
+            const key = [song.source, song.id || song.songmid || song._localFilename, song.name, song.singer].join('|');
+            if (this.trackKey === key) return;
+            this.trackKey = key;
+            this.setLyrics([], '暂无歌词');
+        }
+
+        /** 保存当前歌曲的歌词集合。 */
+        setLyrics(lines, message = '暂无歌词') {
+            this.lyricLines = lines || [];
+            this.lyricMessage = message;
+            this.updateLyrics(-1);
+        }
+
+        /** 显示当前与下一句，向前播放和拖动进度均按同一行号更新。 */
+        updateLyrics(index) {
+            const current = document.getElementById('player-lyric-current');
+            const next = document.getElementById('player-lyric-next');
+            if (!current || !next) return;
+            const first = Math.max(0, index);
+            if (this.lyricIndex !== index && this.lyricLines.length && !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+                for (const line of [current, next]) line.animate?.([{ transform: 'translateY(8px)', opacity: .4 }, { transform: 'translateY(0)', opacity: 1 }], { duration: 220 });
+            }
+            this.lyricIndex = index;
+            current.textContent = this.lyricLines[first]?.text || this.lyricMessage || '暂无歌词';
+            next.textContent = this.lyricLines[first + 1]?.text || '';
+            for (const line of [current, next]) line.setAttribute('title', line.textContent);
         }
 
         /** 音量在栏内展开时，左侧菜单淡出并暂时退出键盘焦点顺序。 */

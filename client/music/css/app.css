@@ -197,6 +197,11 @@
 .playlist-sidebar-item .action-btn i {
     font-size: 10px;
 }
+/* 紧凑行内操作不能被通用按钮放大，否则折叠目录的既有高度会裁切最后一行。 */
+:root .playlist-sidebar-item .sidebar-item-actions .action-btn {
+    min-height: 20px; height: 20px; width: 19px; padding: 0 !important;
+    border: 0 !important; border-radius: 4px !important; background: transparent !important;
+}
 
 .playlist-sidebar-item .action-btn:hover {
     background-color: color-mix(in srgb, var(--c-500) 18%, transparent);

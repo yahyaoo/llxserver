@@ -63,6 +63,13 @@ body:not(.player-detail-open):not(:has(#view-player-detail:not(.hidden))) #playe
 .player-track { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .player-cover-button { width: 40px; height: 40px; border-radius: 8px; overflow: hidden; flex-shrink: 0; }
 .player-track-copy { min-width: 0; flex: 1; }
+.player-bar-lyrics { flex: 1; min-width: 0; font-size: 12px; line-height: 20px; overflow: hidden; }
+.player-bar-lyrics > div { height: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#player-lyric-current { color: var(--c-500); }
+#player-lyric-next { color: var(--text-dim); }
+#player-footer.floating-player { cursor: pointer; }
+@media (max-width: 1100px) { .player-track-copy { flex: 1.2; } .player-bar-lyrics { flex: .8; font-size: 11px; } }
+@media (max-width: 540px) { .player-bar-lyrics { display: none; } }
 .player-title-row { display: flex; align-items: center; gap: 6px; min-width: 0; }
 #player-source { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
 #player-title { font-size: 14px; }

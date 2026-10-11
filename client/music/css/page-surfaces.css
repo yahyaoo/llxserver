@@ -19,7 +19,7 @@
         [class~="t-bg-panel"], [class~="t-bg-panel/30"], [class~="t-bg-panel/50"], [class~="t-bg-panel/60"], [class~="t-bg-panel/80"], [class~="t-bg-panel/90"],
         [class~="t-bg-main"], [class~="t-bg-main/50"], [class~="t-bg-glass"],
         [class*="bg-white/"], [class*="dark:bg-gray-800/"], [class*="bg-gray-50"], [class*="bg-gray-100"],
-        .settings-content, .settings-sidebar, .settings-form-card, .leaderboard-songs):not(.grid.grid-cols-12):not(.absolute):not(.fixed):not(.theme-background-preview):not(.theme-background-preview *):not(:is(.absolute.t-bg-panel, .fixed.t-bg-panel, .cs-dropdown, [role="dialog"], [role="menu"]) *):not(:is(#search-results, #sl-detail-list, #lb-songs-list, #lm-list-container, #songlist-container) .group *) {
+        .settings-content, .settings-sidebar, .leaderboard-songs):not(.settings-form-card):not([data-settings-section] > .grid > div):not(.grid.grid-cols-12):not(.absolute):not(.fixed):not(.theme-background-preview):not(.theme-background-preview *):not(:is(.absolute.t-bg-panel, .fixed.t-bg-panel, .cs-dropdown, [role="dialog"], [role="menu"]) *):not(:is(#search-results, #sl-detail-list, #lb-songs-list, #lm-list-container, #songlist-container) .group *) {
     background: transparent !important;
     backdrop-filter: none !important;
     -webkit-backdrop-filter: none !important;
@@ -27,6 +27,17 @@
 }
 /* 透明详情层打开时，底层歌单网格不参与显示。 */
 #view-songlist:has(#songlist-detail-view:not(.hidden)) > :not(#songlist-detail-view) { visibility: hidden; }
+/* 热搜长标题的滚动限制在文字区域内，保留序号与搜索图标的位置。 */
+:root #view-search .hot-search-item { justify-content: flex-start; gap: 0; min-width: 0; }
+:root #view-search .hot-search-item > .keyword { display: block; min-width: 0; overflow: hidden; white-space: nowrap; }
+/* 目录筛选为紧凑组合控件；明确宽度，避免手机端被相邻按钮挤成单个箭头。 */
+:root #lm-location-container { max-width: 100%; }
+:root #lm-location-container #cs-w-lm-location-select { width: 140px; min-width: 110px; flex: 0 0 140px; }
+@media (max-width: 767px) {
+    #lm-toolbar { grid-template-columns: minmax(0, 1fr) auto; }
+    #lm-directory-controls { grid-column: 1 / -1; min-width: 0; flex-wrap: wrap; }
+    :root #lm-location-container #cs-w-lm-location-select { width: 130px; min-width: 110px; flex-basis: 130px; }
+}
 /* 歌手与专辑的装饰光晕属于面板底色，封面和徽标仍保持原样。 */
 #view-search :is(#artist-detail-header, #album-detail-header) > div > .absolute.pointer-events-none { display: none; }
 #view-search #album-detail-header p {
@@ -38,7 +49,7 @@
 /* 内容区域使用轻量上下分隔线，不围四边框。 */
 :root { --content-divider: color-mix(in srgb, var(--text-main) 10%, transparent); }
 :root .music-shell :is(#view-search, #view-songlist, #songlist-detail-view, #view-leaderboard, #view-localmusic, #view-settings, #view-recent)
-    :is(.settings-form-card, #lb-boards-list, #recent-list) {
+    :is(#lb-boards-list, #recent-list) {
     border: 0;
     border-block: 1px solid var(--content-divider);
     border-radius: 0;

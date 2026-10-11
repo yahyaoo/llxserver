@@ -1,4 +1,4 @@
-/** 账号资料与修改密码界面，只读用户名与服务端认证结果保持一致。 */
+/** 账号资料与修改密码界面，设置页和弹窗共用认证请求。 @author jingyh @date 2026-10-11 */
 (() => {
     let avatarUrl;
     const renderAvatar = (container, url) => {
@@ -34,9 +34,38 @@
         catch (error) { document.getElementById('account-profile-status').textContent = error.message; }
     };
     window.openAccountSettings = async password => {
+        if (password) { window.openAccountPasswordDialog(); return; }
         switchTab('settings'); selectSettingsSection('account');
-        if (password) { document.getElementById('account-password-section').scrollIntoView({ block: 'center', behavior: 'smooth' }); document.getElementById('account-current-password').focus(); }
     };
+    let passwordDialog, passwordReturnFocus;
+    /** 打开独立改密弹窗，不切换页面；原生对话框管理遮罩、焦点和 Esc。 @author jingyh */
+    window.openAccountPasswordDialog = () => {
+        passwordReturnFocus = document.getElementById('header-account-trigger');
+        if (!passwordDialog) {
+            passwordDialog = document.createElement('dialog');
+            passwordDialog.id = 'account-password-dialog';
+            passwordDialog.className = 'account-password-dialog';
+            passwordDialog.setAttribute('aria-labelledby', 'account-password-dialog-title');
+            passwordDialog.innerHTML = `<div class="account-dialog-heading"><div><h2 id="account-password-dialog-title">修改密码</h2><p>修改后需重新登录</p></div><button type="button" class="account-dialog-close" aria-label="关闭修改密码" onclick="closeAccountPasswordDialog()"><i class="fas fa-times"></i></button></div>
+                <form id="account-modal-password-form" onsubmit="changeAccountPassword(event, 'account-modal')">
+                    <label class="settings-field">原密码<input class="settings-text-input" id="account-modal-current-password" type="password" autocomplete="current-password" required></label>
+                    <label class="settings-field">新密码<input class="settings-text-input" id="account-modal-new-password" type="password" autocomplete="new-password" minlength="6" maxlength="128" required><small class="account-field-hint">6–128 位字符</small></label>
+                    <label class="settings-field">确认新密码<input class="settings-text-input" id="account-modal-confirm-password" type="password" autocomplete="new-password" minlength="6" maxlength="128" required></label>
+                    <p id="account-modal-password-status" role="status" aria-live="polite"></p>
+                    <div class="account-dialog-actions"><button type="button" class="settings-action settings-action-secondary" onclick="closeAccountPasswordDialog()">取消</button><button type="submit" class="settings-action">确认修改</button></div>
+                </form>`;
+            passwordDialog.addEventListener('close', () => {
+                document.getElementById('account-modal-password-form').reset();
+                document.getElementById('account-modal-password-status').textContent = '';
+                passwordReturnFocus?.focus();
+            });
+            document.body.appendChild(passwordDialog);
+        }
+        if (!passwordDialog.open) passwordDialog.showModal();
+        document.getElementById('account-modal-current-password').focus();
+    };
+    /** 关闭弹窗时清空密码，不在浏览器存储中保留密码。 @author jingyh */
+    window.closeAccountPasswordDialog = () => passwordDialog?.close();
     window.saveAccountProfile = async event => {
         event.preventDefault(); const button = event.submitter; if (button) button.disabled = true;
         try { await update(await request('/api/user/account', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nickname: document.getElementById('account-nickname').value }) })); document.getElementById('account-profile-status').textContent = '用户名已保存'; }
@@ -49,12 +78,13 @@
         catch (error) { document.getElementById('account-profile-status').textContent = error.message; }
         finally { input.value = ''; }
     };
-    window.changeAccountPassword = async event => {
-        event.preventDefault(); const status = document.getElementById('account-password-status');
-        const password = document.getElementById('account-new-password').value;
-        if (password !== document.getElementById('account-confirm-password').value) { status.textContent = '两次输入的新密码不一致'; return; }
+    /** 两个表单使用各自字段与错误提示，成功后沿用账号退出流程。 @author jingyh */
+    window.changeAccountPassword = async (event, prefix = 'account') => {
+        event.preventDefault(); const status = document.getElementById(prefix + '-password-status');
+        const password = document.getElementById(prefix + '-new-password').value;
+        if (password !== document.getElementById(prefix + '-confirm-password').value) { status.textContent = '两次输入的新密码不一致'; return; }
         const button = event.submitter; if (button) button.disabled = true;
-        try { await request('/api/user/account/password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ currentPassword: document.getElementById('account-current-password').value, newPassword: password }) }); document.getElementById('account-password-form').reset(); status.textContent = '密码已修改，请重新登录'; await handleSyncLogout(true); }
+        try { await request('/api/user/account/password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ currentPassword: document.getElementById(prefix + '-current-password').value, newPassword: password }) }); document.getElementById(prefix + '-password-form').reset(); status.textContent = '密码已修改，请重新登录'; await handleSyncLogout(true); }
         catch (error) { status.textContent = error.message; }
         finally { if (button) button.disabled = false; }
     };

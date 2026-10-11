@@ -15,13 +15,13 @@ function fixture() {
     getAttribute(name) { return this.attributes[name] ?? null }
     appendChild(child) { this.children.push(child) }
     replaceChildren(...children) { this.children = children }
-    querySelector() { return { remove() {} } }
+    querySelector() { return { remove() {}, replaceWith() {} } }
     querySelectorAll() { return this.children.filter(c => c.getAttribute('data-sidebar-sort-id')) }
   }
   const nodes = new Map(['main-sidebar', 'dislike-children', 'dislike-arrow', 'tab-favorites', 'my-lists-container', 'playlist-lists-container'].map(id => [id, new Element(id)]))
   nodes.get('dislike-children').classList.add('hidden'); nodes.get('dislike-children').style.height = '0px'
   const sorts = new Map(), calls = [], stored = {}
-  const context = vm.createContext({ window: { innerWidth: 390 }, settings: { favoriteSidebarOrder: [], saveAccountSettingsToFile: true }, currentListData: null,
+  const context = vm.createContext({ window: { innerWidth: 390, PlaylistEditor: { attach() {}, toggleMenu() {} } }, settings: { favoriteSidebarOrder: [], saveAccountSettingsToFile: true }, currentListData: null,
     document: { getElementById: id => nodes.get(id), querySelectorAll: () => [], createElement: () => new Element() },
     Sortable: { get: c => sorts.get(c), create: (c, options) => { sorts.set(c, { options, destroy() { sorts.delete(c) } }) } },
     localStorage: { setItem: (key, value) => { stored[key] = value } }, console,

@@ -883,28 +883,27 @@
     <!-- Display Settings Panel -->
     <div id="settings-panel-account" class="hidden space-y-6">
         <div id="settings-section-account" data-settings-section="account" class="pt-2 space-y-6">
-            <div class="settings-form-card space-y-4">
-                <h3 class="text-lg font-bold t-text-main">账号资料</h3>
-                <div class="flex items-center gap-4"><span id="account-avatar-preview" class="header-avatar"><i class="fas fa-user"></i></span><label class="settings-action cursor-pointer">上传头像<input id="account-avatar-file" type="file" accept="image/png,image/jpeg,image/webp,image/gif" class="hidden" onchange="uploadAccountAvatar(this)"></label></div>
-                <p class="text-xs t-text-muted">支持 PNG、JPEG、WebP、GIF，最大 2 MB。</p>
-                <form id="account-profile-form" class="space-y-4" onsubmit="saveAccountProfile(event)">
-                    <label class="block text-sm t-text-muted">登录名<input id="account-username" readonly aria-readonly="true" class="w-full mt-2 px-4 py-2 rounded-lg t-bg-track t-text-muted border t-border-main"></label>
-                    <label class="block text-sm t-text-muted">用户名<input id="account-nickname" maxlength="40" class="w-full mt-2 px-4 py-2 rounded-lg t-bg-main t-text-main border t-border-main"></label>
-                    <p class="text-xs t-text-muted">用户名最多 40 字，留空时使用登录名。</p>
-                    <button type="submit" class="settings-action"><i class="fas fa-save"></i>保存用户名</button>
+            <div class="settings-form-card account-settings-card">
+                <div class="account-card-heading"><h3>账号资料</h3><p>管理头像和展示名称</p></div>
+                <form id="account-profile-form" onsubmit="saveAccountProfile(event)">
+                    <div class="account-fields-grid">
+                        <div class="account-avatar-field"><span id="account-avatar-preview" class="header-avatar"><i class="fas fa-user"></i></span><label class="settings-action settings-action-secondary cursor-pointer">上传头像<input id="account-avatar-file" type="file" accept="image/png,image/jpeg,image/webp,image/gif" class="hidden" onchange="uploadAccountAvatar(this)"></label><p class="account-field-hint">PNG、JPEG、WebP、GIF，最大 2 MB</p></div>
+                        <label class="settings-field">登录名<input type="text" id="account-username" disabled readonly aria-readonly="true" title="登录名不可修改" class="settings-text-input"><small class="account-field-hint">登录账号的唯一标识，不可修改</small></label>
+                        <label class="settings-field">用户名<input type="text" id="account-nickname" maxlength="40" class="settings-text-input"><small class="account-field-hint">最多 40 字，留空时使用登录名</small></label>
+                    </div>
+                    <div class="account-form-actions"><button type="submit" class="settings-action"><i class="fas fa-save"></i>保存用户名</button><p id="account-profile-status" role="status" aria-live="polite"></p></div>
                 </form>
-                <p id="account-profile-status" role="status" aria-live="polite" class="text-sm t-text-muted"></p>
             </div>
-            <div id="account-password-section" class="settings-form-card space-y-4">
-                <h3 class="text-lg font-bold t-text-main">修改密码</h3>
-                <form id="account-password-form" class="space-y-4" onsubmit="changeAccountPassword(event)">
-                    <label class="block text-sm t-text-muted">原密码<input type="password" id="account-current-password" autocomplete="current-password" required class="w-full mt-2 px-4 py-2 rounded-lg t-bg-main t-text-main border t-border-main"></label>
-                    <label class="block text-sm t-text-muted">新密码<input type="password" id="account-new-password" autocomplete="new-password" required minlength="6" maxlength="128" class="w-full mt-2 px-4 py-2 rounded-lg t-bg-main t-text-main border t-border-main"></label>
-                    <label class="block text-sm t-text-muted">确认新密码<input type="password" id="account-confirm-password" autocomplete="new-password" required minlength="6" maxlength="128" class="w-full mt-2 px-4 py-2 rounded-lg t-bg-main t-text-main border t-border-main"></label>
-                    <button type="submit" class="settings-action">修改密码</button>
+            <div id="account-password-section" class="settings-form-card account-settings-card">
+                <div class="account-card-heading"><h3>账号安全</h3><p>更新登录密码，修改后需重新登录</p></div>
+                <form id="account-password-form" onsubmit="changeAccountPassword(event)">
+                    <div class="account-fields-grid">
+                        <label class="settings-field">原密码<input type="password" id="account-current-password" autocomplete="current-password" required class="settings-text-input"></label>
+                        <label class="settings-field">新密码<input type="password" id="account-new-password" autocomplete="new-password" required minlength="6" maxlength="128" class="settings-text-input"><small class="account-field-hint">6–128 位字符</small></label>
+                        <label class="settings-field">确认新密码<input type="password" id="account-confirm-password" autocomplete="new-password" required minlength="6" maxlength="128" class="settings-text-input"></label>
+                    </div>
+                    <div class="account-form-actions"><button type="submit" class="settings-action"><i class="fas fa-key"></i>修改密码</button><p id="account-password-status" role="status" aria-live="polite"></p></div>
                 </form>
-                <p class="text-xs t-text-muted">密码修改后需重新登录。</p>
-                <p id="account-password-status" role="status" aria-live="polite" class="text-sm t-text-muted"></p>
             </div>
         </div>
         <div id="settings-section-configuration-import" data-settings-section="configuration-import" class="settings-form-card space-y-4">
@@ -1175,6 +1174,12 @@
                     <h4 class="text-sm font-bold t-text-main flex items-center">
                         <i class="fas fa-list-ul mr-2 text-emerald-500"></i> 播放队列与列表
                     </h4>
+                    <div class="t-bg-panel rounded-xl border t-border-main p-4">
+                        <label for="setting-queue-opacity" class="playback-experience-label">播放队列背景不透明度<output id="setting-queue-opacity-value">95%</output></label>
+                        <input id="setting-queue-opacity" type="range" min="0" max="1" step="0.01" value="0.95"
+                            class="playback-experience-slider" oninput="window.playbackExperience.syncOpacity(this.value)" onchange="updateSetting('queueOpacity', this.value)">
+                        <p class="playback-experience-help">值越大越清晰，独立于全局毛玻璃；队列顶部也可以调整。</p>
+                    </div>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <!-- Change Playlist on Search Play -->
                         <div
@@ -1358,7 +1363,7 @@
                                         <span class="setting-tooltip-trigger ml-1">
                                             <i class="fas fa-question-circle"></i>
                                             <span
-                                                class="setting-tooltip-content">切换歌曲时，音量平滑淡出和淡入，减少切换的突兀感。</span>
+                                                class="setting-tooltip-content">切歌、暂停和恢复播放时平滑改变音量；下方时长分别应用于每次淡入和淡出。</span>
                                         </span>
                                     </h4>
                                 </div>
@@ -1370,6 +1375,12 @@
                                         class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500 transition-all">
                                     </div>
                                 </label>
+                            </div>
+                            <div class="mt-4">
+                                <label for="setting-crossfade-duration" class="playback-experience-label">淡入淡出时间<output id="crossfade-duration-value">1 秒</output></label>
+                                <input id="setting-crossfade-duration" type="range" min="100" max="15000" step="100" value="1000"
+                                    class="playback-experience-slider" oninput="window.playbackExperience.syncDuration(this.value)" onchange="updateSetting('crossfadeDuration', this.value)">
+                                <p class="playback-experience-help">0.1–15 秒；淡出完成后切换，淡入使用相同时长。</p>
                             </div>
                         </div>
 
@@ -1818,6 +1829,7 @@
             if (!container || container.dataset.settingsMounted === 'true') return;
             container.innerHTML = template;
             decorateSettings(container);
+            window.SettingsCards?.apply(container);
             container.dataset.settingsMounted = 'true';
         }
     };

@@ -41,20 +41,29 @@ window.SystemConfigurationView = class SystemConfigurationView {
             { label: '同步与数据', items: ['WebDAV 同步配置', '备份与恢复', '数据库与迁移', '版本更新'] },
         ];
         groups.forEach(group => {
+            const section = document.createElement('section');
+            section.className = 'system-settings-group';
             const heading = document.createElement('h3');
             heading.textContent = group.label;
-            this.navigation.appendChild(heading);
+            section.appendChild(heading);
             group.items.forEach(title => {
                 if (!this.cards.has(title)) return;
                 const button = document.createElement('button');
                 button.type = 'button';
                 button.className = 'system-settings-item';
-                button.textContent = title;
+                const icon = document.createElement('span');
+                icon.className = 'system-settings-icon';
+                icon.setAttribute('aria-hidden', 'true');
+                icon.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M9 4v16M9 10h11"/></svg>';
+                const label = document.createElement('span');
+                label.textContent = title;
+                button.append(icon, label);
                 button.setAttribute('aria-controls', this.cards.get(title).id);
                 button.addEventListener('click', () => this.select(title));
                 this.buttons.set(title, button);
-                this.navigation.appendChild(button);
+                section.appendChild(button);
             });
+            this.navigation.appendChild(section);
         });
         layout.append(this.navigation, this.form);
         this.container.appendChild(layout);

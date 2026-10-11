@@ -861,10 +861,6 @@ window.CustomDirManager = {
                 coverHtml = `<img data-src="${this.escapeAttr(coverUrl)}" data-lm-cover-index="${index}" src="/music/assets/logo.svg" loading="lazy" fetchpriority="low" class="lazy-image lm-cover-image is-placeholder w-10 h-10 md:w-12 md:h-12 rounded-lg object-cover shadow-sm flex-shrink-0 border t-border-main mr-2.5 md:mr-4 ml-0.5 md:ml-3">`;
             }
 
-            const formatSize = (bytes) => {
-                if (!bytes) return '--';
-                return (bytes / 1024 / 1024).toFixed(1) + 'M';
-            };
 
             const formatTime = (ts) => {
                 if (!ts) return '';
@@ -907,7 +903,7 @@ window.CustomDirManager = {
 
                 <!-- Song & Cover -->
                 <div class="col-span-7 sm:col-span-5 md:col-span-4 lg:col-span-4 flex items-center min-w-0 pr-2">
-                    ${coverHtml}
+                    <div class="song-cover lm-song-cover" data-lm-action="play" data-lm-index="${index}">${coverHtml}<span class="song-cover-play"><i class="fas fa-play"></i></span></div>
                     <div class="min-w-0 flex-1">
                         <!-- Song Name -->
                         <div class="song-file-title font-bold text-sm md:text-base t-text-main truncate group-hover:text-emerald-500 transition-colors cursor-pointer" data-lm-action="play" data-lm-index="${index}">
@@ -915,12 +911,10 @@ window.CustomDirManager = {
                         </div>
                         
                         <!-- Row 2: Singer (mobile only) + Quality badge + Audio specs (desktop only) + Lyric/Cover badges (desktop only) -->
-                        <div class="text-[11px] md:text-xs t-text-muted mt-0.5 flex items-center gap-1.5 min-w-0 flex-nowrap">
+                        <div class="song-metadata-row text-[11px] md:text-xs t-text-muted mt-0.5 flex items-center gap-1.5 min-w-0">
                             <span class="sm:hidden font-medium text-emerald-600/80 truncate max-w-[105px] xs:max-w-[140px] shrink min-w-0" title="${safeSinger}">${safeSinger}</span>
                             <span class="px-1.5 py-0.5 rounded text-[9px] border t-border-main ${qualityClass} shrink-0 leading-none font-medium">${this.escapeHtml(qualityName || '标准')}</span>
-                            ${item.bitrate ? `<span class="text-[10px] opacity-60 font-mono hidden sm:inline-block shrink-0">${Math.round(item.bitrate)}kbps</span>` : ''}
-                            ${item.sampleRate ? `<span class="text-[10px] opacity-60 font-mono hidden sm:inline-block shrink-0">${(item.sampleRate / 1000).toFixed(1)}kHz</span>` : ''}
-                            ${item.bitDepth && item.bitDepth > 16 ? `<span class="text-[10px] opacity-60 font-mono hidden sm:inline-block shrink-0">${item.bitDepth}bit</span>` : ''}
+                            ${window.SongMetadata?.render(item) || ''}
                             ${lyricStatusBadge}
                             ${item.hasCover ? `<span class="text-[10px] text-emerald-500 border border-gray-400/40 dark:border-gray-600/50 rounded px-1 scale-90 hidden sm:inline-block shrink-0" title="${this.escapeAttr(coverStatusTitle)}">封</span>` : ''}
                         </div>
@@ -990,19 +984,12 @@ window.CustomDirManager = {
                 <!-- Action Buttons -->
                 <div class="song-row-actions col-span-4 sm:col-span-2 md:col-span-2 lg:col-span-2 flex items-center justify-end gap-0.5 md:gap-2">
                     ${window.SongActions?.renderLoveButton(window.LocalMusicManager?.buildPlaylistSong({ ...item, songInfo: { ...(item.songInfo || {}), meta: { songId: item.songmid || item.id } } }) || { ...item, isLocal: true }) || ''}
-                    <div class="hidden lg:block text-xs text-right pr-2 font-mono t-text-muted shrink-0 mr-1">
-                        ${formatSize(item.size)}
-                    </div>
                     ${(isUnindexed || this.enableReMapping) ? `
                         <button data-lm-action="manual" data-lm-index="${index}"
                                 class="hidden sm:flex w-8 h-8 md:w-7 md:h-7 items-center justify-center rounded-full bg-emerald-500 text-white hover:bg-emerald-600 transition-all shadow-sm shrink-0" title="手动关联">
                             <i class="fas fa-link text-[10px]"></i>
                         </button>
                     ` : ''}
-                    <button data-lm-action="play" data-lm-index="${index}"
-                            class="w-7 h-7 flex items-center justify-center rounded-full t-bg-main border t-border-main t-text-main hover:text-emerald-500 hover:border-emerald-300 transition-all shadow-sm shrink-0" title="播放">
-                        <i class="fas fa-play text-[10px] ml-0.5"></i>
-                    </button>
                     <button data-lm-action="download" data-lm-index="${index}"
                             class="w-7 h-7 flex items-center justify-center rounded-full t-bg-main border t-border-main t-text-main hover:text-blue-500 hover:border-blue-300 transition-all shadow-sm shrink-0" title="下载到设备">
                         <i class="fas fa-download text-[10px]"></i>
