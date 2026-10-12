@@ -30,6 +30,9 @@
 dialog.lx-dialog-panel { width: min(460px, calc(100vw - 20px)); margin: auto; }
 dialog#lyric-settings-dialog.lx-dialog-panel { width: min(720px, calc(100vw - 20px)); }
 dialog.lx-dialog-panel:not([open]) { display: none; }
+@media (max-width: 767px) {
+    :root dialog.lx-dialog-panel { margin: auto; }
+}
 #custom-source-modal-content > .lx-dialog-heading p { display: none; }
 #modal-source-scope-info { display: none; }
 .edit-source-title-line { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; min-width: 0; }

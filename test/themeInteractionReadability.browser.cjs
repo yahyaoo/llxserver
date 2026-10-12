@@ -1,4 +1,4 @@
-/** 筛选红点、工具栏颜色和悬停焦点、手机及弹窗的主题兼容回归。 @author jingyh @date 2026-10-11 */
+/** 筛选红点、工具栏颜色和悬停焦点、手机及弹窗的主题兼容回归。 @author yahyaoo @date 2026-10-11 */
 async page => {
   const checks=[], results=[], check=(value,name)=>{if(!value)throw new Error(name);checks.push(name)}
   const sample=async state=>results.push({state,...await page.evaluate(()=>__readabilityAudit())})
@@ -17,7 +17,7 @@ async page => {
     await page.mouse.move(350,500)
     const colors=await page.locator('#lm-filter-toggle-btn').locator('..').evaluate(el=>[...el.querySelectorAll('button:not(.hidden) > i')].map(icon=>getComputedStyle(icon).color))
     check(new Set(colors).size===1,label+' 音乐库普通操作图标颜色一致')
-    for(const selector of ['#lm-remap-toggle-btn','#lm-filter-toggle-btn','#header-theme-trigger','#btn-play','#player-like-btn','#queue-locate-button']) {
+    for(const selector of ['#lm-filter-toggle-btn','#header-theme-trigger','#btn-play','#player-like-btn','#queue-locate-button']) {
       if(selector==='#queue-locate-button') await page.evaluate(()=>toggleQueueDrawer())
       const target=page.locator(selector)
       await target.hover();await sample(label+'hover-'+selector)

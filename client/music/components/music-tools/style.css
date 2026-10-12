@@ -1,10 +1,42 @@
 /* 多页面工具栏与任务进度；颜色只取主题变量。 @author yahyaoo */
 :root .music-page-controls { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-left:auto; }
-:root .music-page-controls button, :root .music-tools-menu button, :root #lm-batch-toolbar button, :root .recent-batch-toolbar button, :root :is(#batch-toolbar,#sl-batch-toolbar,#lb-batch-toolbar) button {
-    color:var(--text-main)!important; background:transparent!important; border:0!important; box-shadow:none!important;
-    display:inline-flex; align-items:center; gap:8px; padding:9px 12px; border-radius:10px; font-size:13px; min-height:36px;
+/* 页面操作按钮：主题色浅底和描边，悬停加深并让图标跳跃（参考哔哩哔哩顶栏）。 @author yahyaoo @date 2026-10-12 */
+:root :is(.music-page-controls, .recent-batch-toolbar, .playlist-overview-heading) button,
+:root :is(#lm-batch-toolbar, #batch-toolbar, #sl-batch-toolbar, #lb-batch-toolbar) button,
+:root #view-leaderboard button[onclick="playAllLeaderboard()"] {
+    --page-action-bg:color-mix(in srgb, var(--c-500) 9%, var(--bg-panel));
+    --page-action-border:color-mix(in srgb, var(--c-500) 30%, var(--border-dim));
+    color:var(--text-main)!important; background:var(--page-action-bg)!important; border:1px solid var(--page-action-border)!important; box-shadow:none!important;
+    display:inline-flex; align-items:center; gap:7px; margin:0; padding:7px 14px; font-size:13px; font-weight:500; min-height:34px; white-space:nowrap;
 }
-:root .music-page-controls button:hover, :root .music-tools-menu button:hover, :root #lm-batch-toolbar button:hover, :root .recent-batch-toolbar button:hover { background:var(--bg-item-hover)!important; }
+:root :is(.music-page-controls, .recent-batch-toolbar, .playlist-overview-heading) button:not([aria-expanded="true"]) > i,
+:root :is(#lm-batch-toolbar, #batch-toolbar, #sl-batch-toolbar, #lb-batch-toolbar) button:not([aria-expanded="true"]) > i,
+:root #view-leaderboard button[onclick="playAllLeaderboard()"]:not([aria-expanded="true"]) > i { margin:0; color:var(--theme-readable-accent)!important; }
+:root :is(.music-page-controls, .recent-batch-toolbar, .playlist-overview-heading) button:not(:disabled):hover,
+:root :is(#lm-batch-toolbar, #batch-toolbar, #sl-batch-toolbar, #lb-batch-toolbar) button:not(:disabled):hover,
+:root #view-leaderboard button[onclick="playAllLeaderboard()"]:not(:disabled):hover {
+    color:var(--text-main)!important; background:color-mix(in srgb, var(--c-500) 17%, var(--bg-panel))!important;
+    border-color:color-mix(in srgb, var(--c-500) 60%, var(--border-dim))!important;
+    box-shadow:0 6px 14px -8px color-mix(in srgb, var(--c-500) 75%, transparent)!important;
+}
+:root :is(.music-page-controls, .recent-batch-toolbar, .playlist-overview-heading) button:not(:disabled):hover > i,
+:root :is(#lm-batch-toolbar, #batch-toolbar, #sl-batch-toolbar, #lb-batch-toolbar) button:not(:disabled):hover > i,
+:root #view-leaderboard button[onclick="playAllLeaderboard()"]:not(:disabled):hover > i { animation:page-action-jump .5s cubic-bezier(.3,.7,.4,1); }
+@keyframes page-action-jump {
+    0%, 100% { transform:translateY(0); }
+    30% { transform:translateY(-5px); }
+    55% { transform:translateY(0); }
+    75% { transform:translateY(-2px); }
+}
+@media(prefers-reduced-motion:reduce) { :root :is(.music-page-controls, .recent-batch-toolbar, .playlist-overview-heading, #lm-batch-toolbar, #batch-toolbar, #sl-batch-toolbar, #lb-batch-toolbar, #view-leaderboard) button > i { animation:none!important; } }
+/* 更多菜单项统一左对齐，覆盖 Element 按钮默认居中。 */
+:root .music-tools-menu button {
+    color:var(--text-main)!important; background:transparent!important; border:0!important; box-shadow:none!important;
+    display:flex; align-items:center; justify-content:flex-start!important; gap:10px; width:100%; margin:0!important; padding:9px 12px; border-radius:8px; font-size:13px; min-height:36px; text-align:left;
+}
+:root .music-tools-menu button:hover { color:var(--text-main)!important; background:color-mix(in srgb, var(--c-500) 10%, var(--bg-panel))!important; }
+:root .music-tools-menu button[aria-checked="true"], :root .music-tools-menu button[aria-checked="true"] i { color:var(--theme-readable-accent)!important; }
+:root .music-tools-menu button[aria-checked="true"]::after { content:"\f00c"; margin-left:auto; font:var(--fa-font-solid); font-size:12px; }
 :root #lm-batch-toolbar { background:transparent!important; border-color:var(--border-main)!important; padding:10px 0; }
 :root #lm-batch-toolbar span { background:transparent!important; color:var(--text-main)!important; }
 :root :is(#batch-toolbar,#sl-batch-toolbar,#lb-batch-toolbar) { background:transparent!important; border-color:var(--border-main)!important; }
@@ -29,15 +61,14 @@
 }
 :root.music-appearance .music-shell .lm-filter-tag:not(.active) { background:transparent!important; color:var(--text-main)!important; border:1px solid var(--border-main)!important; }
 :root.music-appearance .music-shell .music-page-controls button[aria-expanded="true"] :is(i,span) { color:var(--bg-panel)!important; }
-:root.music-appearance .music-shell .music-page-controls button:not([aria-expanded="true"]) { background:transparent!important; color:var(--text-main)!important; }
+:root.music-appearance .music-shell .music-page-controls button:not([aria-expanded="true"]) { color:var(--text-main)!important; }
 :root.music-appearance #lm-filter-panel .lm-filter-tag.active,
 :root.music-appearance #lm-toolbar .music-page-controls button[aria-expanded="true"],
 :root.music-appearance #music-top-bar .music-page-controls button[aria-expanded="true"] { background:var(--text-main)!important; color:var(--bg-panel)!important; }
 :root.music-appearance #lm-toolbar .music-page-controls button[aria-expanded="true"] :is(i,span),
 :root.music-appearance #music-top-bar .music-page-controls button[aria-expanded="true"] :is(i,span) { color:var(--bg-panel)!important; }
 .music-tools-menu { position:fixed; z-index:10060; width:190px; padding:6px; border:1px solid var(--border-main); border-radius:12px; background:var(--bg-panel); box-shadow:0 10px 32px #0003; }
-:root .music-tools-menu button { display:flex; width:100%; text-align:left; }
-.music-tools-menu i { width:20px; text-align:center; }
+.music-tools-menu i { flex:none; width:18px; text-align:center; }
 :root .recent-song { grid-template-columns:26px 48px minmax(120px,1.4fr) minmax(80px,1fr) 110px 28px; }
 :root .recent-maintenance-more { background:transparent!important; color:var(--text-main)!important; border:0!important; }
 .music-task-host[hidden], .page-tools-dock[hidden] { display:none!important; }
@@ -65,7 +96,7 @@
 @keyframes roaming-heart-pulse { 50% { transform:scale(1.1); } }
 @keyframes roaming-waves { 0% { opacity:0; transform:scaleX(.65); } 40% { opacity:.8; } 100% { opacity:0; transform:scaleX(1.4); } }
 @media(prefers-reduced-motion:reduce) { .roaming-heart,.roaming-heart::after { animation:none; } }
-@media(max-width:959px) { .music-page-controls { gap:2px; } :root .music-page-controls button { padding:8px; font-size:12px; } }
+@media(max-width:959px) { .music-page-controls { gap:6px; } :root .music-page-controls button { padding:6px 10px; font-size:12px; } }
 @media(max-width:599px) {
     :root .recent-song { grid-template-columns:22px 40px minmax(0,1fr) 28px; gap:10px; }
     :root #lm-toolbar { flex-direction:column; align-items:stretch; }

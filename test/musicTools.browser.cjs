@@ -31,7 +31,7 @@ async page => {
         check(colors.distinct && colors.selected>=4.5 && colors.filter>=4.5, `${appearance}/${color} 筛选选中态清晰 ${JSON.stringify(colors)}`);
     }
     await page.locator('#lm-toolbar').getByRole('button',{name:'更多',exact:true}).click({timeout:5000});
-    check(await page.locator('.music-tools-menu').innerText()==='扫描目录\n补全歌词\n嵌入歌词\n补全元信息\n批量操作','音乐库更多菜单五项正确');
+    check(await page.locator('.music-tools-menu').innerText()==='扫描目录\n补全歌词\n嵌入歌词\n补全元信息\n重新关联\n批量操作','音乐库更多菜单六项正确');
     await page.getByRole('menuitem',{name:'批量操作'}).click({timeout:5000});
     check(await page.locator('#lm-batch-toolbar').innerText()==='已选择: 0 首\n全选\n清空\n删除\n退出','批量栏仅保留四项操作');
     await page.locator('#lm-batch-toolbar').getByRole('button',{name:'退出',exact:true}).click({timeout:5000});

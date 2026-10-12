@@ -75,8 +75,9 @@
     function menu(button, entries) {
         closeMenu?.();
         const host = document.createElement('div'); host.className = 'music-tools-menu'; host.setAttribute('role', 'menu');
-        entries.forEach(([label, icon, action]) => {
+        entries.forEach(([label, icon, action, checked]) => {
             const item = document.createElement('button'); item.type = 'button'; item.setAttribute('role', 'menuitem');
+            if (checked !== undefined) { item.setAttribute('role', 'menuitemcheckbox'); item.setAttribute('aria-checked', String(checked)); }
             item.innerHTML = `<i class="fas ${icon}" aria-hidden="true"></i><span>${escape(label)}</span>`;
             item.onclick = async event => { event.stopPropagation(); closeMenu?.(); await action(); }; host.append(item);
         });
@@ -99,7 +100,8 @@
     }
     function more(button, view) {
         const songs = songsFor(view), library = view.id === 'view-localmusic';
-        const entries = library ? [['扫描目录', 'fa-sync-alt', () => window.LocalMusicManager.refresh()], ...Object.entries(labels).filter(([action]) => action !== 'delete').map(([action, label]) => [label, action === 'lyrics' ? 'fa-closed-captioning' : action === 'embed' ? 'fa-file-audio' : 'fa-tags', () => start(action, [], true)]), ['批量操作', 'fa-tasks', () => window.LocalMusicManager.toggleBatchMode()]] : maintenanceEntries(songs);
+        const remap = ['重新关联', 'fa-link', () => document.getElementById('lm-remap-toggle-btn')?.click(), !!libraryManager().enableReMapping];
+        const entries = library ? [['扫描目录', 'fa-sync-alt', () => window.LocalMusicManager.refresh()], ...Object.entries(labels).filter(([action]) => action !== 'delete').map(([action, label]) => [label, action === 'lyrics' ? 'fa-closed-captioning' : action === 'embed' ? 'fa-file-audio' : 'fa-tags', () => start(action, [], true)]), remap, ['批量操作', 'fa-tasks', () => window.LocalMusicManager.toggleBatchMode()]] : maintenanceEntries(songs);
         menu(button, entries);
     }
     const tools = new Map(); let docked = null;
@@ -129,7 +131,7 @@
             const refresh = document.createElement('button'); refresh.type = 'button'; refresh.innerHTML = '<i class="fas fa-sync-alt"></i><span>刷新</span>'; refresh.onclick = () => window.LocalMusicManager.refresh();
             bar.append(filter, refresh);
             const smart = document.createElement('button'); smart.type = 'button'; smart.innerHTML = '<i class="fas fa-magic"></i><span>智能检测</span>'; smart.onclick = () => window.LocalMusicManager.autoLinkAll();
-            const link = document.createElement('button'); link.type = 'button'; link.id = 'lm-remap-toggle-btn'; link.innerHTML = '<i class="fas fa-link"></i><span>重新关联</span>'; link.onclick = () => window.LocalMusicManager.toggleReMapping();
+            const link = document.createElement('button'); link.type = 'button'; link.id = 'lm-remap-toggle-btn'; link.hidden = true; link.innerHTML = '<i class="fas fa-link"></i><span>重新关联</span>'; link.onclick = () => window.LocalMusicManager.toggleReMapping();
             bar.append(smart, link);
         }
         const original = view.querySelector('.recent-view-actions,.downloads-toolbar');
