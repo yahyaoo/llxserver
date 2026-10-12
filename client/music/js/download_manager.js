@@ -677,6 +677,7 @@ class DownloadManager {
 
     // [Unified] Status generator for drawer lists
     getStatusHtml(icon, text, isSpin = false) {
+        if (isSpin) return window.LoadingState.render(text, 'page');
         return `
             <div class="flex flex-col items-center justify-center h-full text-center p-10 space-y-4">
                 <i class="fas ${icon} ${isSpin ? 'fa-spin' : ''} text-4xl t-text-muted opacity-20"></i>

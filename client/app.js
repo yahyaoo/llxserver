@@ -4204,8 +4204,7 @@ class App {
         loadingOverlay.style.background = 'rgba(0,0,0,0.8)';
         loadingOverlay.innerHTML = `
             <div class="login-box glass" style="padding: 3rem;">
-                <div class="status-dot" style="margin: 0 auto 1.5rem; width: 12px; height: 12px;"></div>
-                <h2>正在还原数据...</h2>
+                ${window.LoadingState.render('正在还原数据…')}
                 <p style="color: var(--text-secondary); margin-top: 1rem;">正在解压并恢复文件，请勿关闭或刷新页面。</p>
             </div>
         `;

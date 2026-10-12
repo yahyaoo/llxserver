@@ -124,6 +124,9 @@
             }
             this.lyricIndex = index;
             current.textContent = this.lyricLines[first]?.text || this.lyricMessage || '暂无歌词';
+            if (!this.lyricLines.length && this.lyricMessage?.includes('加载')) {
+                current.innerHTML = window.LoadingState.render(this.lyricMessage, 'inline');
+            }
             next.textContent = this.lyricLines[first + 1]?.text || '';
             for (const line of [current, next]) line.setAttribute('title', line.textContent);
         }

@@ -188,12 +188,7 @@ window.SongListManager = (function () {
         const { source, tagId, sortId } = currentState;
         const container = document.getElementById('songlist-container');
 
-        container.innerHTML = `
-            <div class="col-span-full py-20 text-center t-text-muted">
-                <i class="fas fa-spinner fa-spin text-4xl mb-4 text-emerald-500"></i>
-                <p>正在拉取 ${source === 'all' ? '聚合' : source.toUpperCase()} 歌单...</p>
-            </div>
-        `;
+        container.innerHTML = window.LoadingState.render(`正在拉取 ${source === 'all' ? '聚合' : source.toUpperCase()} 歌单…`, 'page');
 
         try {
             if (source === 'all') {
@@ -247,19 +242,19 @@ window.SongListManager = (function () {
         if (page === 1) {
             detailView.classList.remove('hidden');
             setTimeout(() => detailView.classList.remove('translate-x-full'), 10);
-            listContainer.innerHTML = '<div class="flex items-center justify-center py-20"><i class="fas fa-spinner fa-spin text-4xl text-emerald-500"></i></div>';
+            listContainer.innerHTML = window.LoadingState.render('正在加载歌单详情…', 'page');
 
             // Clear old data to prevent flickering
             detailState.info = null;
             detailState.list = [];
-            document.getElementById('sl-detail-name').innerText = '正在加载...';
-            document.getElementById('sl-detail-title').innerText = '加载中...';
+            document.getElementById('sl-detail-name').innerHTML = window.LoadingState.render('正在加载…', 'inline');
+            document.getElementById('sl-detail-title').innerHTML = window.LoadingState.render('加载中…', 'inline');
             if (window.setImg) window.setImg('sl-detail-cover', '/music/assets/logo.svg');
             else document.getElementById('sl-detail-cover').src = '/music/assets/logo.svg';
             document.getElementById('sl-detail-author').innerText = '';
-            document.getElementById('sl-detail-subtitle').innerText = '正在加载歌单详情...';
+            document.getElementById('sl-detail-subtitle').innerHTML = window.LoadingState.render('正在加载歌单详情…', 'inline');
             const descEl = document.getElementById('sl-detail-desc');
-            if (descEl) descEl.innerText = '正在拉取详情，请稍后...';
+            if (descEl) descEl.innerHTML = window.LoadingState.render('正在拉取详情，请稍后…', 'inline');
             const statsEl = document.getElementById('sl-detail-stats');
             if (statsEl) statsEl.innerHTML = '';
 
@@ -862,7 +857,7 @@ window.SongListManager = (function () {
             }
 
             const container = document.getElementById('songlist-container');
-            container.innerHTML = '<div class="col-span-full py-20 text-center t-text-muted"><i class="fas fa-spinner fa-spin text-4xl mb-4 text-emerald-500"></i><p>正在搜索歌单...</p></div>';
+            container.innerHTML = window.LoadingState.render('正在搜索歌单…', 'page');
 
             try {
                 if (currentState.source === 'all') {
@@ -967,9 +962,9 @@ window.SongListManager = (function () {
             const avatarImg = document.getElementById('user-playlist-avatar');
 
             title.innerText = '拉取 QQ 歌单';
-            subtitle.innerText = `正在拉取用户 ${uid} 的歌单...`;
+            subtitle.innerHTML = window.LoadingState.render(`正在拉取用户 ${uid} 的歌单…`, 'inline');
             avatarImg.classList.add('hidden');
-            container.innerHTML = '<div class="flex items-center justify-center py-20"><i class="fas fa-spinner fa-spin text-4xl text-emerald-500"></i></div>';
+            container.innerHTML = window.LoadingState.render('正在加载用户歌单…', 'page');
 
             try {
                 const res = await fetch(`${API_BASE}/songList/userPlaylist?source=tx&uid=${uid}`);

@@ -2048,7 +2048,7 @@ async function doSearch(page = 1, append = false, prefetch = false) {
         currentSearch = { name: input, source };
         currentPage = 1;
         window.currentNetworkPage = page;
-        resultsContainer.innerHTML = '<div class="flex items-center justify-center h-full"><i class="fas fa-spinner fa-spin text-4xl text-emerald-500"></i></div>';
+        resultsContainer.innerHTML = window.LoadingState.render('正在加载歌曲…', 'page');
     } else {
         window.currentNetworkPage = page;
     }
@@ -2308,10 +2308,7 @@ function switchHotSearchTab(source) {
     const container = document.getElementById('search-results');
     if (container) {
         container.innerHTML = `
-            <div class="flex flex-col items-center justify-center h-full t-text-muted space-y-4">
-                <i class="fas fa-spinner fa-spin text-4xl text-emerald-500"></i>
-                <p>正在加载热门搜索...</p>
-            </div>
+            ${window.LoadingState.render('正在加载热门搜索…', 'page')}
         `;
     }
     fetchHotSearch(source).then(data => {
@@ -2339,10 +2336,7 @@ function showInitialSearchState() {
 
     // 显示加载状态
     container.innerHTML = `
-        <div class="flex flex-col items-center justify-center h-full t-text-muted space-y-4">
-            <i class="fas fa-spinner fa-spin text-4xl text-emerald-500"></i>
-            <p>正在加载热门搜索...</p>
-        </div>
+        ${window.LoadingState.render('正在加载热门搜索…', 'page')}
     `;
 
     // 异步获取并显示热搜
@@ -2649,7 +2643,7 @@ async function enterArtist(id, source = 'wy', order = 'hot', tab = 'songs', isBa
     if (!currentArtistInfo || String(currentArtistInfo.id) !== String(id) || currentArtistInfo.source !== source) {
         // 如果还没有头部，显示加载
         if (!document.getElementById('artist-detail-header')) {
-            resultsContainer.innerHTML = '<div class="flex items-center justify-center h-full"><i class="fas fa-spinner fa-spin text-4xl text-emerald-500"></i></div>';
+            resultsContainer.innerHTML = window.LoadingState.render('正在加载歌曲…', 'page');
         }
 
         try {
@@ -3076,9 +3070,7 @@ function renderArtistHeader(info, activeTab, order) {
 
     container.innerHTML = `
         <div id="artist-detail-content" class="min-h-[calc(100vh-160px)] pb-60">
-            <div class="flex items-center justify-center py-10">
-                <i class="fas fa-spinner fa-spin text-2xl text-emerald-500"></i>
-            </div>
+            ${window.LoadingState.render('正在加载歌手详情…', 'page')}
         </div>
     `;
 
@@ -3131,12 +3123,7 @@ function renderArtistSongsLoading() {
     const content = document.getElementById('artist-detail-content');
     if (!content) return;
     window.viewingPlaylist = [];
-    content.innerHTML = `
-        <div class="flex items-center justify-center py-12 t-text-muted">
-            <i class="fas fa-spinner fa-spin text-2xl text-emerald-500 mr-3"></i>
-            <span class="text-sm font-medium">正在加载歌曲...</span>
-        </div>
-    `;
+    content.innerHTML = window.LoadingState.render('正在加载歌曲…', 'page');
 }
 
 function renderArtistSongsUI(list, page) {
@@ -3326,15 +3313,7 @@ function renderArtistAlbumsLoading(loaded = 0, total = 0) {
     const progressText = loaded > 0
         ? '正在加载全部专辑，已读取 ' + loaded + (total > 0 ? '/' + total : '') + ' 张...'
         : '正在加载全部专辑...';
-    const wrapper = document.createElement('div');
-    const icon = document.createElement('i');
-    const label = document.createElement('span');
-    wrapper.className = 'flex items-center justify-center py-12 t-text-muted';
-    icon.className = 'fas fa-spinner fa-spin text-2xl text-emerald-500 mr-3';
-    label.className = 'text-sm font-medium';
-    label.textContent = progressText;
-    wrapper.append(icon, label);
-    content.replaceChildren(wrapper);
+    content.innerHTML = window.LoadingState.render(progressText, 'page');
 }
 
 async function fetchAllArtistAlbums(id, source, signal, onProgress) {
@@ -4051,7 +4030,7 @@ async function enterAlbum(id, source = 'wy', initialInfo = null) {
     window.history.pushState({ page: 'search-detail' }, '');
 
     const resultsContainer = document.getElementById('search-results');
-    resultsContainer.innerHTML = '<div class="flex items-center justify-center h-full"><i class="fas fa-spinner fa-spin text-4xl text-emerald-500"></i></div>';
+    resultsContainer.innerHTML = window.LoadingState.render('正在加载歌曲…', 'page');
 
     // 如果传入了初始元数据，先预渲染头部
     if (initialInfo) {
@@ -6636,7 +6615,7 @@ function setPlayerStatus(status, isPlaying = null, isLoading = false) {
 
     // 如果指定了加载状态，自动应用跳动动画
     if (isLoading && typeof status === 'string') {
-        statusEl.innerHTML = `<span class="animate-loading-dots">${status}<span>.</span><span>.</span><span>.</span></span>`;
+        statusEl.innerHTML = window.LoadingState.render(status, 'inline');
         return;
     }
 
@@ -9016,7 +8995,7 @@ async function fetchEmbedLyricForLocalSong(song, silent = false) {
     // 显示加载状态（若非静默模式）
     if (!silent) {
         const lyricContent = document.getElementById('lyric-content');
-        if (lyricContent) lyricContent.innerHTML = '<p class="t-text-muted text-lg animate-pulse">正在加载内嵌歌词...</p>';
+        if (lyricContent) lyricContent.innerHTML = window.LoadingState.render('正在加载内嵌歌词…');
         currentLyricLines = [];
     }
 
@@ -9110,7 +9089,7 @@ async function fetchLyric(song, quality = null) {
     lastLyricSongId = currentLyricKey;
     window.playerBar?.setLyrics([], '正在加载歌词…');
 
-    document.getElementById('lyric-content').innerHTML = '<p class="t-text-muted text-lg animate-pulse">正在加载歌词...</p>';
+    document.getElementById('lyric-content').innerHTML = window.LoadingState.render('正在加载歌词…');
     currentLyricLines = [];
 
     // ===== 1. 尝试读取浏览器本地缓存 (最高优先级) =====
@@ -15305,6 +15284,8 @@ function showToast(type, message, duration = 3000) {
         error: { bg: 'bg-red-500', icon: 'fa-exclamation-circle' }
     };
     const conf = config[type] || config.info;
+    // 只调整等待提示的图标，保留原有通知寿命、堆叠及换源抑制逻辑。作者：jingyh
+    const pending = type === 'info' && typeof message === 'string' && /^(正在|(?:加载|搜索|读取|获取|处理|扫描|同步|连接|保存)中)/.test(message);
 
     const toast = document.createElement('div');
     // 添加 toast-item 类用于后续高度计算
@@ -15314,7 +15295,7 @@ function showToast(type, message, duration = 3000) {
     const contentHtml = createMarqueeHtml(message, 'flex-1 font-medium');
 
     toast.innerHTML = `
-        <i class="fas ${conf.icon} text-xl shrink-0"></i>
+        <i class="fas ${pending ? 'fa-spinner fa-spin' : conf.icon} text-xl shrink-0"></i>
         ${contentHtml}
     `;
 
@@ -15405,11 +15386,7 @@ function showLoading(message = '正在处理...') {
     overlay.innerHTML = `
         <div class="absolute inset-0 bg-black/40 backdrop-blur-[2px] transition-opacity duration-300"></div>
         <div class="t-bg-panel rounded-2xl shadow-2xl p-8 flex flex-col items-center gap-4 relative z-[210] border t-border-main animate-slide-up">
-            <div class="relative">
-                <div class="w-12 h-12 rounded-full border-4 border-emerald-100 border-t-emerald-500 animate-spin"></div>
-                <i class="fas fa-music text-emerald-500 absolute inset-0 flex items-center justify-center text-xs"></i>
-            </div>
-            <p class="text-sm font-bold t-text-main animate-pulse">${message}</p>
+            ${window.LoadingState.render(message)}
         </div>
     `;
     document.body.appendChild(overlay);

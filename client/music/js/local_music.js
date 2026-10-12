@@ -897,7 +897,7 @@ window.LocalMusicManager = {
         if (progress) progress.textContent = running ? '扫描中 ' + scan.percent + '%（' + scan.completed + '/' + scan.total + '）' : scan?.status === 'error' ? '扫描结束，部分目录读取失败，请检查权限' : scan?.status === 'completed' ? '扫描完成' : '';
         if (running && !this.originalData.length) {
             const container = document.getElementById('lm-list-container');
-            if (container) container.innerHTML = '<div class="text-center py-20 t-text-muted"><i class="fas fa-circle-notch fa-spin text-3xl"></i><p>首次扫描音乐库 ' + Number(scan.percent || 0) + '%</p></div>';
+            if (container) container.innerHTML = window.LoadingState.render('首次扫描音乐库 ' + Number(scan.percent || 0) + '%', 'page');
         }
         if (running) {
             const owner = this.getCurrentUsername();
@@ -1018,11 +1018,7 @@ window.LocalMusicManager = {
         if (!silent) {
             const container = document.getElementById('lm-list-container');
             if (container) {
-                container.innerHTML = `
-                    <div class="text-center py-20 text-gray-500 animate-fade-in">
-                        <i class="fas fa-circle-notch fa-spin text-4xl mb-4 text-emerald-500"></i>
-                        <p class="font-bold tracking-wider">正在加载音乐库...</p>
-                    </div>`;
+                container.innerHTML = window.LoadingState.render('正在加载音乐库…', 'page');
             }
         }
 

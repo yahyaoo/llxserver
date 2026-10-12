@@ -37,6 +37,7 @@
     <script src="js/Sortable.min.js"></script>
     <script src="/js/notification-engine.js"></script>
     <link rel="stylesheet" href="css/app.css">
+    <link rel="stylesheet" href="components/loading-state/loading-state.css">
     <link rel="stylesheet" href="views/main-navigation/main-navigation.css">
     <link rel="stylesheet" href="views/settings/settings.css">
     <link rel="stylesheet" href="components/top-bar/top-bar.css">
@@ -431,9 +432,7 @@
                             </button>
                         </div>
                         <div id="tag-container" class="flex-1 overflow-y-auto p-4 custom-scrollbar">
-                            <div class="flex items-center justify-center py-10">
-                                <i class="fas fa-circle-notch fa-spin text-2xl text-emerald-500"></i>
-                            </div>
+                            <div data-loading-label="正在加载分类…"></div>
                         </div>
                     </div>
 
@@ -442,10 +441,7 @@
                         <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 md:gap-6"
                             id="songlist-container">
                             <!-- Cards will be injected here -->
-                            <div class="col-span-full py-20 text-center t-text-muted animate-fade-in">
-                                <i class="fas fa-circle-notch fa-spin text-4xl mb-4 text-emerald-500"></i>
-                                <p class="font-bold tracking-wider">正在加载歌单...</p>
-                            </div>
+                            <div class="col-span-full" data-loading-label="正在加载歌单…" data-loading-variant="page"></div>
                         </div>
 
                         <!-- Pagination -->
@@ -486,7 +482,7 @@
                                     <i id="sl-detail-collapse-icon"
                                         class="fas fa-chevron-up text-[10px] t-text-muted transition-transform duration-300 flex-shrink-0"></i>
                                 </div>
-                                <div id="sl-detail-subtitle" class="text-[10px] md:text-xs t-text-muted truncate">加载中...
+                                <div id="sl-detail-subtitle" class="text-[10px] md:text-xs t-text-muted truncate" data-loading-label="加载中…" data-loading-variant="inline">
                                 </div>
                             </div>
                             <button id="sl-detail-play-all" onclick="playAllInSongList()"
@@ -1078,10 +1074,7 @@
                     <!-- List Area -->
                     <div id="lm-list-container"
                         class="flex-1 overflow-y-auto p-2 space-y-1 custom-scrollbar pb-20 rounded-b-xl border border-t-0 t-border-main t-bg-panel">
-                        <div class="text-center py-20 text-gray-500 animate-fade-in">
-                            <i class="fas fa-circle-notch fa-spin text-4xl mb-4 text-emerald-500"></i>
-                            <p class="font-bold tracking-wider">正在加载音乐库...</p>
-                        </div>
+                        <div data-loading-label="正在加载音乐库…" data-loading-variant="page"></div>
                     </div>
                     <div id="lm-pagination"
                         class="flex-shrink-0 flex items-center justify-center gap-2 md:gap-4 py-2 border-x border-b t-border-main rounded-b-xl t-bg-panel/80 hidden">
@@ -1219,7 +1212,7 @@
                         class="hidden w-12 h-12 rounded-full border-2 border-emerald-400/30 object-cover">
                     <div class="flex-1">
                         <h3 class="text-xl font-bold t-text-main" id="user-playlist-title">选择歌单</h3>
-                        <p class="text-xs t-text-muted mt-0.5" id="user-playlist-subtitle">加载中...</p>
+                        <p class="text-xs t-text-muted mt-0.5" id="user-playlist-subtitle" data-loading-label="加载中…" data-loading-variant="inline"></p>
                     </div>
                 </div>
                 <button onclick="window.SongListManager.closeUserPlaylistModal()"
@@ -1767,12 +1760,7 @@
                     <!-- 加载中遮罩 -->
                     <div id="lyric-card-loading"
                         class="absolute inset-0 flex items-center justify-center t-bg-main/80 rounded-2xl hidden">
-                        <div class="flex flex-col items-center gap-3">
-                            <div
-                                class="w-10 h-10 border-4 border-violet-100 border-t-violet-500 rounded-full animate-spin">
-                            </div>
-                            <p class="text-xs t-text-muted font-bold">渲染中...</p>
-                        </div>
+                        <div data-loading-label="正在渲染…"></div>
                     </div>
                 </div>
 
@@ -2012,11 +2000,7 @@
             <div id="comment-list-container"
                 class="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-6 space-y-6 md:space-y-8 pb-12">
                 <!-- Loading State -->
-                <div id="comment-loader" class="flex flex-col items-center justify-center py-20 space-y-4">
-                    <div class="w-12 h-12 border-4 border-emerald-100 border-t-emerald-500 rounded-full animate-spin">
-                    </div>
-                    <p class="text-xs font-bold t-text-muted uppercase tracking-widest">正在加载评论...</p>
-                </div>
+                <div id="comment-loader" data-loading-label="正在加载评论…"></div>
                 <!-- List Container -->
                 <div id="comment-list" class="space-y-6 md:space-y-8"></div>
             </div>
@@ -2160,10 +2144,7 @@
         <!-- List Content -->
         <div id="cache-list-container" class="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-1">
             <!-- Items injected here by JS -->
-            <div class="flex flex-col items-center justify-center h-full text-center p-10 space-y-4">
-                <i class="fas fa-cloud-download-alt text-4xl t-text-muted opacity-20"></i>
-                <p class="text-sm t-text-muted font-medium">正在读取缓存列表...</p>
-            </div>
+            <div data-loading-label="正在读取缓存列表…"></div>
         </div>
 
         <!-- Footer Stats -->
@@ -2405,7 +2386,7 @@
                 <div class="flex items-center justify-between mb-6 flex-shrink-0">
                     <div class="flex flex-col">
                         <h3 class="text-xl font-bold t-text-main tracking-tight">Token 调用详志</h3>
-                        <span id="log-token-name" class="text-[10px] t-text-muted mt-0.5">加载中...</span>
+                        <span id="log-token-name" class="text-[10px] t-text-muted mt-0.5" data-loading-label="加载中…" data-loading-variant="inline"></span>
                     </div>
                     <div class="flex items-center gap-2">
                         <button onclick="handleRefreshTokenLogs()" id="btn-refresh-token-logs"
@@ -2421,7 +2402,7 @@
                 </div>
                 <div id="token-logs-list"
                     class="space-y-3 overflow-y-auto flex-1 pr-2 custom-scrollbar min-h-[200px] text-[11px] leading-relaxed">
-                    <div class="py-12 text-center t-text-muted italic opacity-50">正在加载日志记录...</div>
+                    <div data-loading-label="正在加载日志记录…"></div>
                 </div>
                 <div class="mt-8 flex-shrink-0">
                     <button onclick="closeTokenLogsModal()"
@@ -2507,13 +2488,8 @@
                     </div>
                 </div>
                 <div id="remote-overwrite-step2" class="hidden space-y-6 text-center py-4">
-                    <div class="flex justify-center">
-                        <div
-                            class="w-16 h-16 border-4 border-emerald-100 border-t-emerald-500 rounded-full animate-spin">
-                        </div>
-                    </div>
+                    <div data-loading-label="正在同步数据…"></div>
                     <div>
-                        <h4 class="text-lg font-bold t-text-main">正在同步数据...</h4>
                         <p class="text-xs t-text-muted mt-2">请勿关闭窗口，正在同步歌单数据...</p>
                     </div>
                 </div>
@@ -2688,7 +2664,7 @@
                     <!-- Song List -->
                     <div id="lm-remaster-song-list"
                         class="flex-1 overflow-y-auto custom-scrollbar divide-y divide-gray-100 dark:divide-white/[0.04] min-h-[220px]">
-                        <div class="h-full flex items-center justify-center text-xs t-text-muted">正在加载歌曲...</div>
+                        <div data-loading-label="正在加载歌曲…"></div>
                     </div>
 
                     <!-- Bottom Pagination -->
@@ -2897,6 +2873,7 @@
     <audio id="audio-player" crossorigin="anonymous"></audio>
 
     <!-- External Scripts Section (Placed at the end for performance) -->
+    <script src="components/loading-state/index.js"></script>
     <script src="components/library-artwork/index.js"></script>
     <script src="components/theme-controls/index.js"></script>
     <script src="components/top-bar/SearchBox.js"></script>
@@ -3183,9 +3160,7 @@
                     <span id="sd-playlist-count-tag" class="text-[10px] text-gray-400 dark:text-gray-500"></span>
                 </div>
                 <div id="sd-playlist-list" class="space-y-2">
-                    <div class="text-center py-8 text-gray-400 text-xs" id="sd-playlist-loading">
-                        <i class="fas fa-spinner fa-spin text-xl mb-2 block text-emerald-500/60"></i>加载中...
-                    </div>
+                    <div id="sd-playlist-loading" data-loading-label="正在加载同步歌单…"></div>
                 </div>
             </div>
 

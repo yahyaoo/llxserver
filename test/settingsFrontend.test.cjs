@@ -291,6 +291,7 @@ test('设置页铺满高度，补偿加在滚动区域末尾，不再扣减页�
 
 test('独立设置页面组件同步挂载，重复挂载保留控件草稿；模板和资源入口完整', () => {
   const { context } = createMusicSettingsContext()
+  require('./helpers/loadingState.cjs')(context)
   context.document.getElementById = () => null
   vm.runInContext(fs.readFileSync(path.join(__dirname, '../client/music/views/settings/SettingsView.js'), 'utf8'), context)
   const container = { dataset: {}, innerHTML: '' }
@@ -350,6 +351,7 @@ test('应用分组切换后台和关于；移除左侧设置入口后旧关于�
 
 test('主导航独立组件同步挂载，重复挂载保留收藏树；管理和关于只在设置中提供', () => {
   const { context } = createMusicSettingsContext()
+  require('./helpers/loadingState.cjs')(context)
   context.document.getElementById = () => null
   vm.runInContext(fs.readFileSync(path.join(__dirname, '../client/music/views/main-navigation/MainNavigation.js'), 'utf8'), context)
   const container = { dataset: {}, innerHTML: '' }

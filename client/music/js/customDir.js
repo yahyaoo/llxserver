@@ -396,11 +396,7 @@ window.CustomDirManager = {
         if (!silent) {
             const container = document.getElementById('lm-list-container');
             if (container) {
-                container.innerHTML = `
-                    <div class="text-center py-20 text-gray-500 animate-fade-in">
-                        <i class="fas fa-circle-notch fa-spin text-4xl mb-4 text-emerald-500"></i>
-                        <p class="font-bold tracking-wider">正在加载自定义目录音乐...</p>
-                    </div>`;
+                container.innerHTML = window.LoadingState.render('正在加载自定义目录音乐…', 'page');
             }
         }
 

@@ -3,7 +3,7 @@
     let entries = [], count = 100, recent = true, version = 0;
     window.RecentView = {
         async load() {
-            const host = document.getElementById('recent-list'); host.textContent = '正在加载最近播放…';
+            const host = document.getElementById('recent-list'); host.innerHTML = window.LoadingState.render('正在加载最近播放…', 'page');
             const requestVersion = ++version;
             const owner = window.MusicExperience.account;
             try {

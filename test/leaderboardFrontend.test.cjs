@@ -58,6 +58,7 @@ test('数字与字符串榜单标识保持同一选中态，重复渲染不会�
 
 test('页面重复挂载保留现有 DOM，榜单选择沿用原业务入口', () => {
   const { context, host, calls } = fixture()
+  require('./helpers/loadingState.cjs')(context)
   context.window.LeaderboardManager = { selectBoard: (...args) => calls.push(args) }
   vm.runInContext(fs.readFileSync(path.join(__dirname, '../client/music/views/leaderboard/LeaderboardView.js'), 'utf8'), context)
   const view = context.window.LeaderboardView

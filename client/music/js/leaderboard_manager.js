@@ -78,10 +78,7 @@ window.LeaderboardManager = (function () {
         const container = document.getElementById('lb-songs-list');
         if (page === 1) {
             state.localPage = 1;
-            container.innerHTML = `
-                <div class="flex items-center justify-center py-20">
-                    <i class="fas fa-spinner fa-spin text-4xl text-emerald-500"></i>
-                </div>`;
+            container.innerHTML = window.LoadingState.render('正在加载榜单歌曲…', 'page');
         }
 
         try {

@@ -364,12 +364,12 @@
                             <span id="task-last-run-badge"
                                 class="text-[11px] px-2 py-0.5 rounded-lg border t-border-main text-gray-500 dark:text-gray-400 font-normal bg-gray-50/50 dark:bg-gray-800/50 flex items-center gap-1">
                                 <i class="fas fa-history text-[9px] text-emerald-500"></i>
-                                <span id="task-last-run-text">上次执行: 加载中...</span>
+                                <span id="task-last-run-text">${window.LoadingState.render('上次执行: 加载中…', 'inline')}</span>
                             </span>
                             <span id="task-next-run-badge"
                                 class="text-[11px] px-2 py-0.5 rounded-lg border t-border-main text-gray-500 dark:text-gray-400 font-normal bg-gray-50/50 dark:bg-gray-800/50 flex items-center gap-1">
                                 <i class="far fa-clock text-[9px] text-emerald-500"></i>
-                                <span id="task-next-run-text">下次执行: 加载中...</span>
+                                <span id="task-next-run-text">${window.LoadingState.render('下次执行: 加载中…', 'inline')}</span>
                             </span>
                         </div>
                         <div class="text-xs t-text-muted mt-1.5">

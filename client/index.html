@@ -26,6 +26,7 @@
         }
     </script>
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="music/components/loading-state/loading-state.css">
     <link rel="icon" href="icon.svg" type="image/svg+xml">
     <link rel="manifest" href="manifest.json">
     <script>
@@ -1866,7 +1867,7 @@
                         <div id="about-content" class="about-content"
                             style="line-height: 1.8; color: var(--text-primary);">
                             <!-- Markdown content will be rendered here -->
-                            <div style="text-align: center; color: var(--text-secondary);">加载中...</div>
+                            <div data-loading-label="正在加载关于页面…"></div>
                         </div>
 
                         <!-- Check for Updates Button -->
@@ -2041,11 +2042,7 @@
                         系统将检索云端备份归档包。您可以根据备份生成时间点，自由选择要恢复的历史快照：
                     </p>
                     <div id="backup-list-container">
-                        <div style="text-align:center; padding: 2rem; color: var(--text-muted);">
-                            <span class="task-spinner"
-                                style="width:20px;height:20px;display:inline-block;vertical-align:middle;margin-right:6px;"></span>
-                            正在获取云端备份快照列表...
-                        </div>
+                        <div data-loading-label="正在获取云端备份快照列表…"></div>
                     </div>
                 </div>
 
@@ -2082,6 +2079,7 @@
 
 
     <link rel="stylesheet" href="views/system-configuration/system-configuration.css">
+    <script src="music/components/loading-state/index.js"></script>
     <script src="views/system-configuration/SystemConfigurationView.js"></script>
     <script src="app.js"></script>
 </body>

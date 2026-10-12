@@ -3,7 +3,7 @@
     const template = `<div class="leaderboard-shell">
 <aside id="lb-sidebar" class="-translate-x-full custom-scrollbar" aria-label="榜单目录">
     <div class="leaderboard-sidebar-heading"><span>排行榜</span><button type="button" onclick="toggleLbSidebar(false)" aria-label="关闭榜单目录"><i class="fas fa-times"></i></button></div>
-    <div id="lb-boards-loading" class="hidden flex items-center justify-center py-8"><i class="fas fa-circle-notch fa-spin text-emerald-500 text-xl"></i></div>
+    <div id="lb-boards-loading" class="hidden flex items-center justify-center py-8">${window.LoadingState.render('正在加载榜单…', 'inline')}</div>
     <nav id="lb-boards-list" class="custom-scrollbar" aria-label="榜单列表" onclick="if(window.innerWidth <= 1024) toggleLbSidebar(false)"></nav>
 </aside>
 <div id="lb-sidebar-overlay" onclick="toggleLbSidebar(false)" class="bg-black/40 hidden transition-opacity duration-300 opacity-0"></div>
