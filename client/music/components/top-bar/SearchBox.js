@@ -56,7 +56,12 @@
                         const data = await response.json();
                         if (requestVersion === version) render(data);
                     } catch (error) {
-                        if (error.name !== 'AbortError' && requestVersion === version) { render({}); results.firstChild.textContent = error.message; }
+                        if (error.name !== 'AbortError' && requestVersion === version) {
+                            render({});
+                            const hint = results.firstChild;
+                            hint.className = '';
+                            window.LoadingState.showFailure(hint, { title: '音乐库暂时无法检索', variant: 'inline', retry: search });
+                        }
                     }
                 }, 180);
             };

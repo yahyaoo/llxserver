@@ -8,7 +8,7 @@
     const viewingPublic = () => !document.getElementById('view-localmusic')?.classList.contains('hidden') && window.LocalMusicManager?.isViewingPublicSongs;
     const account = () => headers()['x-user-token'] || (localStorage.getItem('lx_admin_password') ? 'admin' : '');
     const libraryManager = () => window.CustomDirManager?.isActive ? window.CustomDirManager : window.LocalMusicManager;
-    const downloadSong = task => ({ ...task.song, quality: task.quality || task.song.quality, ...(task.serverDownload ? { folder: 'download' } : {}) });
+    const downloadSong = task => window.SongFiles?.enrich([{ ...task.song, quality: task.quality || task.song.quality, ...(task.serverDownload ? { folder: 'download' } : {}) }])[0] || task.song;
     function songsFor(view) {
         if (view.id === 'view-localmusic') return libraryManager().originalData.map(song => window.CustomDirManager?.isActive ? { ...song, folder: 'custom' } : song);
         if (view.id === 'view-recent') return window.RecentView.getEntries();
@@ -50,6 +50,7 @@
                 const notify = task.status === 'error' ? window.showError : window.showInfo;
                 notify?.(`${labels[task.action]}${task.status === 'error' ? '失败' : '完成'}：成功 ${task.succeeded}，跳过 ${task.skipped}，失败 ${task.failed}${task.errors?.[0] ? '（' + task.errors[0] + '）' : ''}`);
                 window.LocalMusicManager?.fetchData(true); window.SystemDownloadManager?.syncServerQueue(true);
+                window.SongFiles?.refresh();
                 if (window.CustomDirManager?.isActive) window.CustomDirManager.fetchData(true);
             }
             const responseScan = await fetch('/api/music/library/scan', { headers: headers(), cache: 'no-store' });
@@ -94,8 +95,12 @@
     const maintenanceEntries = songs => [['补全歌词', 'fa-closed-captioning', () => start('lyrics', songs)], ['嵌入歌词', 'fa-file-audio', () => start('embed', songs)], ['补全元信息', 'fa-tags', () => start('metadata', songs)]];
     function rowMenu(button, index) {
         const manager = libraryManager(), item = { ...manager.displayData[index], ...(window.CustomDirManager?.isActive ? { folder: 'custom' } : {}) };
-        const entries = [['下载', 'fa-download', () => manager.downloadSingle(index)], ['添加到歌单', 'fa-plus', () => manager.addItemToPlaylist(index)], ...maintenanceEntries([item])];
-        if (item.folder !== 'custom' || window.userAllowOperateCustomDir) entries.push(['删除', 'fa-trash-alt', () => start('delete', [item])]);
+        const entries = [window.SongFiles?.menuEntry(button, item), ['下载', 'fa-download', () => manager.downloadSingle(index)], ['添加到歌单', 'fa-plus', () => manager.addItemToPlaylist(index)], ...maintenanceEntries([item])].filter(Boolean);
+        const manual = button.closest('.song-row-actions')?.querySelector('[data-lm-action="manual"]');
+        if (manual) entries.push(['手动关联', 'fa-link', () => manual.click()]);
+        if (item.folder !== 'custom' || window.userAllowOperateCustomDir) entries.push(item.files?.length > 1
+            ? ['管理 / 删除文件', 'fa-trash-alt', () => window.SongFiles.open(button, item)]
+            : ['删除文件', 'fa-trash-alt', () => start('delete', [item])]);
         menu(button, entries);
     }
     function more(button, view) {
@@ -106,7 +111,7 @@
     }
     const tools = new Map(); let docked = null;
     const slot = document.createElement('div'); slot.className = 'page-tools-dock'; slot.hidden = true;
-    document.getElementById('music-top-bar')?.prepend(slot);
+    document.getElementById('music-top-bar')?.append(slot);
     function restore() {
         if (!docked) return;
         if (docked.marker.isConnected) { docked.marker.after(docked.bar); docked.heading.style.minHeight = docked.minHeight; } else docked.bar.remove();
@@ -117,7 +122,7 @@
         const scrollTop = visible ? Math.max(visible.view.scrollTop, visible.view.id === 'view-search' ? document.getElementById('search-results')?.scrollTop || 0 : 0) : 0;
         if (!visible || scrollTop < visible.threshold || innerWidth < 960) { restore(); return; }
         if (docked === visible) return;
-        restore(); docked = visible; visible.heading.style.minHeight = visible.heading.getBoundingClientRect().height + 'px'; slot.append(visible.bar); slot.hidden = false;
+        restore(); docked = visible; visible.heading.style.minHeight = visible.heading.getBoundingClientRect().height + 'px'; slot.append(visible.bar); slot.hidden = false; visible.bar.querySelectorAll('button').forEach(button => { button.title ||= button.textContent.trim(); });
         document.getElementById('music-top-bar')?.classList.add('tools-docked');
     }
     function mount(view, heading) {
@@ -141,6 +146,37 @@
         const taskHost = document.createElement('div'); taskHost.className = 'music-task-host'; heading.after(taskHost); progress(taskHost);
         tools.set(heading, { view, bar, marker, heading, minHeight: heading.style.minHeight, threshold: Math.max(50, heading.offsetTop - 20) });
     }
+    /** 歌曲行只保留喜欢和更多：更多菜单代理原按钮点击，删除类操作排在最后。 */
+    function rowEntries(actions, song) {
+        const maintenance = maintenanceEntries([song]);
+        const names = new Set(maintenance.map(([label]) => label));
+        const proxies = [...actions.querySelectorAll(':scope > button:not(.song-love-btn):not(.song-maintenance-menu):not(.song-row-more)')]
+            .filter(button => !button.disabled && !names.has(button.title))
+            .map(button => [button.title || button.textContent.trim() || '操作', [...(button.querySelector('i')?.classList || [])].find(name => /^fa-[a-z]/.test(name)) || 'fa-circle', () => button.click()]);
+        const removal = proxies.filter(([, icon]) => /^fa-(trash|trash-alt|times)$/.test(icon));
+        return [...proxies.filter(entry => !removal.includes(entry)), ...maintenance, ...removal];
+    }
+    function prepareRows() {
+        document.querySelectorAll('.song-row-actions').forEach(actions => {
+            if (actions.querySelector('[data-library-more],.song-maintenance-menu')) return;
+            const love = actions.querySelector('[data-love-song]');
+            if (!love) return;
+            const button = document.createElement('button'); button.type = 'button'; button.className = 'song-maintenance-menu'; button.title = '更多'; button.setAttribute('aria-label', '更多操作'); button.setAttribute('aria-haspopup', 'menu'); button.innerHTML = '<i class="fas fa-ellipsis-h"></i>';
+            button.onclick = event => {
+                event.stopPropagation();
+                let song = JSON.parse(decodeURIComponent(love.dataset.loveSong));
+                if (actions.closest('#view-downloads')) {
+                    const task = window.SystemDownloadManager.tasks.find(task => actions.closest('.download-task-row')?.id === 'dl-task-' + task.id);
+                    if (task) song = downloadSong(task);
+                }
+                const online = actions.closest('#view-search')?.dataset.onlineSearch === 'true' || actions.closest('#view-leaderboard');
+                const entries = rowEntries(actions, song);
+                if (!online && window.SongFiles) entries.unshift(window.SongFiles.menuEntry(button, song));
+                menu(button, entries);
+            };
+            actions.append(button);
+        });
+    }
     function refreshTools() {
         for (const [heading, tool] of tools) if (!heading.isConnected) { if (docked === tool) restore(); tools.delete(heading); }
         mount(document.getElementById('view-localmusic'), document.getElementById('lm-toolbar'));
@@ -154,22 +190,7 @@
             if (heading.firstElementChild.textContent !== name) heading.firstElementChild.textContent = name;
             mount(search, heading);
         }
-        document.querySelectorAll('.song-row-actions').forEach(actions => {
-            if (actions.querySelector('[data-library-more],.song-maintenance-menu')) return;
-            const love = actions.querySelector('[data-love-song]');
-            if (!love) return;
-            const button = document.createElement('button'); button.type = 'button'; button.className = 'song-maintenance-menu'; button.title = '补全与嵌入'; button.setAttribute('aria-label', '歌曲维护'); button.innerHTML = '<i class="fas fa-ellipsis-h"></i>';
-            button.onclick = event => {
-                event.stopPropagation();
-                let song = JSON.parse(decodeURIComponent(love.dataset.loveSong));
-                if (actions.closest('#view-downloads')) {
-                    const task = window.SystemDownloadManager.tasks.find(task => actions.closest('.download-task-row')?.id === 'dl-task-' + task.id);
-                    if (task) song = downloadSong(task);
-                }
-                menu(button, maintenanceEntries([song]));
-            };
-            actions.append(button);
-        });
+        prepareRows();
         syncDock();
         for (const tool of tools.values()) {
             const roam = tool.bar.querySelector('button');
@@ -182,7 +203,7 @@
     }, true);
     document.addEventListener('scroll', syncDock, true);
     let queued = false;
-    new MutationObserver(() => { if (queued) return; queued = true; requestAnimationFrame(() => { queued = false; refreshTools(); }); }).observe(document.querySelector('.music-shell'), { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'data-online-search'] });
+    new MutationObserver(() => { prepareRows(); if (queued) return; queued = true; requestAnimationFrame(() => { queued = false; refreshTools(); }); }).observe(document.querySelector('.music-shell'), { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'data-online-search'] });
     window.MusicMaintenance = { start, menu, maintenanceEntries, downloadSong, setScan(value) { scan = value; renderProgress(); }, more, refreshTools, songsFor };
     refreshTools(); poll(); timer = setInterval(poll, 2000);
     window.addEventListener('pagehide', () => clearInterval(timer));

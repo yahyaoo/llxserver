@@ -167,7 +167,7 @@ async (page) => {
         await page.evaluate(() => window.soundEffects.close()); await page.waitForTimeout(350);
         await page.evaluate(() => toggleLyrics()); await page.waitForTimeout(650);
         await dragVolume(false, '桌面底部横向音量可连续拖动');
-        check(await row.locator('button:visible').count() === 5, '桌面列表原五个操作恢复');
+        check(await row.locator('.song-row-actions > button:visible').count() === 2, '桌面列表只显示喜欢和更多');
         await page.setViewportSize({ width: 390, height: 844 });
         await page.evaluate(() => MobileShell.open('mobile-library'));
         check(await page.locator('#mobile-pages .favorite-sidebar-drag-handle:visible').count() === 0, '手机收藏和歌单隐藏拖拽图标');

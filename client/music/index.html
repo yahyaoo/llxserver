@@ -91,7 +91,7 @@
             <div class="flex-1 overflow-hidden relative">
 
                 <div id="view-recent" class="recent-view absolute inset-0 hidden opacity-0 transition-all duration-300">
-                    <div class="recent-view-header"><div><h2 id="recent-title">最近播放</h2><p id="recent-meta"></p></div><div class="recent-view-actions"><button onclick="RecentView.play()"><i class="fas fa-play mr-2"></i>播放全部</button><button id="recent-clear" onclick="RecentView.clear()">清空记录</button></div></div>
+                    <div class="recent-view-header"><div><h2 id="recent-title">最近播放</h2><p id="recent-meta"></p></div><div class="recent-view-actions"><button onclick="RecentView.play()"><i class="fas fa-play mr-2"></i>播放全部</button><button id="recent-clear" onclick="RecentView.clear()"><i class="fas fa-trash-alt mr-2"></i>清空记录</button></div></div>
                     <div id="recent-list"></div>
                 </div>
                 <!-- Search View -->
@@ -2776,6 +2776,7 @@
     <script src="js/lyric-parser.js"></script>
     <script src="js/quality.js"></script>
     <script src="js/idb_store.js"></script>
+    <script src="js/client_performance.js"></script>
     <script src="js/user_sync.js"></script>
     <script src="js/batch_pagination.js"></script>
     <script src="views/downloads/DownloadOptions.js"></script>
@@ -2813,6 +2814,8 @@
     <script src="js/sound-effects.js"></script>
     <script src="views/downloads/DownloadsView.js"></script>
     <script src="js/download_manager.js"></script>
+    <script src="js/song_identity.js"></script>
+    <script src="js/song_files.js"></script>
     <script src="js/local_music.js"></script>
     <script src="js/customDir.js"></script>
     <script src="js/common_ui.js"></script>

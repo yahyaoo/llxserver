@@ -86,3 +86,18 @@ test('手机收藏与歌单排序实例禁用，重新初始化到桌面后恢�
     context.window.innerWidth = 390
   }
 })
+
+test('数据为空或退出账号时收藏仍保留三个入口和零计数，返回数据后更新', () => {
+  const { nodes, context } = fixture()
+  context.renderMyLists(null)
+  const favorites = nodes.get('my-lists-container'), playlists = nodes.get('playlist-lists-container')
+  assert.deepEqual(favorites.children.map(node => node.getAttribute('data-sidebar-list-id')).sort(), ['__lib_albums__', '__lib_artists__', 'love'])
+  assert.equal(playlists.children.length, 0)
+  assert.ok(favorites.children.every(node => node.html.includes('>0</span>')))
+  context.renderMyLists({ userList: [] })
+  assert.equal(favorites.children.length, 3)
+  context.renderMyLists({ loveList: [{ id: 'song' }], userList: [{ id: 'loaded', name: '加载后的歌单', list: [] }] })
+  assert.equal(favorites.children.length, 3)
+  assert.ok(favorites.children.find(node => node.getAttribute('data-sidebar-list-id') === 'love').html.includes('>1</span>'))
+  assert.equal(playlists.children[0].getAttribute('data-sidebar-list-id'), 'loaded')
+})

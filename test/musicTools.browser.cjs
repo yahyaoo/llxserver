@@ -36,8 +36,17 @@ async page => {
     check(await page.locator('#lm-batch-toolbar').innerText()==='已选择: 0 首\n全选\n清空\n删除\n退出','批量栏仅保留四项操作');
     await page.locator('#lm-batch-toolbar').getByRole('button',{name:'退出',exact:true}).click({timeout:5000});
     await page.locator('[data-library-more="0"]').click({timeout:5000});
-    check(await page.locator('.music-tools-menu').innerText()==='下载\n添加到歌单\n补全歌词\n嵌入歌词\n补全元信息\n删除','单首歌曲更多菜单正确');
+    const libraryMenu=(await page.locator('.music-tools-menu').innerText()).split('\n');
+    check(['下载','添加到歌单','补全歌词','嵌入歌词','补全元信息','删除'].every((label,index)=>libraryMenu.indexOf(label)===libraryMenu.indexOf('下载')+index),'单首歌曲更多菜单正确');
     await page.keyboard.press('Escape');
+    await page.evaluate(()=>{window.__playedIndex=null;LocalMusicManager.playItem=index=>{window.__playedIndex=index;};});
+    const albumCell=page.locator('#lm-list-container [data-lm-row-index="2"] > div:nth-child(4)');
+    check(await albumCell.evaluate(node=>getComputedStyle(node).cursor)==='pointer','音乐库行非操作列鼠标为手型');
+    await albumCell.click({timeout:5000});
+    check(await page.evaluate(()=>window.__playedIndex)===2,'点击音乐库行非操作列直接播放');
+    await page.evaluate(()=>{window.__playedIndex=null;});
+    await page.locator('#lm-list-container [data-lm-row-index="2"] .song-love-btn').click({timeout:5000});
+    check(await page.evaluate(()=>window.__playedIndex)===null,'点击操作列不触发播放');
     await page.evaluate(()=>{const view=document.getElementById('view-localmusic');view.scrollTop=650;view.dispatchEvent(new Event('scroll'));}); await page.waitForTimeout(300);
     check(await page.locator('.page-tools-dock #lm-filter-toggle-btn').isVisible(),'音乐库滚动后原按钮固定到顶栏');
     await page.evaluate(()=>{const view=document.getElementById('view-localmusic');view.scrollTop=0;view.dispatchEvent(new Event('scroll'));}); await page.waitForTimeout(200);
@@ -57,6 +66,7 @@ async page => {
     await page.locator('.collection-card').click({timeout:5000});await page.waitForFunction(()=>document.querySelector('#collection-page-heading h2')?.textContent==='测试歌单');
     check(await page.locator('#view-search').isVisible() && await page.locator('#collection-page-heading h2').textContent()==='测试歌单','点击歌单方块进入具体歌单');
     check(await page.locator('#search-results .song-maintenance-menu').count()>0,'歌单歌曲具备公共维护菜单');
+    check(await page.locator('#search-results .song-row-actions').first().evaluate(actions=>[...actions.children].filter(child=>getComputedStyle(child).display!=='none').map(child=>child.className.split(' ')[0]).join()==='song-love-btn,song-maintenance-menu'),'桌面歌曲行只显示喜欢和更多');
     await page.evaluate(()=>{const list=window.getMusicScrollContainer('search-results');list.scrollTop=650;list.dispatchEvent(new Event('scroll'));});await page.waitForTimeout(200);
     check(await page.locator('.page-tools-dock').getByRole('button',{name:'漫游播放',exact:false}).isVisible(),'歌单内层列表滚动后固定工具栏');
     await page.evaluate(()=>{document.querySelectorAll('[id^="view-"]').forEach(view=>view.classList.add('hidden'));document.getElementById('view-search').classList.remove('hidden');document.getElementById('view-search').dataset.onlineSearch='false';renderLibraryArtists([{id:'1',source:'wy',name:'测试歌手',picUrl:'/music/assets/logo.svg'}]);});
@@ -75,7 +85,8 @@ async page => {
     });
     await page.evaluate(()=>{switchTab('downloads');SystemDownloadManager.tasks=[{id:'browser-download',song:{id:'wy_123',source:'wy',songmid:'123',name:'下载测试',singer:'测试歌手'},serverDownload:true,isServer:true,quality:'flac',status:'finished',progress:100,totalBytes:4000}];SystemDownloadManager.renderList();});
     await page.locator('#dl-task-browser-download .song-maintenance-menu').click({timeout:5000});
-    check(await page.locator('.music-tools-menu').innerText()==='补全歌词\n嵌入歌词\n补全元信息','下载单首复用三项公共维护');
+    const downloadMenu=(await page.locator('.music-tools-menu').innerText()).split('\n');
+    check(['不喜欢','添加到歌单','补全歌词','嵌入歌词','补全元信息','移除任务'].every((label,index)=>downloadMenu.indexOf(label)===downloadMenu.indexOf('不喜欢')+index),'下载单首更多菜单正确：'+JSON.stringify(downloadMenu));
     await page.getByRole('menuitem',{name:'补全元信息',exact:true}).click();
     await page.waitForTimeout(200);
     check(downloadRequest?.songs[0]?.folder==='download' && downloadRequest.songs[0].quality==='flac','下载维护保留实际类别与音质');

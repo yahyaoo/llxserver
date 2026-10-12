@@ -157,7 +157,7 @@ export const getLibraryItems = (username: string): any[] => {
     const [source, ...parts] = item.identity.split(':')
     const songInfo = { id: source + '_' + parts.join(':'), ...(item.songInfo || { source, songmid: parts.join(':'), name: path.parse(item.filename).name, singer: '未知歌手' }) }
     return { ...item, ...songInfo, songInfo: { ...songInfo, quality: item.quality, types: { [item.quality]: {} } },
-      serverDownloadId: item.id, folder: 'download', name: songInfo.name, singer: songInfo.singer, album: songInfo.albumName || '', source,
+      quality: item.quality, filename: item.filename, serverDownloadId: item.id, folder: 'download', name: songInfo.name, singer: songInfo.singer, album: songInfo.albumName || '', source,
       hasLyric: !!item.lyric, hasCover: !!songInfo.img, mtime: item.mtime || 0 }
   })
 }

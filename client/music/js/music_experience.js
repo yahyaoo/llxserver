@@ -12,6 +12,19 @@
     /** 将所有本地文件转换为当前账号可认证的播放器 URL；不把令牌存入数据库。 */
     const playable = item => {
         const song = { ...item.songInfo, ...item };
+        // 旧最近记录未保存完整音源参数时，从当前账号歌单补齐；只按来源和歌曲标识匹配。作者：yahyaoo
+        const data = window.myPersonalListData || window.currentListData;
+        const sameSong = candidate => {
+            if (!song.source || candidate.source !== song.source) return false;
+            if (song.id != null && candidate.id != null && String(song.id) === String(candidate.id)) return true;
+            const mid = song.songmid || song.songId || song.meta?.songmid || song.meta?.songId;
+            return !!mid && String(mid) === String(candidate.songmid || candidate.songId || candidate.meta?.songmid || candidate.meta?.songId || '');
+        };
+        const match = data && [data.loveList, data.defaultList, ...(data.userList || []).map(list => list.list)].flatMap(list => list || []).find(sameSong);
+        for (const key of ['songmid', 'songId', 'hash', 'copyrightId', 'albumId', 'lrcUrl', 'mrcUrl', 'trcUrl']) {
+            const value = song[key] || song.meta?.[key] || match?.[key] || match?.meta?.[key];
+            if (value != null) song[key] = value;
+        }
         const filename = song.filename || song._localFilename || song.customFilename;
         if (!filename && !song.serverDownloadId) return song;
         const username = accountName();
@@ -19,6 +32,7 @@
         const folder = song.folder || song._localFolder || 'music';
         const custom = song.isCustomDir || song._isCustomDir || song.isCustomFile || folder === 'custom';
         const params = new URLSearchParams({ folder });
+        if (song.location) params.set('location', song.location);
         if (token) params.set('token', token);
         song.url = song.serverDownloadId ? '/api/music/server-download/file/' + encodeURIComponent(song.serverDownloadId) + '?username=' + encodeURIComponent(username) + '&' + params : custom ? '/api/music/custom/file?filename=' + encodeURIComponent(filename) + '&user=' + encodeURIComponent(username) + '&' + params : `/api/music/cache/file/${encodeURIComponent(username)}/${encodeURIComponent(filename)}?${params}`;
         const cover = coverUrl(item);
@@ -56,6 +70,7 @@
         if (filename && !(song.hasCover === false && song.coverType === 'none') && song.folder !== 'download') {
             const folder = song.folder || song._localFolder || 'music';
             const params = new URLSearchParams({ filename, user: accountName(), folder, v: String(song.mtime || '') });
+            if (song.location) params.set('location', song.location);
             add(`/api/music/${song.isCustomDir || song._isCustomDir || folder === 'custom' ? 'custom' : 'cache'}/cover?${params}`);
         }
         fields(song);
@@ -150,13 +165,20 @@
             // 本地缓存按账号分开；数据库配置是最终来源。
             try { value = { ...defaults, ...(JSON.parse(localStorage.getItem(cacheKey(next))) || {}) }; } catch { value = { ...defaults }; }
             value.background = null; apply();
+            window.ClientSync?.seed('appearance', value);
             const auth = headers();
             try {
+                const pending = await window.ClientSync?.read('appearance');
+                if (pending && requestRevision === revision) {
+                    value = { ...defaults, ...pending }; apply();
+                    await loadBackground(requestRevision, auth); return;
+                }
                 const response = await fetch('/api/user/appearance', { headers: auth });
                 if (!response.ok) throw new Error('账号外观配置加载失败');
                 const remote = await response.json();
-                if (requestRevision !== revision) return;
+                if (requestRevision !== revision || window.ClientSync?.has('appearance')) return;
                 value = { ...defaults, ...remote }; localStorage.setItem(cacheKey(next), JSON.stringify(value)); apply();
+                window.ClientSync?.seed('appearance', value);
                 await loadBackground(requestRevision, auth);
             } catch (error) { if (requestRevision === revision) report(error); }
             if (!document.getElementById('view-recent').classList.contains('hidden')) window.RecentView.load();
@@ -166,6 +188,7 @@
             value = { ...value, ...patch }; apply();
             const snapshot = { ...value }, owner = accountName(), auth = headers();
             localStorage.setItem(cacheKey(owner), JSON.stringify(snapshot));
+            if (window.ClientSync) return window.ClientSync.update('appearance', snapshot).catch(report);
             saved = saved.catch(() => {}).then(async () => {
                 const response = await fetch('/api/user/appearance', { method: 'PUT', headers: auth, body: JSON.stringify(snapshot) });
                 if (!response.ok) throw new Error((await response.json()).message || '配置保存失败');
@@ -199,6 +222,10 @@
         },
     };
 
+    window.ClientSync?.register('appearance', async (snapshot, context) => {
+        const response = await fetch('/api/user/appearance', { method: 'PUT', headers: { ...context.headers, 'Content-Type': 'application/json' }, body: JSON.stringify(snapshot), signal: context.signal });
+        if (!response.ok) throw new Error('外观配置同步失败: HTTP ' + response.status);
+    });
     document.addEventListener('DOMContentLoaded', () => {
         document.querySelectorAll('[data-theme-controls]').forEach(container => window.ThemeControls.mount(container));
         document.querySelectorAll('[data-experience-control]').forEach(control => {

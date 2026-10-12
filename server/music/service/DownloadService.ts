@@ -1633,7 +1633,11 @@ export async function getMusicCacheCover(context: RequestContext, runtime: Downl
           res.end('Missing filename')
           return
         }
-        const cover = await fileCache.getCacheCover(filename, username) as any
+        const location = urlObj.searchParams.get('location') || undefined
+        if (location && ![fileCache.getCacheLocation(), 'data', 'root'].includes(location)) {
+          res.writeHead(400); res.end('Invalid cache location'); return
+        }
+        const cover = await fileCache.getCacheCover(filename, username, { folder: urlObj.searchParams.get('folder') || undefined, location }) as any
         if (cover && cover.data) {
           res.writeHead(200, {
             'Content-Type': cover.mime || 'image/jpeg',

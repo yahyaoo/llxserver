@@ -589,7 +589,7 @@
     "method": "getMusicCacheCover",
     "route": "/api/music/cache/cover",
     "condition": "pathname === '/api/music/cache/cover' && req.method === 'GET'",
-    "baselineDigest": "e41e3b5e02650f6a312196fdb33a1c8266e9d0c5736925903ca20d090623b971"
+    "baselineDigest": "f2ce3b309ff512697885534510e59ae157eca418f4190d7e4ea9022ec8ca8dad"
   },
   {
     "group": "musicDownload",
@@ -933,7 +933,7 @@
     "method": "getMusicSongListDetail",
     "route": "/api/music/songList/detail",
     "condition": "pathname === '/api/music/songList/detail' && req.method === 'GET'",
-    "baselineDigest": "5f60c4e554a452ff4b7cf3588f37daffebdaf1e23e7618866017a6b6d9817d50"
+    "baselineDigest": "a9d5e3a0b17f72650cb98dba2fe87e560c2d4ea65fbdc77864f1d00c2923426c"
   },
   {
     "group": "musicDiscovery",

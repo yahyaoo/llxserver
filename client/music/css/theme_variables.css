@@ -321,7 +321,9 @@ i {
 :root.music-appearance #header-account-trigger i { color: var(--theme-readable-accent); }
 :root.music-appearance #player-footer #play-mode-btn { color: var(--theme-readable-accent); }
 /* 强调文字及辅助图标使用可读色；实色背景保留独立前景，避免主题色叠在自身上。 */
-:root.music-appearance :is(.text-emerald-400,.text-emerald-500,.text-emerald-600) { color: var(--theme-readable-accent) !important; }
+:root.music-appearance :is(.text-emerald-400,.text-emerald-500,.text-emerald-600,.text-emerald-700) { color: var(--theme-readable-accent) !important; }
+/* 浅色强调标签背景随主题和外观取色，避免黑白主题深色外观下出现白底白字。 */
+:root.music-appearance :is([class~="bg-emerald-50"],[class~="bg-emerald-100"]) { background-color: color-mix(in srgb, var(--c-500) 16%, var(--bg-panel)) !important; border-color: color-mix(in srgb, var(--c-500) 30%, var(--border-dim)) !important; }
 :root.music-appearance :is([class~="bg-emerald-500"],[class~="bg-emerald-600"]).text-white,
 :root.music-appearance .lm-filter-tag.active { color: var(--theme-on-accent) !important; }
 :root.music-appearance :is(.settings-nav-heading,.setting-tooltip-trigger,.setting-tooltip-trigger > i) { color: var(--text-muted) !important; }

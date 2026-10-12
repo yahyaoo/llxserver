@@ -374,3 +374,29 @@ CREATE TABLE IF NOT EXISTS client_legacy_document (
 );
 CREATE INDEX IF NOT EXISTS idx_client_legacy_document_order ON client_legacy_document (document_key, sort_order);
 
+-- 歌曲身份与物理副本独立存储；同一账号、同一歌曲可以有多个音质和位置。作者：yahyaoo
+CREATE TABLE IF NOT EXISTS client_library_song (
+  username TEXT NOT NULL, -- 所属账号
+  song_key TEXT NOT NULL, -- 跨平台歌曲聚合身份
+  source TEXT NOT NULL, -- 默认文件的音源平台
+  song_id TEXT NOT NULL, -- 默认文件的平台歌曲标识
+  name TEXT NOT NULL, -- 歌曲名称，保留版本信息
+  singer TEXT NOT NULL, -- 歌手名称
+  preferred_file_key TEXT NOT NULL, -- 最高音质文件的身份
+  PRIMARY KEY (username, song_key)
+);
+CREATE TABLE IF NOT EXISTS client_library_song_file (
+  username TEXT NOT NULL, -- 所属账号
+  song_key TEXT NOT NULL, -- 歌曲主表关联身份
+  file_key TEXT NOT NULL, -- 独立文件身份，区分音质和位置
+  quality TEXT NOT NULL, -- 文件实际音质
+  folder TEXT NOT NULL, -- 缓存、下载或自定义目录类别
+  location TEXT NOT NULL, -- 缓存存储位置
+  filename TEXT NOT NULL, -- 索引内文件路径
+  size INTEGER NOT NULL, -- 文件大小，单位字节
+  metadata_json TEXT NOT NULL CHECK (json_valid(metadata_json)), -- 不含认证字段的文件元信息
+  PRIMARY KEY (username, file_key),
+  FOREIGN KEY (username, song_key) REFERENCES client_library_song (username, song_key) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_client_library_song_file_song ON client_library_song_file (username, song_key);
+

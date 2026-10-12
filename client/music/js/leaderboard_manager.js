@@ -64,8 +64,9 @@ window.LeaderboardManager = (function () {
             }
         } catch (e) {
             console.error('[Leaderboard] loadBoards failed:', e);
-            document.getElementById('lb-boards-list').innerHTML =
-                `<div class="p-4 text-red-500 text-sm">加载失败: ${e.message}</div>`;
+            window.LoadingState.showFailure(document.getElementById('lb-boards-list'), {
+                title: '榜单暂时无法加载', variant: 'inline', retry: () => loadBoards(source),
+            });
         } finally {
             showBoardsLoading(false);
         }
@@ -134,7 +135,7 @@ window.LeaderboardManager = (function () {
             renderPagination();
         } catch (e) {
             console.error('[Leaderboard] loadSongs failed:', e);
-            container.innerHTML = `<div class="text-center text-red-500 p-10">加载失败: ${e.message}</div>`;
+            window.LoadingState.showFailure(container, { title: '榜单歌曲暂时无法加载', variant: 'page', retry: () => loadSongs(bangid, source, page) });
         } finally {
             state.loading = false;
         }

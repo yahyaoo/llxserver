@@ -121,6 +121,27 @@
     }
 
     const ListStore = {
+        /** 仅访问账号缓存，首屏不等待 SQLite 网络请求。 @author jingyh */
+        getLocal(scope = account(window.getUserAuthHeaders?.() || {})) {
+            return cachedState(scope).then(state => state?.value ?? null);
+        },
+        /** 已读取的数据只缓存到本地，不重复向服务端写入。 @author jingyh */
+        cache(data, scope = account(window.getUserAuthHeaders?.() || {})) {
+            return idbSet(LIST_KEY + ':' + scope, { value: data, dirty: false });
+        },
+        /** 待同步记录独立于歌单缓存，避免刷新时由服务端旧值覆盖。 @author jingyh */
+        readPending(channel, scope) { return idbGet('lx_pending:' + scope + ':' + channel); },
+        writePending(channel, value, scope) {
+            return value === null ? idbDelete('lx_pending:' + scope + ':' + channel) : idbSet('lx_pending:' + scope + ':' + channel, value);
+        },
+        /** 独立播放状态文档，不覆盖浏览器歌单和最近播放。 @author jingyh */
+        async syncPlayback(value, context, kind = 'playback') {
+            const response = await fetch('/api/music/storage/' + kind, {
+                method: 'PUT', headers: { ...context.headers, 'Content-Type': 'application/json', 'x-browser-device': deviceId() },
+                body: JSON.stringify(value), signal: context.signal,
+            });
+            if (!response.ok) throw new Error('播放状态同步失败: HTTP ' + response.status);
+        },
         /** @returns {Promise<object|null>} 歌单数据，离线未提交内容优先重试。 */
         get() {
             return enqueue(async (headers, scope) => {

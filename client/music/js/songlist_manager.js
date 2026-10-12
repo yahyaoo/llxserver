@@ -29,6 +29,7 @@ window.SongListManager = (function () {
         total: 0,
         limit: 30
     };
+    let detailRequest = 0, detailController = null;
 
     // Sort mode state
     let sortMode = false;
@@ -50,7 +51,7 @@ window.SongListManager = (function () {
 
         updateViewModeUI();
         renderSortTabs();
-        await loadTags();
+        void loadTags();
         if (window.DislikeManager) window.DislikeManager.load();
         loadList();
 
@@ -232,6 +233,9 @@ window.SongListManager = (function () {
     }
 
     async function loadDetail(id, source, page = 1) {
+        const requestId = ++detailRequest;
+        detailController?.abort();
+        detailController = new AbortController();
         detailState.id = id;
         detailState.source = source;
         detailState.page = page;
@@ -271,9 +275,23 @@ window.SongListManager = (function () {
 
 
         try {
-            const url = `${API_BASE}/songList/detail?source=${source}&id=${encodeURIComponent(id)}&page=${page}`;
-            const res = await fetch(url);
-            const data = await res.json();
+            const url = `${API_BASE}/songList/detail?source=${source}&id=${encodeURIComponent(id)}&page=${page}&progressive=1`;
+            const res = await fetch(url, { signal: detailController.signal });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            let previewShown = false;
+            const data = await window.ClientPerformance.readPlaylist(res, preview => {
+                if (requestId !== detailRequest) return;
+                previewShown = true;
+                detailState.info = preview.info;
+                const songs = (preview.list || []).map((song, index) => ({ ...song, id: song.id || song.songmid || song.songId || song.hash || `sl_${id}_${index}` }));
+                detailState.list = page === 1 ? songs : [...detailState.list, ...songs];
+                detailState.total = preview.total;
+                window.viewingPlaylist = detailState.list;
+                if (page === 1) window.ListSearch.init('songlist', { renderCallback: () => window.SongListManager.renderDetail(), getList: () => detailState.list });
+                void renderDetail();
+            });
+            if (requestId !== detailRequest) return;
+            if (previewShown) { detailState.info = data.info; void renderDetail(true); return; }
 
             detailState.info = data.info;
 
@@ -307,6 +325,7 @@ window.SongListManager = (function () {
 
             renderDetail();
         } catch (e) {
+            if (requestId !== detailRequest || e.name === 'AbortError') return;
             console.error('[SongList] Load detail failed:', e);
             if (page === 1) {
                 listContainer.innerHTML = `<div class="text-center text-red-500 p-10">加载失败: ${e.message}</div>`;
@@ -492,7 +511,7 @@ window.SongListManager = (function () {
         `).join('');
     }
 
-    function renderDetail() {
+    async function renderDetail(metadataOnly = false) {
         const info = detailState.info;
         if (!info) return;
 
@@ -562,10 +581,13 @@ window.SongListManager = (function () {
             });
         }
 
+        if (metadataOnly) return;
         // --- Unified Search & Filtering Logic ---
         const displayList = window.ListSearch.getDisplayList(detailState.list);
 
-        listContainer.innerHTML = displayList.map((obj, displayIdx) => {
+        window.ClientPerformance.cancel(listContainer);
+        listContainer.innerHTML = '';
+        const completed = await window.ClientPerformance.render(listContainer, displayList, (obj, displayIdx, fragment) => {
             const song = obj.item;
             const index = obj.originalIndex;
             const isSelected = window.selectedItems.has(String(song.id));
@@ -575,7 +597,7 @@ window.SongListManager = (function () {
 
             // --- Sort mode row ---
             if (sortMode) {
-                return `
+                const template = document.createElement('template'); template.innerHTML = `
                 <div class="sort-row grid grid-cols-12 gap-2 md:gap-4 px-3 py-2 rounded-xl hover:t-bg-panel group transition-colors items-center border border-transparent hover:border-violet-200 dark:hover:border-violet-800 bg-white/50 dark:bg-white/5 cursor-grab active:cursor-grabbing active:shadow-lg active:scale-[1.01] active:border-violet-400"
                      data-song-id="${String(song.id)}" data-sort-index="${index}">
                     <!-- Drag handle + position input -->
@@ -616,6 +638,7 @@ window.SongListManager = (function () {
                     <div class="col-span-4 sm:col-span-1 md:col-span-2 lg:col-span-3"></div>
                 </div>
                 `;
+                fragment.appendChild(template.content); return;
             }
 
             let rowClass = 'grid grid-cols-12 gap-2 md:gap-4 px-3 py-2.5 rounded-xl hover:t-bg-panel group transition-colors cursor-pointer items-center border border-transparent ';
@@ -624,7 +647,7 @@ window.SongListManager = (function () {
             else if (isMatched) rowClass += 'search-match ';
             if (isSelected) rowClass += 'row-selected ring-1 ring-emerald-500/30 ';
 
-            return `
+            const template = document.createElement('template'); template.innerHTML = `
             <div id="sl-row-${index}" class="${rowClass}" data-song-id="${String(song.id)}" 
                  onclick="window.SongListManager.handleRowClick(${index})">
                 <div class="col-span-1 sm:col-span-1 text-center text-gray-400 font-mono text-xs flex items-center justify-center">
@@ -694,7 +717,11 @@ window.SongListManager = (function () {
                     </button>
                 </div>
             </div>
-        `}).join('');
+        `; fragment.appendChild(template.content);
+        }, batch => {
+            Array.from(listContainer.children).slice(-batch.length).forEach(row => window.lazyLoadImages?.(row));
+        });
+        if (!completed) return;
 
         window.SongFileStatus?.update(listContainer, displayList.map(obj => obj.item));
 
@@ -705,10 +732,10 @@ window.SongListManager = (function () {
 
         // Trigger Lazy Load
         if (typeof window.lazyLoadImages === 'function') {
-            window.lazyLoadImages();
+            window.lazyLoadImages(listContainer);
         }
         if (typeof window.applyMarqueeChecks === 'function') {
-            window.applyMarqueeChecks();
+            window.applyMarqueeChecks(listContainer);
         }
     }
 
@@ -794,6 +821,8 @@ window.SongListManager = (function () {
             loadDetail(id, source);
         },
         closeDetail: function () {
+            ++detailRequest; detailController?.abort();
+            window.ClientPerformance?.cancel(document.getElementById('sl-detail-list'));
             const detailView = document.getElementById('songlist-detail-view');
             detailView.classList.add('translate-x-full');
             setTimeout(() => detailView.classList.add('hidden'), 300);
@@ -1119,6 +1148,7 @@ window.SongListManager = (function () {
                     body: JSON.stringify({ listId, orderedSongIds })
                 });
 
+                if (!window.ClientSync) {
                 let res = await send();
                 if (res.status === 401 && typeof ensureUserAuthToken === 'function') {
                     const refreshed = await ensureUserAuthToken({ force: true });
@@ -1129,16 +1159,26 @@ window.SongListManager = (function () {
                     const errText = await res.text();
                     throw new Error(errText || '保存失败');
                 }
+                }
 
                 // Apply new order to detailState.list
                 detailState.list = [...sortWorkList];
                 window.viewingPlaylist = detailState.list;
+                if (window.ClientSync && currentListData) {
+                    if (listId === 'love') currentListData.loveList = detailState.list;
+                    else if (listId === 'default') currentListData.defaultList = detailState.list;
+                    else {
+                        const target = currentListData.userList?.find(list => list.id === listId);
+                        if (target) target.list = detailState.list;
+                    }
+                    await pushDataChange();
+                }
 
                 if (window.showToast) window.showToast('success', '排序已保存');
 
                 // Reload sidebar counts
                 if (typeof renderMyLists === 'function' && typeof currentListData !== 'undefined' && currentListData) {
-                    const data = await window.SyncManager.sync().catch(() => null);
+                    const data = window.ClientSync ? currentListData : await window.SyncManager.sync().catch(() => null);
                     if (data) {
                         currentListData = data;
                         renderMyLists(data);

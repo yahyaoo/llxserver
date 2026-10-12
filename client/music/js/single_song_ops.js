@@ -207,7 +207,16 @@ async function deleteSingleSong(songId) {
         return;
     }
 
-    if (window.SyncManager.mode === 'local') {
+    if (window.ClientSync) {
+        try {
+            const list = getListById(activeListId);
+            if (!list) throw new Error('找不到当前列表');
+            setListById(activeListId, list.filter(item => String(item.id) !== String(songId)));
+            await pushDataChange();
+            renderMyLists(currentListData);
+            handleListClick(activeListId, true, true);
+        } catch (error) { showError('删除失败: ' + error.message); }
+    } else if (window.SyncManager.mode === 'local') {
         // Token authentication is sufficient; a saved plaintext password is not required.
         const authHeaders = getUserAuthHeaders();
         if (!authHeaders['x-user-token'] && !authHeaders['x-user-password']) {

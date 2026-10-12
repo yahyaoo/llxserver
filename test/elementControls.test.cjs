@@ -15,6 +15,12 @@ test('任意实色背景选取对比更高的黑白前景，浅色和深色极�
   assert.equal(api.accentForeground(16, 185, 129), '#000000')
   assert.equal(api.accentForeground(30, 41, 59), '#ffffff')
 })
+
+test('歌词字体原生下拉不转换，不隐藏或创建第二套控件', () => {
+  const source = { id: 'lyric-font-family-select', tagName: 'SELECT', type: 'select-one', dataset: {}, closest: () => null, hasAttribute: key => key === 'data-native-select' }
+  assert.doesNotThrow(() => bridge().upgrade(source))
+  assert.equal(source.dataset.elementSource, undefined)
+})
 test('悬停红色不把中性按钮识别为危险按钮，真正选中时仍保留红色', () => {
   const api = bridge()
   const make = className => {

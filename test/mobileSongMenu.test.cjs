@@ -14,7 +14,10 @@ function environment(mobile = true) {
         getAttribute(name) { return this.attributes[name]; }
         removeAttribute(name) { delete this.attributes[name]; }
         addEventListener(name, fn, capture) { this.events[name + (capture ? 'Capture' : '')] = fn; }
-        querySelector(selector) { return selector === '.song-row-more' ? this.children.find(n => n.className === 'song-row-more') : selector === '[data-library-more]' ? this.children.find(n => n.getAttribute('data-library-more') !== undefined) : this.children.find(n => n.tag === 'button'); }
+        querySelector(selector) {
+            if (selector.includes(',')) return selector.split(',').map(part => this.querySelector(part.trim())).find(Boolean);
+            return selector === '.song-row-more' ? this.children.find(n => n.className === 'song-row-more') : selector === '.song-maintenance-menu' ? this.children.find(n => n.className === 'song-maintenance-menu') : selector === '[data-library-more]' ? this.children.find(n => n.getAttribute('data-library-more') !== undefined) : this.children.find(n => n.tag === 'button');
+        }
         querySelectorAll(selector) { return this.children.filter(n => n.tag === 'button' && (!selector.includes(':scope') || (n.className !== 'song-row-more' && n.className !== 'song-love-btn'))); }
         getBoundingClientRect() { return { right: 380, bottom: 800 }; }
         contains(node) { return node === this || this.children.some(n => n.contains(node)); }

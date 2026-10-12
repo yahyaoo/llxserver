@@ -20,6 +20,8 @@
 .recent-song-info small { color: var(--text-muted); font-size: 12px; margin-top: 6px; }
 .recent-album { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--text-muted); font-size: 13px; }
 .recent-time { text-align: right; color: var(--text-muted); font-size: 12px; }
+.recent-mobile-count { display: none; }
+@media (max-width: 767px) { .recent-mobile-count { display: inline; } }
 .recent-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 320px; gap: 14px; color: var(--text-muted); }
 .recent-empty i { font-size: 42px; color: var(--c-400); }
 .recent-empty strong { font-size: 18px; }

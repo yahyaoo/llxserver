@@ -241,7 +241,7 @@ class DownloadManager {
             if (!this.serverQueuePending) {
                 this.tasks = this.tasks.filter(task => !task.serverManaged || remoteIds.has(task.serverQueueId || task.id));
             }
-            if (filesChanged) window.SongFileStatus?.refresh();
+            if (filesChanged) { window.SongFileStatus?.refresh(); window.SongFiles?.refresh(); }
             this.serverQueueLoaded = true;
             if (render) this.renderList();
             else updatedTasks.forEach(task => this.renderTask(task));
@@ -1571,7 +1571,7 @@ class DownloadManager {
         }
 
         const disliked = !!window.DislikeManager?.isDisliked?.(task.song);
-        return `<div id="dl-task-${task.id}" class="download-task-row song-row">
+        return `<div id="dl-task-${task.id}" class="download-task-row song-row" onclick="if (!event.target.closest('button, a, input, label, .song-row-actions')) window.SystemDownloadManager.playTask('${task.id}')">
             <div class="download-task-song"><button type="button" class="song-cover download-cover-button" onclick="window.SystemDownloadManager.playTask('${task.id}')" title="播放"><img src="${this.escapeHtml(coverSrc)}" alt="" loading="lazy"><span class="song-cover-play"><i class="fas fa-play"></i></span></button><div><strong>${this.escapeHtml(task.song.name)}</strong><small>${this.escapeHtml(task.song.singer)} · ${this.escapeHtml(sourceName || '')}</small><span class="song-metadata-row">${window.SongMetadata?.render(task.song) || ''}</span></div></div>
             <span class="download-task-destination">${isServerTask ? '服务器' : '此设备'}</span>
             <span class="download-task-quality">${this.escapeHtml(qualityLabel)}</span>
@@ -1584,7 +1584,20 @@ class DownloadManager {
     renderList() {
         if (!this.listContainer) return;
 
-        if (this.tasks.length === 0) {
+        // 已完成的同曲下载只显示一行；进行中的独立任务继续展示进度。作者：yahyaoo
+        const displayTasks = [];
+        const completed = new Map();
+        for (const task of this.tasks) {
+            if (!window.SongIdentity || !['finished', 'exists'].includes(task.status)) { displayTasks.push(task); continue; }
+            const key = window.SongIdentity.key(task.song);
+            if (!key) { displayTasks.push(task); continue; }
+            const index = completed.get(key);
+            if (index === undefined) { completed.set(key, displayTasks.length); displayTasks.push(task); }
+            else if (window.SongIdentity.compare({ ...task.song, quality: task.quality }, { ...displayTasks[index].song, quality: displayTasks[index].quality }) < 0) displayTasks[index] = task;
+        }
+        this.displayTasks = displayTasks;
+
+        if (displayTasks.length === 0) {
             this.renderedRange = { start: 0, end: 0 };
             this.listContainer.innerHTML = this.getStatusHtml('fa-inbox', '暂无下载任务');
             return;
@@ -1592,17 +1605,17 @@ class DownloadManager {
 
         const containerHeight = this.listContainer.clientHeight || 600;
         const visibleCount = Math.ceil(containerHeight / this.estimatedTaskHeight) + this.renderBuffer * 2;
-        const maxStart = Math.max(0, this.tasks.length - visibleCount);
+        const maxStart = Math.max(0, displayTasks.length - visibleCount);
         const start = Math.min(
             maxStart,
             Math.max(0, Math.floor(this.listContainer.scrollTop / this.estimatedTaskHeight) - this.renderBuffer)
         );
-        const end = Math.min(this.tasks.length, start + visibleCount);
+        const end = Math.min(displayTasks.length, start + visibleCount);
         this.renderedRange = { start, end };
 
         const topSpacer = start * this.estimatedTaskHeight;
-        const bottomSpacer = Math.max(0, (this.tasks.length - end) * this.estimatedTaskHeight);
-        const visibleTasks = this.tasks.slice(start, end);
+        const bottomSpacer = Math.max(0, (displayTasks.length - end) * this.estimatedTaskHeight);
+        const visibleTasks = displayTasks.slice(start, end);
 
         this.listContainer.innerHTML = `
             <div style="height: ${topSpacer}px;"></div>
@@ -1637,6 +1650,7 @@ class DownloadManager {
     // Update specific task in DOM to avoid full re-render
     renderTask(task) {
         if (!this.listContainer) return;
+        if (window.SongIdentity && ['finished', 'exists'].includes(task.status)) { this.renderList(); return; }
         const taskEl = document.getElementById(`dl-task-${task.id}`);
         if (!taskEl) {
             const taskIndex = this.tasks.findIndex(t => t.id === task.id);

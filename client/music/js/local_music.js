@@ -550,6 +550,17 @@ window.LocalMusicManager = {
         return this.getSelectedEntries().map(item => item.filename);
     },
 
+    /** 点击歌曲行的非操作区域：批量模式切换选中，否则播放，与歌单页面保持一致。 */
+    handleRowClick(event, container) {
+        const row = event.target.closest('[data-lm-row-index]');
+        if (!row || !container.contains(row) || event.target.closest('button, a, input, label, select, textarea, [onclick], .song-row-actions')) return;
+        const index = parseInt(row.dataset.lmRowIndex || '', 10);
+        const item = this.displayData[index];
+        if (!item) return;
+        if (this.batchMode) this.toggleSelect(index, !this.selectedItems.has(this.getItemKey(item)));
+        else this.playItem(index);
+    },
+
     bindListEvents() {
         if (this.listEventsBound) return;
         const container = document.getElementById('lm-list-container');
@@ -558,7 +569,10 @@ window.LocalMusicManager = {
         container.addEventListener('click', (event) => {
             if (this.isCustomDirMode) return;
             const target = event.target.closest('[data-lm-action]');
-            if (!target || !container.contains(target)) return;
+            if (!target || !container.contains(target)) {
+                this.handleRowClick(event, container);
+                return;
+            }
             const index = parseInt(target.dataset.lmIndex || '', 10);
             switch (target.dataset.lmAction) {
                 case 'play':
@@ -1050,7 +1064,7 @@ window.LocalMusicManager = {
             if (result.success) {
                 this.authExpired = false;
                 this.authExpiredNotified = false;
-                this.originalData = result.data || [];
+                this.originalData = this.isViewingPublicSongs ? window.SongIdentity?.aggregate(result.data || []) || result.data || [] : window.SongFiles?.setLibrary(result.data || []) || result.data || [];
                 // Sort by mtime initially descending
                 this.originalData.sort((a, b) => (b.mtime || 0) - (a.mtime || 0));
                 this.applyFilters();
@@ -1066,7 +1080,9 @@ window.LocalMusicManager = {
                 throw new Error(result.message || 'Failed to fetch local music');
             }
         } catch (err) {
-            if (typeof showError === 'function') showError('拉取本地列表失败');
+            if (!silent) window.LoadingState.showFailure(document.getElementById('lm-list-container'), {
+                title: '音乐库暂时无法加载', variant: 'page', retry: () => this.fetchData(),
+            });
             console.error('LocalMusic Fetch Error:', err);
         }
     },
@@ -1498,7 +1514,6 @@ window.LocalMusicManager = {
                             <i class="fas fa-link text-[10px]"></i>
                         </button>
                     ` : ''}
-                    <button data-lm-action="playlist" data-lm-index="${index}" class="song-collect-btn" title="收藏到歌单"><i class="far fa-bookmark"></i></button>
                     <button data-library-more="${index}" type="button" title="更多"><i class="fas fa-ellipsis-h"></i></button>
                 </div>
             </div>
@@ -1764,8 +1779,8 @@ window.LocalMusicManager = {
         const custom = item.folder === 'custom';
         const query = '?user=' + encodeURIComponent(username) + (token ? '&token=' + encodeURIComponent(token) : '');
         const url = item.serverDownloadId ? '/api/music/server-download/file/' + encodeURIComponent(item.serverDownloadId) + query.replace('?user=', '?username=') : custom ? '/api/music/custom/file' + query + '&filename=' + encodeURIComponent(item.filename)
-            : '/api/music/cache/file/' + encodeURIComponent(username) + '/' + encodeURIComponent(item.filename) + query + '&folder=' + item.folder;
-        return { ...item.songInfo, id: item.songInfo?.id || (item.source && item.songmid ? item.source + '_' + item.songmid : item.id), quality: item.quality, type: item.quality, types: { [item.quality]: {} }, hasCover: item.hasCover, coverType: item.coverType,
+            : '/api/music/cache/file/' + encodeURIComponent(username) + '/' + encodeURIComponent(item.filename) + query + '&folder=' + item.folder + (item.location ? '&location=' + encodeURIComponent(item.location) : '');
+        return { ...item.songInfo, files: item.files, location: item.location, libraryKey: item.libraryKey, id: item.songInfo?.id || (item.source && item.songmid ? item.source + '_' + item.songmid : item.id), quality: item.quality, type: item.quality, types: { [item.quality]: {} }, hasCover: item.hasCover, coverType: item.coverType,
             bitrate: item.bitrate, bitDepth: item.bitDepth, sampleRate: item.sampleRate, url,
             pic: item.hasCover === false ? '/music/assets/logo.svg' : item.serverDownloadId ? item.songInfo?.img || '/music/assets/logo.svg' : '/api/music/' + (custom ? 'custom' : 'cache') + '/cover' + query + '&filename=' + encodeURIComponent(item.filename),
             isLocal: true, isCustomFile: custom, customFilename: custom ? item.filename : undefined,
@@ -2339,7 +2354,7 @@ window.LocalMusicManager = {
         } catch (e) {
             console.error('[ManualIndex] Search failed:', e);
             if (page === 1 && container) {
-                container.innerHTML = `<div class="text-center py-20 text-red-500 font-bold">搜索失败: ${e.message}</div>`;
+                window.LoadingState.showFailure(container, { title: '搜索暂时不可用', retry: () => this.doManualSearch(page) });
             }
         } finally {
             this.isManualSearching = false;

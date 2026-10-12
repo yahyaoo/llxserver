@@ -39,6 +39,8 @@ test('生成载荷同步版本，排除开发机配置并清理旧产物', () =>
     fs.writeFileSync(path.join(root, 'deploy/node/start.cjs'), 'launcher');
     fs.writeFileSync(path.join(root, 'dist/server/index.js'), 'compiled-current-source');
     fs.writeFileSync(path.join(root, 'dist/client/index.html'), 'current-public');
+    fs.mkdirSync(path.join(root, 'dist/client/music/js'), { recursive: true });
+    fs.writeFileSync(path.join(root, 'dist/client/music/js/song_identity.js'), 'current-shared-identity');
     fs.writeFileSync(path.join(root, 'config.js'), 'private-runtime-secret');
     fs.writeFileSync(path.join(pack, 'app/server/stale.js'), 'stale');
     const payload = preparePayload(root, pack);
@@ -49,6 +51,13 @@ test('生成载荷同步版本，排除开发机配置并清理旧产物', () =>
     assert.equal(JSON.parse(fs.readFileSync(path.join(payload, 'package.json'))).version, pkg.version);
     assert.match(fs.readFileSync(path.join(pack, 'manifest'), 'utf8'), /version\s*=\s*2.1.3/);
     const lock = JSON.parse(fs.readFileSync(path.join(root, 'package-lock.json')));
+    // 独立服务端只携带必需的共享脚本，不带播放器首页。作者：jingyh
+    const serverPack = path.join(root, 'deploy/fnos/llxserver.server');
+    fs.mkdirSync(serverPack, { recursive: true });
+    fs.writeFileSync(path.join(serverPack, 'manifest'), 'version = old\n');
+    const serverPayload = preparePayload(root, serverPack, 'server');
+    assert.equal(fs.readFileSync(path.join(serverPayload, 'client/music/js/song_identity.js'), 'utf8'), 'current-shared-identity');
+    assert.equal(fs.existsSync(path.join(serverPayload, 'client/index.html')), false);
     lock.version = 'other';
     fs.writeFileSync(path.join(root, 'package-lock.json'), JSON.stringify(lock));
     assert.throws(() => preparePayload(root, pack), /锁文件版本不一致/);

@@ -1192,7 +1192,8 @@ export const getCacheList = async (username?: string) => {
     const musicItems = indexManager.getAll(normalizedUsername, 'music').map(item => ({ ...item, location: currentCacheLocation }))
     const other = currentCacheLocation === CACHE_ROOTS.DATA ? CACHE_ROOTS.ROOT : CACHE_ROOTS.DATA
     const extra = [...indexManager.getAll(normalizedUsername, 'cache', other), ...indexManager.getAll(normalizedUsername, 'music', other)].map(item => ({ ...item, location: other }))
-    const items = [...cacheItems, ...musicItems, ...extra.filter(item => ![...cacheItems, ...musicItems].some(existing => existing.id === item.id && existing.quality === item.quality && existing.folder === item.folder))]
+    // 不同存储位置都是可管理的副本；歌曲聚合由公共目录服务统一处理。作者：yahyaoo
+    const items = [...cacheItems, ...musicItems, ...extra]
 
     return items.map(item => ({
         ...item,
@@ -1560,16 +1561,18 @@ const setIndexCoverState = (filename: string, username: string, coverType: Cache
  * 读取缓存歌曲封面，优先使用已提取封面，必要时从音频元信息提取。
  * @param filename 文件或文档定位路径。
  * @param username 已解析的用户名称。
+ * @param options 指定副本的目录和位置；省略时兼容旧请求的自动查找。
  * @author yahyaoo
  */
-export const getCacheCover = async (filename: string, username?: string) => {
+export const getCacheCover = async (filename: string, username?: string, options: { folder?: string; location?: string } = {}) => {
     const normalizedUsername = (username && username !== '_open' && username !== 'default') ? username : '_open'
 
-    const locations = [
+    if (options.location && ![currentCacheLocation, CACHE_ROOTS.DATA, CACHE_ROOTS.ROOT].includes(options.location)) return null
+    const locations = options.location ? [options.location] : [
         currentCacheLocation,
         currentCacheLocation === CACHE_ROOTS.DATA ? CACHE_ROOTS.ROOT : CACHE_ROOTS.DATA
     ]
-    const roots: Array<'cache' | 'music'> = ['cache', 'music']
+    const roots: Array<'cache' | 'music'> = options.folder === 'cache' || options.folder === 'music' ? [options.folder] : ['cache', 'music']
 
     for (const loc of locations) {
         for (const folder of roots) {
@@ -1577,10 +1580,12 @@ export const getCacheCover = async (filename: string, username?: string) => {
             const filePath = resolveCacheRelativePath(dir, filename) // [Fix] Allow subfolders safely
 
             if (filePath && storageFs.existsSync(filePath)) {
+                // 显式副本使用位置独立的封面缓存，同名同时间文件不能串用图片。作者：yahyaoo
+                const coverKey = options.folder || options.location ? `${loc}/${folder}/${filename}` : filename
                 let stats: Stats | undefined
                 try {
                     stats = storageFs.statSync(filePath)
-                    const cachedCover = readCoverCache(filename, normalizedUsername, stats)
+                    const cachedCover = readCoverCache(coverKey, normalizedUsername, stats)
                     if (cachedCover) {
                           const indexed = indexManager.getAll(normalizedUsername, folder, loc).find(item => item.filename === filename)
                           setIndexCoverState(filename, normalizedUsername, indexed?.coverType === 'embedded' ? 'embedded' : 'cached', stats, loc)
@@ -1599,7 +1604,7 @@ export const getCacheCover = async (filename: string, username?: string) => {
                     if (pic) {
                         const mime = pic.mimeType || 'image/jpeg'
                         const data = Buffer.from(pic.data)
-                        writeCoverCache(filename, normalizedUsername, data, mime, stats)
+                        writeCoverCache(coverKey, normalizedUsername, data, mime, stats)
                         setIndexCoverState(filename, normalizedUsername, 'embedded', stats, loc)
                         return { data, mime: detectImageMime(data) || mime }
                     }
@@ -1613,7 +1618,7 @@ export const getCacheCover = async (filename: string, username?: string) => {
                     .find(candidate => candidate.filename === filename)
                 if (item && hasUsableRemoteCover(item.img)) {
                     const remoteCover = await downloadCoverImage(item.img!)
-                    if (remoteCover && writeCoverCache(filename, normalizedUsername, remoteCover.data, remoteCover.mime, stats)) {
+                    if (remoteCover && writeCoverCache(coverKey, normalizedUsername, remoteCover.data, remoteCover.mime, stats)) {
                         setIndexCoverState(filename, normalizedUsername, 'cached', stats, loc)
                         return remoteCover
                     }
@@ -2905,11 +2910,17 @@ export const setIndexEmbedLyric = (
  * @author yahyaoo
  */
 export const serveCacheFile = (req: http.IncomingMessage, res: http.ServerResponse, filename: string, username?: string) => {
-    const locations = [
+    const query = new URL(req.url || '/', 'http://localhost').searchParams
+    const requestedLocation = query.get('location')
+    if (requestedLocation && ![currentCacheLocation, CACHE_ROOTS.DATA, CACHE_ROOTS.ROOT].includes(requestedLocation)) {
+        res.writeHead(400); res.end('Invalid cache location'); return
+    }
+    // 显式选择副本时不回退到另一个位置的同名文件，旧链接仍兼容自动查找。
+    const locations = requestedLocation ? [requestedLocation] : [
         currentCacheLocation,
         currentCacheLocation === CACHE_ROOTS.DATA ? CACHE_ROOTS.ROOT : CACHE_ROOTS.DATA
     ]
-    const requestedFolder = new URL(req.url || '/', 'http://localhost').searchParams.get('folder')
+    const requestedFolder = query.get('folder')
     const roots = requestedFolder === 'cache' || requestedFolder === 'music' ? [requestedFolder] : ['cache', 'music']
     let filePath = ''
     const normalizedUsername = (username && username !== '_open' && username !== 'default') ? username : '_open'

@@ -1,6 +1,7 @@
 import type { RequestContext, ServerRuntime } from '../../common/http/RequestContext'
 import { getLibraryItems } from './download/ServerDownloadService'
 import { validatePlaylistCover } from './playlist/cover'
+import { aggregateLibrary } from './library/LibraryAggregationService'
 /** 用户歌单、历史快照、缓存列表和平台歌单查询所需的应用依赖契约。 @author yahyaoo */
 export type PlaylistServiceRuntime = Pick<ServerRuntime, 'verifyUserAuth' | 'getUserSpace' | 'getUserDirname' | 'path' | 'storageFs' | 'readBody' | 'getUserConfig' | 'startupLog' | 'fileCache' | 'customMusicManager' | 'musicSdk' | 'normalizeSongInfo'>
 /** 用户歌单、历史快照、缓存列表和平台歌单查询服务。 @author yahyaoo */
@@ -758,7 +759,7 @@ export async function getMusicCacheList(context: RequestContext, runtime: Playli
           username = verified
         }
         void Promise.all([fileCache.getCacheList(username), username === '_open' ? Promise.resolve([]) : runtime.customMusicManager.getCustomMusicList(username)]).then(([cached, custom]) => {
-          const list = [...cached, ...custom, ...getLibraryItems(username)]
+          const list = aggregateLibrary(username, [...cached, ...custom, ...getLibraryItems(username)])
           res.writeHead(200, {
             'Content-Type': 'application/json',
             'Cache-Control': 'no-cache, no-store, must-revalidate',

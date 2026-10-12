@@ -35,10 +35,10 @@ test('歌单导入追加入库、BOM 文件、账号隔离、非法文件回滚�
     const first = await post(route, exported, alice)
     assert.equal(first.status, 200, await first.clone().text())
     const result = await first.json()
-    assert.equal(result.playlists, 1); assert.equal(result.songs, 2)
+    assert.equal(result.playlists, 1); assert.equal(result.songs, 1)
     assert.equal(result.username, 'alice')
     assert.deepEqual(result.lists.userList[0], aliceInitial[0])
-    assert.deepEqual(result.lists.userList[1].list, [song, song])
+    assert.deepEqual(result.lists.userList[1].list, [song])
     assert.notEqual(result.lists.userList[1].id, playlist.id)
 
     const form = new FormData()
@@ -78,7 +78,7 @@ test('歌单导入追加入库、BOM 文件、账号隔离、非法文件回滚�
     const publicData = await (await fetch(runtime.origin + '/api/data?user=_open', { headers: runtime.admin })).json()
     assert.equal(publicData.userList.length, 2)
     assert.equal(publicData.userList[0].name, '默认列表')
-    assert.deepEqual(publicData.userList[1].list, [song, song])
+    assert.deepEqual(publicData.userList[1].list, [song])
     assert.equal((await fetch(runtime.origin + '/music/views/main-navigation/PlaylistActions.js')).status, 200)
   } finally { await runtime.stop() }
 })

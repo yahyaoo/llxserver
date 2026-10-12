@@ -1,11 +1,17 @@
 /** 最近播放与本地歌手、专辑详情列表组件。 @author yahyaoo @date 2026-10-10 */
 (() => {
-    let entries = [], originalEntries = [], count = 100, recent = true, version = 0;
+    let entries = [], originalEntries = [], count = 100, recent = true, version = 0, loadState = 'ready';
     let query = '', searchOpen = false, batch = false, sortByName = false;
     const selected = new Set();
     window.RecentView = {
         getEntries() { return entries.slice(); },
+        refreshFiles() {
+            originalEntries = window.SongFiles?.enrich(originalEntries) || originalEntries;
+            entries = sortByName ? originalEntries.slice().sort((a, b) => a.name.localeCompare(b.name)) : recent ? window.PlayStatistics.sortByPlayCount(originalEntries) : originalEntries.slice();
+            this.render();
+        },
         async load() {
+            loadState = 'loading';
             const host = document.getElementById('recent-list'); host.innerHTML = window.LoadingState.render('正在加载最近播放…', 'page');
             const requestVersion = ++version;
             const owner = window.MusicExperience.account;
@@ -15,11 +21,18 @@
                 const data = await response.json();
                 if (owner !== window.MusicExperience.account || requestVersion !== version) return;
                 this.show('最近播放', data.items, true, data.limit);
-            } catch (error) { if (owner === window.MusicExperience.account && requestVersion === version) host.textContent = error.message; }
+            } catch (error) {
+                if (owner !== window.MusicExperience.account || requestVersion !== version) return;
+                loadState = 'error';
+                console.warn('[Recent] 加载失败:', error);
+                window.LoadingState.showFailure(host, { title: '最近播放暂时无法加载', variant: 'page', retry: () => this.load() });
+            }
         },
         show(title, items, isRecent = false, limit) {
             ++version;
+            loadState = 'ready';
             query = ''; searchOpen = batch = sortByName = false; selected.clear();
+            items = window.SongFiles?.enrich(items) || items;
             originalEntries = items.slice();
             entries = isRecent ? window.PlayStatistics.sortByPlayCount(items) : items.slice(); count = 100; recent = isRecent;
             document.getElementById('recent-title').textContent = title;
@@ -28,6 +41,8 @@
             this.render();
         },
         render() {
+            // 窗口缩放及文件状态更新不能覆盖加载占位或失败后的重试入口。
+            if (loadState !== 'ready') return;
             const host = document.getElementById('recent-list'); host.replaceChildren();
             const header = document.createElement('div'); header.className = 'recent-table-header';
             header.innerHTML = `<div class="recent-header-controls"><button type="button" title="歌曲排序" aria-label="歌曲排序" aria-pressed="${sortByName}" onclick="RecentView.toggleSort()"><i class="fas fa-sort-amount-down"></i></button><button type="button" title="批量操作" aria-label="批量操作" aria-pressed="${batch}" onclick="RecentView.toggleBatch()"><i class="fas fa-tasks"></i></button><button type="button" title="内搜索 (/)" aria-label="列表内搜索" aria-expanded="${searchOpen}" onclick="RecentView.toggleSearch()"><i class="fas fa-search"></i></button></div>` + `<span>歌曲 / 歌手</span><span class="recent-album">${recent ? '播放次数 ↓' : '专辑'}</span><span class="recent-time">${recent ? '最近播放时间' : '音质'}</span>`;
@@ -67,10 +82,14 @@
                 const singer = document.createElement('small'); singer.textContent = song.singer || '未知歌手'; info.append(name, singer);
                 const specs = document.createElement('span'); specs.className = 'recent-song-specs'; specs.innerHTML = window.SongMetadata?.render(song) || ''; info.append(specs);
                 const album = document.createElement('span'); album.className = recent ? 'recent-album recent-play-count' : 'recent-album'; album.textContent = recent ? `${window.PlayStatistics.playCount(song)} 次` : song.albumName || song.album || '—';
-                const date = document.createElement('time'); date.className = 'recent-time'; date.textContent = recent ? new Date(song.playedAt).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : song.quality || '';
+                const date = document.createElement('time'); date.className = 'recent-time';
+                const dateText = recent ? new Date(song.playedAt).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : song.quality || '';
+                const summary = document.createElement('span'); summary.className = 'recent-mobile-count'; summary.textContent = recent ? `${window.PlayStatistics.playCount(song)} 次播放 · ` : '';
+                date.append(summary, document.createTextNode(dateText));
                 const more = document.createElement('button'); more.type = 'button'; more.className = 'recent-maintenance-more'; more.title = '更多'; more.innerHTML = '<i class="fas fa-ellipsis-h"></i>';
-                more.onclick = event => { event.stopPropagation(); window.MusicMaintenance.menu(more, window.MusicMaintenance.maintenanceEntries([song])); };
-                row.append(number, cover, info, album, date, more); row.onclick = () => batch ? this.select(index) : this.play(index); host.append(row);
+                more.onclick = event => { event.stopPropagation(); window.MusicMaintenance.menu(more, [window.SongFiles?.menuEntry(more, song), ...window.MusicMaintenance.maintenanceEntries([song])].filter(Boolean)); };
+                const actions = document.createElement('span'); actions.className = 'recent-song-actions'; actions.innerHTML = window.SongActions?.renderLoveButton(song) || ''; actions.append(more);
+                row.append(number, cover, info, album, date, actions); row.onclick = () => batch ? this.select(index) : this.play(index); host.append(row);
             });
             window.SongFileStatus?.update(host, display.slice(0, count).map(item => item.song), '.recent-song-info strong');
             if (display.length > count) { const more = document.createElement('button'); more.className = 'recent-more'; more.textContent = `加载更多（剩余 ${display.length - count} 首）`; more.onclick = () => { count += 100; this.render(); }; host.append(more); }

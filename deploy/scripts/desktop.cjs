@@ -34,6 +34,8 @@ async function buildDesktop(mode, args) {
     if (mode !== 'client') {
       fs.cpSync(source, backend, { recursive: true, filter: filename => !filename.startsWith(path.join(source, 'client')) && !filename.startsWith(path.join(source, 'node_modules')) });
       if (fs.existsSync(path.join(source, 'client/music/bin'))) fs.cpSync(path.join(source, 'client/music/bin'), path.join(backend, 'client/music/bin'), { recursive: true });
+      // 后端过滤界面资源后仍需保留歌曲标识规则，避免独立 Node 启动失败。作者：jingyh
+      fs.cpSync(path.join(source, 'client/music/js/song_identity.js'), path.join(backend, 'client/music/js/song_identity.js'));
       fs.mkdirSync(path.join(backend, 'deploy/desktop'), { recursive: true });
       fs.copyFileSync(path.join(root, 'deploy/desktop/backend.cjs'), path.join(backend, 'deploy/desktop/backend.cjs'));
       const runtime = await prepareNodeRuntime(root, platform, arch);

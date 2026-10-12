@@ -66,6 +66,7 @@ window.viewingPlaylist = []; // Currently displayed list in UI
 let currentPlayingScope = 'network'; // Scope for active playback
 window.currentSearchScope = 'network'; // 'network', 'local_list', 'local_all' - Scope for UI view
 let currentPlayingSong = null; // Track currently playing song independently of view
+let currentPlaybackOwner = null;
 window.batchCollectSongs = null; // Store songs for batch collection modal
 window.playlistAddTargetSong = null; // Explicit single-song target from any song list
 const audio = document.getElementById('audio-player');
@@ -727,8 +728,10 @@ window.syncServerNetworkListUpdates = syncServerNetworkListUpdates;
 // Initial Sync for Server Cache Config
 setTimeout(() => {
     if (settings.serverCacheLocation && window.updateServerCacheConfig) {
-        console.log('[ServerCache] Syncing config:', settings.serverCacheLocation, settings.serverCacheNamingPattern);
-        window.updateServerCacheConfig(settings.serverCacheLocation, settings.serverCacheNamingPattern);
+        if (window.ClientSync) {
+            window.ClientSync.seed('cache-config', { location: settings.serverCacheLocation, namingPattern: settings.serverCacheNamingPattern || 'simple' });
+            serverCacheConfigInitialized = true;
+        } else window.updateServerCacheConfig(settings.serverCacheLocation, settings.serverCacheNamingPattern);
     }
 }, 2000);
 
@@ -822,6 +825,12 @@ async function fetchPublicListData() {
             const listData = await res.json();
             if (listData) {
                 listData.username = '_open';
+                if (window.ClientSync) {
+                    const pending = await window.ClientSync.read('lists-public');
+                    if (pending?.username === '_open') Object.assign(listData, pending);
+                    await window.SongActions?.restorePending?.(listData);
+                    window.ClientSync.seed('lists-public', listData);
+                }
                 // 将公共列表保存为 window.publicListData，切换展示用
                 window.publicListData = listData;
                 currentListData = listData;
@@ -864,6 +873,8 @@ async function reloadUserFavorites() {
         }
 
         // 2. 再从服务器拉最新数据
+        if (window.ClientSync?.has('lists') && window.myPersonalListData) return;
+        const ownerAtStart = window.ClientSync?.owner();
         const headers = typeof getUserAuthHeaders === 'function' ? getUserAuthHeaders() : {};
         delete headers['x-user-name'];
         const syncUser = localStorage.getItem('lx_sync_user');
@@ -877,11 +888,15 @@ async function reloadUserFavorites() {
         if (res.ok) {
             const listData = await res.json();
             if (listData) {
+                if (window.ClientSync && (window.ClientSync.has('lists') || ownerAtStart !== window.ClientSync.owner())) return;
+                await window.SongActions?.restorePending?.(listData);
+                listData.username = syncUser;
+                window.ClientSync?.seed('lists', listData);
                 currentListData = listData;
                 window.currentListData = listData;
                 window.myPersonalListData = listData;
                 renderMyLists(listData);
-                await window.ListStore.set(listData).catch(e => console.error('[IDBStore] 保存失败:', e));
+                await window.ListStore.cache(listData).catch(e => console.error('[IDBStore] 保存失败:', e));
                 if (typeof loadLibraryData === 'function') {
                     await loadLibraryData();
                 }
@@ -1424,6 +1439,10 @@ function changeQualityPreference(quality) {
 
 // Tab Switching
 function switchTab(tabId, loadRecent = true) {
+    const searchContainer = document.getElementById('search-results');
+    const detailContainer = document.getElementById('sl-detail-list');
+    if (searchContainer) window.ClientPerformance?.cancel(searchContainer);
+    if (detailContainer) window.ClientPerformance?.cancel(detailContainer);
     const songSearchView = document.getElementById('view-search');
     if (songSearchView) songSearchView.dataset.favoritesView = 'false';
     if (tabId === 'downloads') { window.SystemDownloadManager?.renderList(); window.SystemDownloadManager?.syncServerQueue(true); }
@@ -1721,10 +1740,22 @@ function scrollToCurrentSongInQueue(flash = true) {
 window.scrollToCurrentSongInQueue = scrollToCurrentSongInQueue;
 
 
-function renderQueue() {
+async function renderQueue() {
     const listContainer = document.getElementById('queue-list');
     const countEl = document.getElementById('queue-count');
     if (!listContainer) return;
+    const renderId = (window._queueRenderId || 0) + 1; window._queueRenderId = renderId;
+    window.ClientPerformance?.cancel(listContainer);
+    await window.ClientPerformance?.yieldTask();
+    if (window._queueRenderId !== renderId) return;
+
+    // 旧队列也按统一身份恢复，当前歌曲的位置随聚合结果调整。作者：yahyaoo
+    if (currentPlaylist?.length && window.SongIdentity) {
+        const target = window.SongIdentity.key(currentPlaylist[currentIndex]);
+        currentPlaylist = (window.SongFiles ? window.SongFiles.enrich(currentPlaylist) : window.SongIdentity.aggregate(currentPlaylist)).map(song => window.MusicExperience.playable(song));
+        const index = target ? currentPlaylist.findIndex(song => window.SongIdentity.key(song) === target) : -1;
+        currentIndex = index >= 0 ? index : Math.min(Math.max(currentIndex, 0), currentPlaylist.length - 1);
+    }
 
     if (!currentPlaylist || currentPlaylist.length === 0) {
         listContainer.innerHTML = `
@@ -1739,21 +1770,21 @@ function renderQueue() {
 
     if (countEl) countEl.innerText = `${currentPlaylist.length} SONGS`;
 
-    listContainer.innerHTML = currentPlaylist.map((song, index) => {
+    listContainer.innerHTML = '';
+    const completed = await window.ClientPerformance.render(listContainer, currentPlaylist, (song, index, fragment) => {
         const isActive = index === currentIndex;
-        return `
-              <div class="group flex items-center gap-3 p-3 rounded-xl transition-all hover:t-bg-item-hover cursor-pointer relative ${isActive ? 'queue-track-active t-bg-item-hover border-l-4 border-emerald-500 pl-2' : ''}"
+        const template = document.createElement('template'); template.innerHTML = `
+              <div class="queue-song-row group flex items-center gap-3 p-3 rounded-xl transition-all hover:t-bg-item-hover cursor-pointer relative ${isActive ? 'queue-track-active t-bg-item-hover border-l-4 border-emerald-500 pl-2' : ''}"
                  onclick="playSongFromQueue(${index})">
                 
-                <div class="song-cover w-10 h-10 rounded-lg overflow-hidden flex-shrink-0 relative">
-                    <img src="${getImgUrl(song)}" 
-                         onerror="this.src='/music/assets/logo.svg'" 
+                <div class="song-cover queue-song-cover w-10 h-10 rounded-lg overflow-hidden flex-shrink-0 relative">
+                    <img src="/music/assets/logo.svg"
                          loading="lazy" fetchpriority="low"
                          class="w-full h-full object-cover">
                     ${isActive ? '<div class="absolute inset-0 bg-emerald-500/20 flex items-center justify-center"><div class="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-ping"></div></div>' : ''}<span class="song-cover-play"><i class="fas fa-play"></i></span>
                 </div>
                 
-                <div class="flex-1 min-w-0">
+                <div class="queue-song-info flex-1 min-w-0">
                     ${createMarqueeHtml(song.name, 'text-sm font-bold ' + (isActive ? 'text-emerald-500' : 't-text-main'))}
                     <div class="song-metadata-row flex items-center gap-1 mt-0.5">
                         ${getSourceTag(song.source)}
@@ -1762,7 +1793,8 @@ function renderQueue() {
                     </div>
                 </div>
 
-                <div class="flex items-center gap-1 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
+                <div class="queue-song-actions flex items-center gap-1 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button onclick="event.stopPropagation(); window.SongFiles?.open(this, currentPlaylist[${index}])" class="p-2 t-text-muted rounded-lg" title="音质与文件"><i class="fas fa-layer-group text-xs"></i></button>
                     <button data-player-add-to-playlist onclick="event.stopPropagation(); openPlaylistAddModalForSongObject(currentPlaylist[${index}])" class="p-2 text-emerald-500 hover:bg-emerald-50 rounded-lg transition-colors" title="添加到歌单">
                         <i class="fas fa-plus text-xs"></i>
                     </button>
@@ -1775,9 +1807,12 @@ function renderQueue() {
                 </div>
             </div>
         `;
-    }).join('');
+        fragment.appendChild(template.content);
+    });
+    if (!completed) return;
 
     // Initialize/Update Sortable (Supports Mobile Touch)
+    listContainer.querySelectorAll('.queue-song-cover img').forEach((image, index) => window.LibraryArtwork.bind(image, currentPlaylist[index]));
     if (typeof Sortable !== 'undefined' && listContainer) {
         try {
             const oldSortable = Sortable.get(listContainer);
@@ -1832,7 +1867,7 @@ function renderQueue() {
     }
 
     // Apply dynamic marquee checks for the queue list
-    applyMarqueeChecks();
+    applyMarqueeChecks(listContainer);
 }
 
 function playSongFromQueue(index) {
@@ -2137,7 +2172,7 @@ async function doSearch(page = 1, append = false, prefetch = false) {
                 showError(`搜索追加出错: ${e.message}`);
             }
         } else {
-            resultsContainer.innerHTML = `<div class="text-center text-red-500 p-8">搜索出错: ${e.message}</div>`;
+            window.LoadingState.showFailure(resultsContainer, { title: '搜索暂时不可用', variant: 'page', retry: () => doSearch(page) });
         }
     }
 }
@@ -4295,6 +4330,7 @@ async function saveGlobalSortOrder() {
 
     try {
         const orderedSongIds = window.glSortWorkList.map(s => String(s.id || s.songmid || s.songId || s.hash));
+        if (!window.ClientSync) {
         const res = await fetch('/api/music/user/list/reorder', {
             method: 'POST',
             headers: {
@@ -4311,6 +4347,7 @@ async function saveGlobalSortOrder() {
             const errText = await res.text();
             throw new Error(errText || '保存失败');
         }
+        }
 
         if (currentListData) {
             if (listId === 'default') {
@@ -4322,6 +4359,7 @@ async function saveGlobalSortOrder() {
                 if (target) target.list = window.glSortWorkList;
             }
         }
+        if (window.ClientSync) await pushDataChange();
 
         showSuccess('歌单排序已成功保存');
         toggleGlobalSortMode(false);
@@ -4338,8 +4376,16 @@ async function saveGlobalSortOrder() {
 window.saveGlobalSortOrder = saveGlobalSortOrder;
 
 // List search logic is now handled by ListSearch service in list_search.js
-function renderResults(list) {
+async function renderResults(list) {
     const container = document.getElementById('search-results');
+    const renderId = (window._resultsRenderId || 0) + 1; window._resultsRenderId = renderId;
+    window.ClientPerformance?.cancel(container);
+    window.unobserveLazyImages?.(container);
+    container.innerHTML = window.LoadingState?.render('正在加载歌曲…', 'page') || '';
+    await window.ClientPerformance?.yieldTask();
+    if (window._resultsRenderId !== renderId || document.getElementById('view-search')?.classList.contains('hidden')) return;
+    // 在线页保留平台结果，本地收藏和歌单使用统一歌曲及文件聚合。作者：yahyaoo
+    if (document.getElementById('view-search')?.dataset.onlineSearch === 'false') list = window.SongFiles?.enrich(list || []) || list;
     const header = document.getElementById('search-results-header');
     if (header) header.classList.remove('hidden');
     // 专辑歌曲列表渲染时也需要隐藏 album-detail-header（由 enterAlbum 单独管理显示）
@@ -4353,6 +4399,7 @@ function renderResults(list) {
         header.classList.remove('hidden');
     }
 
+    window.ClientPerformance?.cancel(container);
     container.innerHTML = '';
 
     if (list && list.length > 0) {
@@ -4394,7 +4441,7 @@ function renderResults(list) {
         pageList = indexedDisplayList.slice(startIndex, endIndex);
     }
 
-    pageList.forEach((obj, pageIndex) => {
+    const completed = await window.ClientPerformance.render(container, pageList, (obj, pageIndex, fragment) => {
         const { item, originalIndex: actualIndexInOriginal } = obj;
         const row = document.createElement('div');
         row.id = `gl-row-${actualIndexInOriginal}`;
@@ -4539,8 +4586,12 @@ function renderResults(list) {
         }
 
         window.LibraryArtwork.bind(row.querySelector('.song-cover img'), item);
-        container.appendChild(row);
+        fragment.appendChild(row);
+    }, batch => {
+        const rows = Array.from(container.children).slice(-batch.length);
+        rows.forEach(row => lazyLoadImages(row));
     });
+    if (!completed) return;
 
     window.SongFileStatus?.update(container, pageList.map(obj => obj.item));
 
@@ -5838,13 +5889,29 @@ async function selectServerCacheLocation(value) {
 window.selectServerCacheLocation = selectServerCacheLocation;
 
 async function updateServerCacheConfig(location, pattern) {
+    if (window.ClientSync) {
+        const snapshot = { location: location || settings.serverCacheLocation || 'root', namingPattern: pattern || settings.serverCacheNamingPattern || 'simple' };
+        window.ClientSync.seed('cache-config', { location: settings.serverCacheLocation || 'root', namingPattern: lastNamingPattern || 'simple' });
+        // 新增自定义路径需要原接口验证写权限；已知内置位置与命名设置采用周期同步。
+        if (location && !['data', 'root'].includes(location) && location !== settings.serverCacheLocation) {
+            await window.ClientSync.update('cache-config', snapshot);
+            try { await window.ClientSync.flush('cache-config', true); return true; }
+            catch (error) { showError(error.message || '缓存目录保存失败'); return false; }
+        }
+        await window.ClientSync.update('cache-config', snapshot);
+        return true;
+    }
+    return submitServerCacheConfig(location, pattern);
+}
+/** 缓存配置周期提交复用原路径校验与命名变更流程。 @author jingyh */
+async function submitServerCacheConfig(location, pattern, context = null) {
     const loc = location || window.settings?.serverCacheLocation || 'root';
     const pat = pattern || window.settings?.serverCacheNamingPattern || 'simple';
     const oldPattern = lastNamingPattern;
 
     const headers = { 'Content-Type': 'application/json' };
     // 携带 Token（或兼容旧密码），让服务端正确识别身份
-    Object.assign(headers, getUserAuthHeaders());
+    Object.assign(headers, context?.headers || getUserAuthHeaders());
     const adminPass = localStorage.getItem('lx_admin_password');
     if (adminPass) headers['x-frontend-auth'] = adminPass;
 
@@ -5855,12 +5922,14 @@ async function updateServerCacheConfig(location, pattern) {
             body: JSON.stringify({
                 location: loc,
                 namingPattern: pat
-            })
+            }),
+            ...(context ? { signal: context.signal } : {})
         });
         if (!response.ok) {
             const result = await response.json().catch(() => ({}));
             showError(result.error || result.message || '缓存目录保存失败，请检查路径及写入权限');
             console.warn('[ServerCache] Config update failed:', response.status);
+            if (context) throw new Error(result.error || result.message || '缓存配置同步失败');
             // 失败时回滚 UI
             if (typeof syncSettingsUI === 'function') {
                 if (location) syncSettingsUI('serverCacheLocation', settings.serverCacheLocation);
@@ -5908,10 +5977,12 @@ async function updateServerCacheConfig(location, pattern) {
         }
     } catch (e) {
         console.error('[ServerCache] Config update failed:', e);
+        if (context) throw e;
         return false;
     }
 }
 window.updateServerCacheConfig = updateServerCacheConfig; // Expose global
+window.ClientSync?.register('cache-config', (snapshot, context) => submitServerCacheConfig(snapshot.location, snapshot.namingPattern, context));
 
 /**
  * 查看服务端当前播放缓存目录
@@ -6290,6 +6361,7 @@ async function playSong(song, index, forceQuality = null, noPlay = false, isRetr
     preSelectedNextIndex = null;
 
     currentPlayingSong = song;
+    currentPlaybackOwner = window.ClientSync?.owner() || '_open';
     window.currentPlayingSong = song; // expose for lyric-card.js
     window.playerBar?.beginLoading(thisRequestId);
     // The advertised quality is not necessarily the quality that will be played.
@@ -6297,12 +6369,12 @@ async function playSong(song, index, forceQuality = null, noPlay = false, isRetr
     updatePlayerInfo(song, null);
     updateMediaSessionMetadata(song);
     // 异步触发歌词抓取，初步尝试（此时音质可能尚未最终确定，但在 playSong 后续逻辑中会再次同步）
-    fetchLyric(song);
+    setTimeout(() => { if (thisRequestId === currentLoadingRequestId) void fetchLyric(song); }, 0);
 
     // Refresh queue UI if drawer is open to update active indicator
     const queueDrawer = document.getElementById('queue-drawer');
     if (queueDrawer && !queueDrawer.classList.contains('translate-x-full')) {
-        renderQueue();
+        setTimeout(() => { if (thisRequestId === currentLoadingRequestId) renderQueue(); }, 0);
     }
 
     // [Fix] 切换歌曲前强制重置手动滚动状态
@@ -6735,6 +6807,11 @@ async function addToDefaultList(song) {
  * @param {boolean} shouldAddToDefault 是否加入默认(试听)列表
  */
 function updatePlaylist(list, startIndex = 0, scope = 'local_list', shouldAddToDefault = null) {
+    if (list?.length && window.SongFiles && ['local_list', 'local_all'].includes(scope)) {
+        const targetKey = window.SongIdentity.key(list[startIndex]);
+        list = window.SongFiles.enrich(list).map(song => window.MusicExperience.playable(song));
+        startIndex = Math.max(0, list.findIndex(song => window.SongIdentity.key(song) === targetKey));
+    }
     if (!list || list.length === 0) {
         showError('播放列表为空');
         return;
@@ -6755,49 +6832,12 @@ function updatePlaylist(list, startIndex = 0, scope = 'local_list', shouldAddToD
         }
     }
 
-    // [New] Deduplicate by quality if setting enabled
-    if (settings.deduplicatePlaylistByQuality && window.QualityManager) {
+    // 本地与在线来源的播放队列都使用统一身份；在线页面本身不改变。作者：yahyaoo
+    if (window.SongIdentity) {
         const targetSong = list[startIndex];
-        const targetId = targetSong ? (targetSong.songmid || targetSong.id) : null;
-
-        const deduplicated = [];
-        const seenIds = new Map(); // id -> index in deduplicated
-
-        list.forEach((song) => {
-            const id = song.songmid || song.id;
-            if (!id) {
-                deduplicated.push(song);
-                return;
-            }
-
-            const qualityAttr = song.quality || song.type || '128k';
-
-            if (seenIds.has(id)) {
-                const existingIdx = seenIds.get(id);
-                const existingSong = deduplicated[existingIdx];
-                const existingQuality = existingSong.quality || existingSong.type || '128k';
-
-                const p1 = window.QualityManager.QUALITY_PRIORITY.indexOf(existingQuality);
-                const p2 = window.QualityManager.QUALITY_PRIORITY.indexOf(qualityAttr);
-
-                // Priority index: smaller means better quality.
-                // Lower index is higher quality
-                if (p2 !== -1 && (p1 === -1 || p2 < p1)) {
-                    deduplicated[existingIdx] = song;
-                }
-            } else {
-                seenIds.set(id, deduplicated.length);
-                deduplicated.push(song);
-            }
-        });
-
-        // Find new startIndex based on targetId (identity matching)
-        if (targetId) {
-            const newIndex = deduplicated.findIndex(s => (s.songmid || s.id) === targetId);
-            if (newIndex !== -1) startIndex = newIndex;
-        }
-
-        list = deduplicated;
+        const targetKey = window.SongIdentity.key(targetSong);
+        list = window.SongIdentity.aggregate(list);
+        startIndex = Math.max(0, list.findIndex(song => window.SongIdentity.key(song) === targetKey));
     }
 
     // [New] Use a shallow copy to prevent mutations from affecting the source list
@@ -6815,6 +6855,20 @@ function updatePlaylist(list, startIndex = 0, scope = 'local_list', shouldAddToD
     }
 }
 window.updatePlaylist = updatePlaylist;
+
+/** 切换文件仅替换队列中的对应歌曲，不清空顺序和其他歌曲。 @author yahyaoo */
+function playSongFileVersion(song) {
+    const key = window.SongIdentity.key(song);
+    let index = key ? currentPlaylist.findIndex(item => window.SongIdentity.key(item) === key) : -1;
+    if (index < 0) {
+        index = currentPlaylist.length;
+        currentPlaylist.push(song);
+        if (index === 0) currentPlayingScope = 'local_list';
+    } else currentPlaylist[index] = song;
+    window.playSong(song, index, null, false, false, false);
+    renderQueue();
+}
+window.playSongFileVersion = playSongFileVersion;
 
 // 显示错误提示（现代化 Toast）
 // 移除旧版 showError，由后文统一的 showToast 驱动
@@ -6884,7 +6938,7 @@ function updatePlayerInfo(song, actualQuality) {
     if (artistEl) {
         artistEl.innerText = song.singer;
         artistEl.setAttribute('data-text', song.singer);
-        artistEl.classList.add('truncate');
+        artistEl.classList.remove('truncate');
         artistEl.classList.remove('overflow-hidden');
 
         artistEl.onclick = null;
@@ -6897,6 +6951,12 @@ function updatePlayerInfo(song, actualQuality) {
         albumEl.textContent = album ? ' - ' + album : '';
         albumEl.title = album;
         albumEl.hidden = !album;
+    }
+    // 合并为同一条滚动文字，标签保持独立；播放页仍保留原歌手和专辑节点。作者：yahyaoo
+    const metadataText = document.getElementById('player-metadata-text');
+    if (metadataText) {
+        metadataText.setAttribute('data-text', (song.singer || '') + (getSongAlbumName(song) ? ' - ' + getSongAlbumName(song) : ''));
+        setTimeout(() => window.playerBar?.updateMetadataScroll(), 50);
     }
 
     // 触发滚动检测
@@ -7135,7 +7195,7 @@ audio.addEventListener('timeupdate', () => {
 
     // 自动恢复：保存播放进度 (节流)
     if (settings.autoResume && (!window._lastStateSave || now - window._lastStateSave > 5000)) {
-        savePlaybackState();
+        savePlaybackState(true);
         window._lastStateSave = now;
     }
 });
@@ -7221,16 +7281,28 @@ audio.addEventListener('pause', () => {
         lyricPlayer.pause();
     }
     if (wordAnimationId) cancelAnimationFrame(wordAnimationId); // 立即停止行动画
-    if (settings.autoResume) savePlaybackState();
+    if (settings.autoResume) savePlaybackState(true);
 });
 
 // ========================================
 // Auto-Resume State Logic
 // ========================================
 
-function savePlaybackState() {
-    if (!currentPlayingSong) return;
+let savedPlaybackQueue = null, savedPlaybackQueueSize = -1;
+const playbackCacheKey = kind => 'lx_playback_' + kind + ':' + (window.ClientSync?.owner() || '_open');
+window.ClientSync?.register('playback', (state, context) => window.ListStore.syncPlayback(state, context));
+window.ClientSync?.register('queue', (state, context) => window.ListStore.syncPlayback(state, context, 'queue'));
+function savePlaybackState(progressOnly = false) {
+    if (currentPlaybackOwner && currentPlaybackOwner !== (window.ClientSync?.owner() || '_open')) return;
     try {
+        const queueChanged = !progressOnly || savedPlaybackQueue !== currentPlaylist || savedPlaybackQueueSize !== currentPlaylist?.length;
+        if (queueChanged) {
+            savedPlaybackQueue = currentPlaylist; savedPlaybackQueueSize = currentPlaylist?.length;
+            const playlist = currentPlaylist ? currentPlaylist.slice(0, 300) : [];
+            localStorage.setItem(playbackCacheKey('queue'), JSON.stringify(playlist));
+            void window.ClientSync?.update('queue', { playlist }).catch(error => console.warn('[Resume] 本地队列保存失败:', error));
+        }
+        if (!currentPlayingSong) return;
         const state = {
             song: currentPlayingSong,
             index: currentIndex,
@@ -7239,12 +7311,13 @@ function savePlaybackState() {
             listId: window.currentViewingListId,
             // [Fix] 保存整个当前播放队列副本。
             // 限制长度为 300 首以兼顾性能和容量（通常足够临时列表使用）
-            playlist: currentPlaylist ? currentPlaylist.slice(0, 300) : null,
             playMode: playMode,
             quality: currentQuality,
-            timestamp: Date.now()
         };
-        localStorage.setItem('lx_playback_state', JSON.stringify(state));
+        const serialized = JSON.stringify(state);
+        if (serialized === localStorage.getItem(playbackCacheKey('state'))) return;
+        localStorage.setItem(playbackCacheKey('state'), serialized);
+        void window.ClientSync?.update('playback', state).catch(error => console.warn('[Resume] 本地同步记录保存失败:', error));
     } catch (e) {
         console.error('[Resume] 无法保存播放状态:', e);
     }
@@ -7256,12 +7329,27 @@ async function restorePlaybackState() {
     }
 
     try {
-        const saved = localStorage.getItem('lx_playback_state');
+        // 旧单键只迁移一次，随后各账号独立恢复。
+        let saved = localStorage.getItem(playbackCacheKey('state'));
+        if (!saved) {
+            saved = localStorage.getItem('lx_playback_state');
+            if (saved) {
+                localStorage.setItem(playbackCacheKey('state'), saved);
+                const queue = localStorage.getItem('lx_playback_queue');
+                if (queue) localStorage.setItem(playbackCacheKey('queue'), queue);
+                localStorage.removeItem('lx_playback_state'); localStorage.removeItem('lx_playback_queue');
+            }
+        }
+        const pendingState = await window.ClientSync?.read('playback');
+        if (pendingState) saved = JSON.stringify(pendingState);
         if (!saved) {
             return;
         }
 
         const state = JSON.parse(saved);
+        const pendingQueue = await window.ClientSync?.read('queue');
+        if (pendingQueue) state.playlist = pendingQueue.playlist;
+        else if (!state.playlist) state.playlist = JSON.parse(localStorage.getItem(playbackCacheKey('queue')) || '[]');
         if (!state || !state.song) {
             return;
         }
@@ -7276,7 +7364,7 @@ async function restorePlaybackState() {
 
         // 2. 恢复播放列表 (优先从持久化队列恢复)
         if (state.playlist && state.playlist.length > 0) {
-            currentPlaylist = state.playlist;
+            currentPlaylist = window.SongIdentity ? window.SongIdentity.aggregate(state.playlist) : state.playlist;
             currentPlayingScope = state.scope || 'network';
         } else if (['local_list', 'local_all', 'songlist'].includes(state.scope)) {
             // 回退逻辑：如果队列没存，根据作用域恢复
@@ -7284,10 +7372,17 @@ async function restorePlaybackState() {
             window.currentViewingListId = state.listId || 'default';
         }
 
-        currentIndex = state.index >= 0 ? state.index : 0;
+        const restoredKey = window.SongIdentity?.key(state.song);
+        const restoredIndex = restoredKey ? currentPlaylist.findIndex(song => window.SongIdentity.key(song) === restoredKey) : -1;
+        currentIndex = restoredIndex >= 0 ? restoredIndex : Math.min(Math.max(state.index || 0, 0), Math.max(0, currentPlaylist.length - 1));
         currentPlayingSong = state.song;
+        currentPlaybackOwner = window.ClientSync?.owner() || '_open';
         window.currentPlayingSong = state.song;
         currentQuality = state.quality || null;
+        const progressBaseline = { ...state }; delete progressBaseline.playlist; delete progressBaseline.timestamp;
+        window.ClientSync?.seed('playback', progressBaseline);
+        window.ClientSync?.seed('queue', { playlist: state.playlist || [] });
+        savedPlaybackQueue = currentPlaylist; savedPlaybackQueueSize = currentPlaylist.length;
 
         // 3. 更新 UI (静默更新)
         updatePlayerInfo(state.song, currentQuality);
@@ -7664,7 +7759,7 @@ function updatePlayModeUI() {
             'list': 'fa-redo',
             'single': 'fa-redo-alt',
             'random': 'fa-random',
-            'roaming': 'fa-heart roaming-heart',
+            'roaming': 'fa-heart-pulse roaming-heart',
             'order': 'fa-play'
         };
         const colors = {
@@ -7916,6 +8011,8 @@ async function updateSetting(key, value) {
         }
     }
 
+    if (Object.is(settings[key], value)) return;
+    window.ClientSync?.seed('settings', settings);
     settings[key] = value;
     window.settings = settings; // 确保全局引用同步
     try {
@@ -8306,6 +8403,8 @@ async function resetAllSettings() {
         window.settings = settings;
         localStorage.setItem('lx_settings', JSON.stringify(settings));
         localStorage.removeItem('lx_playback_state'); // 同时重置播放进度记忆
+        localStorage.removeItem(playbackCacheKey('state'));
+        localStorage.removeItem(playbackCacheKey('queue'));
 
         // If sync enabled, push to server
         if (settings.saveAccountSettingsToFile) {
@@ -9043,7 +9142,10 @@ async function loadLyricData(song, quality = null) {
     if (settings.enableLyricCache !== false) {
         try {
             const cached = localStorage.getItem(cacheKey);
-            if (cached) return window.PlaybackLyrics.normalize(JSON.parse(cached));
+            if (cached) {
+                const raw = window.PlaybackLyrics.normalize(JSON.parse(cached));
+                if (raw.lrc.trim() || raw.klyric.trim()) return raw;
+            }
         } catch (error) {
             console.warn('[Lyric] 读取浏览器缓存失败:', error);
             localStorage.removeItem(cacheKey);
@@ -9060,7 +9162,7 @@ async function loadLyricData(song, quality = null) {
                 if (settings.enableLyricCache !== false && (raw.lrc || raw.klyric)) {
                     localStorage.setItem(cacheKey, JSON.stringify(raw));
                 }
-                return raw;
+                if (raw.lrc.trim() || raw.klyric.trim()) return raw;
             }
         } catch (error) { console.warn('[Lyric] 读取服务器缓存失败:', error); }
     }
@@ -9784,6 +9886,12 @@ async function loadLibraryData() {
         window.libraryData.albums = Array.isArray(al) ? al : [];
         window.dislikeLibraryData.artists = Array.isArray(dar) ? dar : [];
         window.dislikeLibraryData.albums = Array.isArray(dal) ? dal : [];
+        for (const kind of ['artists', 'albums']) {
+            const channel = 'library-' + kind + ':' + (isPublic ? 'public' : 'personal');
+            const pending = await window.ClientSync?.read(channel);
+            if (pending) window.libraryData[kind] = pending;
+            else window.ClientSync?.seed(channel, window.libraryData[kind]);
+        }
 
         if (!isPublic && isUserLoggedIn()) {
             window.myPersonalLibraryData = {
@@ -9845,10 +9953,24 @@ function refreshDislikeSidebarCount() {
 }
 
 /** 持久化 artists 到后端（自动感知公开收藏状态） */
+for (const kind of ['artists', 'albums']) for (const mode of ['public', 'personal']) {
+    window.ClientSync?.register('library-' + kind + ':' + mode, async (items, context) => {
+        const headers = { ...context.headers, 'Content-Type': 'application/json' };
+        if (mode === 'public') headers['x-user-name'] = '_open';
+        const response = await fetch('/api/user/library/' + kind + (mode === 'public' ? '?user=_open' : ''), {
+            method: 'POST', headers, body: JSON.stringify(items), signal: context.signal,
+        });
+        if (!response.ok) throw new Error('收藏同步失败: HTTP ' + response.status);
+    });
+}
 async function saveLibraryArtists(customList = null) {
     try {
         const isPublic = !isUserLoggedIn() || (!customList && window.isViewingPublicFavorites);
         const listToSave = customList || window.libraryData.artists;
+        if (window.ClientSync) {
+            await window.ClientSync.update('library-artists:' + (isPublic ? 'public' : 'personal'), listToSave);
+            refreshLibrarySidebarCount(); return;
+        }
         let headers = { 'Content-Type': 'application/json' };
         let url = '/api/user/library/artists';
         if (isPublic) {
@@ -9869,6 +9991,10 @@ async function saveLibraryAlbums(customList = null) {
     try {
         const isPublic = !isUserLoggedIn() || (!customList && window.isViewingPublicFavorites);
         const listToSave = customList || window.libraryData.albums;
+        if (window.ClientSync) {
+            await window.ClientSync.update('library-albums:' + (isPublic ? 'public' : 'personal'), listToSave);
+            refreshLibrarySidebarCount(); return;
+        }
         let headers = { 'Content-Type': 'application/json' };
         let url = '/api/user/library/albums';
         if (isPublic) {
@@ -10731,6 +10857,10 @@ function switchSyncMode(mode) {
 let settingsPushTimer = null;
 /** 普通设置立即本地生效，合并变更后上报；手动保存仍等待服务端确认。 */
 function pushSettingsToServer(force = false) {
+    if (window.ClientSync) {
+        if (!force && !settings.saveAccountSettingsToFile) return Promise.resolve();
+        return window.ClientSync.update('settings', settings).then(() => force ? window.ClientSync.flush('settings', true) : undefined);
+    }
     if (force) { clearTimeout(settingsPushTimer); settingsPushTimer = null; return submitSettingsToServer(true); }
     clearTimeout(settingsPushTimer);
     settingsPushTimer = setTimeout(() => { settingsPushTimer = null; void submitSettingsToServer(); }, 15000);
@@ -10738,7 +10868,7 @@ function pushSettingsToServer(force = false) {
 }
 window.addEventListener('music-account-changed', () => { clearTimeout(settingsPushTimer); settingsPushTimer = null; });
 document.addEventListener('visibilitychange', () => { if (document.hidden && settingsPushTimer) { clearTimeout(settingsPushTimer); settingsPushTimer = null; void submitSettingsToServer(); } });
-async function submitSettingsToServer(force = false) {
+async function submitSettingsToServer(force = false, snapshot = settings, context = null) {
     if (!force && !settings.saveAccountSettingsToFile) return;
     // Only local sync mode supports this for now
     if (localStorage.getItem('lx_sync_mode') !== 'local' && !window.lx_config?.['user.enablePublicRestriction'] && !force) return;
@@ -10756,7 +10886,7 @@ async function submitSettingsToServer(force = false) {
             if (adminPass) headers['x-frontend-auth'] = adminPass;
         } else {
             // 已登录用户：使用 Token（或兼容旧密码）
-            Object.assign(headers, getUserAuthHeaders());
+            Object.assign(headers, context?.headers || getUserAuthHeaders());
             const adminPass = localStorage.getItem('lx_admin_password');
             if (adminPass) headers['x-frontend-auth'] = adminPass;
         }
@@ -10764,21 +10894,18 @@ async function submitSettingsToServer(force = false) {
         const res = await fetch('/api/user/settings', {
             method: 'POST',
             headers: headers,
-            body: JSON.stringify(settings)
+            body: JSON.stringify(snapshot),
+            ...(context ? { signal: context.signal } : {})
         });
         if (res.ok) {
             console.log('[Settings] 已成功同步到服务器');
-        }
-
-        // 同时同步音质配置
-        if (window.soundEffects && typeof window.soundEffects.pushToServer === 'function') {
-            window.soundEffects.pushToServer();
-        }
+        } else throw new Error('设置同步失败: HTTP ' + res.status);
     } catch (e) {
         console.error('[Settings] 同步到服务器失败:', e);
         if (force) throw e;
     }
 }
+window.ClientSync?.register('settings', (snapshot, context) => submitSettingsToServer(true, snapshot, context));
 
 async function manualSaveSettings(btn) {
     const originalText = btn.innerHTML;
@@ -10824,6 +10951,12 @@ async function fetchSettingsFromServer() {
     if (!user && !isPublicMode) return;
 
     try {
+        const accountAtStart = window.ClientSync?.owner();
+        const pendingSettings = await window.ClientSync?.read('settings');
+        if (pendingSettings) {
+            settings = normalizeStoredSettings({ ...settings, ...pendingSettings }); window.settings = settings;
+            syncSettingsUI(); setupNetworkListAutoCheck(); return;
+        }
         console.log('[Settings] 正在从服务器尝试加载设置...');
         const headers = {};
         if (isPublicMode) {
@@ -10842,9 +10975,12 @@ async function fetchSettingsFromServer() {
 
         if (res.ok) {
             const serverSettings = await res.json();
+            if (window.ClientSync && (accountAtStart !== window.ClientSync.owner() || window.ClientSync.has('settings'))) return;
             console.log('[Settings] 从服务器加载设置成功:', serverSettings);
             // Merge settings
             settings = normalizeStoredSettings({ ...settings, ...serverSettings });
+            window.settings = settings;
+            window.ClientSync?.seed('settings', settings);
             // Save to local
             localStorage.setItem('lx_settings', JSON.stringify(settings));
             // Update UI
@@ -11094,7 +11230,7 @@ function handleRemoteConnect() {
             setData: async (data) => {
                 console.log('[Sync] 远程数据已同步:', data);
                 // Save to cache
-                await window.ListStore.set(data).catch(e => console.error('[IDBStore] 保存失败:', e));
+                await window.ListStore.cache(data).catch(e => console.error('[IDBStore] 保存失败:', e));
                 // Update global
                 const oldUsername = currentListData ? currentListData.username : null;
                 currentListData = data;
@@ -11257,7 +11393,7 @@ async function handleRemoteOverwriteConnect(silent = false) {
                 currentListData = data;
                 if (oldUsername) currentListData.username = oldUsername;
 
-                await window.ListStore.set(data).catch(e => console.error('[IDBStore] 保存失败:', e));
+                await window.ListStore.cache(data).catch(e => console.error('[IDBStore] 保存失败:', e));
                 renderMyLists(data);
 
                 // 2. Push to local server (important!)
@@ -11614,17 +11750,15 @@ if (!window._sidebarMarqueeBound) {
 }
 
 function renderMyLists(data) {
+    if (data && window.SongIdentity) data = { ...data, loveList: window.SongIdentity.aggregate(data.loveList || []), defaultList: window.SongIdentity.aggregate(data.defaultList || []), userList: (data.userList || []).map(list => ({ ...list, list: window.SongIdentity.aggregate(list.list || []) })) };
     if (!document.getElementById('view-playlists')?.classList.contains('hidden')) window.PlaylistsView?.render(data?.userList || []);
     const container = document.getElementById('my-lists-container');
     container.innerHTML = '';
     const playlists = document.getElementById('playlist-lists-container');
     playlists.replaceChildren();
 
-    if (!data) {
-        container.replaceChildren();
-        refreshFavoritesChildrenHeight();
-        return;
-    }
+    // 加载前及退出账号后仍保留收藏固定入口，与不喜欢分组保持一致。
+    if (!data) data = { loveList: [], userList: [] };
 
     // Helper to create list item
     const createItem = (listObj, name, icon, count) => {
@@ -11734,14 +11868,11 @@ function renderMyLists(data) {
     }
 
     sidebarItems.push(
-        { id: '__lib_artists__', type: 'lib', el: createLibItem('__lib_artists__', '歌手', 'fa-user', 'lib-artist-count', handleArtistLibraryClick) },
-        { id: '__lib_albums__', type: 'lib', el: createLibItem('__lib_albums__', '专辑', 'fa-compact-disc', 'lib-album-count', handleAlbumLibraryClick) }
+        { id: '__lib_artists__', type: 'lib', el: createLibItem('__lib_artists__', '收藏歌手', 'fa-user', 'lib-artist-count', handleArtistLibraryClick) },
+        { id: '__lib_albums__', type: 'lib', el: createLibItem('__lib_albums__', '收藏专辑', 'fa-compact-disc', 'lib-album-count', handleAlbumLibraryClick) }
     );
 
-    if (data.loveList) {
-        // 内层 ♥ 喜爱列表，命名为「我的喜爱」以与外层「我的收藏」折叠面板区分
-        sidebarItems.push({ id: 'love', type: 'system', el: createItem('love', '我的喜爱', 'fa-heart', data.loveList.length) });
-    }
+    sidebarItems.push({ id: 'love', type: 'system', el: createItem('love', '收藏歌曲', 'fa-music', data.loveList?.length || 0) });
     if (data.userList) {
         data.userList.forEach(l => {
             const listLen = l.list ? l.list.length : 0;
@@ -12173,7 +12304,7 @@ window.applyImportedPlaylists = async result => {
     renderMyLists(currentListData);
     if (typeof renderPlaylistAddGrid === 'function') renderPlaylistAddGrid();
     // 数据库已提交，缓存写入失败不应把此次导入显示为失败。
-    await window.ListStore.set(data).catch(() => {});
+    await window.ListStore.cache(data).catch(() => {});
 };
 
 async function handleCreateList() {
@@ -12502,8 +12633,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // 1. Restore cached list data (from IndexedDB) for logged in user only
+    // 主界面先显示，缓存、认证及网络恢复不阻塞默认入口。
+    const defaultTab = settings.defaultEntry || 'favorites';
+    switchTab(defaultTab);
+    await window.ClientPerformance?.yieldTask();
+    window.ClientSync?.seed('settings', settings);
     try {
-        const cachedList = await window.ListStore.get();
+        const pendingList = await window.ClientSync?.read('lists');
+        const cachedLocalList = await window.ListStore.getLocal();
+        const cachedList = pendingList ? { ...cachedLocalList, ...pendingList, loveList: cachedLocalList?.loveList || [] } : cachedLocalList;
         if (cachedList && isUserLoggedIn()) {
             currentListData = cachedList;
             const savedUser = localStorage.getItem('lx_sync_user');
@@ -12511,16 +12649,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                 currentListData.username = savedUser;
             }
             window.myPersonalListData = currentListData;
+            window.ClientSync?.seed('lists', currentListData);
+            await window.SongActions?.restorePending?.(currentListData);
             renderMyLists(currentListData);
             console.log('[Cache] 已恢复缓存的个人列表数据');
         }
     } catch (e) {
         console.error('[Cache] 恢复列表数据失败:', e);
     }
-
-    // [New] Switch to the user's default entry tab on load
-    const defaultTab = settings.defaultEntry || 'favorites';
-    switchTab(defaultTab);
 
     // 使用有效账号会话加载歌单，本地与远程账号均通过 HTTP 入口同步。
     const account = await window.accountReady;
@@ -12530,16 +12666,21 @@ document.addEventListener('DOMContentLoaded', async () => {
         try {
             const listData = await syncManager.sync();
             if (listData) {
+                if (window.ClientSync?.has('lists') && currentListData) {
+                    listData.defaultList = currentListData.defaultList; listData.userList = currentListData.userList;
+                }
+                await window.SongActions?.restorePending?.(listData);
                 currentListData = listData;
                 currentListData.username = account.username;
                 window.myPersonalListData = currentListData;
                 renderMyLists(currentListData);
-                await window.ListStore.set(currentListData);
+                window.ClientSync?.seed('lists', currentListData);
+                await window.ListStore.cache(currentListData);
             }
             loadLibraryData();
-            if (settings.saveAccountSettingsToFile) await fetchSettingsFromServer();
+            if (settings.saveAccountSettingsToFile) void fetchSettingsFromServer();
             updateUserUI();
-            if (window.loadAccountProfile) await window.loadAccountProfile();
+            if (window.loadAccountProfile) void window.loadAccountProfile();
         } catch (error) { console.warn('[Account] 加载账号数据失败:', error); }
     }
 
@@ -12554,9 +12695,25 @@ window.resetAllSettings = resetAllSettings;
 async function pushDataChange(customListData) {
     const listToSave = customListData || currentListData;
     if (!listToSave) return;
+    if (window.ClientSync) {
+        // 喜爱独立同步，普通歌单快照只包含本接口实际保存的字段。
+        const snapshot = { username: listToSave.username, defaultList: listToSave.defaultList || [], userList: listToSave.userList || [] };
+        const channel = ['_open', 'default', 'open'].includes(listToSave.username) ? 'lists-public' : 'lists';
+        await window.ClientSync.update(channel, snapshot);
+        // 批量删除、排序及导入等入口同样可能修改喜欢，保持独立的最终状态同步。
+        if (Array.isArray(listToSave.loveList)) await window.ClientSync.update(channel === 'lists-public' ? 'favorites-public' : 'favorites', listToSave.loveList);
+        return;
+    }
+    return submitDataChange(listToSave);
+}
+
+/** 仅由周期同步提交普通歌单，复用原鉴权与远程同步机制。 @author jingyh */
+async function submitDataChange(listToSave, context = null) {
 
     // 1. 优先同步保存到客户端 IndexedDB 本地缓存
-    await window.ListStore.set(listToSave).catch(e => console.error('[IDBStore] 保存失败:', e));
+    if (!context || context.name === listToSave.username) {
+        await window.ListStore.cache({ ...await window.ListStore.getLocal(context?.name), ...listToSave }, context?.name).catch(e => console.error('[IDBStore] 保存失败:', e));
+    }
 
     const isUserLoggedIn = !!userToken && localStorage.getItem('lx_sync_mode') === 'local';
     const isPublicList = listToSave.username === '_open' || listToSave.username === 'default';
@@ -12570,9 +12727,10 @@ async function pushDataChange(customListData) {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        ...getUserAuthHeaders()
+                        ...(context?.headers || getUserAuthHeaders())
                     },
-                    body: JSON.stringify(listToSave)
+                    body: JSON.stringify(listToSave),
+                    ...(context ? { signal: context.signal } : {})
                 });
                 if (!res.ok) {
                     const errorText = await res.text();
@@ -12585,17 +12743,20 @@ async function pushDataChange(customListData) {
                 throw e;
             }
         }
+        if (!isAdmin && context) throw new Error('公共歌单同步需要管理员权限');
         return;
     }
 
     // 3. 登录普通用户的 SyncManager 推送逻辑
     try {
-        if (window.SyncManager && window.SyncManager.client) {
-            await window.SyncManager.push(listToSave);
+        if (window.SyncManager?.mode === 'remote' && window.SyncManager.client) {
+            const pendingFavorites = await window.ClientSync?.read('favorites');
+            const personal = window.myPersonalListData?.username === listToSave.username ? window.myPersonalListData : currentListData;
+            await window.SyncManager.push({ ...listToSave, loveList: pendingFavorites || personal?.loveList || [] });
             console.log('Data Pushed to Remote');
         } else {
             // 本地无同步模式：调用 REST API 推送给当前用户
-            const headers = getUserAuthHeaders();
+            const headers = { ...(context?.headers || getUserAuthHeaders()) };
             if (headers['x-user-name'] === '_open') {
                 const syncUser = localStorage.getItem('lx_sync_user');
                 if (syncUser) headers['x-user-name'] = syncUser;
@@ -12607,7 +12768,8 @@ async function pushDataChange(customListData) {
                     'Content-Type': 'application/json',
                     ...headers
                 },
-                body: JSON.stringify(listToSave)
+                body: JSON.stringify(listToSave),
+                ...(context ? { signal: context.signal } : {})
             });
             if (!res.ok) throw new Error(await res.text());
         }
@@ -12616,11 +12778,17 @@ async function pushDataChange(customListData) {
         throw e;
     }
 }
+window.ClientSync?.register('lists', submitDataChange);
+window.ClientSync?.register('lists-public', submitDataChange);
 
 async function refreshUserListData() {
     if (!window.SyncManager) return;
     try {
+        if (window.ClientSync?.has('lists')) return currentListData;
+        const ownerAtStart = window.ClientSync?.owner();
         const listData = await window.SyncManager.sync();
+        if (window.ClientSync && (window.ClientSync.has('lists') || ownerAtStart !== window.ClientSync.owner())) return currentListData;
+        await window.SongActions?.restorePending?.(listData);
         currentListData = listData;
         window.currentListData = listData;
         if (listData && listData.username !== '_open') {
@@ -12637,7 +12805,8 @@ async function refreshUserListData() {
         }
 
         // Save to cache
-        await window.ListStore.set(listData).catch(e => console.error('[IDBStore] 保存失败:', e));
+        window.ClientSync?.seed('lists', { username: listData.username, defaultList: listData.defaultList || [], userList: listData.userList || [] });
+        await window.ListStore.cache(listData).catch(e => console.error('[IDBStore] 保存失败:', e));
         console.log('[Sync] List Data Refreshed');
         return listData;
     } catch (e) {
@@ -14145,9 +14314,10 @@ async function handleTogglePlaylist(listId, btnElement) {
 
         // 5. Background Backend Sync
         try {
-            const isRemoteSync = window.SyncManager && window.SyncManager.mode === 'remote' && window.SyncManager.client && window.SyncManager.client.isConnected;
-
-            if (isRemoteSync) {
+            if (window.ClientSync) {
+                await pushDataChange(activeListData);
+                showSuccess(`批量收藏 ${addedSongs.length} 首歌曲成功`);
+            } else if (window.SyncManager && window.SyncManager.mode === 'remote' && window.SyncManager.client && window.SyncManager.client.isConnected) {
                 // 远程模式：推送更新
                 await pushDataChange(activeListData);
                 showSuccess(`成功批量同步 ${addedSongs.length} 首歌曲`);

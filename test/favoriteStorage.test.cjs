@@ -59,7 +59,7 @@ function fixture(user = 'endpoint') {
 }
 
 test('独立接口按配置添加、不重复、取消持久化，并发操作不丢数据', async () => {
-  const f = fixture(); const other = { ...song, id: 'wy_2' }
+  const f = fixture(); const other = { ...song, id: 'wy_2', name: '另一首歌曲' }
   const added = await Promise.all([f.request(handleFavorites, { song, loved: true }), f.request(handleFavorites, { song: other, loved: true })])
   assert.deepEqual(added.map(value => value.status), [200, 200])
   assert.deepEqual((await f.data.getListData()).loveList.map(value => value.id), ['wy_1', 'wy_2'])
@@ -69,6 +69,15 @@ test('独立接口按配置添加、不重复、取消持久化，并发操作�
   assert.deepEqual((await f.request(handleFavorites)).json().items.map(value => value.id), ['wy_2'])
   const restarted = dataManager('endpoint'); await restarted.initPromise
   assert.deepEqual((await restarted.getListData()).loveList.map(value => value.id), ['wy_2'])
+})
+
+test('跨平台同曲只喜欢一次，并可从另一平台取消', async () => {
+  const f = fixture('cross-platform'); const other = { ...song, source: 'kg', id: 'kg_other' }
+  await f.request(handleFavorites, { song, loved: true })
+  await f.request(handleFavorites, { song: other, loved: true })
+  assert.equal((await f.data.getListData()).loveList.length, 1)
+  await f.request(handleFavorites, { song: other, loved: false })
+  assert.equal((await f.data.getListData()).loveList.length, 0)
 })
 
 test('拒绝伪造账号、公共非管理员写入、畸形请求与普通歌单的 love 目标', async () => {

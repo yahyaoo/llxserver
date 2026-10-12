@@ -18,6 +18,21 @@ function fixture() {
   return { context, calls, stored, respond: value => { response = value; }, session: context.window.playbackLyrics };
 }
 const song = { id: 'kg_1', songmid: '1', source: 'kg', name: '测试歌曲', singer: '歌手' };
+
+test('旧最近记录补齐 hash 后，同曲空歌词会重新获取', async () => {
+  const f = fixture(); let requests = 0;
+  const load = async item => { requests++; return { lrc: item.hash ? '[00:01.00]恢复歌词' : '' }; };
+  await f.session.load(song, load, () => {}, () => {}, assert.fail);
+  await f.session.load({ ...song, hash: 'restored' }, load, raw => assert.match(raw.lrc, /恢复歌词/), () => {}, assert.fail);
+  assert.equal(requests, 2);
+});
+test('空缓存不能阻止平台歌词加载', async () => {
+  const f = fixture(); f.context.settings.enableLyricCache = true; f.context.settings.enableServerLyricCache = true;
+  f.stored.set('lx_lyric_kg_1 ', JSON.stringify({ lrc: '' }));
+  f.context.fetch = async url => { f.calls.push({ url }); return { ok: true, json: async () => url.includes('/cache/lyric') ? { success: true, data: { lyric: '' } } : { lyric: '[00:01.00]有效歌词' } }; };
+  assert.match((await f.context.loadLyricData(song)).lrc, /有效歌词/);
+  assert.ok(f.calls.some(call => call.url.includes('/lyric?')));
+});
 test('同曲补全信息共用请求，旧歌曲迟到不能覆盖当前歌词', async () => {
   const { session } = fixture(); let releaseA, releaseB; const applied = [], resets = [];
   const load = item => new Promise(resolve => { if (item.songmid === '1') releaseA = resolve; else releaseB = resolve; });

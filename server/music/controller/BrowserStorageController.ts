@@ -20,13 +20,13 @@ export interface BrowserStorageDependencies {
  * @returns 请求完成结果。
  * @author yahyaoo
  */
-export async function browserList(req: IncomingMessage, res: ServerResponse, dependencies: BrowserStorageDependencies): Promise<void> {
+export async function browserList(req: IncomingMessage, res: ServerResponse, dependencies: BrowserStorageDependencies, kind: 'list' | 'playback' | 'queue' = 'list'): Promise<void> {
   const device = String(req.headers['x-browser-device'] || '')
   if (!/^[a-zA-Z0-9-]{16,80}$/.test(device)) { res.writeHead(400); res.end('无效浏览器设备标识'); return }
   const verified = dependencies.verifyUser(req)
   const requested = String(req.headers['x-user-name'] || '')
   if (!verified && requested && !['default', 'open', '_open'].includes(requested)) { res.writeHead(401); res.end('Unauthorized'); return }
-  const key = path.join(dependencies.userDirectory(verified || '_open'), 'browser', device, 'browser-state.json')
+  const key = path.join(dependencies.userDirectory(verified || '_open'), 'browser', device, kind === 'list' ? 'browser-state.json' : kind + '-state.json')
   res.setHeader('Content-Type', 'application/json; charset=utf-8')
   try {
     if (req.method === 'GET') {

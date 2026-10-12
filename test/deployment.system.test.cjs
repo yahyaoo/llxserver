@@ -50,6 +50,10 @@ test('实际整体 ZIP 和两个独立 ZIP 均可启动，鉴权、配置、资�
     assert.equal(fs.existsSync(path.join(standaloneClient, 'dist/server')), false);
     assert.equal(fs.existsSync(path.join(standaloneClient, 'node_modules')), false);
     assert.equal(fs.existsSync(path.join(standaloneServer, 'server')), false);
+    // 从真实交付目录加载共享规则，并确认重复歌曲仍按原实现合并。作者：jingyh
+    const sharedIdentity = path.join(standaloneServer, 'client/music/js/song_identity.js');
+    assert.deepEqual(fs.readFileSync(sharedIdentity), fs.readFileSync(path.join(project, 'dist/client/music/js/song_identity.js')));
+    assert.equal(require(sharedIdentity).aggregate([{ source: 'kw', id: 'package-song' }, { source: 'kw', id: 'package-song' }]).length, 1);
     copyProductionDependencies(standaloneServer); copyProductionDependencies(all);
     const setup = "require('./dist/server/modules/utils/musicSdk/index.js').default.init=async()=>{};require('./index.js');";
     const backendPort = await freePort(), clientPort = await freePort(), allPort = await freePort();

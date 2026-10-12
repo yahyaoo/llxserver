@@ -17,7 +17,22 @@
 :root #queue-drawer #queue-locate-button { color: var(--text-main) !important; background: var(--bg-item-hover) !important; border: 1px solid var(--border-dim) !important; }
 :root #queue-drawer #queue-locate-button:hover,
 :root #queue-drawer #queue-locate-button:focus-visible { color: var(--theme-readable-accent) !important; background: color-mix(in srgb, var(--c-500) 14%, var(--bg-panel)) !important; }
-#queue-list { scrollbar-width: thin; scrollbar-color: var(--text-dim) transparent; scrollbar-gutter: stable; }
+#queue-list { flex: 1 1 0; min-width: 0; min-height: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior-y: contain; -webkit-overflow-scrolling: touch; scrollbar-width: thin; scrollbar-color: var(--text-dim) transparent; scrollbar-gutter: stable; }
+#queue-drawer { max-width: 100vw; height: 100dvh; overflow: hidden; }
+#queue-drawer > :not(#queue-list) { flex-shrink: 0; }
+.queue-song-row { min-width: 0; width: 100%; }
+.queue-song-cover { display: block; flex: 0 0 40px; width: 40px; height: 40px; }
+.queue-song-cover img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.queue-song-info { flex: 1 1 0; min-width: 0; overflow: hidden; }
+.queue-song-actions { flex: none; }
+@media (max-width: 767px) {
+    /* 队列覆盖手机导航，末尾歌曲与文件操作保持可见。作者：yahyaoo */
+    #queue-drawer { z-index: 70; }
+    #queue-drawer .queue-song-row { gap: 10px; padding: 10px 8px; }
+    #queue-drawer .queue-song-actions { gap: 0; }
+    #queue-drawer .queue-song-actions button, #queue-drawer .queue-drag-handle { width: 30px; height: 36px; padding: 0; display: flex; align-items: center; justify-content: center; }
+    #queue-drawer .song-metadata-row { white-space: nowrap; overflow: hidden; }
+}
 #queue-list::-webkit-scrollbar { width: 6px; display: block; }
 #queue-list::-webkit-scrollbar-thumb { background: var(--text-dim); border-radius: 6px; }
 #queue-list::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }

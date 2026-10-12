@@ -1398,12 +1398,12 @@ const handleStartServer = async (port = 9527, ip = '0.0.0.0') => await new Promi
         await songFileStatus({ req, res, pathname, urlObj, ip }, serverRuntime, songFileStatusService)
         return
       }
-      if (pathname === '/api/music/storage/list') {
+      if (pathname === '/api/music/storage/list' || pathname === '/api/music/storage/playback' || pathname === '/api/music/storage/queue') {
         await browserList(req, res, {
           verifyUser: verifyUserAuth,
           userDirectory: username => path.join(global.lx.userPath, getUserDirname(username)),
           service: new BrowserStorageService(new BrowserStorageRepository(repositories().music)),
-        })
+        }, pathname.endsWith('/playback') ? 'playback' : pathname.endsWith('/queue') ? 'queue' : 'list')
         return
       }
       if (pathname === '/api/music/playlists/import' && req.method === 'POST') {

@@ -40,7 +40,7 @@ test('静态占位装配不改显示状态，重复装配保留业务结果，�
 
 test('最近播放等待时显示动效，完成后原有列表渲染接管；失败时移除动画', async () => {
     const { context, view } = fixture();
-    const host = { innerHTML: '', set textContent(value) { this.innerHTML = value; } };
+    const host = { innerHTML: '', querySelector: () => ({ disabled: false }), set textContent(value) { this.innerHTML = value; } };
     context.document.getElementById = () => host;
     context.window.MusicExperience = { account: 'alice' };
     context.window.getUserAuthHeaders = () => ({});
@@ -54,7 +54,73 @@ test('最近播放等待时显示动效，完成后原有列表渲染接管；�
     resolve({ ok: true, json: async () => ({ items: [{ name: '歌曲' }], limit: 100 }) });
     await pending; assert.equal(host.innerHTML, '原有列表'); assert.equal(shown[1][0].name, '歌曲');
     const failed = context.window.RecentView.load(); resolve({ ok: false }); await failed;
-    assert.equal(host.innerHTML, '最近播放加载失败');
+    assert.ok(host.innerHTML.includes('最近播放暂时无法加载'));
+    assert.ok(host.innerHTML.includes('重新加载'));
+    assert.ok(!host.innerHTML.includes('lx-loading-bars'));
+});
+
+test('失败状态安全转义提示文字，重试期间阻止重复点击', async () => {
+    const { view } = fixture();
+    const button = { disabled: false }, host = { innerHTML: '', querySelector: () => button };
+    let calls = 0, finish;
+    view.showFailure(host, { title: '<img src=x>', description: '<script> &', variant: 'unknown', retry: () => {
+        calls++; return new Promise(resolve => { finish = resolve; });
+    } });
+    assert.ok(host.innerHTML.includes('&lt;img') && host.innerHTML.includes('&lt;script&gt; &amp;'));
+    assert.ok(!host.innerHTML.includes('<img') && host.innerHTML.includes('lx-load-error--section'));
+    assert.ok(host.innerHTML.includes('role="status"') && host.innerHTML.includes('type="button"'));
+    const pending = button.onclick();
+    await button.onclick(); assert.equal(calls, 1); assert.equal(button.disabled, true);
+    finish(); await pending; assert.equal(button.disabled, false);
+    view.showFailure(host); assert.ok(!host.innerHTML.includes('<button'));
+});
+
+test('最近播放网络异常显示中文提示，点击重试恢复列表，过期失败不覆盖页面', async () => {
+    const { context } = fixture();
+    const button = { disabled: false }, host = { innerHTML: '', querySelector: () => button };
+    context.document.getElementById = () => host;
+    context.window.MusicExperience = { account: 'alice' };
+    context.window.getUserAuthHeaders = () => ({});
+    vm.runInContext(fs.readFileSync(path.join(__dirname, '../client/music/views/recent/RecentView.js'), 'utf8'), context);
+    const recent = context.window.RecentView;
+    const render = recent.render;
+    recent.show = () => { host.innerHTML = '恢复后的歌曲列表'; };
+    for (const error of [new TypeError('Failed to fetch'), new SyntaxError('Unexpected token < in JSON')]) {
+        context.fetch = async () => { throw error; };
+        await recent.load();
+        assert.ok(host.innerHTML.includes('最近播放暂时无法加载'));
+        assert.ok(!host.innerHTML.includes(error.message));
+        render.call(recent);
+        assert.ok(host.innerHTML.includes('重新加载'), '窗口缩放重绘不覆盖失败提示');
+        context.fetch = async () => ({ ok: true, json: async () => ({ items: [], limit: 100 }) });
+        await button.onclick(); assert.equal(host.innerHTML, '恢复后的歌曲列表');
+    }
+    let reject;
+    context.fetch = () => new Promise((resolve, fail) => { reject = fail; });
+    const pending = recent.load();
+    context.window.MusicExperience.account = 'bob'; host.innerHTML = '新账号列表';
+    reject(new Error('Failed to fetch')); await pending;
+    assert.equal(host.innerHTML, '新账号列表');
+    context.window.MusicExperience.account = 'alice';
+    const old = recent.load(); const rejectOld = reject;
+    context.fetch = async () => ({ ok: true, json: async () => ({ items: [], limit: 100 }) });
+    await recent.load(); rejectOld(new Error('Failed to fetch')); await old;
+    assert.equal(host.innerHTML, '恢复后的歌曲列表');
+});
+
+test('主导航初始歌单加载占位属于歌单容器，收藏容器不包含它', () => {
+    const { context } = fixture();
+    const sidebar = { dataset: {}, innerHTML: '' };
+    context.document.getElementById = () => sidebar;
+    vm.runInContext(fs.readFileSync(path.join(__dirname, '../client/music/views/main-navigation/MainNavigation.js'), 'utf8'), context);
+    const favorites = sidebar.innerHTML.slice(sidebar.innerHTML.indexOf('id="my-lists-container"'), sidebar.innerHTML.indexOf('id="tab-dislike"'));
+    const playlists = sidebar.innerHTML.slice(sidebar.innerHTML.indexOf('id="playlist-lists-container"'));
+    assert.ok(!favorites.includes('正在加载歌单'));
+    for (const name of ['收藏歌曲', '收藏歌手', '收藏专辑']) assert.ok(favorites.includes(name));
+    for (const id of ['love', '__lib_artists__', '__lib_albums__']) assert.ok(favorites.includes(`data-sidebar-list-id="${id}"`));
+    assert.ok(playlists.includes('正在加载歌单') && playlists.includes('lx-loading--inline'));
+    sidebar.innerHTML = '业务渲染后的歌单'; context.window.MainNavigation.mount(sidebar);
+    assert.equal(sidebar.innerHTML, '业务渲染后的歌单');
 });
 
 test('播放缓冲使用紧凑动效并转义歌曲状态文字', () => {

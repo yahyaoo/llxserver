@@ -4,6 +4,16 @@ const assert = require('node:assert/strict')
 const fs = require('node:fs'), path = require('node:path'), vm = require('node:vm')
 const { PlaybackTracker, playCount, sortByPlayCount } = require('../client/music/js/play_statistics.js')
 
+test('旧最近记录从当前账号收藏补齐歌词参数，来源不符不混用', () => {
+  const window = { getUserAuthHeaders: () => ({}), currentListData: { loveList: [{ id: 'kg_one', source: 'kg', meta: { songmid: 'one', hash: 'restored-hash' } }], userList: [] } }
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../client/music/js/music_experience.js'), 'utf8'), { window, document: { documentElement: {}, addEventListener() {} }, URL, URLSearchParams, location: { origin: 'http://localhost' } })
+  const legacy = { id: 'kg_one', source: 'kg', name: '旧记录' }
+  assert.equal(window.MusicExperience.playable(legacy).hash, 'restored-hash')
+  assert.equal(window.MusicExperience.playable(legacy).songmid, 'one')
+  assert.equal(legacy.hash, undefined)
+  assert.equal(window.MusicExperience.playable({ ...legacy, source: 'qq' }).hash, undefined)
+})
+
 test('旧本地记录按当前账号重建目录及下载 URL，不复用保存时的令牌', () => {
   const context = vm.createContext({ window: { getUserAuthHeaders: () => ({ 'x-user-name': 'alice', 'x-user-token': 'current-token' }) },
     document: { documentElement: {}, addEventListener() {} }, URL, URLSearchParams, location: { origin: 'http://localhost' } })
@@ -106,7 +116,7 @@ test('最近播放显示表头、次数及正确播放顺序，音乐库详情�
     MusicExperience: { playable: song => song, coverCandidates: () => [] }, SongFileStatus: { update(host, items, selector) { bound = { items, selector } } },
     updatePlaylist(songs, index) { playlist = { songs, index } } }
   vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../client/music/views/recent/RecentView.js'), 'utf8'), {
-    window, document: { getElementById: id => nodes.get(id), querySelector: () => null, createElement: element },
+    window, document: { getElementById: id => nodes.get(id), querySelector: () => null, createElement: element, createTextNode: textContent => ({ textContent }) },
   })
   const songs = [{ id: 'low', name: '少次歌曲', singer: '歌手', source: 'wy', playCount: 1, playedAt: 2, albumName: '专辑甲' },
     { id: 'high', name: '多次歌曲', singer: '歌手', source: 'wy', playCount: 3, playedAt: 1, albumName: '专辑乙' }]

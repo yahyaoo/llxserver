@@ -55,3 +55,8 @@ test('占位图和不安全地址不能抢占真实封面，过期令牌替换�
   const url = new URL(w.MusicExperience.coverUrl({ pic: '/api/music/cache/cover?filename=x&user=bob&token=stale' }), 'http://localhost')
   assert.equal(url.searchParams.get('user'), 'alice'); assert.equal(url.searchParams.get('token'), 'current-token')
 })
+
+test('副本封面携带目录和位置，避免同名文件读取另一个副本', () => {
+  const w = runtime(), url = new URL(w.MusicExperience.coverUrl({source:'custom',filename:'同名.flac',folder:'cache',location:'root'}), 'http://localhost')
+  assert.equal(url.pathname, '/api/music/cache/cover'); assert.equal(url.searchParams.get('folder'), 'cache'); assert.equal(url.searchParams.get('location'), 'root')
+})

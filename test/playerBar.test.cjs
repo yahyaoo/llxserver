@@ -76,6 +76,18 @@ test('更多与音量面板互斥，重复点击关闭，无效入口保留当�
   assert.equal(get('player-volume-popover').hidden, true)
 })
 
+test('歌手和专辑共用单行容器，溢出滚动且缩短后复原', () => {
+  const { context, get } = createContext()
+  const container = get('player-metadata-text'), track = { scrollWidth: 600 }
+  container.clientWidth = 250; container.querySelector = () => track
+  context.window.playerBar.updateMetadataScroll()
+  assert.equal(container.attributes['data-overflow'], 'true')
+  assert.equal(container.style['--metadata-offset'], '-350px')
+  track.scrollWidth = 100; context.window.playerBar.updateMetadataScroll()
+  assert.equal(container.attributes['data-overflow'], 'false')
+  assert.equal(container.style['--metadata-offset'], '0px')
+})
+
 test('底栏普通位置打开播放页，按钮、进度、音量和弹框不触发导航', () => {
   const { context, get } = createContext()
   let opened = 0

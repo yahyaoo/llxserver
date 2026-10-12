@@ -284,6 +284,17 @@ window.CustomDirManager = {
         return Array.from(this.selectedItems);
     },
 
+    /** 点击歌曲行的非操作区域：批量模式切换选中，否则播放，与歌单页面保持一致。 */
+    handleRowClick(event, container) {
+        const row = event.target.closest('[data-lm-row-index]');
+        if (!row || !container.contains(row) || event.target.closest('button, a, input, label, select, textarea, [onclick], .song-row-actions')) return;
+        const index = parseInt(row.dataset.lmRowIndex || '', 10);
+        const item = this.displayData[index];
+        if (!item) return;
+        if (this.batchMode) this.toggleSelect(index, !this.selectedItems.has(item.filename));
+        else this.playItem(index);
+    },
+
     bindEvents() {
         if (this.listEventsBound) return;
         const container = document.getElementById('lm-list-container');
@@ -293,7 +304,10 @@ window.CustomDirManager = {
         container.addEventListener('click', (event) => {
             if (!this.isActive) return;
             const target = event.target.closest('[data-lm-action]');
-            if (!target || !container.contains(target)) return;
+            if (!target || !container.contains(target)) {
+                this.handleRowClick(event, container);
+                return;
+            }
             const index = parseInt(target.dataset.lmIndex || '', 10);
             switch (target.dataset.lmAction) {
                 case 'play':
@@ -426,7 +440,7 @@ window.CustomDirManager = {
                     window.LocalMusicManager.syncRemasterVisibility();
                 }
                 
-                this.originalData = result.data || [];
+                this.originalData = window.SongIdentity?.aggregate((result.data || []).map(item => ({ ...item, folder: 'custom' }))) || result.data || [];
                 this.originalData.sort((a, b) => (b.mtime || 0) - (a.mtime || 0));
                 this.applyFilters();
             } else {
@@ -869,7 +883,6 @@ window.CustomDirManager = {
                             <i class="fas fa-link text-[10px]"></i>
                         </button>
                     ` : ''}
-                    <button data-lm-action="playlist" data-lm-index="${index}" class="song-collect-btn" title="收藏到歌单"><i class="far fa-bookmark"></i></button>
                     <button data-library-more="${index}" type="button" title="更多"><i class="fas fa-ellipsis-h"></i></button>
                 </div>
             </div>

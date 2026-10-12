@@ -22,7 +22,21 @@
         });
     }
 
-    window.LoadingState = { render, mount };
+    /** 展示友好的失败状态；技术异常由调用方记录，不直接写入页面。 */
+    function showFailure(host, { title = '暂时无法加载', description = '请检查网络连接，或稍后再试。', variant = 'section', retry } = {}) {
+        if (!host) return;
+        const size = variants.has(variant) ? variant : 'section';
+        host.innerHTML = `<div class="lx-load-error lx-load-error--${size}" role="status" aria-live="polite"><span class="lx-load-error-icon" aria-hidden="true"><i class="fas fa-cloud"></i><i class="fas fa-exclamation"></i></span><strong class="lx-load-error-title">${escapeText(title)}</strong><span class="lx-load-error-description">${escapeText(description)}</span>${typeof retry === 'function' ? '<button type="button" class="lx-load-error-retry"><i class="fas fa-redo" aria-hidden="true"></i><span>重新加载</span></button>' : ''}</div>`;
+        const button = host.querySelector('.lx-load-error-retry');
+        if (button) button.onclick = async () => {
+            if (button.disabled) return;
+            button.disabled = true;
+            try { await retry(); }
+            finally { button.disabled = false; }
+        };
+    }
+
+    window.LoadingState = { render, mount, showFailure };
     mount();
     // 脚本后的静态弹窗也要装配；只在文档解析结束时再检查一次。
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => mount(), { once: true });

@@ -43,7 +43,7 @@
         if (!mobile.matches) return;
         const rows = root.matches?.('.song-row-actions') ? [root] : root.querySelectorAll('.song-row-actions');
         rows.forEach(actions => {
-            if (actions.querySelector('.song-row-more') || actions.querySelector('[data-library-more]')) return;
+            if (actions.querySelector('.song-row-more,.song-maintenance-menu,[data-library-more]')) return;
             const button = document.createElement('button');
             button.type = 'button'; button.className = 'song-row-more';
             button.title = '更多操作'; button.setAttribute('aria-label', '更多歌曲操作');

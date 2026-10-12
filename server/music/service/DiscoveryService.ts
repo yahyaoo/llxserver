@@ -1129,7 +1129,19 @@ export async function getMusicSongListDetail(context: RequestContext, runtime: D
           if (!musicSdk[source] || !musicSdk[source].songList) {
             throw new Error(`Source ${source} does not support songList`)
           }
-          const result = await musicSdk[source].songList.getListDetail(id, page)
+          const provider = musicSdk[source].songList as any
+          // 分阶段仅调整返回时间：歌曲列表与详情独立的音源不再等待详情，旧请求仍返回完整 JSON。
+          if (urlObj.searchParams.get('progressive') === '1' && source === 'mg' && /^\d+$/.test(id) && provider.getListDetailList && provider.getListDetailInfo) {
+            const infoPromise = provider.getListDetailInfo(id).catch(() => null)
+            const result = await provider.getListDetailList(id, page)
+            result.list = (result.list || []).map(normalizeSongInfo)
+            res.writeHead(200, { 'Content-Type': 'application/x-ndjson; charset=utf-8', 'Cache-Control': 'no-store', 'X-Accel-Buffering': 'no' })
+            res.write(JSON.stringify({ ...result, info: { name: '歌单', total: result.total } }) + '\n')
+            const info = await infoPromise
+            if (!res.destroyed) res.end(JSON.stringify({ info: info || { name: '歌单', total: result.total } }) + '\n')
+            return
+          }
+          const result = await provider.getListDetail(id, page)
           if (result && result.list) {
             result.list = result.list.map(normalizeSongInfo)
           }

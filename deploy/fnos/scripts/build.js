@@ -40,6 +40,11 @@ function preparePayload(root, pack, mode = 'all') {
     fs.copyFileSync(path.join(root, 'index.js'), path.join(payload, 'index.js'));
   }
   if (mode !== 'server') copyDir(path.join(root, 'dist/client'), path.join(payload, 'client'));
+  // 独立服务端不携带界面，但歌曲聚合必须使用同一构建的共享规则。作者：jingyh
+  if (mode === 'server') {
+    fs.mkdirSync(path.join(payload, 'client/music/js'), { recursive: true });
+    fs.copyFileSync(path.join(root, 'dist/client/music/js/song_identity.js'), path.join(payload, 'client/music/js/song_identity.js'));
+  }
   if (mode === 'client') copyDir(path.join(root, 'deploy/client'), path.join(payload, 'deploy/client'));
   // NAS 的业务配置由安装向导初始化到 SQL；载荷不包含开发机的密码或数据库路径。
   fs.writeFileSync(path.join(payload, 'config.js'), '/** SQLite 路径由共享空间引导文件保存。 @author yahyaoo */\nmodule.exports = {};\n');

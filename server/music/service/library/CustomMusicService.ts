@@ -327,6 +327,10 @@ export const syncCustomIndex = (username: string, strict = false, force = true):
                 index.clear()
                 for (const item of message.items) customIndexManager.set(username, item.filename, item)
                 customIndexManager.save(username)
+                // 手动和后台扫描都在完成前重建歌曲与文件的聚合子表。作者：yahyaoo
+                const { aggregateLibrary } = require('./LibraryAggregationService')
+                const { getLibraryItems } = require('../download/ServerDownloadService')
+                aggregateLibrary(username, [...await fileCache.getCacheList(username), ...message.items.map((item: any) => ({ ...item, folder: 'custom' })), ...getLibraryItems(username)])
                 Object.assign(entry.state, { status: message.errors.length ? 'error' : 'completed', completed: message.items.length, percent: 100, errors: message.errors, finishedAt: Date.now() })
                 if (strict && message.errors.length) reject(new Error(message.errors[0].message)); else resolve(message.items)
                 } catch (error) { reject(error) }
@@ -364,6 +368,7 @@ export const getCustomMusicList = async (username: string) => {
     const items = customIndexManager.getAll(username).filter(item => allowed.has((item as any).directoryId))
     return items.map(item => ({
         ...item,
+        folder: 'custom',
         songInfo: {
             id: item.id,
             songmid: item.songmid || item.id,

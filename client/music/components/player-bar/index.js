@@ -57,6 +57,7 @@
 
         /** 同步浮层遮挡范围，只用于滚动末尾留白，不改变页面高度。 */
         updateScrollClearance() {
+            this.updateMetadataScroll();
             const footer = document.getElementById('player-footer');
             if (!this.root || !footer) return;
             const rect = footer.getBoundingClientRect();
@@ -64,6 +65,17 @@
             const visible = rect.height > 0 && rect.top + rect.height > 0 && rect.top < viewportHeight;
             const clearance = visible ? Math.ceil(Math.min(viewportHeight, viewportHeight - rect.top) + 16) : 0;
             document.body.style.setProperty('--player-bar-clearance', `${clearance}px`);
+        }
+
+        /** 歌手和专辑保持单行；超长时往返滚动，原节点继续供播放页使用。 @author yahyaoo */
+        updateMetadataScroll() {
+            const container = document.getElementById('player-metadata-text');
+            const track = container?.querySelector('.player-metadata-track');
+            if (!container || !track) return;
+            const overflow = Math.max(0, track.scrollWidth - container.clientWidth);
+            container.setAttribute('data-overflow', String(overflow > 1));
+            container.style.setProperty('--metadata-offset', -overflow + 'px');
+            container.style.setProperty('--metadata-duration', Math.max(8, overflow / 24 + 4) + 's');
         }
 
         /** 窗口和组件尺寸改变时重新测量，避免手机布局沿用桌面补偿值。 */

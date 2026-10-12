@@ -63,7 +63,7 @@
     /** 统一按钮类型，保留导航选中态、纯图标按钮以及原来绑定的点击处理器。 */
     function button(source) {
         // 图片封面与磁贴自有布局，保留原生按钮语义，避免圆形内边距挤压图片。
-        if (source.matches('.player-cover-button,.playlist-add-tile,.song-cover-button,.recent-play-button,.download-cover-button,.player-icon-button,.player-menu-item,.player-detail-toolbar button,#player-footer button,.song-row-more,.player-feature-header button')) return;
+        if (source.matches('.player-cover-button,.playlist-add-tile,.song-cover-button,.recent-play-button,.download-cover-button,.player-icon-button,.player-menu-item,.player-detail-toolbar button,#player-footer button,.song-row-more,.playlist-group-link,.player-feature-header button')) return;
         const state = source.className.split(/\s+/).filter(name => !/^(el-button(?:--.*)?|lx-el-button|lx-el-navigation|is-circle|is-text|is-disabled)$/.test(name)).join(' ') + ':' + !!source.disabled;
         if (buttonStates.get(source) === state) return;
         buttonStates.set(source, state);
@@ -187,6 +187,8 @@
     /** 接入已有控件；Element 自己生成的内部控件不再递归适配。 */
     function upgrade(source) {
         if (source.closest('.lx-element-widget,.el-overlay,.el-message,.el-popper') || source.dataset.elementSource || source.type === 'hidden') return;
+        // 原生弹框内明确保留的字体选择使用浏览器控件，避免浮层及焦点冲突。作者：yahyaoo
+        if (source.tagName === 'SELECT' && source.id === 'lyric-font-family-select' && source.hasAttribute('data-native-select')) return;
         if (source.matches('button,a,[role="button"],.elfinder-button:not(.elfinder-button-search)')) { button(source); return; }
         if (source.tagName === 'SELECT') { widget(source, 'select'); return; }
         if (source.type === 'range') { widget(source, 'slider'); return; }

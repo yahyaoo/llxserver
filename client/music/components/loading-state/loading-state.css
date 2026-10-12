@@ -44,3 +44,25 @@
 @keyframes lx-loading-wave { 0%, 100% { transform: scaleY(.3); } 50% { transform: scaleY(1); } }
 @media (max-width: 700px) { .lx-loading--page { min-height: clamp(180px, 36dvh, 340px); } .lx-loading-art { width: 60px; height: 60px; } }
 @media (prefers-reduced-motion: reduce) { .lx-loading-art::before, .lx-loading-bars > span, :is(.fa-spinner, .fa-circle-notch).fa-spin { animation: none; } .lx-loading-bars > span { transform: scaleY(.65); } }
+
+/* 加载失败沿用主题色，以安静的提示和重试入口替代原始异常文本。 */
+.lx-load-error { box-sizing: border-box; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; width: 100%; min-height: 180px; padding: 32px 20px; text-align: center; color: var(--text-main, var(--text-primary, #334155)); grid-column: 1 / -1; }
+.lx-load-error--page { flex: 1; min-height: clamp(240px, 45dvh, 420px); }
+.lx-load-error-icon { position: relative; display: grid; place-items: center; width: 72px; height: 72px; margin-bottom: 6px; border-radius: 24px; background: color-mix(in srgb, currentColor 6%, transparent); }
+.lx-load-error-icon .fa-cloud { font-size: 30px; opacity: .4; }
+.lx-load-error-icon .fa-exclamation { position: absolute; right: 16px; bottom: 14px; font-size: 17px; }
+.lx-load-error-title { max-width: 100%; font-size: 17px; font-weight: 600; line-height: 1.5; overflow-wrap: anywhere; }
+.lx-load-error-description { max-width: 320px; color: var(--text-muted, var(--text-secondary, #64748b)); font-size: 13px; line-height: 1.8; overflow-wrap: anywhere; }
+.lx-load-error-retry { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 38px; margin-top: 6px; padding: 8px 18px; border: 1px solid color-mix(in srgb, currentColor 18%, transparent); border-radius: 999px; background: color-mix(in srgb, currentColor 5%, transparent); color: inherit; font-size: 13px; font-weight: 500; cursor: pointer; transition: background .15s ease; }
+.lx-load-error-retry:hover { background: color-mix(in srgb, currentColor 10%, transparent); }
+.lx-load-error-retry:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
+.lx-load-error-retry:disabled { opacity: .5; cursor: wait; }
+.lx-load-error--inline { min-height: 0; padding: 18px 12px; gap: 8px; }
+.lx-load-error--inline .lx-load-error-icon { width: 44px; height: 44px; border-radius: 14px; }
+.lx-load-error--inline .fa-cloud { font-size: 20px; }
+.lx-load-error--inline .fa-exclamation { right: 8px; bottom: 7px; font-size: 12px; }
+.lx-load-error--inline .lx-load-error-title { font-size: 13px; }
+:where(#search-results, #lm-list-container, #lb-songs-list):has(> .lx-load-error--page) { display: flex; flex-direction: column; justify-content: center; }
+.recent-view:not(.hidden):has(#recent-list > .lx-load-error--page) { display: flex; flex-direction: column; }
+#recent-list:has(> .lx-load-error--page) { flex: 1; display: flex; min-height: 0; border: 0; }
+@media (max-width: 700px) { .lx-load-error--page { min-height: clamp(200px, 36dvh, 340px); } }

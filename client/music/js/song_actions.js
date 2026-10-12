@@ -2,11 +2,13 @@
 (function () {
     let queue = Promise.resolve();
     const activeData = () => isUserLoggedIn() ? (window.myPersonalListData || currentListData) : currentListData;
+    const channelFor = data => ['_open', 'default', 'open'].includes(data?.username) ? 'favorites-public' : 'favorites';
+    const sameSong = (a, b) => window.SongIdentity ? !!window.SongIdentity.key(a) && window.SongIdentity.key(a) === window.SongIdentity.key(b) : !!a.id && a.id === b.id;
 
     function isLoved(song) {
         if (!song) return false;
-        const id = cleanSongData(song)?.id;
-        return !!activeData()?.loveList?.some(item => item.id === id);
+        const cleaned = cleanSongData(song);
+        return !!activeData()?.loveList?.some(item => sameSong(item, cleaned));
     }
 
     function renderLoveButton(song) {
@@ -39,8 +41,25 @@
             if (!data) { showError('请先登录或创建歌单'); return; }
             if (!isUserLoggedIn() && !(await requireAdminForOpenWrite('修改公开喜欢歌曲'))) return;
             const cleaned = cleanSongData(song);
+            if (window.ClientSync) {
+                const channel = channelFor(data);
+                window.ClientSync.seed(channel, data.loveList || []);
+                const original = data.loveList;
+                const next = [...original];
+                const index = next.findIndex(item => sameSong(item, cleaned));
+                if (index < 0) addMusicByConfiguredLocation(next, cleaned);
+                else next.splice(index, 1);
+                data.loveList = next;
+                renderMyLists(currentListData); refresh();
+                if (window.currentViewingListId === 'love' && data === currentListData) handleListClick('love', true, true);
+                if (currentPlayingSong) updatePlayerInfo(currentPlayingSong);
+                await window.ClientSync.update(channel, next);
+                await window.ListStore.cache?.(data);
+                showSuccess(index < 0 ? '已加入喜欢' : '已取消喜欢');
+                return;
+            }
             const next = { ...data, loveList: [...data.loveList] };
-            const index = next.loveList.findIndex(item => item.id === cleaned.id);
+            const index = next.loveList.findIndex(item => sameSong(item, cleaned));
             const willLove = index < 0;
             if (willLove) addMusicByConfiguredLocation(next.loveList, cleaned);
             else next.loveList.splice(index, 1);
@@ -70,5 +89,50 @@
         return queue;
     }
 
-    window.SongActions = { isLoved, renderLoveButton, toggleLove, refresh };
+    /** 本地未同步喜爱优先恢复，不能被服务端旧列表覆盖。 @author jingyh */
+    async function restorePending(data) {
+        if (!data || !window.ClientSync) return;
+        const channel = channelFor(data);
+        const items = await window.ClientSync.read(channel);
+        if (items) data.loveList = items;
+        else window.ClientSync.seed(channel, data.loveList || []);
+    }
+    const submitFavorites = isPublic => async (items, context) => {
+        if (!isPublic && window.SyncManager?.mode === 'remote' && window.SyncManager.client) {
+            await window.SyncManager.push({ ...activeData(), loveList: items }); return;
+        }
+        const baseline = JSON.parse(context.baseline || '[]');
+        const attempted = JSON.parse(context.uncertainBaseline || context.baseline || '[]');
+        const removed = [...baseline, ...attempted].filter((song, index, all) => all.findIndex(item => sameSong(item, song)) === index && !items.some(item => sameSong(item, song)));
+        const changes = removed.map(song => ({ song, loved: false }));
+        const additions = items.filter(song => !baseline.some(item => sameSong(item, song)) || !attempted.some(item => sameSong(item, song)));
+        const location = window.CONFIG?.['list.addMusicLocationType'] || 'top';
+        if (location === 'top') additions.reverse();
+        changes.push(...additions.map(song => ({ song, loved: true, location })));
+        // 只对仍保留的成员比较顺序，新增/删除按既有添加位置规则执行。
+        const orderChanged = prior => {
+            const common = items.filter(song => prior.some(item => sameSong(item, song)));
+            const oldCommon = prior.filter(song => items.some(item => sameSong(item, song)));
+            return common.some((song, index) => !sameSong(song, oldCommon[index]));
+        };
+        const reordered = orderChanged(baseline) || orderChanged(attempted);
+        if (!changes.length && !reordered) return;
+        const headers = { ...context.headers, 'Content-Type': 'application/json' };
+        if (isPublic) headers['x-user-name'] = '_open';
+        if (changes.length) {
+        const response = await fetch('/api/user/favorites' + (isPublic ? '?user=_open' : ''), {
+            method: 'POST', headers,
+            body: JSON.stringify({ changes }), signal: context.signal
+        });
+        if (!response.ok) throw new Error(await response.text() || '保存喜欢失败');
+        }
+        if (reordered) {
+            const response = await fetch('/api/music/user/list/reorder', { method: 'POST', headers, signal: context.signal,
+                body: JSON.stringify({ listId: 'love', orderedSongIds: items.map(song => String(song.id)) }) });
+            if (!response.ok) throw new Error(await response.text() || '保存喜欢排序失败');
+        }
+    };
+    window.ClientSync?.register('favorites', submitFavorites(false));
+    window.ClientSync?.register('favorites-public', submitFavorites(true));
+    window.SongActions = { isLoved, renderLoveButton, toggleLove, refresh, restorePending };
 })();

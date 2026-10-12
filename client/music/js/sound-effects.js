@@ -184,6 +184,7 @@ window.soundEffects = (function () {
                 customPresets = data.customPresets || [];
             } catch (e) { }
         }
+        window.ClientSync?.seed('sound-effects', { settings, customPresets });
     }
 
     function saveSettings() {
@@ -194,26 +195,31 @@ window.soundEffects = (function () {
         localStorage.setItem('lx_sound_effects', JSON.stringify(payload));
 
         if (window.settings && window.settings.saveAccountSettingsToFile) {
-            pushToServer(payload);
+            if (window.ClientSync) void window.ClientSync.update('sound-effects', payload).catch(error => console.warn('[SoundEffects] 本地保存失败:', error));
+            else pushToServer(payload);
         }
     }
+    window.ClientSync?.register('sound-effects', pushToServer);
 
-    async function pushToServer(payload) {
-        if (localStorage.getItem('lx_sync_mode') !== 'local') return;
+    async function pushToServer(payload, context = null) {
+        if (localStorage.getItem('lx_sync_mode') !== 'local') return false;
         // 当前登录使用会话鉴权，不再读取或要求浏览器保存密码。
-        if (!window.isUserLoggedIn?.()) return;
+        if (!window.isUserLoggedIn?.()) return false;
 
         try {
-            await fetch('/api/user/sound-effects', {
+            const response = await fetch('/api/user/sound-effects', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    ...getUserAuthHeaders()
+                    ...(context?.headers || getUserAuthHeaders())
                 },
-                body: JSON.stringify(payload)
+                body: JSON.stringify(payload),
+                ...(context ? { signal: context.signal } : {})
             });
+            if (!response.ok) throw new Error('音效同步失败: HTTP ' + response.status);
         } catch (e) {
             console.error('[SoundEffects] Failed to sync settings to server:', e);
+            if (context) throw e;
         }
     }
 
@@ -225,13 +231,18 @@ window.soundEffects = (function () {
         if (!window.isUserLoggedIn?.()) return;
 
         try {
+            const ownerAtStart = window.ClientSync?.owner();
+            const saved = await window.ClientSync?.read('sound-effects');
+            if (saved) { settings = { ...settings, ...saved.settings }; customPresets = saved.customPresets || []; applySettings(); renderUI(); return; }
             const res = await fetch('/api/user/sound-effects', {
                 headers: getUserAuthHeaders()
             });
             if (res.ok) {
                 const data = await res.json();
+                if (window.ClientSync && (ownerAtStart !== window.ClientSync.owner() || window.ClientSync.has('sound-effects'))) return;
                 settings = { ...settings, ...data.settings };
                 customPresets = data.customPresets || [];
+                window.ClientSync?.seed('sound-effects', { settings, customPresets });
                 // Save to local
                 localStorage.setItem('lx_sound_effects', JSON.stringify({
                     settings: settings,
@@ -680,7 +691,8 @@ window.soundEffects = (function () {
         },
         fetchFromServer: fetchFromServer,
         pushToServer: () => {
-            pushToServer({ settings: settings, customPresets: customPresets });
+            const payload = { settings, customPresets };
+            return window.ClientSync ? window.ClientSync.update('sound-effects', payload) : pushToServer(payload);
         }
     };
 

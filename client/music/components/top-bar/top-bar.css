@@ -127,9 +127,20 @@ body:has(#view-search[data-online-search="true"]:not(.hidden)) .library-search {
 #main-sidebar.main-navigation { background: color-mix(in srgb, var(--bg-panel) calc(var(--surface-opacity) * 100%), transparent) !important; backdrop-filter: blur(var(--surface-blur, 24px)); -webkit-backdrop-filter: blur(var(--surface-blur, 24px)); }
 .has-music-background :is(.t-bg-panel,.settings-sidebar,.settings-content,.settings-form-card) { background-color: color-mix(in srgb, var(--bg-panel) calc(var(--surface-opacity) * 100%), transparent); backdrop-filter: blur(12px); }
 .has-music-background .t-bg-main { background-color: transparent; }
-.playlist-group-heading { display: flex; align-items: center; justify-content: space-between; padding: 24px 14px 10px; color: var(--text-muted); font-size: 12px; font-weight: 600; }
-.playlist-group-heading button { font-size: 15px; width: 28px; height: 28px; border-radius: 50%; }
-.playlist-group-heading button:hover { color: var(--c-500); background: var(--bg-item-hover); }
+.playlist-group-heading { display: flex; align-items: center; justify-content: space-between; padding: 2px 8px 10px 10px; color: var(--text-muted); font-size: 12px; font-weight: 600; }
+.playlist-group-heading #playlist-actions-button { font-size: 15px; width: 28px; height: 28px; border-radius: 50%; }
+.playlist-group-heading #playlist-actions-button:hover { color: var(--c-500); background: var(--bg-item-hover); }
+/* 歌单入口做成带图标和箭头的胶囊，悬停时箭头前移，提示可以进入歌单总览。 */
+:root .playlist-group-heading .playlist-group-link {
+    display: inline-flex; align-items: center; gap: 8px; width: auto; height: 34px; padding: 0 10px 0 12px;
+    border: 1px solid color-mix(in srgb, var(--c-500) 22%, transparent) !important; border-radius: 17px;
+    background: color-mix(in srgb, var(--c-500) 8%, transparent) !important; color: var(--text-main) !important;
+    font-size: 14px; font-weight: 650; box-shadow: none !important;
+}
+.playlist-group-link > i:first-child { color: var(--theme-readable-accent, var(--c-500)); font-size: 13px; }
+.playlist-group-arrow { font-size: 10px; color: var(--text-muted); transition: transform .2s ease, color .2s ease; }
+:root .playlist-group-heading .playlist-group-link:hover { background: color-mix(in srgb, var(--c-500) 17%, var(--bg-panel)) !important; border-color: color-mix(in srgb, var(--c-500) 55%, transparent) !important; }
+.playlist-group-link:hover .playlist-group-arrow { transform: translateX(3px); color: var(--theme-readable-accent, var(--c-500)); }
 .navigation-collapsed #playlist-lists-container, .navigation-collapsed .playlist-group-heading { display: none; }
 @media (max-width: 900px) {
     #music-top-bar { left: 12px; right: 12px; gap: 10px; }

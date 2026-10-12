@@ -26,7 +26,9 @@
         /** 同曲请求共用进行中的任务；旧歌曲的响应不再更新当前歌词。 */
         load(song, loader, apply, reset, fail) {
             const account = window.MusicExperience?.account || '';
-            const key = JSON.stringify([account, PlaybackLyrics.identify(song).key]);
+            // 同曲补齐平台查询参数后重新获取，避免缺少 hash 时的空结果被继续复用。作者：yahyaoo
+            const query = ['hash', 'copyrightId', 'lrcUrl', 'mrcUrl', 'trcUrl'].map(field => song[field] || song.meta?.[field] || '');
+            const key = JSON.stringify([account, PlaybackLyrics.identify(song).key, query]);
             if (this.key === key && (this.pending || this.ready)) return this.pending || Promise.resolve();
             this.key = key;
             this.ready = false;

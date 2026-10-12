@@ -36,8 +36,10 @@ test('SQL 失败时不覆盖内存，成功时才刷新歌单快照与客户端�
   let captured
   const successful = new LxConfigurationImportService({ replace(...args) { captured = args } })
   const result = await successful.import(space, { lists })
-  assert.equal(restored, lists)
-  assert.equal(result.songs, 3); assert.equal(result.playlists, 3)
+  assert.deepEqual(restored, { ...lists, defaultList: [song] })
+  assert.equal(lists.defaultList.length, 2, '聚合不能修改原始导入参数')
+  assert.deepEqual(captured[1].lists, restored, '持久化快照与内存恢复使用相同聚合结果')
+  assert.equal(result.songs, 2); assert.equal(result.playlists, 3)
   assert.deepEqual(snapshots.snapshotInfo.clients, {})
   assert.equal(captured[2].info.latest, snapshots.snapshotInfo.latest)
 })

@@ -51,20 +51,14 @@
     border-radius: 8px;
     flex-shrink: 0;
 }
-.song-row-actions > button:hover { box-shadow: inset 0 0 0 1px var(--c-400); }
-.song-row-actions > button:not(:disabled):hover > i { animation: song-action-hop 380ms ease-out; }
+.song-row-actions > button:not(:disabled):hover > i { animation: page-action-jump .5s cubic-bezier(.3,.7,.4,1); }
 /* 歌手、专辑和在线歌单卡片同样默认展示已有操作。 */
 :root .music-shell :is(button[id^="singer-fav-"], button[id^="singer-dislike-"],
     button[id^="album-fav-"], button[id^="album-dislike-"], .artist-album-download-btn,
     .artist-album-favorite-btn, .lib-fav-btn, .lib-album-download-btn) { opacity: 1; }
 :root .music-shell :is(button[id^="singer-fav-"], button[id^="singer-dislike-"],
     button[id^="album-fav-"], button[id^="album-dislike-"], .artist-album-download-btn,
-    .artist-album-favorite-btn, .lib-fav-btn, .lib-album-download-btn):hover > i { animation: song-action-hop 380ms ease-out; }
-@keyframes song-action-hop {
-    0%, 100% { transform: translateY(0); }
-    35% { transform: translateY(-4px) rotate(-8deg); }
-    65% { transform: translateY(-1px) rotate(5deg); }
-}
+    .artist-album-favorite-btn, .lib-fav-btn, .lib-album-download-btn):hover > i { animation: page-action-jump .5s cubic-bezier(.3,.7,.4,1); }
 @media (prefers-reduced-motion: reduce) {
     .song-row-actions > button > i,
     :is(button[id^="singer-fav-"], button[id^="singer-dislike-"], button[id^="album-fav-"],
