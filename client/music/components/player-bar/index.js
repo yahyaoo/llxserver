@@ -47,6 +47,11 @@
             document.addEventListener('click', this.onDocumentClick);
             document.addEventListener('keydown', this.onDocumentKeydown);
             document.getElementById('volume-container')?.addEventListener('keydown', this.onVolumeKeydown);
+            this.unsubscribeLyrics = window.playbackLyrics?.subscribe(state => {
+                if (this.lyricLines !== state.lines || this.lyricMessage !== state.message) this.setLyrics(state.lines, state.message);
+                this.updateLyrics(state.index);
+            });
+            this.renderTitle();
             this.observeLayout();
         }
 
@@ -81,6 +86,8 @@
         /** 卸载组件并释放事件，不更改音频状态。 */
         destroy() {
             if (!this.root) return;
+            this.unsubscribeLyrics?.();
+            this.unsubscribeLyrics = null;
             document.getElementById('player-footer')?.removeEventListener('click', this.onBarClick);
             document.removeEventListener('click', this.onDocumentClick);
             document.removeEventListener('keydown', this.onDocumentKeydown);
@@ -98,12 +105,43 @@
             this.root = null;
         }
 
-        /** 换歌或重载歌词时清空旧内容；底栏复用详情页的歌词时间轴。 */
+        /** 歌曲信息刷新不清空歌词；歌词状态由公共会话统一发布。 */
         setTrack(song) {
-            const key = [song.source, song.id || song.songmid || song._localFilename, song.name, song.singer].join('|');
-            if (this.trackKey === key) return;
-            this.trackKey = key;
-            this.setLyrics([], '暂无歌词');
+            this.trackTitle = song.name || '未知歌曲';
+            this.renderTitle();
+        }
+
+        /** 播放准备进度由真实阶段推进，绑定请求，旧请求不能覆盖新歌曲。 */
+        beginLoading(requestId) {
+            this.loadingRequestId = requestId;
+            this.loading = true;
+            this.loadingProgress = 0;
+            this.loadingSource = '';
+            this.renderTitle();
+        }
+        advanceLoading(percent, requestId = this.loadingRequestId) {
+            if (!this.loading || requestId !== this.loadingRequestId || !Number.isFinite(percent)) return;
+            this.loadingProgress = Math.max(this.loadingProgress, Math.min(99, Math.round(percent)));
+            this.renderTitle();
+        }
+        bindLoadingSource(url, requestId) {
+            if (this.loading && this.loadingRequestId === requestId) this.loadingSource = url;
+        }
+        matchesLoadingSource(url) { return this.loading && !!this.loadingSource && this.loadingSource === url; }
+        finishLoading(requestId = this.loadingRequestId) {
+            if (!this.loading || requestId !== this.loadingRequestId) return;
+            this.loading = false;
+            this.renderTitle();
+        }
+        /** 仅改变歌曲名显示，其他控件和详情页共用原节点。 */
+        renderTitle() {
+            const title = document.getElementById('player-title');
+            if (!title) return;
+            const text = this.loading ? '正在加载中 ' + this.loadingProgress + '%' : this.trackTitle || '暂无播放';
+            title.textContent = text;
+            title.setAttribute('data-text', text);
+            title.setAttribute('aria-busy', String(!!this.loading));
+            title.setAttribute('title', this.loading ? '播放准备进度 · ' + (this.trackTitle || '') : text);
         }
 
         /** 保存当前歌曲的歌词集合。 */
@@ -123,11 +161,11 @@
                 for (const line of [current, next]) line.animate?.([{ transform: 'translateY(8px)', opacity: .4 }, { transform: 'translateY(0)', opacity: 1 }], { duration: 220 });
             }
             this.lyricIndex = index;
-            current.textContent = this.lyricLines[first]?.text || this.lyricMessage || '暂无歌词';
+            current.textContent = (this.lyricLines[first]?.text || this.lyricLines[first]?.words?.map(word => word.text).join('')) || this.lyricMessage || '暂无歌词';
             if (!this.lyricLines.length && this.lyricMessage?.includes('加载')) {
                 current.innerHTML = window.LoadingState.render(this.lyricMessage, 'inline');
             }
-            next.textContent = this.lyricLines[first + 1]?.text || '';
+            next.textContent = (this.lyricLines[first + 1]?.text || this.lyricLines[first + 1]?.words?.map(word => word.text).join('')) || '';
             for (const line of [current, next]) line.setAttribute('title', line.textContent);
         }
 

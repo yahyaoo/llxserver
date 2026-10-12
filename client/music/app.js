@@ -212,7 +212,6 @@ let currentRawLrc = '';
 let currentRawTlrc = '';
 let currentRawRlrc = '';
 let currentRawKlrc = ''; // 逐词歌词 (klyric/lxlyric)
-let lastLyricSongId = null; // 追踪上次加载歌词的歌曲ID
 
 let currentRecoveryState = null; // 播放失败自动恢复状态管理
 let currentPlaybackErrorHandler = null; // 当前音频地址的错误恢复监听器
@@ -6286,6 +6285,7 @@ async function playSong(song, index, forceQuality = null, noPlay = false, isRetr
 
     currentPlayingSong = song;
     window.currentPlayingSong = song; // expose for lyric-card.js
+    window.playerBar?.beginLoading(thisRequestId);
     // The advertised quality is not necessarily the quality that will be played.
     // Clear the previous song's quality until URL resolution confirms the actual one.
     updatePlayerInfo(song, null);
@@ -6311,15 +6311,7 @@ async function playSong(song, index, forceQuality = null, noPlay = false, isRetr
         indicator.style.display = 'none';
     }
 
-    // Show persistent loading toast
-    if (!isRetry) {
-        RecoveryToast.dismiss();
-        showInfo(`正在加载: ${song.name}...`);
-    } else if (isRetry === true) {
-        if (!RecoveryToast.isActive()) {
-            showInfo(`链接过期或失效，正在为您重新在线解析: ${song.name}...`);
-        }
-    }
+    if (!isRetry) RecoveryToast.dismiss();
 
     // 处理切换提示的显示与隐藏
     const hint = document.getElementById('toggle-hint');
@@ -6382,6 +6374,7 @@ async function playSong(song, index, forceQuality = null, noPlay = false, isRetr
 
         // 2. Stale Check
         if (currentLoadingRequestId !== thisRequestId) return;
+        window.playerBar?.advanceLoading(60, thisRequestId);
 
         if (currentRecoveryState) {
             currentRecoveryState.currentApiSourceName = urlResult.sourceName || '';
@@ -6480,6 +6473,7 @@ async function playSong(song, index, forceQuality = null, noPlay = false, isRetr
         audio.addEventListener('error', currentPlaybackErrorHandler, { once: true });
 
         playbackTracker.prepare(playbackSong, currentQuality, !!isRetry);
+        window.playerBar?.bindLoadingSource(new URL(finalUrl, location.href).href, thisRequestId);
         audio.src = finalUrl;
 
         if (noPlay) {
@@ -6507,6 +6501,7 @@ async function playSong(song, index, forceQuality = null, noPlay = false, isRetr
             if (thisRequestId !== currentLoadingRequestId) return;
             if (settings.enableCrossfade) fadeVolume(typeof currentVolume !== 'undefined' ? currentVolume : 1);
 
+            window.playerBar?.finishLoading(thisRequestId);
             setPlayerStatus('', true);
             updatePlayButton(true);
 
@@ -6596,6 +6591,7 @@ async function playSong(song, index, forceQuality = null, noPlay = false, isRetr
         }
     } finally {
         if (currentLoadingRequestId === thisRequestId) {
+            window.playerBar?.finishLoading(thisRequestId);
             currentLoadingRequestId = 0;
             currentLoadingSongId = null;
         }
@@ -6610,6 +6606,16 @@ async function playSong(song, index, forceQuality = null, noPlay = false, isRetr
  * @param {boolean} isLoading 是否显示加载/缓冲动画
  */
 function setPlayerStatus(status, isPlaying = null, isLoading = false) {
+    if (isLoading) {
+        if (currentLoadingRequestId) window.playerBar?.advanceLoading(status.includes('获取') ? 30 : 10, currentLoadingRequestId);
+        else if (audio && !audio.paused && !audio.ended) {
+            if (!window.playerBar?.loading) {
+                window.playerBar?.beginLoading(0);
+                window.playerBar?.bindLoadingSource(audio.src, 0);
+            }
+            window.playerBar?.advanceLoading(70, 0);
+        }
+    } else if (!currentLoadingRequestId && (!isPlaying || audio?.readyState >= 3)) window.playerBar?.finishLoading();
     const statusEl = document.getElementById('player-status');
     if (!statusEl) return;
 
@@ -6840,8 +6846,7 @@ function updatePlayerInfo(song, actualQuality) {
     // Bottom Player - 更新标题
     const titleEl = document.getElementById('player-title');
     if (titleEl) {
-        titleEl.innerText = song.name;
-        titleEl.setAttribute('data-text', song.name);
+        window.playerBar?.renderTitle();
         titleEl.classList.add('truncate');
         titleEl.classList.remove('overflow-hidden');
 
@@ -6878,6 +6883,14 @@ function updatePlayerInfo(song, actualQuality) {
 
         artistEl.onclick = null;
         artistEl.classList.add('hover:text-emerald-500', 'cursor-pointer', 'transition-colors');
+    }
+
+    const albumEl = document.getElementById('player-album');
+    if (albumEl) {
+        const album = getSongAlbumName(song);
+        albumEl.textContent = album ? ' - ' + album : '';
+        albumEl.title = album;
+        albumEl.hidden = !album;
     }
 
     // 触发滚动检测
@@ -7166,6 +7179,7 @@ audio.addEventListener('play', () => {
 });
 
 audio.addEventListener('playing', () => {
+    if (audio.readyState >= 3 && window.playerBar?.matchesLoadingSource(audio.currentSrc || audio.src)) window.playerBar.finishLoading();
     // [Fix] 'playing' 事件表示音频真正开始震动输出，此时同步最准确
     setPlayerStatus('', true); // 恢复正常播放状态
     if ('mediaSession' in navigator) {
@@ -7356,13 +7370,17 @@ audio.addEventListener('ended', () => {
 });
 
 audio.addEventListener('canplay', () => {
+    if (audio.readyState >= 3 && window.playerBar?.matchesLoadingSource(audio.currentSrc || audio.src)) window.playerBar.advanceLoading(95);
     if ('mediaSession' in navigator) {
         updatePositionState();
     }
 });
 
 // Additional events to sync progress
-audio.addEventListener('loadedmetadata', updatePositionState);
+audio.addEventListener('loadedmetadata', () => {
+    updatePositionState();
+    if (audio.readyState >= 1 && window.playerBar?.matchesLoadingSource(audio.currentSrc || audio.src)) window.playerBar.advanceLoading(80);
+});
 audio.addEventListener('ratechange', updatePositionState);
 audio.addEventListener('seeked', () => {
     updatePositionState();
@@ -8981,283 +8999,114 @@ function updateDetailInfo(song) {
 }
 
 
-/**
- * 读取本地未关联歌曲的内嵌歌词（或作为网络获取失败时的兜底）
- * @param {object} song 歌曲对象
- * @param {boolean} [silent=false] 是否静默模式（为 true 时若无内嵌歌词不覆盖 UI 为暂无歌词）
- * @returns {Promise<boolean>} 是否成功获取并应用了内嵌歌词
- */
-async function fetchEmbedLyricForLocalSong(song, silent = false) {
+/** 读取内嵌歌词，仅返回数据；展示与请求并发由公共歌词会话负责。 */
+async function fetchEmbedLyricForLocalSong(song) {
     const filename = song._localFilename || song.customFilename || song.filename;
     const username = song._localUsername || '';
-    const isCustomDir = !!song._isCustomDir || song.folder === 'custom' || !!song.isCustomFile;
-
-    // 显示加载状态（若非静默模式）
-    if (!silent) {
-        const lyricContent = document.getElementById('lyric-content');
-        if (lyricContent) lyricContent.innerHTML = window.LoadingState.render('正在加载内嵌歌词…');
-        currentLyricLines = [];
-    }
-
+    const custom = !!song._isCustomDir || song.folder === 'custom' || !!song.isCustomFile;
+    const url = custom
+        ? `/api/music/custom/embedLyric?filename=${encodeURIComponent(filename)}&user=${encodeURIComponent(username)}`
+        : `/api/music/cache/embedLyric?filename=${encodeURIComponent(filename)}&folder=${encodeURIComponent(song._localFolder || song.folder || 'cache')}`;
     try {
-        const headers = {};
-        Object.assign(headers, getUserAuthHeaders());
-
-        let apiUrl;
-        if (isCustomDir) {
-            apiUrl = `/api/music/custom/embedLyric?filename=${encodeURIComponent(filename)}&user=${encodeURIComponent(username)}`;
-        } else {
-            const folder = song._localFolder || song.folder || 'cache';
-            apiUrl = `/api/music/cache/embedLyric?filename=${encodeURIComponent(filename)}&folder=${encodeURIComponent(folder)}`;
-        }
-
-        const res = await fetch(apiUrl, { headers });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-
-        const lrc = data.lrc || '';
-        if (!data.success || !lrc || lrc.trim().length < 5) {
-            console.log('[Lyric] 内嵌歌词为空，无歌词展示');
-            if (!silent) {
-                renderLyric([], '暂无内嵌歌词');
-            }
-            return false;
-        }
-
-        console.log(`[Lyric] 成功读取内嵌歌词: ${filename} (长度: ${lrc.length})`);
-        currentRawLrc = lrc;
-        currentRawTlrc = '';
-        currentRawRlrc = '';
-        currentRawKlrc = '';
-
-        // 更新歌词 key 防止重复加载
-        lastLyricSongId = `_local_embed_${filename}`;
-
-        initLyricPlayer();
-        applyLyricUpdate();
-        return true;
-    } catch (e) {
-        console.warn('[Lyric] 读取内嵌歌词失败:', e);
-        if (!silent) {
-            renderLyric([], '暂无歌词');
-        }
-        return false;
+        const response = await fetch(url, { headers: getUserAuthHeaders() });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+        return data.success && data.lrc?.trim().length >= 5 ? window.PlaybackLyrics.normalize(data) : null;
+    } catch (error) {
+        console.warn('[Lyric] 读取内嵌歌词失败:', error);
+        return null;
     }
 }
 
-async function fetchLyric(song, quality = null) {
-    if (!song) {
-        return;
+/** 统一歌词数据获取顺序：浏览器缓存、服务器缓存、平台接口、本地内嵌兜底。 */
+async function loadLyricData(song, quality = null) {
+    const { source, songmid } = window.PlaybackLyrics.identify(song);
+    const local = song.isLocal && song._localFilename;
+    if (!source || !songmid || source === 'custom' || source === 'local') {
+        return local ? fetchEmbedLyricForLocalSong(song) : null;
     }
-
-    // 支持两种数据结构:
-    // 1. 搜索结果: song.songmid, song.source 在顶层
-    // 2. 收藏列表: song.songmid, song.source 可能在 meta 中
-    // 3. 不同平台字段名差异: songmid vs songId
-    let songmid = song.songmid || song.songId;
-    let source = song.source;
-
-    // 如果顶层没有,尝试从 meta 中获取
-    if (!songmid && song.meta) {
-        songmid = song.meta.songmid || song.meta.songId;
-    }
-    if (!source && song.meta) {
-        source = song.meta.source;
-    }
-
-    // 如果还是没有必要的数据，检查是否为本地文件（可尝试读取内嵌歌词）
-    if (!songmid || !source || source === 'custom' || source === 'local') {
-        // [新增] 本地未关联歌曲：优先尝试读取音频文件内嵌歌词
-        if (song.isLocal && song._localFilename) {
-            console.log('[Lyric] 本地未关联歌曲，尝试读取内嵌歌词:', song._localFilename);
-            await fetchEmbedLyricForLocalSong(song);
-        } else {
-            console.warn('[Lyric] 歌曲缺少必要的字段 songmid/songId 或 source:', song);
-        }
-        return;
-    }
-
-    // [Optimize] 如果歌曲未变化且已有歌词，跳过完整加载流程逻辑
-    const currentLyricKey = `${source}_${songmid} `;
-    if (lastLyricSongId === currentLyricKey && currentLyricLines.length > 0) {
-        console.log(`[Lyric] 歌词已就绪(${currentLyricKey})，同步播放状态`);
-        if (lyricPlayer) {
-            applyLyricUpdate();
-        }
-        return;
-    }
-    lastLyricSongId = currentLyricKey;
-    window.playerBar?.setLyrics([], '正在加载歌词…');
-
-    document.getElementById('lyric-content').innerHTML = window.LoadingState.render('正在加载歌词…');
-    currentLyricLines = [];
-
-    // ===== 1. 尝试读取浏览器本地缓存 (最高优先级) =====
+    // 保留已有缓存键，避免旧歌词缓存失效。
     const cacheKey = `lx_lyric_${source}_${songmid} `;
     if (settings.enableLyricCache !== false) {
         try {
             const cached = localStorage.getItem(cacheKey);
-            if (cached) {
-                const data = JSON.parse(cached);
-                currentRawLrc = data.lrc || '';
-                currentRawTlrc = data.tlyric || '';
-                currentRawRlrc = data.rlyric || '';
-                currentRawKlrc = data.klyric || data.lxlyric || '';
-
-                console.log(`[Lyric] 使用浏览器本地缓存歌词: ${songmid} `);
-                initLyricPlayer();
-                applyLyricUpdate();
-                return; // 命中缓存，直接返回
-            }
-        } catch (e) {
-            console.warn('[Lyric] 读取浏览器本地缓存失败:', e);
+            if (cached) return window.PlaybackLyrics.normalize(JSON.parse(cached));
+        } catch (error) {
+            console.warn('[Lyric] 读取浏览器缓存失败:', error);
             localStorage.removeItem(cacheKey);
         }
     }
-
-    // ===== 2. 尝试读取服务器端缓存歌词 =====
-    const username = currentListData?.username || '';
-    const headers = {};
-    Object.assign(headers, getUserAuthHeaders());
-
+    const headers = getUserAuthHeaders();
     if (settings.enableServerLyricCache !== false) {
         try {
-            const serverCacheUrl = `${API_BASE}/cache/lyric?source=${source}&songmid=${songmid}&songId=${encodeURIComponent(song.id || '')}&name=${encodeURIComponent(song.name || '')}&singer=${encodeURIComponent(song.singer || '')}`;
-            const scRes = await fetch(serverCacheUrl, { headers });
-            if (scRes.ok) {
-                const scData = await scRes.json();
-                if (scData.success && scData.data) {
-                    currentRawLrc = scData.data.lyric || scData.data.lrc || '';
-                    currentRawTlrc = scData.data.tlyric || '';
-                    currentRawRlrc = scData.data.rlyric || '';
-                    currentRawKlrc = scData.data.klyric || scData.data.lxlyric || '';
-
-                    console.log(`[Lyric] 使用服务器端缓存歌词: ${source}_${songmid} `);
-
-                    // 同步到浏览器本地缓存
-                    if (settings.enableLyricCache !== false && currentRawLrc) {
-                        localStorage.setItem(cacheKey, JSON.stringify({
-                            lrc: currentRawLrc, tlyric: currentRawTlrc, rlyric: currentRawRlrc, klyric: currentRawKlrc
-                        }));
-                    }
-
-                    initLyricPlayer();
-                    applyLyricUpdate();
-                    return;
+            const url = `${API_BASE}/cache/lyric?source=${encodeURIComponent(source)}&songmid=${encodeURIComponent(songmid)}&songId=${encodeURIComponent(song.id || '')}&name=${encodeURIComponent(song.name || '')}&singer=${encodeURIComponent(song.singer || '')}`;
+            const response = await fetch(url, { headers });
+            const cached = response.ok ? await response.json() : null;
+            if (cached?.success && cached.data) {
+                const raw = window.PlaybackLyrics.normalize(cached.data);
+                if (settings.enableLyricCache !== false && (raw.lrc || raw.klyric)) {
+                    localStorage.setItem(cacheKey, JSON.stringify(raw));
                 }
+                return raw;
             }
-        } catch (e) {
-            console.warn('[Lyric] 读取服务器端缓存失败:', e);
-        }
+        } catch (error) { console.warn('[Lyric] 读取服务器缓存失败:', error); }
     }
-
-    // ===== 3. 从网络抓取最新歌词 =====
     try {
-        const params = new URLSearchParams({
-            source,
-            songmid,
-            name: song.name || song.songname || '',
-            singer: song.singer || song.singername || '',
-            hash: song.hash || '',
-            interval: song.interval || song.duration || '',
-            copyrightId: song.copyrightId || '',
-            albumId: song.albumId || '',
-            lrcUrl: song.lrcUrl || '',
-            mrcUrl: song.mrcUrl || '',
-            trcUrl: song.trcUrl || ''
-        });
-
-        const url = `${API_BASE}/lyric?${params.toString()}`;
-        // [优化] 使用低优先级 fetch 获取歌词，避免阻塞主进程加载和 PWA 安装按钮出现
-        const res = await fetch(url, { headers, priority: 'low' });
-
-        if (!res.ok) {
-            throw new Error(`Fetch lyric failed: ${res.status}`);
+        const params = new URLSearchParams({ source, songmid, name: song.name || song.songname || '',
+            singer: song.singer || song.singername || '', hash: song.hash || song.meta?.hash || '',
+            interval: song.interval || song.duration || '', copyrightId: song.copyrightId || song.meta?.copyrightId || '',
+            albumId: song.albumId || song.meta?.albumId || '', lrcUrl: song.lrcUrl || song.meta?.lrcUrl || '',
+            mrcUrl: song.mrcUrl || song.meta?.mrcUrl || '', trcUrl: song.trcUrl || song.meta?.trcUrl || '' });
+        const response = await fetch(`${API_BASE}/lyric?${params}`, { headers, priority: 'low' });
+        if (!response.ok) throw new Error(`Fetch lyric failed: ${response.status}`);
+        const data = await response.json();
+        const raw = window.PlaybackLyrics.normalize(data);
+        if (!raw.lrc && !raw.klyric) return local ? fetchEmbedLyricForLocalSong(song) : raw;
+        if (settings.enableLyricCache !== false) {
+            try { localStorage.setItem(cacheKey, JSON.stringify(raw)); updateStorageStatsUI(); }
+            catch (error) { console.warn('[Lyric] 写入本地缓存失败:', error); }
         }
-
-        const data = await res.json();
-        currentRawLrc = data.lyric || data.lrc || '';
-        currentRawTlrc = data.tlyric || '';
-        currentRawRlrc = data.rlyric || '';
-        currentRawKlrc = data.klyric || data.lxlyric || '';
-
-        const isFromLocal = !!data._fromLocalCache;
-        console.log(`[Lyric] ${isFromLocal ? '使用服务器本地缓存歌词' : '获取到网络歌词'}:`, { source, songmid });
-
-        // ===== 4. 写入缓存 (浏览器本地 + 服务器端) =====
-        if (currentRawLrc) {
-            const cacheData = {
-                lrc: currentRawLrc,
-                tlyric: currentRawTlrc,
-                rlyric: currentRawRlrc,
-                klyric: currentRawKlrc
-            };
-
-            // 写入浏览器本地
-            if (settings.enableLyricCache !== false) {
-                try {
-                    localStorage.setItem(cacheKey, JSON.stringify(cacheData));
-                    updateStorageStatsUI();
-                } catch (e) {
-                    console.warn('[Lyric] 写入本地缓存失败:', e);
-                }
-            }
-
-            // 写入服务器端 (如果不是已经来自服务器缓存，且启用了服务端缓存)
-            if (settings.enableServerLyricCache !== false && !isFromLocal) {
-                try {
-                    fetch(`${API_BASE}/cache/lyric`, {
-                        method: 'POST',
-                        headers: {
-                            ...headers,
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            songInfo: { ...song, quality: (typeof quality !== 'undefined' ? quality : (typeof currentQuality !== 'undefined' ? currentQuality : null)) },
-                            lyricsObj: {
-                                lyric: currentRawLrc,
-                                tlyric: currentRawTlrc,
-                                rlyric: currentRawRlrc,
-                                lxlyric: currentRawKlrc
-                            }
-                        })
-                    }).catch(e => console.warn('[Lyric] 上传服务端缓存失败:', e));
-                } catch (e) { }
-            }
+        if (settings.enableServerLyricCache !== false && !data._fromLocalCache) {
+            fetch(`${API_BASE}/cache/lyric`, { method: 'POST',
+                headers: { ...headers, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ songInfo: { ...song, quality }, lyricsObj: {
+                    lyric: raw.lrc, tlyric: raw.tlyric, rlyric: raw.rlyric, lxlyric: raw.klyric } })
+            }).catch(error => console.warn('[Lyric] 上传服务端缓存失败:', error));
         }
-
-        if (!currentRawLrc) {
-            // [兜底] 若获取到的歌词为空，且该歌曲是本地文件，尝试读取其内嵌歌词兜底
-            if (song.isLocal && song._localFilename) {
-                console.log('[Lyric] 网络/缓存歌词为空，尝试使用本地内嵌歌词兜底:', song._localFilename);
-                const embedSuccess = await fetchEmbedLyricForLocalSong(song, true);
-                if (embedSuccess) return;
-            }
-            renderLyric([]);
-            return;
+        return raw;
+    } catch (error) {
+        if (local) {
+            const embedded = await fetchEmbedLyricForLocalSong(song);
+            if (embedded) return embedded;
         }
+        throw error;
+    }
+}
 
-        // Initialize LinePlayer
+/** 两处播放器仅调用此入口；请求去重、过期保护和状态发布统一处理。 */
+function fetchLyric(song, quality = null) {
+    if (!song) return Promise.resolve();
+    return window.playbackLyrics.load(song, item => loadLyricData(item, quality), raw => {
+        currentRawLrc = raw?.lrc || '';
+        currentRawTlrc = raw?.tlyric || '';
+        currentRawRlrc = raw?.rlyric || '';
+        currentRawKlrc = raw?.klyric || '';
+        if (!currentRawLrc && !currentRawKlrc) { renderLyric([]); return; }
         initLyricPlayer();
         applyLyricUpdate();
-
-    } catch (e) {
-        console.error(`[Lyric] Failed (${source}_${songmid}):`, e);
-
-        // [兜底] 若网络获取歌词抛错，且该歌曲是本地文件，尝试读取其内嵌歌词兜底
-        if (song.isLocal && song._localFilename) {
-            console.log('[Lyric] 网络获取歌词异常，尝试使用本地内嵌歌词兜底:', song._localFilename);
-            const embedSuccess = await fetchEmbedLyricForLocalSong(song, true);
-            if (embedSuccess) return;
-        }
-
-        renderLyric([], `暂无歌词 (${source}: ${songmid})`);
-    }
+    }, () => {
+        lyricPlayer?.pause();
+        currentRawLrc = currentRawTlrc = currentRawRlrc = currentRawKlrc = '';
+        renderLyric([], '正在加载歌词…');
+    }, error => {
+        console.warn('[Lyric] 歌词加载失败:', error);
+        renderLyric([], '暂无歌词');
+    });
 }
 
 // 辅助函数：根据当前设置应用歌词更新
 function applyLyricUpdate() {
-    if (!lyricPlayer || !currentRawLrc) return;
+    if (!lyricPlayer || (!currentRawLrc && !currentRawKlrc)) return;
 
     const extendedLyrics = [];
     const showTrans = settings.showLyricTranslation !== false;
@@ -9373,7 +9222,7 @@ function scrollToActiveLine(force = false) {
 
 // Sync lyric by line number (called by LinePlayer)
 function syncLyricByLineNum(lineNum) {
-    window.playerBar?.updateLyrics(lineNum);
+    window.playbackLyrics.setIndex(lineNum);
     // Always update the highlight classes regardless of scroll
     const container = document.getElementById('lyric-content');
     if (!container) return;
@@ -9680,12 +9529,17 @@ function updateScrollIndicator() {
 
 // renderLyric function - generates DOM elements for each lyric line
 function renderLyric(lines, emptyMsg = '暂无歌词') {
-    window.playerBar?.setLyrics(lines, emptyMsg);
+    currentLyricLines = lines;
+    currentLyricIndex = -1;
+    window.currentLyricLines = lines;
+    window.currentLyricIndex = -1;
+    window.playbackLyrics.setLines(lines, emptyMsg);
     const container = document.getElementById('lyric-content');
     container.innerHTML = '';
 
     if (lines.length === 0) {
-        container.innerHTML = `<p class="t-text-muted text-lg font-medium">${emptyMsg}</p>`;
+        if (emptyMsg.includes('加载')) container.innerHTML = window.LoadingState.render(emptyMsg);
+        else { const message = document.createElement('p'); message.className = 't-text-muted text-lg font-medium'; message.textContent = emptyMsg; container.append(message); }
         return;
     }
 

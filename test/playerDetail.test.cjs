@@ -60,7 +60,7 @@ function environment() {
   const song = add('player-song-info', footer), copy = add('track-copy', song);
   const miniLyrics = add('mini-lyrics', song, 'player-bar-lyrics');
   add('detail-visualizer', view);
-  add('player-title', copy); add('player-artist', copy); add('player-source', copy);
+  add('player-title', copy); const metadata = add('metadata', copy, 'player-metadata-row'); add('player-artist', metadata); add('player-album', metadata); add('player-source', metadata);
   const progress = add('progress', song, 'player-progress');
   add('time-current', progress); add('progress-container', progress); add('time-total', progress);
   const actions = add('actions', footer, 'player-actions'), more = add('more-anchor', actions);
@@ -102,8 +102,8 @@ test('进入播放页复用唯一控件，按钮顺序正确，退出恢复原�
   assert.equal(nodes.get('player-bar-root').parent, page.left);
   assert.deepEqual(nodes.get('actions').children.filter(node => node.tagName !== '#comment').map(node => node.id), ['player-like-btn', 'player-mobile-lyrics', 'queue', 'btn-sound-effects', 'comment', 'more-anchor']);
   assert.deepEqual(nodes.get('transport').children.filter(node => node.tagName !== '#comment').map(node => node.id), ['mode-anchor', 'prev', 'btn-play', 'next', 'volume-anchor']);
-  assert.equal(nodes.get('player-source').parent, nodes.get('progress'));
-  assert.equal(page.album.textContent, ' · 测试专辑');
+  assert.equal(nodes.get('player-source').parent, nodes.get('metadata'));
+  assert.equal(page.album.textContent, ' - 测试专辑');
   env.close();
   for (const id of ['player-bar-root', 'play-mode-btn', 'btn-sound-effects', 'comment', 'player-source', 'player-like-btn', 'queue', 'volume-anchor']) {
     const { node, parent, index } = original.get(id);
@@ -127,14 +127,14 @@ test('背景模式保留旧值并支持页面与歌手模式；无效值安全�
   assert.equal(nodes.get('view-player-detail').getAttribute('data-player-background'), 'dark');
 });
 
-test('手机歌曲标签跟随标题，切换到桌面恢复进度区，关闭时还原节点', () => {
+test('歌曲标签始终位于歌手专辑后，切换尺寸和关闭时保持原节点', () => {
   const env = environment(); env.window.innerWidth = 390; env.open();
-  assert.equal(env.nodes.get('player-source').parent, env.nodes.get('player-title').parentElement);
+  assert.equal(env.nodes.get('player-source').parent, env.nodes.get('metadata'));
   assert.equal(env.page.album.textContent, ' - 测试专辑');
   env.window.innerWidth = 1440; env.page.updateResponsiveLayout();
-  assert.equal(env.nodes.get('player-source').parent, env.nodes.get('progress'));
+  assert.equal(env.nodes.get('player-source').parent, env.nodes.get('metadata'));
   env.close();
-  assert.equal(env.nodes.get('player-source').parent, env.nodes.get('track-copy'));
+  assert.equal(env.nodes.get('player-source').parent, env.nodes.get('metadata'));
 });
 
 test('退出歌手背景后，迟到的头像请求和旧图片回调不能重新显示背景', async () => {

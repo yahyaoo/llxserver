@@ -48,6 +48,7 @@ function createContext() {
   const volumeFunctions = appSource.slice(appSource.indexOf('let currentVolume ='), appSource.indexOf('// ========== 播放模式'))
   const changeVolume = appSource.slice(appSource.indexOf('function changeVolume(delta)'), appSource.indexOf('// 注册全局键盘监听'))
   vm.runInContext(read('client/music/components/playback-experience/index.js'), context)
+  vm.runInContext(read('client/music/js/playback-lyrics.js'), context)
   vm.runInContext(read('client/music/components/player-bar/template.js'), context)
   vm.runInContext(read('client/music/components/player-bar/index.js'), context)
   vm.runInContext(volumeFunctions + changeVolume, context)
@@ -91,7 +92,7 @@ test('底栏普通位置打开播放页，按钮、进度、音量和弹框不�
   assert.equal(get('player-footer').events.click, undefined)
 })
 
-test('双行歌词同步前进、跳转和末尾，换歌清空旧歌词', () => {
+test('双行歌词同步前进、跳转和末尾，信息刷新不清空共享歌词', () => {
   const { context, get } = createContext()
   const bar = context.window.playerBar
   bar.setLyrics([{ text: '第一句' }, { text: '第二句' }, { text: '第三句' }])
@@ -105,8 +106,9 @@ test('双行歌词同步前进、跳转和末尾，换歌清空旧歌词', () =>
   bar.updateLyrics(0)
   assert.equal(get('player-lyric-current').textContent, '第一句')
   bar.setTrack({ id: 'next', name: '下一首' })
-  assert.equal(get('player-lyric-current').textContent, '暂无歌词')
-  assert.equal(get('player-lyric-next').textContent, '')
+  assert.equal(get('player-lyric-current').textContent, '第一句')
+  assert.equal(get('player-lyric-next').textContent, '第二句')
+  context.window.playbackLyrics.setLines([], '暂无歌词')
   bar.setLyrics([], '暂无歌词')
   assert.equal(get('player-lyric-current').textContent, '暂无歌词')
 })
@@ -322,3 +324,34 @@ test('移除底栏画布后详情页频谱独立初始化，旧底栏设置不�
   assert.equal(styles.opacity, '0')
   context.window.musicVisualizer.clear('footer')
 })
+
+/** 请求与界面状态回归：底栏是共享歌词的双行呈现层。 @author jingyh */
+test('共享歌词行号更新、同曲信息刷新、组件重挂载均保持双行一致', () => {
+  const { context, get } = createContext();
+  const { playerBar: bar, playbackLyrics: lyrics } = context.window;
+  const lines = [{ text: '第一句' }, { text: '第二句' }, { text: '第三句' }];
+  lyrics.setLines(lines); lyrics.setIndex(1);
+  bar.setTrack({ id: 'a', source: 'kg', name: '补全标题', singer: '补全歌手' });
+  assert.equal(get('player-lyric-current').textContent, '第二句');
+  assert.equal(get('player-lyric-next').textContent, '第三句');
+  bar.destroy(); bar.mount(get('player-bar-root'));
+  assert.equal(get('player-lyric-current').textContent, '第二句');
+  lyrics.setLines([], '暂无歌词');
+  assert.equal(get('player-lyric-current').textContent, '暂无歌词');
+});
+
+test('加载标题显示阶段百分比，刷新歌曲信息保留进度，旧请求不能结束新请求', () => {
+  const { context, get } = createContext(), bar = context.window.playerBar;
+  bar.setTrack({ name: '原歌曲' }); bar.beginLoading(1);
+  assert.equal(get('player-title').textContent, '正在加载中 0%');
+  bar.advanceLoading(30, 1); bar.setTrack({ name: '补全歌曲' }); bar.advanceLoading(10, 1);
+  assert.equal(get('player-title').textContent, '正在加载中 30%');
+  bar.beginLoading(2); bar.advanceLoading(99, 1); bar.finishLoading(1);
+  assert.equal(get('player-title').textContent, '正在加载中 0%');
+  bar.bindLoadingSource('new-url', 2);
+  assert.equal(bar.matchesLoadingSource('old-url'), false);
+  assert.equal(bar.matchesLoadingSource('new-url'), true);
+  bar.advanceLoading(95, 2); bar.finishLoading(2);
+  assert.equal(get('player-title').textContent, '补全歌曲');
+  assert.equal(get('player-title').attributes['aria-busy'], 'false');
+});

@@ -53,10 +53,10 @@ body:not(.player-detail-open):not(:has(#view-player-detail:not(.hidden))) #playe
     transition: color 0.18s, background-color 0.18s;
 }
 .player-icon-button:hover { color: var(--theme-readable-accent); background: var(--bg-item-hover); }
-#player-like-btn.text-red-500 { color: #f43f5e; }
+:root:root #player-like-btn[aria-pressed="true"], :root:root body .song-love-btn[aria-pressed="true"] { color: #f43f5e !important; }
 #player-like-btn[aria-pressed="false"] { color: var(--text-muted); }
-#player-like-btn:hover { color: #be123c; }
-:root.dark #player-like-btn:hover { color: #fda4af; }
+#player-like-btn:hover, .song-love-btn:hover { color: #be123c; }
+:root.dark #player-like-btn:hover, :root.dark .song-love-btn:hover { color: #fda4af; }
 .player-icon-button:focus-visible, .player-cover-button:focus-visible, .player-menu-item:focus-visible,
 .player-volume-track:focus-visible { outline: 2px solid var(--c-500); outline-offset: 3px; }
 #player-footer #btn-play { width: 44px; height: 44px; color: var(--text-main); font-size: 25px; }
@@ -78,7 +78,10 @@ body:not(.player-detail-open):not(:has(#view-player-detail:not(.hidden))) #playe
 /* 标签沿用洛雪的紧凑尺寸和平台、音质配色；容器间距替代来源标签的额外右边距。作者：jingyh */
 #player-source > span { font-size: 10px; line-height: 14px; padding: 0 4px; border-width: 1px; border-style: solid; border-radius: 4px; margin-right: 0; white-space: nowrap; }
 #player-title { font-size: 14px; }
-#player-artist { color: var(--text-dim); font-size: 12px; margin-top: 2px; }
+.player-metadata-row { display: flex; align-items: center; flex-wrap: wrap; gap: 2px 4px; min-width: 0; margin-top: 2px; }
+#player-artist, #player-album { color: var(--text-dim); font-size: 12px; max-width: 100%; }
+#player-album { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#player-album[hidden] { display: none; }
 .player-progress { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .player-time { font-size: 10px; color: var(--text-dim); font-variant-numeric: tabular-nums; }
 .player-progress-track { flex: 1; min-width: 0; height: 12px; display: flex; align-items: center; }
@@ -147,8 +150,8 @@ body:not(.player-detail-open):not(:has(#view-player-detail:not(.hidden))) #playe
     .player-track { gap: 8px; }
     .player-title-row { flex-wrap: wrap; gap: 3px; }
     #player-title { flex-basis: 100%; font-size: 13px; }
-    #player-source { order: 1; max-width: 100%; }
-    #player-artist { font-size: 11px; }
+    #player-source { max-width: 100%; }
+    #player-artist, #player-album { font-size: 11px; }
     .player-actions { grid-column: 1 / -1; grid-row: 2; gap: 8px; justify-content: flex-end; }
     .player-actions .player-icon-button { width: 28px; height: 30px; font-size: 15px; }
     .player-time { display: none; }

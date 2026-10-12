@@ -1,6 +1,8 @@
 /** 最近播放与本地歌手、专辑详情列表组件。 @author jingyh @date 2026-10-10 */
 (() => {
-    let entries = [], count = 100, recent = true, version = 0;
+    let entries = [], originalEntries = [], count = 100, recent = true, version = 0;
+    let query = '', searchOpen = false, batch = false, sortByName = false;
+    const selected = new Set();
     window.RecentView = {
         async load() {
             const host = document.getElementById('recent-list'); host.innerHTML = window.LoadingState.render('正在加载最近播放…', 'page');
@@ -16,6 +18,8 @@
         },
         show(title, items, isRecent = false, limit) {
             ++version;
+            query = ''; searchOpen = batch = sortByName = false; selected.clear();
+            originalEntries = items.slice();
             entries = isRecent ? window.PlayStatistics.sortByPlayCount(items) : items.slice(); count = 100; recent = isRecent;
             document.getElementById('recent-title').textContent = title;
             document.getElementById('recent-meta').textContent = `${items.length} 首${isRecent ? ` · 最多保留 ${limit} 条` : ' · 音乐库'}`;
@@ -25,12 +29,33 @@
         render() {
             const host = document.getElementById('recent-list'); host.replaceChildren();
             const header = document.createElement('div'); header.className = 'recent-table-header';
-            header.innerHTML = `<span class="recent-number" aria-hidden="true"></span><span class="recent-cover-label" aria-hidden="true"></span><span>歌曲 / 歌手</span><span class="recent-album">${recent ? '播放次数 ↓' : '专辑'}</span><span class="recent-time">${recent ? '最近播放时间' : '音质'}</span>`;
+            header.innerHTML = `<div class="recent-header-controls"><button type="button" title="歌曲排序" aria-label="歌曲排序" aria-pressed="${sortByName}" onclick="RecentView.toggleSort()"><i class="fas fa-sort-amount-down"></i></button><button type="button" title="批量操作" aria-label="批量操作" aria-pressed="${batch}" onclick="RecentView.toggleBatch()"><i class="fas fa-tasks"></i></button><button type="button" title="内搜索 (/)" aria-label="列表内搜索" aria-expanded="${searchOpen}" onclick="RecentView.toggleSearch()"><i class="fas fa-search"></i></button></div>` + `<span>歌曲 / 歌手</span><span class="recent-album">${recent ? '播放次数 ↓' : '专辑'}</span><span class="recent-time">${recent ? '最近播放时间' : '音质'}</span>`;
             host.append(header);
+            if (searchOpen) {
+                const search = document.createElement('input'); search.type = 'search'; search.className = 'recent-search';
+                search.placeholder = '搜索歌曲 / 歌手 / 专辑'; search.value = query; search.setAttribute('aria-label', '列表内搜索');
+                search.oninput = () => { query = search.value; this.render(); const input = document.querySelector('.recent-search'); input?.focus(); };
+                host.append(search);
+            }
+            if (batch) {
+                const toolbar = document.createElement('div'); toolbar.className = 'recent-batch-toolbar';
+                toolbar.innerHTML = `<span>已选 ${selected.size} 首</span><button onclick="RecentView.selectAll()">全选</button><button onclick="RecentView.collectSelected()">加入歌单</button><button onclick="RecentView.downloadSelected()">下载</button><button onclick="RecentView.toggleBatch()">退出</button>`;
+                host.append(toolbar);
+            }
+            const display = entries.map((song, index) => ({ song, index })).filter(({ song }) =>
+                [song.name, song.singer, window.getSongAlbumName?.(song)].some(value => String(value || '').toLowerCase().includes(query.toLowerCase())));
             if (!entries.length) { const empty = document.createElement('div'); empty.className = 'recent-empty'; empty.innerHTML = '<i class="far fa-clock"></i><strong>还没有播放记录</strong><span>成功播放超过 10 秒后，歌曲会出现在这里</span>'; host.append(empty); return; }
-            entries.slice(0, count).forEach((song, index) => {
+            if (!display.length) {
+                const empty = document.createElement('div'); empty.className = 'recent-empty'; empty.textContent = '没有匹配的歌曲'; host.append(empty); return;
+            }
+            display.slice(0, count).forEach(({ song, index }) => {
                 const row = document.createElement('div'); row.className = 'recent-song song-row';
                 const number = document.createElement('span'); number.className = 'recent-number'; number.textContent = String(index + 1).padStart(2, '0');
+                if (batch) {
+                    number.textContent = ''; const checkbox = document.createElement('input'); checkbox.type = 'checkbox';
+                    checkbox.checked = selected.has(index); checkbox.setAttribute('aria-label', '选择 ' + song.name);
+                    checkbox.onclick = event => { event.stopPropagation(); this.select(index); }; number.append(checkbox);
+                }
                 const img = document.createElement('img'); img.alt = ''; window.LibraryArtwork.attach(img, window.MusicExperience.coverCandidates(song));
                 const cover = document.createElement('button'); cover.type = 'button'; cover.className = 'song-cover recent-song-cover recent-play-button'; cover.title = '播放';
                 const overlay = document.createElement('span'); overlay.className = 'song-cover-play'; overlay.innerHTML = '<i class="fas fa-play"></i>';
@@ -42,11 +67,28 @@
                 const specs = document.createElement('span'); specs.className = 'recent-song-specs'; specs.innerHTML = window.SongMetadata?.render(song) || ''; info.append(specs);
                 const album = document.createElement('span'); album.className = recent ? 'recent-album recent-play-count' : 'recent-album'; album.textContent = recent ? `${window.PlayStatistics.playCount(song)} 次` : song.albumName || song.album || '—';
                 const date = document.createElement('time'); date.className = 'recent-time'; date.textContent = recent ? new Date(song.playedAt).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : song.quality || '';
-                row.append(number, cover, info, album, date); row.onclick = () => this.play(index); host.append(row);
+                row.append(number, cover, info, album, date); row.onclick = () => batch ? this.select(index) : this.play(index); host.append(row);
             });
-            window.SongFileStatus?.update(host, entries.slice(0, count), '.recent-song-info strong');
-            if (entries.length > count) { const more = document.createElement('button'); more.className = 'recent-more'; more.textContent = `加载更多（剩余 ${entries.length - count} 首）`; more.onclick = () => { count += 100; this.render(); }; host.append(more); }
+            window.SongFileStatus?.update(host, display.slice(0, count).map(item => item.song), '.recent-song-info strong');
+            if (display.length > count) { const more = document.createElement('button'); more.className = 'recent-more'; more.textContent = `加载更多（剩余 ${display.length - count} 首）`; more.onclick = () => { count += 100; this.render(); }; host.append(more); }
         },
+        /** 排序只调整当前展示；原始顺序可一键恢复，不保存到歌曲数据。 */
+        toggleSort() {
+            sortByName = !sortByName; selected.clear();
+            entries = sortByName ? entries.slice().sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'zh-CN'))
+                : recent ? window.PlayStatistics.sortByPlayCount(originalEntries) : originalEntries.slice();
+            this.render();
+        },
+        toggleSearch() { searchOpen = !searchOpen; if (!searchOpen) query = ''; this.render(); document.querySelector('.recent-search')?.focus(); },
+        toggleBatch() { batch = !batch; selected.clear(); this.render(); },
+        select(index) { selected.has(index) ? selected.delete(index) : selected.add(index); this.render(); },
+        selectAll() {
+            entries.forEach((song, index) => { if ([song.name, song.singer, window.getSongAlbumName?.(song)].some(value => String(value || '').toLowerCase().includes(query.toLowerCase()))) selected.add(index); });
+            this.render();
+        },
+        selectedSongs() { return [...selected].sort((a, b) => a - b).map(index => window.MusicExperience.playable(entries[index])); },
+        collectSelected() { const songs = this.selectedSongs(); if (songs.length) { window.batchCollectSongs = songs; window.openPlaylistAddModal(); } },
+        downloadSelected() { const songs = this.selectedSongs(); if (songs.length) window.batchDownloadSongs?.(songs); },
         play(index = 0) {
             if (!entries.length) return;
             const playlist = entries.map(song => window.MusicExperience.playable(song));

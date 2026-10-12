@@ -219,7 +219,7 @@
                         <div id="search-results-header"
                             class="grid grid-cols-12 gap-2 md:gap-4 px-5 py-3 border-b t-border-main t-bg-main text-gray-500 text-xs md:text-sm font-medium items-center flex-shrink-0 pr-6">
                             <div
-                                class="col-span-1 sm:col-span-1 text-center font-mono flex items-center justify-center gap-1 sm:gap-1.5">
+                                class="song-header-controls col-span-1 sm:col-span-1 text-center font-mono flex items-center justify-center gap-1 sm:gap-1.5">
                                 <button id="search-back-btn" onclick="goBackToSearch()"
                                     class="hidden px-1.5 py-1 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
                                     title="返回列表">
@@ -1056,8 +1056,10 @@
                     <!-- Header Row -->
                     <div
                         class="grid grid-cols-12 gap-2 md:gap-4 p-4 border t-border-main t-bg-main text-gray-500 text-[10px] sm:text-xs font-bold uppercase tracking-wider shrink-0 mt-2 rounded-t-xl">
-                        <div class="col-span-1 text-center font-mono flex items-center justify-center">
+                        <div class="song-header-controls col-span-1 text-center font-mono flex items-center justify-center">
                             <div class="flex items-center gap-1">
+                                <button onclick="if(document.getElementById('lm-filter-panel').classList.contains('hidden')) window.LocalMusicManager.toggleFilterPanel(); document.getElementById('lm-sort-by').focus()" title="歌曲排序" aria-label="歌曲排序"><i class="fas fa-sort-amount-down"></i></button>
+                                <button onclick="if(document.getElementById('lm-filter-panel').classList.contains('hidden')) window.LocalMusicManager.toggleFilterPanel(); document.getElementById('lm-search-input').focus()" title="列表内搜索" aria-label="列表内搜索"><i class="fas fa-search"></i></button>
                                 <button onclick="window.LocalMusicManager.toggleBatchMode()"
                                     class="text-[10px] text-emerald-600 hover:text-emerald-700" title="批量操作">
                                     <i class="fas fa-tasks"></i>
@@ -2910,6 +2912,7 @@
     <script src="js/dislike_manager.js"></script>
     <script src="js/song_metadata.js"></script>
     <script src="js/song_actions.js"></script>
+    <script src="js/playback-lyrics.js"></script>
     <script src="components/player-bar/template.js"></script>
     <script src="components/player-bar/index.js"></script>
     <script src="views/player-detail/template.js"></script>

@@ -104,3 +104,14 @@
     background: color-mix(in srgb, var(--c-500) 20%, transparent) !important;
     box-shadow: inset 0 0 0 1px var(--c-500) !important;
 }
+
+/* 表头操作保持固定的可点击尺寸，避免缩小或被列内容遮挡。 @author jingyh */
+:root .music-shell .song-header-controls { overflow: visible; position: relative; z-index: 1; }
+:root .music-shell .song-header-controls > .flex { gap: 2px; }
+:root .music-shell .song-header-controls button { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 26px !important; min-height: 30px; height: 30px !important; padding: 0 !important; border-radius: 50%; font-size: 13px; color: var(--text-muted) !important; }
+:root .music-shell .song-header-controls button.hidden { display: none; }
+:root .music-shell .song-header-controls button:hover { color: var(--theme-readable-accent) !important; background: var(--bg-item-hover); }
+:root .music-shell #search-results-header { padding-left: 12px; }
+@media (max-width: 767px) {
+    :root .music-shell .song-header-controls button { width: 20px !important; font-size: 11px; }
+}

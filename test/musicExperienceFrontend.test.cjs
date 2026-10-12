@@ -99,22 +99,28 @@ test('公共排序按次数与时间降序，旧数据显示零次且不改变�
 })
 
 test('最近播放显示表头、次数及正确播放顺序，音乐库详情保留专辑顺序', () => {
-  const element = () => ({ children: [], classList: { toggle() {} }, append(...nodes) { this.children.push(...nodes) }, replaceChildren() { this.children = [] } })
+  const element = () => ({ children: [], setAttribute() {}, classList: { toggle() {} }, append(...nodes) { this.children.push(...nodes) }, replaceChildren() { this.children = [] } })
   const nodes = new Map(['recent-list', 'recent-title', 'recent-meta', 'recent-clear'].map(id => [id, element()]))
   let playlist, bound
   const window = { PlayStatistics: { sortByPlayCount, playCount }, LibraryArtwork: { attach() {} },
     MusicExperience: { playable: song => song, coverCandidates: () => [] }, SongFileStatus: { update(host, items, selector) { bound = { items, selector } } },
     updatePlaylist(songs, index) { playlist = { songs, index } } }
   vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../client/music/views/recent/RecentView.js'), 'utf8'), {
-    window, document: { getElementById: id => nodes.get(id), createElement: element },
+    window, document: { getElementById: id => nodes.get(id), querySelector: () => null, createElement: element },
   })
   const songs = [{ id: 'low', name: '少次歌曲', singer: '歌手', source: 'wy', playCount: 1, playedAt: 2, albumName: '专辑甲' },
     { id: 'high', name: '多次歌曲', singer: '歌手', source: 'wy', playCount: 3, playedAt: 1, albumName: '专辑乙' }]
   window.RecentView.show('最近播放', songs, true, 100)
   const [header, first, second] = nodes.get('recent-list').children
+  assert.match(header.innerHTML, /RecentView.toggleSort/); assert.match(header.innerHTML, /RecentView.toggleBatch/); assert.match(header.innerHTML, /RecentView.toggleSearch/);
   assert.match(header.innerHTML, /歌曲 \/ 歌手/); assert.match(header.innerHTML, /播放次数 ↓/); assert.match(header.innerHTML, /最近播放时间/)
   assert.equal(first.children[3].textContent, '3 次'); assert.equal(second.children[3].textContent, '1 次')
   assert.equal(first.children[2].children[0].className, 'song-file-title')
+  window.RecentView.toggleSort();
+  assert.equal(nodes.get('recent-list').children[1].children[2].children[0].textContent, '多次歌曲');
+  window.RecentView.toggleBatch(); window.RecentView.selectAll();
+  assert.equal(window.RecentView.selectedSongs().length, 2);
+  window.RecentView.toggleBatch(); window.RecentView.toggleSort();
   assert.equal(bound.selector, '.recent-song-info strong'); assert.deepEqual(bound.items.map(song => song.id), ['high', 'low'])
   second.onclick(); assert.equal(playlist.songs[playlist.index].id, 'low')
   window.RecentView.show('专辑详情', songs)

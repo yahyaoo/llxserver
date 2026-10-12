@@ -78,10 +78,11 @@ body.player-feature-open :is(#mobile-page-header, #mobile-bottom-nav) { display:
     #view-player-detail .player-track-copy { white-space: normal; }
     #view-player-detail .player-title-row { display: flex; justify-content: center; align-items: center; gap: 6px; flex-wrap: nowrap; }
     #view-player-detail #player-title { font-size: clamp(20px, 5.6vw, 26px); line-height: 1.4; min-width: 0; max-width: 100%; flex: 0 1 auto; }
+    #view-player-detail .player-metadata-row { justify-content: center; }
     :root #view-player-detail #player-source { display: flex; width: auto; max-width: 100%; gap: 4px; }
     /* 使用原音源与品质标签的颜色和边框，不重绘洛雪标签。 */
     :root #view-player-detail #player-source > span { font-size: 10px; }
-    #view-player-detail #player-artist, #view-player-detail .player-detail-album { font-size: 14px; line-height: 2; }
+    #view-player-detail #player-artist, #view-player-detail #player-album { font-size: 14px; line-height: 2; }
     #view-player-detail .player-bar-lyrics {
         display: flex; flex-direction: column; justify-content: center; flex: 1 0 52px; min-height: 52px;
         width: 100%; text-align: center; font-size: 14px; line-height: 24px;

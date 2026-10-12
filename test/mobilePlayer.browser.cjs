@@ -48,7 +48,7 @@ async (page) => {
         await page.waitForTimeout(650);
         check(await page.locator('#player-footer').isVisible(), '手机播放页显示完整播放器');
         check(!await page.locator('#lyrics-wrapper').isVisible(), '播放主页隐藏歌词内容');
-        check(await page.locator('#player-source').evaluate(n => n.previousElementSibling.id === 'player-title'), '原音源标签位于歌曲标题后');
+        check(await page.locator('#player-source').evaluate(n => n.previousElementSibling.id === 'player-album'), '原音源标签位于歌手专辑后');
         check(await page.locator('#player-source').evaluate(n => getComputedStyle(n.children[0]).color !== getComputedStyle(n.children[1]).color), '酷狗和 Hi-Res 保留原标签颜色');
         check(await page.locator('.player-detail-album').innerText() === ' - 人间雪', '第二行显示歌手与专辑');
         check(await page.locator('#view-player-detail .player-actions').evaluate(n => {

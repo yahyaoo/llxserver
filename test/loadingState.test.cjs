@@ -60,6 +60,7 @@ test('最近播放等待时显示动效，完成后原有列表渲染接管；�
 test('播放缓冲使用紧凑动效并转义歌曲状态文字', () => {
     const { context, view } = fixture();
     const status = { innerHTML: '' };
+    context.currentLoadingRequestId = 1;
     context.document.getElementById = () => status;
     const app = fs.readFileSync(path.join(__dirname, '../client/music/app.js'), 'utf8');
     const start = app.indexOf('function setPlayerStatus(');

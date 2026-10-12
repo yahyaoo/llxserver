@@ -17,9 +17,12 @@ window.LXPlayerBarTemplate = String.raw`
                 <div class="player-track-copy">
                     <div class="player-title-row">
                         <div id="player-title" class="font-bold truncate dynamic-marquee min-w-0 w-fit" data-text="暂无播放">暂无播放</div>
+                    </div>
+                    <div class="player-metadata-row">
+                        <div id="player-artist" class="truncate dynamic-marquee min-w-0 w-fit" data-text="选择一首歌曲播放">选择一首歌曲播放</div>
+                        <span id="player-album" hidden></span>
                         <div id="player-source"></div>
                     </div>
-                    <div id="player-artist" class="truncate dynamic-marquee min-w-0 w-fit" data-text="选择一首歌曲播放">选择一首歌曲播放</div>
                 </div>
                 <div class="player-bar-lyrics" aria-label="同步歌词">
                     <div id="player-lyric-current">暂无歌词</div>

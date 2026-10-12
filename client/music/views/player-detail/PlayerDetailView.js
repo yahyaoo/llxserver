@@ -41,9 +41,7 @@
             this.fullscreenButton = document.getElementById('player-detail-fullscreen');
             this.fullscreenButton.addEventListener('click', () => this.toggleFullscreen());
             this.background = new window.PlayerBackground(document.getElementById('player-artist-background'));
-            this.album = document.createElement('span');
-            this.album.className = 'player-detail-album';
-            this.album.hidden = true;
+            this.album = document.getElementById('player-album');
             this.spectrumButton = document.createElement('button');
             this.spectrumButton.className = 'player-menu-item player-detail-spectrum';
             this.spectrumButton.setAttribute('role', 'switch');
@@ -101,8 +99,6 @@
                     item.title = item.textContent.trim();
                     item.setAttribute('aria-label', item.title);
                 }
-                this.move(document.getElementById('player-source'), footer.querySelector('.player-progress'), document.getElementById('time-total'));
-                document.getElementById('player-artist').after(this.album);
                 document.getElementById('player-more-menu').append(this.spectrumButton);
                 this.applyBackground();
                 this.updateTrack();
@@ -110,7 +106,6 @@
             } else {
                 window.PlayerFeaturePages?.dismiss();
                 this.lyricsButton.remove();
-                this.album.remove();
                 this.spectrumButton.remove();
                 for (const { node, marker } of this.moves.reverse()) {
                     node.classList.remove('player-detail-direct-action');
@@ -130,13 +125,13 @@
         updateTrack(force = false) {
             const song = window.getActiveSongInfo?.() || window.currentPlayingSong;
             const album = window.getSongAlbumName?.(song) || '';
-            this.album.textContent = album ? (window.innerWidth < 768 ? ' - ' : ' · ') + album : '';
+            this.album.textContent = album ? ' - ' + album : '';
             this.album.title = album;
             this.album.hidden = !album;
             if (this.view.getAttribute('data-player-background') === 'artist') this.background.update(song, force);
         }
 
-        /** 手机标签沿用原节点和原样式，放在标题后；宽屏恢复进度区位置。 */
+        /** 手机调整歌词与频谱位置；歌曲标签始终跟在歌手和专辑后。 */
         updateResponsiveLayout() {
             const mobile = this.open && window.innerWidth < 768;
             if (mobile) {
@@ -148,9 +143,6 @@
             }
             document.getElementById('volume-container').setAttribute('aria-orientation', this.open ? 'vertical' : 'horizontal');
             if (!this.open) return;
-            const source = document.getElementById('player-source');
-            if (window.innerWidth < 768) document.getElementById('player-title').after(source);
-            else document.getElementById('player-footer').querySelector('.player-progress').insertBefore(source, document.getElementById('time-total'));
             this.updateTrack();
         }
 
