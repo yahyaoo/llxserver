@@ -91,7 +91,8 @@ jobs:
           target: ${{ matrix.target }}
           push: true
           # Enable multi-platform build
-          platforms: linux/amd64,linux/arm64,linux/arm/v7
+          # Node 24 官方 Debian 镜像支持这两种架构，不提供 ARMv7。
+          platforms: linux/amd64,linux/arm64
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=llxserver-${{ matrix.mode }}

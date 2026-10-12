@@ -21,6 +21,8 @@ test('工作流触发 snapshot 并隔离 latest、正式版本与 Docker Hub 发
   assert.match(workflow, /value=latest,enable=\$\{\{ env\.IS_SNAPSHOT != 'true' \}\}/);
   assert.match(workflow, /value=\$\{\{ env\.IMAGE_TAG \}\}/);
   assert.match(workflow, /name=\$\{\{ env\.DOCKER_HUB_REPO \}\}.*enable=\$\{\{ env\.IS_SNAPSHOT != 'true' \}\}/);
+  assert.match(workflow, /platforms: linux\/amd64,linux\/arm64\s/);
+  assert.doesNotMatch(workflow, /linux\/arm\/v7/);
 });
 test('客户端镜像不复制开发机配置', () => {
   const dockerfile = fs.readFileSync(path.join(__dirname, '../deploy/docker/client.Dockerfile'), 'utf8');
