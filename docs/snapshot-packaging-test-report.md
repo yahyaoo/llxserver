@@ -99,3 +99,7 @@ GitHub 还将从 snapshot 标签重新构建和执行测试，全部通过后上
 ### 交付方式
 
 生成 all、server、client 三种 ZIP 和三种 FPK，并按唯一 snapshot 标签归档到 `output/snapshot/<标签>/`，附 `BUILD_INFO.txt` 与 `SHA256SUMS`。标签指向 dev 提交，触发现有 GitHub snapshot 工作流；构建信息记录完整来源提交。网络受限时使用 GitHub Git API 校验对象、快进更新 dev 并回读标签，不覆盖既有标签。
+
+### 本轮云端首轮反馈
+
+首轮标签 `v2.1.5-snapshot.20261012.fd91ed5` 的云端单元测试发现新增桌面资源测试将模拟运行时写死为 `node.exe`，Linux 权限步骤查找 `node` 时失败。修正测试样例为对应平台名称，并在同一用例中覆盖 Windows、Linux、macOS 三个平台的文件保留及权限步骤。应用实现和六种安装包内容不变，新提交使用新 snapshot 标签重建，首轮标签保留追溯。
