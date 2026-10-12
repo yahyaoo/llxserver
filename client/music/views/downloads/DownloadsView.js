@@ -1,4 +1,4 @@
-/** 独立下载管理页面，复用现有队列和任务操作。 @author jingyh */
+/** 独立下载管理页面，复用现有队列和任务操作。 @author yahyaoo */
 (() => {
     const host = document.getElementById('view-localmusic')?.parentElement;
     if (!host || document.getElementById('view-downloads')) return;
@@ -14,9 +14,13 @@
     view.innerHTML = '<header class="downloads-heading"><div class="downloads-title"><h2>下载管理</h2><p id="download-global-speed">0 B/s · 0 项任务</p></div><div class="downloads-total">总进度 <strong id="download-progress-text">0%</strong></div></header>'
         + '<div class="downloads-toolbar">' + actions.map(([action, icon, label]) => '<button type="button" data-download-action="' + action + '"><i class="fas ' + icon + '" aria-hidden="true"></i>' + label + '</button>').join('') + '</div>'
         + '<div class="downloads-columns" aria-hidden="true"><span>歌曲</span><span>下载位置</span><span>音质</span><span>进度 / 状态</span><span>操作</span></div><div id="download-list-container" class="downloads-list custom-scrollbar" aria-live="polite"></div>';
-    view.querySelector('.downloads-toolbar').addEventListener('click', event => {
-        const action = event.target.closest('[data-download-action]')?.dataset.downloadAction;
-        if (action && actions.some(item => item[0] === action)) window.SystemDownloadManager?.[action]();
-    });
+    // 原按钮移入吸顶工具栏后仍保留直接绑定的事件。作者：yahyaoo
+    view.querySelectorAll('[data-download-action]').forEach(button => button.addEventListener('click', () => {
+        const action = button.dataset.downloadAction;
+        if (action === 'retryAllLyrics' && window.MusicMaintenance) {
+            const songs = window.SystemDownloadManager.tasks.filter(task => task.isServer && ['finished', 'exists'].includes(task.status)).map(task => window.MusicMaintenance.downloadSong(task));
+            window.MusicMaintenance.start('lyrics', songs);
+        } else if (actions.some(item => item[0] === action)) window.SystemDownloadManager?.[action]();
+    }));
     host.appendChild(view);
 })();

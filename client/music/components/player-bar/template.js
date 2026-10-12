@@ -106,6 +106,7 @@ window.LXPlayerBarTemplate = String.raw`
                             <i class="fas fa-random w-4 text-purple-500"></i>
                             <span>随机播放</span>
                         </button>
+                        <button onclick="setPlayMode('roaming')" class="play-mode-option" data-mode="roaming"><i class="fas fa-heart roaming-heart"></i><span>漫游播放</span></button>
                         <button onclick="setPlayMode('order')"
                             class="play-mode-option w-full px-3 py-2 text-left hover:t-bg-item-hover flex items-center gap-2 text-sm transition-colors"
                             data-mode="order">

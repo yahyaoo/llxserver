@@ -8,8 +8,9 @@ import * as fileCache from '../service/cache/FileCacheService'
 import * as customMusic from '../service/library/CustomMusicService'
 import { ArtistArtworkService } from '../service/library/ArtistArtworkService'
 import { SongArtworkService } from '../service/library/SongArtworkService'
+import { getRoamingWeights } from '../service/RoamingService'
 
-/** 账号主题、音乐库搜索和最近播放接口。 @author jingyh @date 2026-10-10 */
+/** 账号主题、音乐库搜索和最近播放接口。 @author yahyaoo @date 2026-10-10 */
 export async function handleExperience(context: RequestContext, runtime: ServerRuntime): Promise<void> {
   const { req, res, pathname, urlObj } = context
   if (pathname === '/api/music/artwork') {
@@ -29,7 +30,9 @@ export async function handleExperience(context: RequestContext, runtime: ServerR
   const repository = new ExperienceRepository(repositories().music, userDir)
   const cacheDir = fileCache.getCacheDir(username, false)
   try {
-    if (pathname === '/api/music/artwork' && req.method === 'GET') {
+    if (pathname === '/api/user/roaming/weights' && req.method === 'GET') {
+      json(200, await getRoamingWeights(username, repository))
+    } else if (pathname === '/api/music/artwork' && req.method === 'GET') {
       const urls = urlObj.searchParams.getAll('url')
       const cover = await new SongArtworkService(repository, cacheDir).get(urlObj.searchParams.get('source') || '', urlObj.searchParams.get('id') || '', urls)
       if (!cover) { json(404, { message: '暂无可用封面' }); return }

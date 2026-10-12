@@ -80,7 +80,7 @@
                                     </li>
                                 </ul></li>
         <li><a href="#" onclick="switchTab('downloads'); return false" id="tab-downloads" title="下载管理" aria-label="下载管理" class="flex items-center px-6 py-3 t-text-muted hover:t-bg-main"><i class="fas fa-cloud-download-alt w-6 text-center"></i><span class="ml-3 font-medium">下载管理</span></a></li>
-        <li><div class="playlist-group-heading"><span>歌单</span><button type="button" id="playlist-actions-button" onclick="togglePlaylistActions(event)" title="新建或导入歌单" aria-label="新建或导入歌单" aria-haspopup="menu" aria-expanded="false" aria-controls="playlist-actions-menu"><i class="fas fa-plus" aria-hidden="true"></i></button></div><div id="playlist-lists-container" class="space-y-1 px-1.5"></div></li>
+        <li><div class="playlist-group-heading"><button type="button" onclick="PlaylistsView.open()" title="查看所有歌单">歌单</button><button type="button" id="playlist-actions-button" onclick="togglePlaylistActions(event)" title="新建或导入歌单" aria-label="新建或导入歌单" aria-haspopup="menu" aria-expanded="false" aria-controls="playlist-actions-menu"><i class="fas fa-plus" aria-hidden="true"></i></button></div><div id="playlist-lists-container" class="space-y-1 px-1.5"></div></li>
         </ul></nav>
 
             <!-- Mini Player Info (Optional, cover art here) -->

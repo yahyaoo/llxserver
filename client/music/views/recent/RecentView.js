@@ -1,9 +1,10 @@
-/** 最近播放与本地歌手、专辑详情列表组件。 @author jingyh @date 2026-10-10 */
+/** 最近播放与本地歌手、专辑详情列表组件。 @author yahyaoo @date 2026-10-10 */
 (() => {
     let entries = [], originalEntries = [], count = 100, recent = true, version = 0;
     let query = '', searchOpen = false, batch = false, sortByName = false;
     const selected = new Set();
     window.RecentView = {
+        getEntries() { return entries.slice(); },
         async load() {
             const host = document.getElementById('recent-list'); host.innerHTML = window.LoadingState.render('正在加载最近播放…', 'page');
             const requestVersion = ++version;
@@ -67,7 +68,9 @@
                 const specs = document.createElement('span'); specs.className = 'recent-song-specs'; specs.innerHTML = window.SongMetadata?.render(song) || ''; info.append(specs);
                 const album = document.createElement('span'); album.className = recent ? 'recent-album recent-play-count' : 'recent-album'; album.textContent = recent ? `${window.PlayStatistics.playCount(song)} 次` : song.albumName || song.album || '—';
                 const date = document.createElement('time'); date.className = 'recent-time'; date.textContent = recent ? new Date(song.playedAt).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : song.quality || '';
-                row.append(number, cover, info, album, date); row.onclick = () => batch ? this.select(index) : this.play(index); host.append(row);
+                const more = document.createElement('button'); more.type = 'button'; more.className = 'recent-maintenance-more'; more.title = '更多'; more.innerHTML = '<i class="fas fa-ellipsis-h"></i>';
+                more.onclick = event => { event.stopPropagation(); window.MusicMaintenance.menu(more, window.MusicMaintenance.maintenanceEntries([song])); };
+                row.append(number, cover, info, album, date, more); row.onclick = () => batch ? this.select(index) : this.play(index); host.append(row);
             });
             window.SongFileStatus?.update(host, display.slice(0, count).map(item => item.song), '.recent-song-info strong');
             if (display.length > count) { const more = document.createElement('button'); more.className = 'recent-more'; more.textContent = `加载更多（剩余 ${display.length - count} 首）`; more.onclick = () => { count += 100; this.render(); }; host.append(more); }

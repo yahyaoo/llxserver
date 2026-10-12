@@ -132,6 +132,24 @@ export const check = (song: any, username: string, quality?: string, exact = fal
 /** 优先返回下载时保存的歌词，断网播放也可显示歌词。 */
 export const getLyric = (song: any, username: string) => findItem(song, username)?.lyric || null
 
+/** 校验归属后提供维护线程使用的文件路径。 @author yahyaoo */
+export const getMaintenanceFile = (id: string, username: string): string | null => {
+  load(); const item = items.find(item => item.id === id && item.username === username)
+  return item ? itemPath(item) : null
+}
+
+/** 工作线程完成后只更新索引，不在 HTTP 主线程再次写入文件。 @author yahyaoo */
+export const finishMaintenance = (id: string, username: string, result: any, lyricPath: string) => {
+  load(); const item = items.find(item => item.id === id && item.username === username)
+  if (!item) return
+  if (result.deleted) items = items.filter(entry => entry !== item)
+  else {
+    for (const key of ['size', 'mtime', 'hasEmbedLyric', 'hasCover']) if (result[key] !== undefined) (item as any)[key] = result[key]
+    if (result.hasLyric) { item.lyricFilename = path.basename(lyricPath); item.lyric = storageFs.readFileSync(lyricPath, 'utf8') as any }
+  }
+  save()
+}
+
 /** 音乐库读取当前账号全部已下载文件，保留旧下载目录中的有效文件。 */
 export const getLibraryItems = (username: string): any[] => {
   load()
@@ -164,7 +182,7 @@ export const removeLibraryItems = (ids: string[], username: string): number => {
  * 批量获取当前用户实际可读取的下载歌曲身份，复用下载文件完整性检查。
  * @param username 已验证的当前用户名称。
  * @returns 文件仍然存在且大小正确的歌曲身份集合。
- * @author jingyh
+ * @author yahyaoo
  */
 export const getAvailableIdentities = (username: string): Set<string> => {
   load()

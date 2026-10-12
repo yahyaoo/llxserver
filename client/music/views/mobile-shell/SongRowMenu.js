@@ -1,4 +1,4 @@
-/** 手机歌曲行收起次要操作，打开菜单时移动原按钮，保留权限与点击事件。 @author jingyh */
+/** 手机歌曲行收起次要操作，打开菜单时移动原按钮，保留权限与点击事件。 @author yahyaoo */
 (function () {
     const mobile = window.matchMedia('(max-width: 767px)');
     let active = null;
@@ -43,7 +43,7 @@
         if (!mobile.matches) return;
         const rows = root.matches?.('.song-row-actions') ? [root] : root.querySelectorAll('.song-row-actions');
         rows.forEach(actions => {
-            if (actions.querySelector('.song-row-more')) return;
+            if (actions.querySelector('.song-row-more') || actions.querySelector('[data-library-more]')) return;
             const button = document.createElement('button');
             button.type = 'button'; button.className = 'song-row-more';
             button.title = '更多操作'; button.setAttribute('aria-label', '更多歌曲操作');

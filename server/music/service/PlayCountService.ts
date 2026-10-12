@@ -1,6 +1,7 @@
 import type { ExperienceRepository } from '../repository/ExperienceRepository'
+import { recordRoamingPlay } from './RoamingService'
 
-/** 公共播放次数校验与持久化服务。 @author jingyh @date 2026-10-11 */
+/** 公共播放次数校验与持久化服务。 @author yahyaoo @date 2026-10-11 */
 export class PlayCountService {
   constructor(private readonly repository: ExperienceRepository) {}
 
@@ -35,6 +36,7 @@ export class PlayCountService {
       const items = this.get()
       const previous = items.find(item => String(item.id) === String(song.id) && item.source === song.source)
       if (previous?.lastPlaybackId === song.playbackId) return items
+      if (!recordRoamingPlay(song, this.repository)) return items
       const clean: any = {}
       for (const key of ['id', 'songmid', 'songId', 'name', 'singer', 'source', 'albumName', 'albumId', 'interval', 'quality', 'type', 'types', 'isLocal', '_localLibraryItem', 'filename', 'folder', 'isCustomDir', 'hasCover', 'mtime', 'serverDownloadId', 'customFilename', 'isCustomFile']) {
         if (song[key] !== undefined) clean[key] = song[key]

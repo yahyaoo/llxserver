@@ -34,6 +34,7 @@ window.CustomDirManager = {
         const container = document.getElementById(containerId);
         if (!container) return;
         container.querySelectorAll('[data-filter-value]').forEach(btn => {
+            btn.setAttribute('aria-pressed', String(!!filterSet?.has(btn.dataset.filterValue)));
             const val = btn.dataset.filterValue;
             if (filterSet && filterSet.has(val)) {
                 btn.classList.add('active');
@@ -447,6 +448,7 @@ window.CustomDirManager = {
     },
 
     async refresh() {
+        if (window.MusicMaintenance) { await window.LocalMusicManager.scanLibrary(); await this.fetchData(true); return; }
         const btn = document.querySelector('button[title="同步并刷新"] i');
         if (btn) btn.classList.add('fa-spin');
 
@@ -861,25 +863,14 @@ window.CustomDirManager = {
                 <!-- Action Buttons -->
                 <div class="song-row-actions col-span-4 sm:col-span-2 md:col-span-2 lg:col-span-2 flex items-center justify-end gap-0.5 md:gap-2">
                     ${window.SongActions?.renderLoveButton(window.LocalMusicManager?.buildPlaylistSong({ ...item, songInfo: { ...(item.songInfo || {}), meta: { songId: item.songmid || item.id } } }) || { ...item, isLocal: true }) || ''}
-                    ${(isUnindexed || this.enableReMapping) ? `
+                    ${this.enableReMapping ? `
                         <button data-lm-action="manual" data-lm-index="${index}"
                                 class="hidden sm:flex w-8 h-8 md:w-7 md:h-7 items-center justify-center rounded-full bg-emerald-500 text-white hover:bg-emerald-600 transition-all shadow-sm shrink-0" title="手动关联">
                             <i class="fas fa-link text-[10px]"></i>
                         </button>
                     ` : ''}
-                    <button data-lm-action="download" data-lm-index="${index}"
-                            class="w-7 h-7 flex items-center justify-center rounded-full t-bg-main border t-border-main t-text-main hover:text-blue-500 hover:border-blue-300 transition-all shadow-sm shrink-0" title="下载到设备">
-                        <i class="fas fa-download text-[10px]"></i>
-                    </button>
-                    <button data-lm-action="playlist" data-lm-index="${index}"
-                            class="w-7 h-7 flex items-center justify-center rounded-full t-bg-main border t-border-main text-emerald-500 hover:bg-emerald-50 hover:border-emerald-300 transition-all shadow-sm shrink-0" title="添加到歌单">
-                        <i class="fas fa-plus text-[10px]"></i>
-                    </button>
-                    ${canDelete ? `
-                    <button data-lm-action="delete" data-lm-index="${index}"
-                            class="w-7 h-7 flex items-center justify-center rounded-full t-bg-main border t-border-main t-text-muted hover:text-red-500 hover:border-red-300 transition-all shadow-sm shrink-0" title="删除">
-                        <i class="far fa-trash-alt text-[10px]"></i>
-                    </button>` : ''}
+                    <button data-lm-action="playlist" data-lm-index="${index}" class="song-collect-btn" title="收藏到歌单"><i class="far fa-bookmark"></i></button>
+                    <button data-library-more="${index}" type="button" title="更多"><i class="fas fa-ellipsis-h"></i></button>
                 </div>
             </div>
             `;
@@ -1076,6 +1067,10 @@ window.CustomDirManager = {
     },
 
     async _executeDelete(filenames) {
+        if (window.MusicMaintenance) {
+            const targets = this.originalData.filter(item => filenames.includes(item.filename)).map(item => ({ ...item, folder: 'custom' }));
+            return window.MusicMaintenance.start('delete', targets, false, true);
+        }
         try {
             const res = await fetch('/api/music/custom/remove', {
                 method: 'POST',

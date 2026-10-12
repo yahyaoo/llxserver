@@ -57,6 +57,8 @@
     <link rel="stylesheet" href="views/player-detail/mobile-player.css">
     <link rel="stylesheet" href="assets/element/element-plus.css">
     <link rel="stylesheet" href="assets/element/element-controls.css">
+    <link rel="stylesheet" href="components/music-tools/style.css">
+    <link rel="stylesheet" href="views/playlists/playlists.css">
     <script src="assets/element/vue.global.prod.js" defer></script>
     <script src="assets/element/element-plus.min.js" defer></script>
     <script src="assets/element/zh-cn.min.js" defer></script>
@@ -715,7 +717,7 @@
                     class="absolute inset-0 flex flex-col px-2 pt-2 md:px-6 md:pt-6 pb-44 md:pb-32 hidden opacity-0 transition-all duration-300 overflow-hidden">
 
                     <!-- Settings and Filters Area -->
-                    <div id="lm-toolbar"
+                    <div id="lm-toolbar" data-library-heading="true"
                         class="grid grid-cols-[auto_1fr] md:flex md:flex-row md:items-center justify-between gap-1.5 md:gap-3 mb-1.5 md:mb-2 shrink-0 px-1">
                         <div class="contents md:flex md:items-center md:justify-start md:w-auto md:gap-2">
                             <div class="flex items-baseline gap-1 md:gap-1.5 order-1">
@@ -725,7 +727,7 @@
                                     首</span>
                             </div>
                             <div id="lm-directory-controls" class="flex items-center gap-1 md:gap-2 order-3 md:order-2">
-                                <button type="button" id="library-scan-button" onclick="LocalMusicManager.scanLibrary()" class="px-3 py-1 rounded-lg border t-border-main text-xs"><i class="fas fa-sync-alt"></i> 扫描</button><span id="library-scan-progress" role="status" aria-live="polite" class="text-xs t-text-muted"></span>
+
                                 <button id="lm-sync-download-btn"
                                     onclick="window.LocalMusicManager.openSyncDownloadModal()"
                                     class="hidden text-[9px] md:text-[10px] font-bold px-1.5 md:px-2 py-0.5 rounded-lg bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500 hover:text-white transition-all inline-flex items-center gap-1 cursor-pointer shrink-0 whitespace-nowrap w-auto self-center h-fit"
@@ -742,61 +744,6 @@
                             </div>
                         </div>
 
-                        <!-- Desktop Search & Actions -->
-                        <div class="contents md:flex md:items-center md:gap-2 md:gap-3 md:flex-1 md:justify-end">
-                            <!-- Mobile Toggle Buttons -->
-                            <div class="flex md:hidden items-center justify-end gap-0.5 order-2">
-                                <button id="lm-filter-toggle-btn-mobile"
-                                    onclick="window.LocalMusicManager.toggleFilterPanel()"
-                                    class="w-6 h-6 flex items-center justify-center bg-gray-100 dark:bg-gray-700/50 rounded hover:bg-[var(--c-500)] hover:text-white transition-all relative">
-                                    <i class="fas fa-filter text-[10px]"></i>
-                                    <span id="lm-filter-active-dot"
-                                        class="absolute top-1 right-1 w-1 h-1 bg-[var(--c-500)] rounded-full hidden"></span>
-                                </button>
-                                <button onclick="window.LocalMusicManager.refresh()"
-                                    class="w-6 h-6 flex items-center justify-center bg-gray-100 dark:bg-gray-700/50 rounded"><i
-                                        class="fas fa-sync-alt text-[10px]"></i></button>
-                                <button onclick="window.LocalMusicManager.autoLinkAll()"
-                                    class="w-6 h-6 flex items-center justify-center bg-gray-100 dark:bg-gray-700/50 rounded"
-                                    title="智能检测"><i class="fas fa-magic text-[10px]"></i></button>
-                                <button id="lm-remap-toggle-btn-mobile"
-                                    onclick="window.LocalMusicManager.toggleReMapping()"
-                                    class="w-6 h-6 flex items-center justify-center bg-gray-100 dark:bg-gray-700/50 rounded hover:bg-emerald-500 hover:text-white transition-all"
-                                    title="歌曲重映射"><i class="fas fa-link text-[10px]"></i></button>
-                                <button id="lm-remaster-btn-mobile"
-                                    onclick="window.LocalMusicManager.openRemasterModal()"
-                                    class="hidden w-6 h-6 items-center justify-center bg-gray-100 dark:bg-gray-700/50 rounded hover:bg-red-500 hover:text-white transition-all"
-                                    title="歌曲洗版"><i class="fas fa-exchange-alt text-[10px]"></i></button>
-                                <button onclick="window.LocalMusicManager.toggleBatchMode()"
-                                    class="w-6 h-6 flex items-center justify-center bg-gray-100 dark:bg-gray-700/50 rounded"><i
-                                        class="fas fa-list-ul text-[10px]"></i></button>
-                            </div>
-
-                            <div class="hidden md:flex items-center gap-1 order-5 md:order-4">
-                                <button id="lm-filter-toggle-btn" onclick="window.LocalMusicManager.toggleFilterPanel()"
-                                    class="w-7 h-7 md:w-8 md:h-8 flex items-center justify-center bg-gray-100 dark:bg-gray-700/50 rounded-lg hover:bg-[var(--c-500)] hover:text-white transition-all relative"
-                                    title="高级筛选">
-                                    <i class="fas fa-filter text-xs md:text-sm"></i>
-                                    <span id="lm-filter-active-dot-desktop"
-                                        class="absolute top-1 right-1 w-1.5 h-1.5 bg-[var(--c-500)] rounded-full hidden"></span>
-                                </button>
-                                <button onclick="window.LocalMusicManager.refresh()"
-                                    class="w-7 h-7 md:w-8 md:h-8 flex items-center justify-center bg-gray-100 dark:bg-gray-700/50 rounded-lg hover:bg-[var(--c-500)] hover:text-white transition-all"
-                                    title="刷新"><i class="fas fa-sync-alt text-xs"></i></button>
-                                <button onclick="window.LocalMusicManager.autoLinkAll()"
-                                    class="w-7 h-7 md:w-8 md:h-8 flex items-center justify-center bg-gray-100 dark:bg-gray-700/50 rounded-lg hover:bg-purple-500 hover:text-white transition-all"
-                                    title="智能检测"><i class="fas fa-magic text-xs"></i></button>
-                                <button id="lm-remap-toggle-btn" onclick="window.LocalMusicManager.toggleReMapping()"
-                                    class="w-7 h-7 md:w-8 md:h-8 flex items-center justify-center bg-gray-100 dark:bg-gray-700/50 rounded-lg hover:bg-emerald-500 hover:text-white transition-all"
-                                    title="歌曲重映射"><i class="fas fa-link text-xs"></i></button>
-                                <button id="lm-remaster-btn" onclick="window.LocalMusicManager.openRemasterModal()"
-                                    class="hidden w-7 h-7 md:w-8 md:h-8 items-center justify-center bg-gray-100 dark:bg-gray-700/50 rounded-lg hover:bg-red-500 hover:text-white transition-all"
-                                    title="歌曲洗版"><i class="fas fa-exchange-alt text-xs"></i></button>
-                                <button onclick="window.LocalMusicManager.toggleBatchMode()"
-                                    class="w-7 h-7 md:w-8 md:h-8 flex items-center justify-center bg-gray-100 dark:bg-gray-700/50 rounded-lg hover:bg-blue-500 hover:text-white transition-all"
-                                    title="批量操作"><i class="fas fa-list-ul text-xs"></i></button>
-                            </div>
-                        </div>
                     </div>
 
                     <!-- 高级筛选面板 (折叠式) -->
@@ -989,69 +936,7 @@
                         </div>
                     </div>
 
-                    <!-- 批量操作栏 -->
-                    <div id="lm-batch-toolbar"
-                        class="hidden bg-emerald-50/90 dark:bg-emerald-950/40 border-b border-emerald-200/50 dark:border-emerald-800/50 p-2 md:p-3 flex items-center justify-between shrink-0 rounded-t-2xl transition-all backdrop-blur-sm sticky top-0 z-20">
-                        <div class="flex items-center gap-2 md:gap-4 w-full">
-                            <span
-                                class="text-xs md:text-sm text-emerald-700 dark:text-emerald-300 whitespace-nowrap font-bold bg-emerald-100 dark:bg-emerald-900/40 px-2 py-1 rounded-lg shrink-0">
-                                已选择: <span id="lm-batch-selected-count">0</span> 首
-                            </span>
-
-                            <div
-                                class="flex items-center gap-1.5 md:gap-2 overflow-x-auto no-scrollbar py-0.5 flex-1 min-w-0">
-                                <!-- 基础操作组 -->
-                                <div class="flex items-center gap-1 shrink-0">
-                                    <button onclick="window.LocalMusicManager.selectAll()"
-                                        class="text-[11px] md:text-xs px-2.5 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg shadow-sm transition-all font-medium whitespace-nowrap">全选</button>
-                                    <button onclick="window.LocalMusicManager.deselectAll()"
-                                        class="text-[11px] md:text-xs px-2.5 py-1.5 bg-gray-400 hover:bg-gray-500 text-white rounded-lg shadow-sm transition-all font-medium whitespace-nowrap">清空</button>
-                                    <button onclick="window.LocalMusicManager.toggleBatchMode()"
-                                        class="text-[11px] md:text-xs px-2.5 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded-lg shadow-sm transition-all font-medium whitespace-nowrap">退出</button>
-                                </div>
-                                <div class="h-4 w-[1px] bg-emerald-200 dark:bg-emerald-800 mx-1 shrink-0"></div>
-                                <!-- 功能操作组 -->
-                                <div class="flex items-center gap-1 shrink-0">
-                                    <button onclick="window.LocalMusicManager.batchAddToPlaylist()"
-                                        class="text-[11px] md:text-xs px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg shadow-sm transition-all font-medium whitespace-nowrap flex items-center gap-1.5"
-                                        title="将选中的本地歌曲加入歌单">
-                                        <i class="fas fa-folder-plus"></i>加入歌单
-                                    </button>
-                                    <button onclick="window.LocalMusicManager.batchFetchLyrics()"
-                                        class="text-[11px] md:text-xs px-2.5 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg shadow-sm transition-all font-medium whitespace-nowrap flex items-center gap-1.5">
-                                        <i class="fas fa-closed-captioning"></i>补全歌词
-                                    </button>
-                                    <button onclick="window.LocalMusicManager.batchEmbedLyric()"
-                                        class="text-[11px] md:text-xs px-2.5 py-1.5 bg-violet-500 hover:bg-violet-600 text-white rounded-lg shadow-sm transition-all font-medium whitespace-nowrap flex items-center gap-1.5"
-                                        title="将歌词嵌入音频文件 USLT 标签（有 .lrc 文件直接使用，否则从网络获取）">
-                                        <i class="fas fa-file-audio"></i>嵌入歌词
-                                    </button>
-                                    <button id="lm-batch-categorize-btn"
-                                        onclick="window.LocalMusicManager.openCategorizeModal()"
-                                        class="text-[11px] md:text-xs px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg shadow-sm transition-all font-medium whitespace-nowrap flex items-center gap-1.5 hidden">
-                                        <i class="fas fa-folder-open"></i>分类
-                                    </button>
-                                    <button onclick="window.LocalMusicManager.batchUpdateMetadata()"
-                                        class="text-[11px] md:text-xs px-2.5 py-1.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg shadow-sm transition-all font-medium whitespace-nowrap flex items-center gap-1.5">
-                                        <i class="fas fa-tags"></i>补全元信息
-                                    </button>
-                                    <button id="lm-batch-move-btn"
-                                        onclick="window.LocalMusicManager.batchSwitchFolder()"
-                                        class="text-[11px] md:text-xs px-2.5 py-1.5 bg-orange-500 hover:bg-orange-600 text-white rounded-lg shadow-sm transition-all font-medium whitespace-nowrap flex items-center gap-1.5">
-                                        <i class="fas fa-exchange-alt"></i>移动目录
-                                    </button>
-                                    <button onclick="window.LocalMusicManager.batchDownloadToDevice()"
-                                        class="text-[11px] md:text-xs px-2.5 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg shadow-sm transition-all font-medium whitespace-nowrap flex items-center gap-1.5">
-                                        <i class="fas fa-download"></i>保存
-                                    </button>
-                                    <button id="lm-batch-delete-btn" onclick="window.LocalMusicManager.batchDelete()"
-                                        class="text-[11px] md:text-xs px-2.5 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg shadow-sm transition-all font-medium whitespace-nowrap flex items-center gap-1.5">
-                                        <i class="fas fa-trash-alt"></i>删除
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                    <div id="lm-batch-toolbar" class="hidden"><div class="flex items-center gap-2"><span>已选择: <span id="lm-batch-selected-count">0</span> 首</span><button onclick="LocalMusicManager.selectAll()">全选</button><button onclick="LocalMusicManager.deselectAll()">清空</button><button id="lm-batch-delete-btn" onclick="LocalMusicManager.batchDelete()">删除</button><button onclick="LocalMusicManager.toggleBatchMode()">退出</button></div></div>
 
                     <!-- Header Row -->
                     <div
@@ -2937,7 +2822,10 @@
     <script src="js/music_experience.js"></script>
     <script src="js/play_statistics.js"></script>
     <script src="components/playback-experience/index.js"></script>
+    <script src="js/roaming.js"></script>
     <script src="app.js"></script>
+    <script src="views/playlists/PlaylistsView.js"></script>
+    <script src="components/music-tools/index.js"></script>
     <script src="components/dialog/DialogChrome.js"></script>
     <link rel="stylesheet" href="components/dialog/playlist-editor.css">
     <script src="components/dialog/PlaylistEditor.js"></script>

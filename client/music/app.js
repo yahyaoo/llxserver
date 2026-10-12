@@ -22,7 +22,7 @@ function checkForUpdates() {
     }
 }
 
-/** 更新设置保存在服务端，使用既有管理员认证，不写入播放器账户设置。 @author jingyh */
+/** 更新设置保存在服务端，使用既有管理员认证，不写入播放器账户设置。 @author yahyaoo */
 async function saveAppUpdateSettings() {
     if (!localStorage.getItem('lx_admin_password') && !await handleAdminAuth('修改更新设置需要管理员身份')) return;
     const enabled = document.getElementById('setting-app-update-enabled').checked;
@@ -71,7 +71,10 @@ window.playlistAddTargetSong = null; // Explicit single-song target from any son
 const audio = document.getElementById('audio-player');
 // 所有歌曲来源共用主播放器统计，预读音频不参与计数。
 const playbackTracker = new window.PlayStatistics.PlaybackTracker(audio, {
-    onQualified: (song, quality, playback) => window.MusicExperience.record(song, quality, playback),
+    onQualified: async (song, quality, playback) => {
+        await window.MusicExperience.record(song, quality, playback);
+        if (playMode === 'roaming') { await window.DeferredWrites.flush(); await window.Roaming.refresh(currentPlaylist).catch(() => {}); }
+    },
 });
 window.addEventListener('music-account-changed', () => playbackTracker.reset());
 let currentPlaybackRate = 1.0;
@@ -939,7 +942,7 @@ window.ensureUserAuthToken = ensureUserAuthToken;
 /**
  * 下载请求遇到认证失效时验证现有会话；无法恢复则返回登录页。
  * 保留请求正文，重试时重新读取认证头，防止沿用服务重启前的 Token。
- * @author jingyh
+ * @author yahyaoo
  */
 async function fetchDownloadWithAuth(url, options = {}) {
     const request = () => fetch(url, {
@@ -1437,7 +1440,7 @@ function switchTab(tabId, loadRecent = true) {
         return;
     }
 
-    // 设置可逆展开，不执行普通切页的模式重置与控件回填。作者：jingyh
+    // 设置可逆展开，不执行普通切页的模式重置与控件回填。作者：yahyaoo
     if (tabId === 'settings' && window.settingsPageToggle) {
         window.settingsPageToggle.show();
         window.MobileShell?.sync('settings');
@@ -5391,7 +5394,7 @@ function getNextIndex() {
     if (!currentPlaylist || currentPlaylist.length === 0) return -1;
 
     // [Random Prefetch Fix] 如果处于随机播放模式，且已有预选内容，优先返回预选
-    if (playMode === 'random' && preSelectedNextIndex !== null) {
+    if (['random', 'roaming'].includes(playMode) && preSelectedNextIndex !== null) {
         if (preSelectedNextIndex >= 0 && preSelectedNextIndex < currentPlaylist.length) {
             return preSelectedNextIndex;
         }
@@ -5400,6 +5403,9 @@ function getNextIndex() {
 
     let nextIndex;
     switch (playMode) {
+        case 'roaming':
+            nextIndex = window.Roaming.choose(currentPlaylist, currentIndex);
+            break;
         case 'single':
             nextIndex = currentIndex;
             break;
@@ -5433,7 +5439,7 @@ async function prefetchNextSong(startFromIndex = null, depth = 0) {
     if (targetIndex === null) {
         targetIndex = getNextIndex();
         // [Random Prefetch Fix] 如果是随机模式，且尚未有预选结果，将本次生成的索引存入预选
-        if (playMode === 'random' && preSelectedNextIndex === null) {
+        if (['random', 'roaming'].includes(playMode) && preSelectedNextIndex === null) {
             preSelectedNextIndex = targetIndex;
         }
     }
@@ -5484,7 +5490,7 @@ async function prefetchNextSong(startFromIndex = null, depth = 0) {
 }
 
 // --- Server Cache Helpers ---
-/** 检查指定目录下载索引；未命中时保留原缓存与音源流程。 @author jingyh */
+/** 检查指定目录下载索引；未命中时保留原缓存与音源流程。 @author yahyaoo */
 async function checkServerDownload(song, quality, exactQuality = false, currentDirectory = false) {
     try {
         const params = new URLSearchParams({ source: song.source || '',
@@ -5809,7 +5815,7 @@ async function triggerServerCache(song, url, quality) {
 let lastNamingPattern = window.settings?.serverCacheNamingPattern || 'simple';
 let serverCacheConfigInitialized = false; // 首次初始化同步完成前不弹命名格式变更弹窗
 
-/** 自定义缓存路径先提交验证，成功后才保存到播放器设置。 @author jingyh */
+/** 自定义缓存路径先提交验证，成功后才保存到播放器设置。 @author yahyaoo */
 async function selectServerCacheLocation(value) {
     const previous = settings.serverCacheLocation || 'root';
     let location = value;
@@ -6820,7 +6826,7 @@ window.setImg = (id, src) => {
     if (el) window.LibraryArtwork.attach(el, src);
 };
 
-/** 播放爱心仅表示我的喜爱，复用直接喜欢操作，避免打开歌单选择弹框。 @author jingyh */
+/** 播放爱心仅表示我的喜爱，复用直接喜欢操作，避免打开歌单选择弹框。 @author yahyaoo */
 function updatePlayerLoveButton(song) {
     const button = document.getElementById('player-like-btn');
     if (!button) return;
@@ -7049,6 +7055,9 @@ function playPrev() {
     let prevIndex;
 
     switch (playMode) {
+        case 'roaming':
+            prevIndex = window.Roaming.choose(currentPlaylist, currentIndex);
+            break;
         case 'single':
             // 单曲循环：继续播放当前歌曲
             prevIndex = currentIndex;
@@ -7077,12 +7086,12 @@ function playPrev() {
     playSong(currentPlaylist[prevIndex], prevIndex);
 }
 
-/** 获取已保存的渐变时长，旧账号和导入值同样限制有效范围。 @author jingyh */
+/** 获取已保存的渐变时长，旧账号和导入值同样限制有效范围。 @author yahyaoo */
 function getCrossfadeDuration() {
     return window.PlaybackExperience.normalizeDuration(settings.crossfadeDuration ?? DEFAULT_SETTINGS.crossfadeDuration);
 }
 
-/** 原播放入口统一交给可取消渐变组件，保留音频元素与用户音量。 @author jingyh */
+/** 原播放入口统一交给可取消渐变组件，保留音频元素与用户音量。 @author yahyaoo */
 function fadeVolume(targetVolume, duration = getCrossfadeDuration()) {
     return window.playbackExperience.fade(audio, targetVolume, duration);
 }
@@ -7510,7 +7519,7 @@ function setVolume(e) {
     if (!container) return;
     const rect = container.getBoundingClientRect();
     const point = e.touches?.[0] || e;
-    // 点击和拖动使用相同方向，播放页由下向上增大音量。作者：jingyh
+    // 点击和拖动使用相同方向，播放页由下向上增大音量。作者：yahyaoo
     const vertical = document.body.classList.contains('player-detail-open');
     const ratio = vertical ? (rect.bottom - point.clientY) / rect.height : (point.clientX - rect.left) / rect.width;
     if (!Number.isFinite(ratio)) return;
@@ -7548,6 +7557,7 @@ let playMode = 'list'; // 'list': 列表循环, 'single': 单曲循环, 'random'
 
 // 设置播放模式
 function setPlayMode(mode) {
+    if (mode === 'roaming') window.Roaming.refresh(currentPlaylist).catch(() => {});
     playMode = mode;
     // [Random Prefetch Fix] 切换模式时清空预读预选索引
     preSelectedNextIndex = null;
@@ -7654,12 +7664,14 @@ function updatePlayModeUI() {
             'list': 'fa-redo',
             'single': 'fa-redo-alt',
             'random': 'fa-random',
+            'roaming': 'fa-heart roaming-heart',
             'order': 'fa-play'
         };
         const colors = {
             'list': 'text-emerald-500',
             'single': 'text-blue-500',
             'random': 'text-purple-500',
+            'roaming': 't-text-main',
             'order': 'text-gray-500'
         };
 
@@ -7686,6 +7698,7 @@ function getPlayModeName(mode) {
         'list': '列表循环',
         'single': '单曲循环',
         'random': '随机播放',
+        'roaming': '漫游播放',
         'order': '顺序播放'
     };
     return names[mode] || '未知';
@@ -8241,7 +8254,7 @@ function syncSettingsUI(key = null, value = null) {
 /**
  * 应用播放页背景样式
  * @param {string} mode 背景模式，沿用原设置与账号保存入口。
- * @author jingyh
+ * @author yahyaoo
  */
 function applyPlayerBackground(mode) {
     window.playerDetailView?.applyBackground(mode);
@@ -11496,7 +11509,7 @@ function initFavoriteSidebarSortable(container) {
         delayOnTouchOnly: true,
         touchStartThreshold: 4,
         onEnd: () => {
-            // 两组共用原设置字段，合并当前 DOM 顺序，避免一组拖动覆盖另一组。作者：jingyh
+            // 两组共用原设置字段，合并当前 DOM 顺序，避免一组拖动覆盖另一组。作者：yahyaoo
             const groups = ['my-lists-container', 'playlist-lists-container'].map(id => document.getElementById(id)).filter(Boolean);
             const ids = groups.flatMap(group => Array.from(group.querySelectorAll('[data-sidebar-sort-id]')))
                 .map(el => el.getAttribute('data-sidebar-sort-id'))
@@ -11601,6 +11614,7 @@ if (!window._sidebarMarqueeBound) {
 }
 
 function renderMyLists(data) {
+    if (!document.getElementById('view-playlists')?.classList.contains('hidden')) window.PlaylistsView?.render(data?.userList || []);
     const container = document.getElementById('my-lists-container');
     container.innerHTML = '';
     const playlists = document.getElementById('playlist-lists-container');
@@ -11759,7 +11773,7 @@ function handleListClick(listId, skipAutoUpdate = false, preservePage = false) {
     exitListSecondaryModes();
 
     if (!currentListData) return;
-    // 旧播放缓存可能仍引用协议默认列表；页面只展示实际存在的普通歌单。作者：jingyh
+    // 旧播放缓存可能仍引用协议默认列表；页面只展示实际存在的普通歌单。作者：yahyaoo
     if (!['love', 'dislike_songs'].includes(listId) && !currentListData.userList?.some(list => list.id === listId)) {
         listId = currentListData.userList?.[0]?.id || 'love';
     }
@@ -12017,7 +12031,7 @@ function handleFavoritesClick() {
 }
 
 function handleDislikeFolderClick() {
-    // 父级只展开目录；子项仍使用原跳转入口，不改变当前页面及操作状态。作者：jingyh
+    // 父级只展开目录；子项仍使用原跳转入口，不改变当前页面及操作状态。作者：yahyaoo
     const sidebar = document.getElementById('main-sidebar');
     const wasCollapsed = window.innerWidth >= 1025 && sidebar?.classList.contains('navigation-collapsed');
     if (wasCollapsed) toggleMainNavigation();
@@ -12129,7 +12143,7 @@ function handleDislikeAlbumsClick() {
     }
 }
 
-/** 返回与新建操作一致的导入目标；浏览公开收藏时仍优先写入个人歌单。 @author jingyh */
+/** 返回与新建操作一致的导入目标；浏览公开收藏时仍优先写入个人歌单。 @author yahyaoo */
 window.getPlaylistImportTarget = () => {
     const data = (window.isViewingPublicFavorites && window.myPersonalListData) ? window.myPersonalListData : currentListData;
     if (!data) return null;
@@ -12137,14 +12151,14 @@ window.getPlaylistImportTarget = () => {
     return ['default', 'open'].includes(username) ? '_open' : username;
 };
 
-/** 公开歌单沿用现有管理员验证流程。 @author jingyh */
+/** 公开歌单沿用现有管理员验证流程。 @author yahyaoo */
 window.preparePlaylistImport = async target => !['default', '_open', 'open'].includes(target) || await requireAdminForOpenWrite('公开列表中导入歌单');
 
 /**
  * 应用服务器已持久化的导入结果，更新列表、缓存与添加歌曲弹框。
  * @param result 导入接口返回的用户名称及完整列表。
  * @returns 页面更新完成的 Promise。
- * @author jingyh
+ * @author yahyaoo
  */
 window.applyImportedPlaylists = async result => {
     if (window.getPlaylistImportTarget() !== result.username) return;
@@ -12474,8 +12488,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     // [新增] 恢复播放模式设置
     try {
         const savedMode = localStorage.getItem('lx_play_mode');
-        if (savedMode && ['list', 'single', 'random', 'order'].includes(savedMode)) {
+        if (savedMode && ['list', 'single', 'random', 'order', 'roaming'].includes(savedMode)) {
             playMode = savedMode;
+            if (savedMode === 'roaming') window.Roaming.refresh(currentPlaylist).catch(() => {});
             updatePlayModeUI();
             console.log('[PlayMode] 已恢复播放模式:', playMode);
         } else {
@@ -15138,7 +15153,7 @@ function showToast(type, message, duration = 3000) {
         error: { bg: 'bg-red-500', icon: 'fa-exclamation-circle' }
     };
     const conf = config[type] || config.info;
-    // 只调整等待提示的图标，保留原有通知寿命、堆叠及换源抑制逻辑。作者：jingyh
+    // 只调整等待提示的图标，保留原有通知寿命、堆叠及换源抑制逻辑。作者：yahyaoo
     const pending = type === 'info' && typeof message === 'string' && /^(正在|(?:加载|搜索|读取|获取|处理|扫描|同步|连接|保存)中)/.test(message);
 
     const toast = document.createElement('div');

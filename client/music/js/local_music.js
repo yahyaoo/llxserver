@@ -680,6 +680,7 @@ window.LocalMusicManager = {
         const container = document.getElementById(containerId);
         if (!container) return;
         container.querySelectorAll('[data-filter-value]').forEach(btn => {
+            btn.setAttribute('aria-pressed', String(filterSet.has(btn.dataset.filterValue)));
             const val = btn.dataset.filterValue;
             if (filterSet.has(val)) {
                 btn.classList.add('active');
@@ -883,7 +884,7 @@ window.LocalMusicManager = {
 
     async scanLibrary() {
         try {
-            const response = await fetch('/api/music/library/scan', { method: 'POST', headers: window.getUserAuthHeaders() });
+            const response = await fetch('/api/music/library/scan', { method: 'POST', headers: { ...window.getUserAuthHeaders(), ...(this.isViewingPublicSongs ? { 'x-user-name': '_open' } : {}) } });
             const result = await response.json();
             if (!response.ok) throw new Error(result.message || '请登录后扫描音乐库');
             this.showScanProgress(result.scan);
@@ -894,6 +895,7 @@ window.LocalMusicManager = {
         clearTimeout(this.scanPollTimer);
         const progress = document.getElementById('library-scan-progress');
         const running = scan?.status === 'running';
+        window.MusicMaintenance?.setScan(scan);
         if (progress) progress.textContent = running ? '扫描中 ' + scan.percent + '%（' + scan.completed + '/' + scan.total + '）' : scan?.status === 'error' ? '扫描结束，部分目录读取失败，请检查权限' : scan?.status === 'completed' ? '扫描完成' : '';
         if (running && !this.originalData.length) {
             const container = document.getElementById('lm-list-container');
@@ -904,11 +906,11 @@ window.LocalMusicManager = {
             this.scanPollTimer = setTimeout(async () => {
                 if (owner !== this.getCurrentUsername()) return;
                 try {
-                    const response = await fetch('/api/music/library/scan', { headers: window.getUserAuthHeaders(), cache: 'no-store' });
+                    const response = await fetch('/api/music/library/scan', { headers: { ...window.getUserAuthHeaders(), ...(this.isViewingPublicSongs ? { 'x-user-name': '_open' } : {}) }, cache: 'no-store' });
                     if (!response.ok) return;
                     const result = await response.json();
                     this.showScanProgress(result.scan);
-                    if (result.scan.status !== 'running') await this.fetchData(true);
+                    if (result.scan.status !== 'running') { await this.fetchData(true); if (window.CustomDirManager?.isActive) await window.CustomDirManager.fetchData(true); }
                 } catch { if (owner === this.getCurrentUsername()) this.showScanProgress(scan); }
             }, 1000);
         }
@@ -919,11 +921,12 @@ window.LocalMusicManager = {
     toggleFilterPanel() {
         const panel = document.getElementById('lm-filter-panel');
         const btn = document.getElementById('lm-filter-toggle-btn');
-        this.isFilterPanelOpen = !this.isFilterPanelOpen;
+        this.isFilterPanelOpen = panel ? panel.classList.contains('hidden') : !this.isFilterPanelOpen;
+        btn?.setAttribute('aria-expanded', String(this.isFilterPanelOpen));
 
         if (this.isFilterPanelOpen) {
             if (panel) panel.classList.remove('hidden');
-            if (btn) btn.classList.add('t-bg-main', 'shadow-inner');
+            if (btn) btn.classList.remove('t-bg-main', 'shadow-inner');
         } else {
             if (panel) panel.classList.add('hidden');
             if (btn) btn.classList.remove('t-bg-main', 'shadow-inner');
@@ -1217,7 +1220,7 @@ window.LocalMusicManager = {
 
         // 4. Update UI Indicator
         const hasActiveFilters = this.searchKeyword || this.quickSearchKeyword || this.filterQuality.size > 0 || this.filterFolder !== 'all' || this.filterStatus.size > 0 || this.filterSource.size > 0;
-        // 两种布局共用实际筛选状态；红点不表示通知或错误。作者：jingyh
+        // 两种布局共用实际筛选状态；红点不表示通知或错误。作者：yahyaoo
         for (const id of ['lm-filter-active-dot', 'lm-filter-active-dot-desktop']) document.getElementById(id)?.classList.toggle('hidden', !hasActiveFilters);
 
         // 同步所有 select 的 active 状态（非 all 时背景高亮）
@@ -1489,28 +1492,14 @@ window.LocalMusicManager = {
                 <!-- Action Button -->
                 <div class="song-row-actions col-span-4 sm:col-span-2 md:col-span-2 lg:col-span-2 flex items-center justify-end gap-0.5 md:gap-2">
                     ${window.SongActions?.renderLoveButton(this.buildPlaylistSong(item) || { ...item, isLocal: true }) || ''}
-                    ${(isUnindexed || this.enableReMapping) ? `
+                    ${this.enableReMapping ? `
                         <button data-lm-action="manual" data-lm-index="${index}"
                                 class="hidden sm:flex w-8 h-8 md:w-7 md:h-7 items-center justify-center rounded-full bg-emerald-500 text-white hover:bg-emerald-600 transition-all shadow-sm shrink-0" title="手动关联">
                             <i class="fas fa-link text-[10px]"></i>
                         </button>
                     ` : ''}
-                    <!-- Download -->
-                    <button data-lm-action="download" data-lm-index="${index}"
-                            class="w-7 h-7 flex items-center justify-center rounded-full t-bg-main border t-border-main t-text-main hover:text-blue-500 hover:border-blue-300 transition-all shadow-sm shrink-0" title="下载到设备">
-                        <i class="fas fa-download text-[10px]"></i>
-                    </button>
-                    <button data-lm-action="playlist" data-lm-index="${index}"
-                            class="w-7 h-7 flex items-center justify-center rounded-full t-bg-main border t-border-main text-emerald-500 hover:bg-emerald-50 hover:border-emerald-300 transition-all shadow-sm shrink-0" title="添加到歌单">
-                        <i class="fas fa-plus text-[10px]"></i>
-                    </button>
-                    <!-- Deletion from single operations -->
-                    ${(item.folder !== 'custom' || !!window.userAllowOperateCustomDir) ? `
-                    <button data-lm-action="delete" data-lm-index="${index}"
-                            class="w-7 h-7 flex items-center justify-center rounded-full t-bg-main border t-border-main t-text-muted hover:text-red-500 hover:border-red-300 transition-all shadow-sm shrink-0" title="删除">
-                        <i class="far fa-trash-alt text-[10px]"></i>
-                    </button>
-                    ` : ''}
+                    <button data-lm-action="playlist" data-lm-index="${index}" class="song-collect-btn" title="收藏到歌单"><i class="far fa-bookmark"></i></button>
+                    <button data-library-more="${index}" type="button" title="更多"><i class="fas fa-ellipsis-h"></i></button>
                 </div>
             </div>
             `;
@@ -1853,6 +1842,9 @@ window.LocalMusicManager = {
     },
 
     async _executeDelete(items) {
+        if (window.MusicMaintenance) {
+            return window.MusicMaintenance.start('delete', items, false, true);
+        }
         try {
             const headers = {
                 'Content-Type': 'application/json',

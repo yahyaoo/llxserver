@@ -66,6 +66,8 @@ import * as fileCache from '../../music/service/cache/FileCacheService'
 import * as customMusicManager from '../../music/service/library/CustomMusicService'
 import * as serverDownloadQueue from '../../music/service/download/ServerDownloadQueueService'
 import * as serverDownloads from '../../music/service/download/ServerDownloadService'
+import { startMaintenance } from '../../music/service/library/MusicMaintenanceService'
+import { getMusicTasks } from '../../music/service/library/MusicTaskService'
 import * as appUpdates from '../../integrations/update/UpdateGateway'
 import * as remasterQueue from '../../music/service/download/RemasterQueueService'
 import * as scheduler from '../../music/service/task/SchedulerService'
@@ -1663,7 +1665,7 @@ enabled?: boolean } = {}
       // ─────────────────────────────────────────────────────────────────────
 
 
-      if (['/api/user/appearance', '/api/user/appearance/background', '/api/user/recent', '/api/music/library/search', '/api/music/library/avatar', '/api/music/artwork'].includes(pathname)) {
+      if (['/api/user/appearance', '/api/user/appearance/background', '/api/user/recent', '/api/user/roaming/weights', '/api/music/library/search', '/api/music/library/avatar', '/api/music/artwork'].includes(pathname)) {
         await handleExperience({ req, res, pathname, urlObj, ip }, serverRuntime)
         return
       }
@@ -1913,8 +1915,19 @@ enabled?: boolean } = {}
         catch (error: any) { res.writeHead(400, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ success: false, message: error.message })) }
         return
       }
+      if (pathname === '/api/music/maintenance' && (req.method === 'GET' || req.method === 'POST')) {
+        const publicRequest = req.headers['x-user-name'] === '_open' || !verifyUserAuth(req) && adminAuthenticated
+        const username = publicRequest ? adminAuthenticated ? '_open' : null : verifyUserAuth(req)
+        const send = (code: number, value: unknown) => { res.writeHead(code, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(value)) }
+        if (!username) { send(401, { success: false, message: '请登录后维护歌曲' }); return }
+        try {
+          if (req.method === 'GET') send(200, { success: true, tasks: getMusicTasks(username) })
+          else send(202, { success: true, task: await startMaintenance(username, JSON.parse(await readBody(req)), publicRequest && adminAuthenticated) })
+        } catch (error: any) { send(error.statusCode || 400, { success: false, message: error.message }) }
+        return
+      }
       if (pathname === '/api/music/library/scan' && (req.method === 'GET' || req.method === 'POST')) {
-        const username = verifyUserAuth(req)
+        const username = req.headers['x-user-name'] === '_open' ? adminAuthenticated ? '_open' : null : verifyUserAuth(req) || (adminAuthenticated ? '_open' : null)
         if (!username) { res.writeHead(401); res.end('Unauthorized'); return }
         const scan = req.method === 'POST' ? customMusicManager.ensureMusicScan(username, true) : customMusicManager.getScanStatus(username)
         res.writeHead(req.method === 'POST' ? 202 : 200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify({ success: true, scan })); return
@@ -2799,10 +2812,10 @@ const startSubsonicStandaloneServer = () => {
  * 初始化公共账号默认数据、音乐 SDK、音源、缓存与下载解析器，再启动监听和任务调度。
  * @param port HTTP 监听端口。
  * @param ip 服务绑定地址。
- * @author jingyh
+ * @author yahyaoo
  */
 export const startServer = async (port: number, ip: string) => {
-  // 监听前持久化公共账号默认文档；数据库故障时不启动未初始化的服务。 @author jingyh
+  // 监听前持久化公共账号默认文档；数据库故障时不启动未初始化的服务。 @author yahyaoo
   const openUserSpace = getUserSpace('_open')
   await openUserSpace.listManage.listDataManage.initPromise
   // Initialize file cache settings from global config

@@ -1188,10 +1188,10 @@ export const getCacheList = async (username?: string) => {
         if (mustSync) await syncState.pending
     }
 
-    const cacheItems = indexManager.getAll(normalizedUsername, 'cache')
-    const musicItems = indexManager.getAll(normalizedUsername, 'music')
+    const cacheItems = indexManager.getAll(normalizedUsername, 'cache').map(item => ({ ...item, location: currentCacheLocation }))
+    const musicItems = indexManager.getAll(normalizedUsername, 'music').map(item => ({ ...item, location: currentCacheLocation }))
     const other = currentCacheLocation === CACHE_ROOTS.DATA ? CACHE_ROOTS.ROOT : CACHE_ROOTS.DATA
-    const extra = [...indexManager.getAll(normalizedUsername, 'cache', other), ...indexManager.getAll(normalizedUsername, 'music', other)]
+    const extra = [...indexManager.getAll(normalizedUsername, 'cache', other), ...indexManager.getAll(normalizedUsername, 'music', other)].map(item => ({ ...item, location: other }))
     const items = [...cacheItems, ...musicItems, ...extra.filter(item => ![...cacheItems, ...musicItems].some(existing => existing.id === item.id && existing.quality === item.quality && existing.folder === item.folder))]
 
     return items.map(item => ({

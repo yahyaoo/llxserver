@@ -1,4 +1,4 @@
-/** 手机更多菜单复用原按钮，验证事件、节点身份与桌面不介入。 @author jingyh */
+/** 手机更多菜单复用原按钮，验证事件、节点身份与桌面不介入。 @author yahyaoo */
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs'), path = require('node:path'), vm = require('node:vm');
@@ -14,7 +14,7 @@ function environment(mobile = true) {
         getAttribute(name) { return this.attributes[name]; }
         removeAttribute(name) { delete this.attributes[name]; }
         addEventListener(name, fn, capture) { this.events[name + (capture ? 'Capture' : '')] = fn; }
-        querySelector(selector) { return selector === '.song-row-more' ? this.children.find(n => n.className === 'song-row-more') : this.children.find(n => n.tag === 'button'); }
+        querySelector(selector) { return selector === '.song-row-more' ? this.children.find(n => n.className === 'song-row-more') : selector === '[data-library-more]' ? this.children.find(n => n.getAttribute('data-library-more') !== undefined) : this.children.find(n => n.tag === 'button'); }
         querySelectorAll(selector) { return this.children.filter(n => n.tag === 'button' && (!selector.includes(':scope') || (n.className !== 'song-row-more' && n.className !== 'song-love-btn'))); }
         getBoundingClientRect() { return { right: 380, bottom: 800 }; }
         contains(node) { return node === this || this.children.some(n => n.contains(node)); }
@@ -45,6 +45,15 @@ test('手机菜单移动原按钮，执行原事件，关闭恢复原顺序与�
     assert.equal(env.download.children.length, 0); assert.equal(env.download.attributes.role, undefined);
     trigger.events.click({ stopPropagation() {} }); trigger.events.click({ stopPropagation() {} });
     assert.equal(env.menu.hidden, true);
+});
+
+test('音乐库使用自己的更多菜单，不再追加第二层入口', () => {
+    const env = environment();
+    env.row.querySelector('.song-row-more').remove();
+    env.add.setAttribute('data-library-more', '0');
+    env.api.prepare();
+    assert.equal(env.row.children.length, 3);
+    assert.equal(env.row.querySelector('.song-row-more'), undefined);
 });
 
 test('桌面不增加菜单按钮也不移动原操作', () => {
