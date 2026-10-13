@@ -41,6 +41,17 @@
         pending = request;
         return request;
     }
+    /** 从推送目录选择可用版本，沿用统一音质顺序与认证 URL 构造。 */
+    function findPlayable(song, quality, exactQuality, kind) {
+        checkOwner();
+        const item = library.get(window.SongIdentity.key(song));
+        const candidates = (item?.files || []).filter(file => kind === 'download' ? file.folder === 'download' : file.folder !== 'download');
+        const exact = candidates.find(file => file.quality === quality);
+        const file = exact || (!exactQuality && candidates[0]);
+        if (!file) return { exists: false };
+        const selectedSong = window.MusicExperience.playable(window.SongIdentity.selectFile(item, file));
+        return { exists: true, url: selectedSong.url, quality: file.quality, filename: file.filename, folder: file.folder, location: file.location, songInfo: selectedSong };
+    }
     function close() { panel?.remove(); panel = null; }
     const locations = { cache: '播放缓存', music: '音乐目录', custom: '自定义目录', download: '服务器下载' };
     function open(button, song) {
@@ -92,6 +103,6 @@
         if (!document.getElementById('view-recent')?.classList.contains('hidden')) window.RecentView?.refreshFiles?.();
         if (!document.getElementById('queue-drawer')?.classList.contains('translate-x-full')) window.renderQueue?.();
     });
-    window.SongFiles = { setLibrary, enrich, refresh, open, menuEntry, close };
+    window.SongFiles = { setLibrary, enrich, refresh, findPlayable, open, menuEntry, close };
     document.addEventListener('DOMContentLoaded', () => refresh());
 })();

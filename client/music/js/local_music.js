@@ -851,17 +851,14 @@ window.LocalMusicManager = {
         const el = document.getElementById('lm-location-select');
         const val = el.value;
         try {
-            await fetch('/api/music/cache/config', {
-                method: 'POST',
-                headers: window.getUserAuthHeaders ? window.getUserAuthHeaders() : {},
-                body: JSON.stringify({ location: val })
-            });
+            await window.updateServerCacheConfig(val);
+            window.updateSetting('serverCacheLocation', val);
             // Reset subpath when changing location
             this.selectedSubPath = '';
             const subPathText = document.getElementById('lm-subpath-text');
             if (subPathText) subPathText.innerText = '全部';
 
-            this.refresh();
+            this.applyFilters();
             // 位置切换后刷新同步下载按钮可见状态
             if (typeof window.updateSyncDownloadBtnVisibility === 'function') {
                 window.updateSyncDownloadBtnVisibility();
@@ -915,22 +912,10 @@ window.LocalMusicManager = {
             const container = document.getElementById('lm-list-container');
             if (container) container.innerHTML = window.LoadingState.render('首次扫描音乐库 ' + Number(scan.percent || 0) + '%', 'page');
         }
-        if (running) {
-            const owner = this.getCurrentUsername();
-            this.scanPollTimer = setTimeout(async () => {
-                if (owner !== this.getCurrentUsername()) return;
-                try {
-                    const response = await fetch('/api/music/library/scan', { headers: { ...window.getUserAuthHeaders(), ...(this.isViewingPublicSongs ? { 'x-user-name': '_open' } : {}) }, cache: 'no-store' });
-                    if (!response.ok) return;
-                    const result = await response.json();
-                    this.showScanProgress(result.scan);
-                    if (result.scan.status !== 'running') { await this.fetchData(true); if (window.CustomDirManager?.isActive) await window.CustomDirManager.fetchData(true); }
-                } catch { if (owner === this.getCurrentUsername()) this.showScanProgress(scan); }
-            }, 1000);
-        }
+        if (running) window.ClientTransport?.subscribe('maintenance', true);
     },
 
-    async refresh() { await this.scanLibrary(); await this.fetchData(true); },
+    async refresh() { await this.fetchData(true); },
 
     toggleFilterPanel() {
         const panel = document.getElementById('lm-filter-panel');
@@ -3048,7 +3033,7 @@ window.LocalMusicManager = {
     },
 
     async remasterRequest(path, options = {}) {
-        const response = await fetch(path, {
+        const response = await (options.method === 'POST' && window.ClientTransport ? window.ClientTransport.request : fetch)(path, {
             ...options,
             headers: {
                 ...(options.body ? { 'Content-Type': 'application/json' } : {}),
@@ -3108,6 +3093,8 @@ window.LocalMusicManager = {
     },
 
     closeRemasterModal() {
+        window.ClientTransport?.subscribe('remaster', false);
+        this.remasterUnsubscribe?.(); this.remasterUnsubscribe = null;
         const modal = document.getElementById('lm-remaster-modal');
         if (modal) {
             modal.classList.add('hidden');
@@ -3180,31 +3167,31 @@ window.LocalMusicManager = {
             this.remasterPollTimer = null;
         }
 
-        const status = await this.remasterRequest(`/api/music/remaster/status?offset=${this.remasterResultOffset}&limit=200`);
+        if (!this.remasterUnsubscribe) this.remasterUnsubscribe = window.ClientTransport?.on('remaster', result => {
+            if (result.success) void this.applyRemasterStatus(result.data).catch(error => showError(error.message));
+        });
+        window.ClientTransport?.subscribe('remaster', true);
+    },
+
+    /** 由服务端续推增量结果，避免客户端递归翻页和每秒轮询。 */
+    async applyRemasterStatus(status) {
         if (status.id && this.remasterTaskId && status.id !== this.remasterTaskId) {
             this.remasterResultOffset = 0;
             this.remasterResults = [];
             this.remasterTaskId = status.id;
-            return this.loadRemasterStatus(false);
         }
         if (status.id) this.remasterTaskId = status.id;
         if (status.targetQuality) this.remasterTargetQuality = status.targetQuality;
         if (Array.isArray(status.results) && status.results.length) {
-            this.remasterResults.push(...status.results);
+            const start = Number(status.nextOffset || 0) - status.results.length;
+            if (start <= this.remasterResults.length) this.remasterResults.splice(start, status.results.length, ...status.results);
         }
         this.remasterResultOffset = Number(status.nextOffset || this.remasterResultOffset);
         this.renderRemasterStatus(status);
-
-        if (this.remasterResultOffset < Number(status.processed || 0)) {
-            return this.loadRemasterStatus(false);
-        }
+        if (this.remasterResultOffset < Number(status.processed || 0)) return;
 
         const modalOpen = document.getElementById('lm-remaster-modal')?.classList.contains('flex');
-        if (status.status === 'running' && modalOpen) {
-            this.remasterPollTimer = setTimeout(() => this.loadRemasterStatus(false).catch(e => {
-                if (typeof showError === 'function') showError(e.message || '获取洗版进度失败');
-            }), 1000);
-        } else if (status.id && status.status !== 'idle' && this.remasterLastTerminalTaskId !== status.id) {
+        if (status.status !== 'running' && modalOpen && status.id && status.status !== 'idle' && this.remasterLastTerminalTaskId !== status.id) {
             this.remasterLastTerminalTaskId = status.id;
             if (window.CustomDirManager && window.CustomDirManager.isActive) {
                 await window.CustomDirManager.fetchData(true);

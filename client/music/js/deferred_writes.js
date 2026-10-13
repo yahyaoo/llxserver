@@ -33,16 +33,30 @@
             for (const property of ['url', 'pic']) {
                 if (typeof clean[property] !== 'string') continue;
                 const parsed = new URL(clean[property], location.origin);
+                // 下载命令必须保留音源的临时签名，原下载接口依赖此 URL。
+                if (url === '/api/music/cache/download' && property === 'url' && parsed.origin !== location.origin) continue;
                 for (const parameter of ['token', 'password', 'auth']) parsed.searchParams.delete(parameter);
                 clean[property] = parsed.origin === location.origin ? parsed.pathname + parsed.search : parsed.toString();
             }
+            const cacheWrite = /^\/api\/music\/cache\/(lyric|download)$/.test(url);
+            const song = clean.songInfo || clean;
+            const mergeKey = cacheWrite ? JSON.stringify([url, window.SongIdentity?.key?.(song) || song.id || song.songmid || [song.source, song.name, song.singer], clean.quality || song.quality || '']) : null;
+            const index = mergeKey ? items.findIndex(item => item.mergeKey === mergeKey) : -1;
+            const canonical = value => JSON.stringify(value, (key, item) => item && typeof item === 'object' && !Array.isArray(item) ? Object.fromEntries(Object.keys(item).sort().map(name => [name, item[name]])) : item);
+            if (index >= 0 && canonical(items[index].data) === canonical(clean)) return Promise.resolve();
             const id = clean.playbackId || window.crypto.randomUUID?.() || Date.now() + ':' + Math.random();
-            if (!items.some(item => item.id === id)) { items.push({ id, url, data: clean }); write(name, items); }
+            if (!items.some(item => item.id === id)) {
+                const item = { id, url, data: clean, ...(mergeKey ? { mergeKey } : {}) };
+                if (index >= 0) items[index] = item; else items.push(item);
+                write(name, items); window.dispatchEvent?.(new Event('client-local-event'));
+            }
             return Promise.resolve();
-        }, flush,
+        },
+        collect() { return read(owner()).map(item => ({ id: 'event:' + item.id, eventId: item.id, url: item.url, method: 'POST', data: item.data })); },
+        ack(events, results, name) {
+            const done = new Set(events.filter(item => results[item.id] && (results[item.id].status < 300 || [400, 404, 422].includes(results[item.id].status))).map(item => item.eventId));
+            write(name, read(name).filter(item => !done.has(item.id)));
+        },
+        flush: () => window.ClientSync ? window.ClientSync.flush() : flush(),
     };
-    setInterval(flush, 15000);
-    window.addEventListener('online', flush);
-    window.addEventListener('music-account-changed', flush);
-    document.addEventListener('visibilitychange', () => { if (document.hidden) void flush(); });
 })();

@@ -151,6 +151,13 @@
     window.MusicExperience = {
         get account() { return account; },
         get value() { return { ...value }; },
+        /** 服务端主动推送外观，当前账号的本地未提交配置优先。 */
+        async acceptPush(remote) {
+            if (window.ClientSync?.has('appearance')) return;
+            value = { ...defaults, ...remote }; localStorage.setItem(cacheKey(accountName()), JSON.stringify(value)); apply();
+            window.ClientSync?.seed('appearance', value);
+            await loadBackground(++revision, headers());
+        },
         playable, coverUrl, coverCandidates, coverReference,
         playItem(item) { const song = playable(item); window.updatePlaylist([song], 0, 'local_all', false); },
         openCollection(name, items) { window.switchTab('recent', false); window.RecentView.show(name, items); },

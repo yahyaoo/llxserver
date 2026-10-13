@@ -5,16 +5,18 @@ const vm = require('node:vm');
 const fs = require('node:fs');
 const path = require('node:path');
 const source = fs.readFileSync(path.join(__dirname, '../client/music/js/client_performance.js'), 'utf8');
-function fixture(saved = new Map()) {
+function fixture(saved = new Map(), storage = new Map()) {
     let owner = 'alice'; const intervals = [], sent = [];
-    const window = { addEventListener() {}, getUserAuthHeaders: () => ({ 'x-user-name': owner, 'x-user-token': owner }),
+    const events = new Map();
+    const localStorage = { getItem: key => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, value), removeItem: key => storage.delete(key) };
+    const window = { addEventListener: (type, listener) => events.set(type, listener), getUserAuthHeaders: () => ({ 'x-user-name': owner, 'x-user-token': owner }),
         ListStore: { readPending: async (channel, name) => structuredClone(saved.get(name + ':' + channel)),
             writePending: async (channel, value, name) => { if (value === null) saved.delete(name + ':' + channel); else saved.set(name + ':' + channel, structuredClone(value)); } } };
     vm.runInNewContext(source, { window, console: { warn() {} }, document: { addEventListener() {} }, structuredClone,
-        AbortController, TextDecoder, performance, setTimeout, clearTimeout, setInterval: (fn, ms) => intervals.push({ fn, ms }) });
+        localStorage, AbortController, TextDecoder, performance, setTimeout, clearTimeout, setInterval: (fn, ms) => intervals.push({ fn, ms }) });
     const api = window.ClientSync;
     api.register('settings', async (data, context) => sent.push({ data: structuredClone(data), owner: context.name }));
-    return { api, saved, sent, intervals, window, owner: name => { owner = name; } };
+    return { api, saved, sent, intervals, window, storage, events, owner: name => { owner = name; } };
 }
 module.exports = { fixture };
 function functionSource(file, name) {

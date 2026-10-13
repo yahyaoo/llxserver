@@ -1,3 +1,4 @@
+import { ClientChannel, cacheVersions } from './ClientChannel'
 import { getMusicDirectories, validateDirectories, checkDirectory } from '../library/MusicDirectoryService'
 import { ApiTokenStore } from '../auth/ApiTokenStore'
 import { handleAccount } from '../../music/service/AccountService'
@@ -1109,7 +1110,7 @@ export function createServerRuntime() {
 
 const handleStartServer = async (port = 9527, ip = '0.0.0.0') => await new Promise((resolve, reject) => {
   const serverRuntime = createServerRuntime()
-  const httpServer = http.createServer(async (req, res) => {
+  const requestHandler = async (req: http.IncomingMessage, res: http.ServerResponse): Promise<void> => {
     // CORS 跨域处理
     res.setHeader('Access-Control-Allow-Origin', '*')
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS')
@@ -1123,10 +1124,16 @@ const handleStartServer = async (port = 9527, ip = '0.0.0.0') => await new Promi
     }
 
     const ip = getIP(req)
-    accessLog.info(`${req.method} ${req.url} from ${ip}`)
+    if (!(req as any).clientDispatch) accessLog.info(`${req.method} ${req.url} from ${ip}`)
     // console.log(req.url)
     const urlObj = new URL(req.url ?? '', `http://${req.headers.host}`)
     const pathname = urlObj.pathname
+    if (!(req as any).clientDispatch && req.method !== 'GET') res.once('finish', () => {
+      if (res.statusCode >= 300) return
+      const scoped = /^\/api\/(user\/|music\/(storage|cache|library|custom)\/)/.test(pathname)
+      const owner = scoped ? (req.headers['x-user-name'] === '_open' || urlObj.searchParams.get('user') === '_open' ? '_open' : verifyUserAuth(req) || undefined) : undefined
+      clientChannel.notify(pathname, owner)
+    })
 
     // 远程账号通过当前入口访问远端接口，Cookie 与管理员凭据不转发。
     // 已有播放器音频链接携带会话令牌，沿用其访问方式。
@@ -1158,6 +1165,17 @@ const handleStartServer = async (port = 9527, ip = '0.0.0.0') => await new Promi
     if (accountApi && !authEntry && !verifyUserAuth(req) && !adminAuthenticated) {
       res.writeHead(401, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' })
       res.end(JSON.stringify({ success: false, message: '请登录后访问系统' }))
+      return
+    }
+
+    if (pathname === '/api/user/client-bootstrap' && req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' })
+      const entries = await clientChannel.snapshot(req)
+      res.end(JSON.stringify({ entries, versions: cacheVersions(entries) })); return
+    }
+    if (pathname === '/api/user/client-sync' && req.method === 'POST') {
+      try { const result = await clientChannel.report(req, JSON.parse(await readBody(req))); res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(result)) }
+      catch (error: any) { res.writeHead(400); res.end(JSON.stringify({ message: error.message })) }
       return
     }
 
@@ -2163,6 +2181,20 @@ enabled?: boolean } = {}
 
       // [新增] 音乐 URL API
       if (pathname === '/api/music/url' && req.method === 'POST') {
+        const reqId = req.headers['x-req-id'] as string
+        const device = req.headers['x-browser-device'] as string
+        const owner = verifyUserAuth(req)
+        if (owner && device && /^[\w-]{1,128}$/.test(reqId || '')) {
+          // 复用原解析进度出口，原控制器的音源选择和重试规则保持不变。
+          const relay = { write(chunk: string) {
+            for (const line of String(chunk).split('\n')) if (line.startsWith('data:')) {
+              try { clientChannel.publish(owner, 'resolve-progress', { reqId, attempt: JSON.parse(line.slice(5)) }, device) } catch {}
+            }
+            return true
+          } } as unknown as http.ServerResponse
+          musicProgressClients.set(reqId, relay)
+          res.once('finish', () => { if (musicProgressClients.get(reqId) === relay) musicProgressClients.delete(reqId) })
+        }
         await musicDiscoveryController.postMusicUrl({ req, res, pathname, urlObj, ip }, serverRuntime)
         return
       }
@@ -2515,7 +2547,10 @@ enabled?: boolean } = {}
     if (!code) return
     res.writeHead(code)
     res.end(msg)
-  })
+  }
+  const httpServer = http.createServer(requestHandler)
+  const clientChannel = new ClientChannel(requestHandler, verifyUserAuth, req => userSessions.get((req.headers['x-user-token'] as string) || parseCookies(req.headers.cookie)[USER_SESSION_COOKIE]), username => path.join(global.lx.userPath, getUserDirname(username)))
+  httpServer.on('close', () => clientChannel.close())
 
   wss = new WebSocketServer({
     noServer: true,
@@ -2642,6 +2677,12 @@ enabled?: boolean } = {}
 
   httpServer.on('upgrade', function upgrade(request, socket, head) {
     socket.addListener('error', onSocketError)
+    if (new URL(request.url || '/', 'http://localhost').pathname === '/api/music/client-channel') {
+      const origin = request.headers.origin
+      try { if (origin && new URL(origin).host !== request.headers.host) { socket.destroy(); return } }
+      catch { socket.destroy(); return }
+      clientChannel.sockets.handleUpgrade(request, socket, head, ws => clientChannel.connect(ws, request)); return
+    }
 
     // 调用全局定义的 authConnection (在文件顶部约113行已经定义过)
     authConnection(request, (err, success) => {

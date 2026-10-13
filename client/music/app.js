@@ -74,7 +74,7 @@ const audio = document.getElementById('audio-player');
 const playbackTracker = new window.PlayStatistics.PlaybackTracker(audio, {
     onQualified: async (song, quality, playback) => {
         await window.MusicExperience.record(song, quality, playback);
-        if (playMode === 'roaming') { await window.DeferredWrites.flush(); await window.Roaming.refresh(currentPlaylist).catch(() => {}); }
+        if (playMode === 'roaming') await window.Roaming.refresh(currentPlaylist).catch(() => {});
     },
 });
 window.addEventListener('music-account-changed', () => playbackTracker.reset());
@@ -175,6 +175,7 @@ const DEFAULT_SETTINGS = {
     enableLyricGlow: true, // 歌词荧光效果 (默认开启)
     enablePersistentToken: false, // 启用持久化 Token 验证
     playerBackground: 'theme', // 播放页背景：跟随页面、歌手氛围、封面虚化、纯色或黑色。
+    clientSyncTransport: 'ws', // 默认共用长连接上报，断开回退同一批量 HTTP 接口
     saveAccountSettingsToFile: true, // 同步账号设置到文件 (默认开启)
     autoUpdateNetworkList: false, // 自动更新网络歌单 (默认关闭)
     networkListAutoCheckInterval: '6h', // 网络歌单自动检测间隔
@@ -510,17 +511,7 @@ function setupNetworkListAutoCheck() {
         clearInterval(networkListAutoCheckTimer);
         networkListAutoCheckTimer = null;
     }
-    if (!settings.autoUpdateNetworkList) {
-        return;
-    }
-    const intervalMs = parseNetworkListAutoCheckInterval(settings.networkListAutoCheckInterval);
-    if (intervalMs === null || intervalMs <= 0) {
-        return;
-    }
-    networkListAutoCheckTimer = setInterval(() => {
-        checkNetworkListUpdates().catch(err => console.error('[AutoCheck] 网络歌单检测失败:', err));
-    }, intervalMs);
-    console.log('[AutoCheck] 已设置网络歌单自动检测间隔：', settings.networkListAutoCheckInterval, '(', intervalMs, 'ms )');
+    // 网络歌单自动任务由服务端调度，客户端不再创建检测定时器。作者：jingyh
 }
 
 async function checkNetworkListUpdates(manual = false) {
@@ -735,14 +726,7 @@ setTimeout(() => {
     }
 }, 2000);
 
-// 页面加载后立即拉取服务端后台任务状态与歌单更新状态，并每隔 30 秒自动刷新
-setTimeout(() => {
-    syncServerNetworkListUpdates();
-}, 500);
-setInterval(() => {
-    refreshTaskScheduleStatus();
-    syncServerNetworkListUpdates();
-}, 30 * 1000);
+// 后台任务状态按页面订阅长连接，空闲播放不查询。作者：jingyh
 
 window.batchMode = false;
 window.selectedItems = new Set();
@@ -943,7 +927,8 @@ async function handleTogglePublicFavorites() {
 }
 window.handleTogglePublicFavorites = handleTogglePublicFavorites;
 
-async function ensureUserAuthToken() {
+async function ensureUserAuthToken(options = {}) {
+    if (!options.force && window.AccountSession.getToken()) { userToken = window.AccountSession.getToken(); return true; }
     try {
         const data = await window.AccountSession.verify();
         if (!data) { window.AccountSession.redirect(); return false; }
@@ -1196,7 +1181,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Initialize SongList Manager
     if (window.SongListManager) {
-        window.SongListManager.init();
+        // 在线歌单页在用户打开时初始化，首页不发出预加载请求。作者：jingyh
     }
 
     // Initialize Lyric Font Size UI
@@ -1544,6 +1529,7 @@ function switchTab(tabId, loadRecent = true) {
 
     if (tabId === 'songlist') {
         document.getElementById('page-title').innerText = "歌单";
+        window.SongListManager?.init();
     }
 
     if (tabId === 'leaderboard') {
@@ -5338,44 +5324,32 @@ async function fetchSongUrl(song, quality, isRetry = false, isSilent = false, op
     const reqId = Math.random().toString(36).slice(2) + Date.now().toString(36);
     let progressEs = null;
     try {
-        progressEs = new EventSource(`/api/music/progress?reqId=${reqId}`);
-        progressEs.onmessage = (e) => {
-            if (isSilent) return;
-            try {
-                const attempt = JSON.parse(e.data);
-                const songNamePrefix = attempt.name || song.name || '';
-                const msg = `[${songNamePrefix}] ${attempt.message || (attempt.status === 'success' ? '解析成功' : '解析失败')}`;
-
-                // 若处于换源试错常驻提示中，将进度同步至常驻卡片，避免底层露出绿色普通 Toast
-                if (typeof RecoveryToast !== 'undefined' && RecoveryToast.isActive()) {
-                    const sourceName = attempt.sourceName || attempt.name;
-                    if (sourceName && sourceName !== song.name) {
-                        RecoveryToast.show(song, `[${sourceName}] ${attempt.status === 'success' ? '解析成功' : '尝试失败'}...`, {
-                            triedPlatform: sourceName,
-                            quality: quality,
-                            status: attempt.status === 'success' ? 'success' : (attempt.status === 'fail' ? 'failed' : 'trying')
-                        });
-                    } else if (attempt.status === 'success') {
-                        RecoveryToast.updateStatusText(`[${sourceName || '备选源'}] 解析成功，准备播放...`);
-                    } else if (attempt.status === 'fail') {
-                        RecoveryToast.updateStatusText(`[${sourceName || '备选源'}] 解析失败`);
-                    }
-                    return;
-                }
-
-                if (attempt.status === 'success') showSuccess(msg);
-                else showError(msg);
-            } catch (_) { }
-        };
+        // 解析进度复用公共消息通道，不为每首歌建立额外连接。作者：jingyh
+        const unsubscribe = window.ClientTransport?.on('resolve-progress', data => {
+            if (isSilent || data.reqId !== reqId) return;
+            const attempt = data.attempt;
+            const songNamePrefix = attempt.name || song.name || '';
+            const msg = `[${songNamePrefix}] ${attempt.message || (attempt.status === 'success' ? '解析成功' : '解析失败')}`;
+            if (typeof RecoveryToast !== 'undefined' && RecoveryToast.isActive()) {
+                const sourceName = attempt.sourceName || attempt.name;
+                if (sourceName && sourceName !== song.name) RecoveryToast.show(song, `[${sourceName}] ${attempt.status === 'success' ? '解析成功' : '尝试失败'}...`, { triedPlatform: sourceName, quality, status: attempt.status === 'success' ? 'success' : (attempt.status === 'fail' ? 'failed' : 'trying') });
+                else if (attempt.status === 'success') RecoveryToast.updateStatusText(`[${sourceName || '备选源'}] 解析成功，准备播放...`);
+                else if (attempt.status === 'fail') RecoveryToast.updateStatusText(`[${sourceName || '备选源'}] 解析失败`);
+                return;
+            }
+            if (attempt.status === 'success') showSuccess(msg); else showError(msg);
+        });
+        if (unsubscribe) progressEs = { close: unsubscribe };
     } catch (_) { }
 
     const headers = { 'Content-Type': 'application/json' };
     // 携带认证信息 (Token 或密码)
     Object.assign(headers, getUserAuthHeaders());
     headers['x-req-id'] = reqId;
+    if (window.ClientTransport) headers['x-browser-device'] = window.ListStore.deviceId();
 
-    // [Fix] 给予 SSE 连接极短的建连时间，确保并发请求下后端能优先捕获到 SSE 客户端
-    await new Promise(r => setTimeout(r, 50));
+    // 先让出界面任务绘制加载提示，共用连接无需逐曲等待建连。
+    await window.ClientPerformance?.yieldTask();
 
     try {
         const currentPlatform = song.source;
@@ -5543,6 +5517,7 @@ async function prefetchNextSong(startFromIndex = null, depth = 0) {
 // --- Server Cache Helpers ---
 /** 检查指定目录下载索引；未命中时保留原缓存与音源流程。 @author yahyaoo */
 async function checkServerDownload(song, quality, exactQuality = false, currentDirectory = false) {
+    if (window.ClientData) return window.SongFiles.findPlayable(song, quality, exactQuality, 'download');
     try {
         const params = new URLSearchParams({ source: song.source || '',
             songmid: song.songmid || song.meta?.songmid || '',
@@ -5557,6 +5532,7 @@ async function checkServerDownload(song, quality, exactQuality = false, currentD
 window.checkServerDownload = checkServerDownload;
 
 async function checkServerCache(song, quality, exactQuality = false) {
+    if (window.ClientData) return window.SongFiles.findPlayable(song, quality, exactQuality, 'cache');
     try {
         const username = currentListData?.username || '';
         const params = new URLSearchParams({
@@ -5848,17 +5824,13 @@ async function triggerServerCache(song, url, quality) {
             }
         };
 
-        await fetch('/api/music/cache/download', {
-            method: 'POST',
-            headers: headers,
-            body: JSON.stringify({
+        await window.DeferredWrites.enqueue('/api/music/cache/download', {
                 songInfo: songInfoForCache,
                 url,
                 quality,
                 namingPattern: window.settings?.serverCacheNamingPattern || 'simple',
                 embedLyric: !!(window.settings?.embedLyricToFile ?? true)
-            })
-        });
+            });
         // 移除 403 自动重试逻辑，API 不再报 403
     } catch (e) { console.error('[ServerCache] Trigger failed:', e); }
 }
@@ -5892,12 +5864,7 @@ async function updateServerCacheConfig(location, pattern) {
     if (window.ClientSync) {
         const snapshot = { location: location || settings.serverCacheLocation || 'root', namingPattern: pattern || settings.serverCacheNamingPattern || 'simple' };
         window.ClientSync.seed('cache-config', { location: settings.serverCacheLocation || 'root', namingPattern: lastNamingPattern || 'simple' });
-        // 新增自定义路径需要原接口验证写权限；已知内置位置与命名设置采用周期同步。
-        if (location && !['data', 'root'].includes(location) && location !== settings.serverCacheLocation) {
-            await window.ClientSync.update('cache-config', snapshot);
-            try { await window.ClientSync.flush('cache-config', true); return true; }
-            catch (error) { showError(error.message || '缓存目录保存失败'); return false; }
-        }
+        // 所有目录变更先本地保存，写权限仍由周期上报时的原接口验证。
         await window.ClientSync.update('cache-config', snapshot);
         return true;
     }
@@ -6513,14 +6480,10 @@ async function playSong(song, index, forceQuality = null, noPlay = false, isRetr
                 const _lyricHeaders = { 'Content-Type': 'application/json' };
                 Object.assign(_lyricHeaders, getUserAuthHeaders());
                 // x-user-token 现在由 getUserAuthHeaders 统一管理
-                fetch(`${API_BASE}/cache/lyric`, {
-                    method: 'POST',
-                    headers: _lyricHeaders,
-                    body: JSON.stringify({
+                window.DeferredWrites.enqueue(`${API_BASE}/cache/lyric`, {
                         songInfo: { ...playbackSong, quality: currentQuality },
                         lyricsObj: { lyric: currentRawLrc, tlyric: currentRawTlrc, rlyric: currentRawRlrc, lxlyric: currentRawKlrc }
-                    })
-                }).catch(e => console.warn('[Lyric] 音质确定后重写服务端缓存失败:', e));
+                    }).catch(e => console.warn('[Lyric] 音质确定后重写服务端缓存失败:', e));
             } catch (e) { }
         }
 
@@ -6654,7 +6617,7 @@ async function playSong(song, index, forceQuality = null, noPlay = false, isRetr
         }
 
         // [Trigger Prefetch] 确保即便 play() 被拦截也尝试发起下一首预读
-        prefetchNextSong();
+        // 后续歌曲在实际播放时解析，避免播放一首歌曲就主动请求下一首。作者：jingyh
 
     } catch (error) {
         if (currentLoadingRequestId !== thisRequestId) return;
@@ -7342,6 +7305,7 @@ async function restorePlaybackState() {
         }
         const pendingState = await window.ClientSync?.read('playback');
         if (pendingState) saved = JSON.stringify(pendingState);
+        else if (window.ClientData?.get('/api/music/storage/playback')?.value) saved = JSON.stringify(window.ClientData.get('/api/music/storage/playback').value);
         if (!saved) {
             return;
         }
@@ -7349,6 +7313,7 @@ async function restorePlaybackState() {
         const state = JSON.parse(saved);
         const pendingQueue = await window.ClientSync?.read('queue');
         if (pendingQueue) state.playlist = pendingQueue.playlist;
+        else if (window.ClientData?.get('/api/music/storage/queue')?.value) state.playlist = window.ClientData.get('/api/music/storage/queue').value.playlist;
         else if (!state.playlist) state.playlist = JSON.parse(localStorage.getItem(playbackCacheKey('queue')) || '[]');
         if (!state || !state.song) {
             return;
@@ -8234,6 +8199,7 @@ const SETTINGS_UI_MAP = {
             }
         }
     },
+    clientSyncTransport: { id: 'setting-client-sync-transport', type: 'value', normalize: value => value === 'http' ? 'http' : 'ws', action: value => window.ClientTransport?.setMode(value) },
     saveAccountSettingsToFile: { id: 'setting-save-settings-to-file', type: 'checkbox' },
     enableLyricCache: { id: 'setting-enable-lyric-cache', type: 'checkbox' },
     enableSongUrlCache: { id: 'setting-enable-url-cache', type: 'checkbox' },
@@ -8272,7 +8238,7 @@ const SETTINGS_UI_MAP = {
     hotSearchLimit: {
         id: 'hot-search-limit-input',
         type: 'value',
-        action: () => document.getElementById('search-results-header')?.classList.contains('hidden') && showInitialSearchState()
+        action: (value, isSingle) => isSingle && document.getElementById('search-results-header')?.classList.contains('hidden') && showInitialSearchState()
     },
     itemsPerPage: { id: 'items-per-page-select', type: 'value' },
     enableClientModeSync: { id: 'setting-client-mode-sync', type: 'checkbox' }
@@ -9182,11 +9148,8 @@ async function loadLyricData(song, quality = null) {
             catch (error) { console.warn('[Lyric] 写入本地缓存失败:', error); }
         }
         if (settings.enableServerLyricCache !== false && !data._fromLocalCache) {
-            fetch(`${API_BASE}/cache/lyric`, { method: 'POST',
-                headers: { ...headers, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ songInfo: { ...song, quality }, lyricsObj: {
-                    lyric: raw.lrc, tlyric: raw.tlyric, rlyric: raw.rlyric, lxlyric: raw.klyric } })
-            }).catch(error => console.warn('[Lyric] 上传服务端缓存失败:', error));
+            window.DeferredWrites.enqueue(`${API_BASE}/cache/lyric`, { songInfo: { ...song, quality }, lyricsObj: {
+                    lyric: raw.lrc, tlyric: raw.tlyric, rlyric: raw.rlyric, lxlyric: raw.klyric } }).catch(error => console.warn('[Lyric] 上传服务端缓存失败:', error));
         }
         return raw;
     } catch (error) {
@@ -9891,6 +9854,10 @@ async function loadLibraryData() {
             const pending = await window.ClientSync?.read(channel);
             if (pending) window.libraryData[kind] = pending;
             else window.ClientSync?.seed(channel, window.libraryData[kind]);
+            const dislikeChannel = 'dislike-library-' + kind + ':' + (isPublic ? 'public' : 'personal');
+            const pendingDislike = await window.ClientSync?.read(dislikeChannel);
+            if (pendingDislike) window.dislikeLibraryData[kind] = pendingDislike;
+            else window.ClientSync?.seed(dislikeChannel, window.dislikeLibraryData[kind]);
         }
 
         if (!isPublic && isUserLoggedIn()) {
@@ -11025,7 +10992,12 @@ function updateSyncStatus(html, showLogout = true) {
     if (typeof updateAdminUI === 'function') updateAdminUI();
 }
 
-async function handleSyncLogout(skipConfirm = false) {
+/** 注销或改密前保存最终进度，在令牌失效前确认全部变化。 @author jingyh */
+window.prepareClientLogout = async () => {
+    audio.pause(); savePlaybackState();
+    await window.ClientSync?.flush(undefined, true);
+};
+async function handleSyncLogout(skipConfirm = false, alreadySynced = false) {
     if (!skipConfirm) {
         const confirmed = typeof showSelect === 'function'
             ? await showSelect('退出登录', '确定要退出当前账号？', { danger: true })
@@ -11034,6 +11006,9 @@ async function handleSyncLogout(skipConfirm = false) {
     }
 
     try {
+        // 退出前先保存暂停后的最终进度，令牌失效前确认所有尚未提交修改。作者：jingyh
+        if (!alreadySynced) await window.prepareClientLogout();
+        window.ClientTransport?.close();
         // 1. 服务端注销 Token
         if (userToken) {
             try {
@@ -12778,6 +12753,36 @@ async function submitDataChange(listToSave, context = null) {
         throw e;
     }
 }
+/** 推送更新缓存后按当前页面刷新，本地尚未确认的编辑始终优先。 @author jingyh */
+window.ClientTransport?.on('cache', async changed => {
+    if (Object.keys(changed).some(route => /\/api\/music\/(cache\/(list|directories|subdirs)|custom\/list)/.test(route))) {
+        await window.SongFiles?.refresh();
+        if (!document.getElementById('view-localmusic')?.classList.contains('hidden')) await window.LocalMusicManager?.fetchData(true);
+    }
+    for (const [route, channel, publicSpace] of [['/api/user/list', 'lists', false], ['/api/user/list?user=_open', 'lists-public', true]]) {
+        if (!changed[route]?.data?.userList) continue;
+        const data = structuredClone(changed[route].data);
+        data.username = publicSpace ? '_open' : localStorage.getItem('lx_sync_user');
+        const pending = await window.ClientSync?.read(channel);
+        if (pending) Object.assign(data, pending);
+        await window.SongActions?.restorePending(data);
+        if (publicSpace) window.publicListData = data; else window.myPersonalListData = data;
+        await window.ListStore.cache(data, data.username); window.ClientSync?.seed(channel, data);
+        if (publicSpace === !!window.isViewingPublicFavorites) {
+            currentListData = data; window.currentListData = data; renderMyLists(data); window.SongActions?.refresh();
+            if (window.currentSearchScope === 'local_list' && window.currentViewingListId) handleListClick(window.currentViewingListId, true, true);
+        }
+    }
+    if (Object.keys(changed).some(route => route.includes('/library/'))) await loadLibraryData();
+    if (changed['/api/user/settings'] && !window.ClientSync?.has('settings')) await fetchSettingsFromServer();
+    if (changed['/api/user/appearance']?.status === 200) await window.MusicExperience?.acceptPush(changed['/api/user/appearance'].data);
+    if (changed['/api/user/sound-effects'] && !window.ClientSync?.has('sound-effects')) await window.soundEffects?.fetchFromServer();
+    if (changed['/api/music/dislike']) await window.DislikeManager?.load(true);
+    if (changed['/api/user/account'] || changed['/api/user/account/avatar']) await window.loadAccountProfile?.();
+    if (changed['/api/user/recent'] && !document.getElementById('view-recent')?.classList.contains('hidden')) await window.RecentView?.load();
+});
+window.addEventListener('client-local-event', () => { if (!document.getElementById('view-recent')?.classList.contains('hidden')) void window.RecentView?.load(); });
+
 window.ClientSync?.register('lists', submitDataChange);
 window.ClientSync?.register('lists-public', submitDataChange);
 
@@ -15664,7 +15669,7 @@ document.addEventListener('DOMContentLoaded', () => {
         restorePlaybackState();
 
         // [新增] 延迟显示热搜，避免启动请求堆积
-        if (typeof showInitialSearchState === 'function') {
+        if (typeof showInitialSearchState === 'function' && !window.ClientData) {
             showInitialSearchState();
         }
 

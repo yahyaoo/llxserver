@@ -22,6 +22,16 @@
             <div class="settings-content-heading"><h2 id="settings-section-title">源与基础设置</h2></div>
     <!-- System Settings Panel -->
     <div id="settings-panel-system" class="space-y-6 animate-fade-in">
+        <div id="settings-section-advanced" data-settings-section="advanced" class="settings-form-card hidden">
+            <h3>高级</h3>
+            <label class="settings-field">状态上报方式
+                <select id="setting-client-sync-transport" class="settings-text-input" onchange="updateSetting('clientSyncTransport', this.value)">
+                    <option value="ws">WebSocket（默认，不可用时回退 HTTP）</option>
+                    <option value="http">HTTP</option>
+                </select>
+            </label>
+            <p class="account-field-hint">每 30 秒合并上报实际变化，服务端数据与进度通过长连接推送。</p>
+        </div>
         <!-- 源与基础设置 -->
         <div id="settings-section-sources" data-settings-section="sources" class="col-span-full pt-2 space-y-4">
             <h4 class="text-sm font-bold t-text-main flex items-center">

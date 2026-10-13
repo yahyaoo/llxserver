@@ -9,14 +9,6 @@
         unknown: ['fa-question-circle', '文件状态暂不可用']
     };
     const scope = () => JSON.stringify(window.getUserAuthHeaders?.() || {});
-    const scalar = value => typeof value === 'string' || typeof value === 'number' ? value : undefined;
-    /** 只发送识别歌曲需要的字段，避免携带播放 URL 和无关元数据。 */
-    function describe(song) {
-        const meta = song.meta || {};
-        return Object.fromEntries(['id', 'source', 'songmid', 'songId', 'name', 'singer', 'albumName'].map(key => [key, scalar(song[key] || meta[key])]).concat([
-            ['album', scalar(song.album) || scalar(song.album?.name)]
-        ]).filter(([, value]) => value !== undefined));
-    }
     function paint(slot, state) {
         const [icon, label] = states[state] || states.unknown;
         slot.dataset.fileState = state;
@@ -24,33 +16,14 @@
         slot.setAttribute('aria-label', label);
         slot.innerHTML = `<i class="fas ${icon}" aria-hidden="true"></i>`;
     }
-    /** 每次绑定记录节点本身，过期响应无法写入翻页后的新节点。 */
+    /** 直接使用登录快照及服务端推送更新的文件目录，不因进入列表检查服务器。 */
     async function query(container, binding) {
-        binding.pending = true;
-        try {
-            const revision = ++binding.revision;
-            const account = scope();
-            const current = () => bindings.get(container) === binding && binding.revision === revision && scope() === account;
-            for (let offset = 0; offset < binding.songs.length; offset += 500) {
-                const count = Math.min(500, binding.songs.length - offset);
-                try {
-                    const response = await window.fetchDownloadWithAuth('/api/music/file-status', {
-                        method: 'POST', headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ songs: binding.songs.slice(offset, offset + count).map(describe) })
-                    });
-                    if (!response.ok) throw new Error('状态查询失败');
-                    const result = await response.json();
-                    if (!result.success || !Array.isArray(result.statuses) || result.statuses.length !== count) throw new Error('状态响应不完整');
-                    if (!current()) return;
-                    result.statuses.forEach((item, index) => {
-                        if (binding.slots[offset + index]) paint(binding.slots[offset + index], ['downloaded', 'cached', 'cloud'].includes(item.state) ? item.state : 'unknown');
-                    });
-                } catch {
-                    if (!current()) return;
-                    binding.slots.slice(offset, offset + count).forEach(slot => paint(slot, 'unknown'));
-                }
-            }
-        } finally { binding.pending = false; }
+        binding.songs.forEach((item, index) => {
+            const song = window.SongFiles?.enrich([item])[0] || item;
+            const files = song.files || [];
+            const state = files.some(file => file.folder !== 'cache') ? 'downloaded' : files.length ? 'cached' : 'cloud';
+            if (binding.slots[index]) paint(binding.slots[index], state);
+        });
     }
     /** 为当前页的歌名节点添加图标；调用方提供与歌曲顺序一致的选择器。 */
     function update(container, songs, selector = '.song-file-title') {
@@ -91,7 +64,5 @@
     }
     window.SongFileStatus = { update, refresh };
     window.addEventListener('song-files-changed', refresh);
-    window.addEventListener('focus', refresh);
-    document.addEventListener('visibilitychange', refresh);
-    window.setInterval(refresh, 15000);
+    window.addEventListener('song-files-updated', refresh);
 })();

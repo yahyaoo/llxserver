@@ -60,6 +60,7 @@ export const defaultPlayerSettings = {
   enableLyricGlow: true,
   enablePersistentToken: false,
   playerBackground: 'theme',
+  clientSyncTransport: 'ws',
   saveAccountSettingsToFile: true,
   autoUpdateNetworkList: false,
   networkListAutoCheckInterval: '6h',

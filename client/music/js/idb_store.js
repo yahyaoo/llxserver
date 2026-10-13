@@ -53,7 +53,8 @@
         return openDB().then(db => new Promise((resolve, reject) => {
             const tx = db.transaction(STORE_NAME, 'readwrite');
             const req = tx.objectStore(STORE_NAME).put(value, key);
-            req.onsuccess = () => resolve();
+            tx.oncomplete = () => resolve();
+            tx.onabort = () => reject(tx.error || new Error('本地事务未完成'));
             req.onerror = (e) => reject(e.target.error);
         }));
     }
@@ -62,7 +63,8 @@
         return openDB().then(db => new Promise((resolve, reject) => {
             const tx = db.transaction(STORE_NAME, 'readwrite');
             const req = tx.objectStore(STORE_NAME).delete(key);
-            req.onsuccess = () => resolve();
+            tx.oncomplete = () => resolve();
+            tx.onabort = () => reject(tx.error || new Error('本地事务未完成'));
             req.onerror = (e) => reject(e.target.error);
         }));
     }
@@ -121,6 +123,8 @@
     }
 
     const ListStore = {
+        /** 公共缓存与消息队列的账号键由调用方提供，事务完成后才视为落盘。 @author jingyh */
+        getValue: idbGet, putValue: idbSet, deleteValue: idbDelete, deviceId,
         /** 仅访问账号缓存，首屏不等待 SQLite 网络请求。 @author jingyh */
         getLocal(scope = account(window.getUserAuthHeaders?.() || {})) {
             return cachedState(scope).then(state => state?.value ?? null);
@@ -144,6 +148,7 @@
         },
         /** @returns {Promise<object|null>} 歌单数据，离线未提交内容优先重试。 */
         get() {
+            if (window.ClientData) return window.ClientData.request('/api/user/list').then(response => response.json());
             return enqueue(async (headers, scope) => {
                 const key = LIST_KEY + ':' + scope;
                 const state = await cachedState(scope);
@@ -169,6 +174,7 @@
         },
         /** @param {object} data 原歌单对象。 @returns {Promise<void>} 本地落盘并尝试同步。 */
         set(data) {
+            if (window.ClientSync) return this.cache(data).then(() => window.ClientSync.update('lists', data));
             return enqueue(async (headers, scope) => {
                 const key = LIST_KEY + ':' + scope;
                 await idbSet(key, { value: data, dirty: true });

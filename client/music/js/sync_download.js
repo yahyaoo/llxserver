@@ -472,21 +472,18 @@
   // ─────────────────────────────────────────────
   const startPolling = () => {
     stopPolling()
-    _pollTimer = setInterval(pollProgress, 1500)
-    pollProgress()
+    window.ClientTransport?.subscribe('sync-download', true)
   }
 
   const stopPolling = () => {
     if (_pollTimer) { clearInterval(_pollTimer); _pollTimer = null }
+    window.ClientTransport?.subscribe('sync-download', false)
   }
 
   const pollProgress = async () => {
-    try {
-      const resp = await apiFetch('/api/user/sync-download/progress')
-      if (!resp.success) return
-      updateProgressUI(resp.data)
-    } catch { }
+    window.ClientTransport?.subscribe('sync-download', true)
   }
+  window.ClientTransport?.on('sync-download', response => { if (response.success) updateProgressUI(response.data) })
 
   // ─────────────────────────────────────────────
   // 同步运行时锁定 / 停止时解锁所有可配置控件

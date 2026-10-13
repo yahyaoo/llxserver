@@ -28,40 +28,6 @@
         }
     }
     function renderProgress() { document.querySelectorAll('.music-task-host').forEach(progress); }
-    async function poll() {
-        if (polling) return;
-        const current = account();
-        if (current !== owner) { owner = current; tasks = []; scan = null; completed.clear(); window.Roaming?.reset(); renderProgress(); if (current && localStorage.getItem('lx_play_mode') === 'roaming') window.Roaming?.refresh().catch(() => {}); }
-        if (!window.isUserLoggedIn?.() && !localStorage.getItem('lx_admin_password')) return;
-        polling = true;
-        try {
-            const response = await fetch('/api/music/maintenance', { headers: headers(), cache: 'no-store' });
-            if (!response.ok || current !== account()) return;
-            tasks = (await response.json()).tasks;
-            if (localStorage.getItem('lx_admin_password')) {
-                const publicResponse = await fetch('/api/music/maintenance', { headers: headers(true), cache: 'no-store' });
-                if (publicResponse.ok && current === account()) {
-                    const publicTasks = (await publicResponse.json()).tasks;
-                    tasks = [...new Map([...tasks, ...publicTasks].map(task => [task.id, task])).values()];
-                }
-            }
-            for (const task of tasks) if (task.status !== 'running' && !completed.has(task.id)) {
-                completed.add(task.id);
-                const notify = task.status === 'error' ? window.showError : window.showInfo;
-                notify?.(`${labels[task.action]}${task.status === 'error' ? '失败' : '完成'}：成功 ${task.succeeded}，跳过 ${task.skipped}，失败 ${task.failed}${task.errors?.[0] ? '（' + task.errors[0] + '）' : ''}`);
-                window.LocalMusicManager?.fetchData(true); window.SystemDownloadManager?.syncServerQueue(true);
-                window.SongFiles?.refresh();
-                if (window.CustomDirManager?.isActive) window.CustomDirManager.fetchData(true);
-            }
-            const responseScan = await fetch('/api/music/library/scan', { headers: headers(), cache: 'no-store' });
-            if (responseScan.ok && current === account()) scan = (await responseScan.json()).scan;
-            if (localStorage.getItem('lx_admin_password')) {
-                const publicScan = await fetch('/api/music/library/scan', { headers: headers(true), cache: 'no-store' });
-                if (publicScan.ok && current === account()) { const value = (await publicScan.json()).scan; if (value?.status === 'running') scan = value; }
-            }
-            renderProgress();
-        } catch {} finally { polling = false; }
-    }
     async function start(action, songs, all = false, confirmed = false) {
         if (action === 'delete' && !confirmed && !await window.showSelect('删除本地文件', `确定删除 ${songs.length} 个文件吗？文件删除后无法恢复。`, { danger: true })) return;
         try {
@@ -69,7 +35,7 @@
             const data = await response.json();
             if (!response.ok) throw new Error(data.message || '任务启动失败');
             tasks = tasks.filter(task => task.action !== action).concat(data.task); renderProgress();
-            window.showInfo?.(`${labels[action]}已在后台开始`); await poll();
+            window.showInfo?.(`${labels[action]}已在后台开始`); window.ClientTransport?.subscribe('maintenance', true);
         } catch (error) { window.showError?.(error.message); }
     }
     /** 菜单挂到 body，避免被歌曲行或过滤面板裁切。 */
@@ -205,6 +171,12 @@
     let queued = false;
     new MutationObserver(() => { prepareRows(); if (queued) return; queued = true; requestAnimationFrame(() => { queued = false; refreshTools(); }); }).observe(document.querySelector('.music-shell'), { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'data-online-search'] });
     window.MusicMaintenance = { start, menu, maintenanceEntries, downloadSong, setScan(value) { scan = value; renderProgress(); }, more, refreshTools, songsFor };
-    refreshTools(); poll(); timer = setInterval(poll, 2000);
+    refreshTools();
+    // 任务进度由页面订阅的长连接推送，不在空闲播放器轮询。作者：jingyh
+    window.ClientTransport?.on('maintenance', data => { tasks = data.tasks || []; scan = data.scan || null; renderProgress();
+        window.LocalMusicManager?.showScanProgress(scan);
+        for (const task of tasks) if (task.status !== 'running' && !completed.has(task.id)) {
+            completed.add(task.id); (task.status === 'error' ? window.showError : window.showInfo)?.(`${labels[task.action]}${task.status === 'error' ? '失败' : '完成'}：成功 ${task.succeeded}，跳过 ${task.skipped}，失败 ${task.failed}`);
+        } });
     window.addEventListener('pagehide', () => clearInterval(timer));
 })();

@@ -10,9 +10,13 @@ function browser(legacy) {
   if (legacy) cache.set('lx_list_data', legacy)
   let username = '_open', offline = false
   const operation = (work) => { const req = {}; queueMicrotask(() => { req.result = work(); req.onsuccess?.({ target: req }) }); return req }
-  const db = { objectStoreNames: { contains: () => true }, transaction: () => ({ objectStore: () => ({
-    get: key => operation(() => cache.get(key)), put: (value, key) => operation(() => cache.set(key, structuredClone(value))), delete: key => operation(() => cache.delete(key)),
-  }) }) }
+  const db = { objectStoreNames: { contains: () => true }, transaction: () => {
+    const tx = { objectStore: () => ({
+      get: key => operation(() => cache.get(key)),
+      put: (value, key) => operation(() => { cache.set(key, structuredClone(value)); queueMicrotask(() => tx.oncomplete?.()); }),
+      delete: key => operation(() => { cache.delete(key); queueMicrotask(() => tx.oncomplete?.()); }),
+    }) }; return tx;
+  } }
   const window = { getUserAuthHeaders: () => ({ 'x-user-name': username }), fetchDownloadWithAuth: async (_url, options) => {
     const account = options.headers['x-user-name']
     calls.push({ account, method: options.method })

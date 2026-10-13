@@ -28,22 +28,12 @@
             localStorage.removeItem('lx_admin_password');
             for (const key of ['lx_sync_url', 'lx_sync_code', 'lx_ws_auth']) localStorage.removeItem(key);
             if (remote) localStorage.setItem('lx_login_server', server.value.trim()); else localStorage.removeItem('lx_login_server');
-            await new Promise(resolve => {
-                const request = indexedDB.open('lx_music_store', 1);
-                request.onupgradeneeded = () => { if (!request.result.objectStoreNames.contains('kv')) request.result.createObjectStore('kv'); };
-                request.onerror = () => resolve();
-                request.onsuccess = () => {
-                    const database = request.result;
-                    if (!database.objectStoreNames.contains('kv')) { database.close(); resolve(); return; }
-                    const transaction = database.transaction('kv', 'readwrite');
-                    transaction.objectStore('kv').clear();
-                    transaction.oncomplete = transaction.onerror = transaction.onabort = () => { database.close(); resolve(); };
-                };
-            });
+            button.textContent = '正在加载账号数据…';
+            await window.ClientData.bootstrap();
             passwordInput.value = '';
             window.location.replace(new URL('./', document.baseURI).href);
         } catch (failure) { error.textContent = failure.message || '网络连接失败，请稍后重试'; error.hidden = false; passwordInput.value = ''; passwordInput.focus(); }
         finally { button.disabled = false; button.textContent = '登录'; }
     });
-    window.AccountSession.verify().then(data => { if (data) window.location.replace(new URL('./', document.baseURI).href); }).catch(() => {});
+    window.AccountSession.verify().then(async data => { if (data) { await window.ClientData.bootstrap(); window.location.replace(new URL('./', document.baseURI).href); } }).catch(() => {});
 })();

@@ -104,7 +104,7 @@ test('昵称、密码与远程地址校验覆盖错误输入', () => {
 })
 test('未勾选记住我使用会话存储，记住我使用持久存储；不会保存密码', () => {
   const storage = () => { const values = new Map(); return { getItem: key => values.get(key) || null, setItem: (key,value) => values.set(key,value), removeItem: key => values.delete(key) } }
-  const localStorage = storage(), sessionStorage = storage(), window = {}
+  const localStorage = storage(), sessionStorage = storage(), window = { fetch: async () => { throw Error('存储测试不应发起验证请求') } }
   vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../client/music/js/account-session.js'),'utf8'), { localStorage, sessionStorage, window, document: { documentElement: { dataset: { accountPage: 'login' } } } })
   const session = window.AccountSession
   session.save({ token:'temp', username:'alice', expiresAt: Date.now()+1000, rememberMe:false })

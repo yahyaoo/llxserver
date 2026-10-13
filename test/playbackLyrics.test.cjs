@@ -7,7 +7,7 @@ const app = read('client/music/app.js');
 const loader = app.slice(app.indexOf('async function fetchEmbedLyricForLocalSong('), app.indexOf('// 辅助函数：根据当前设置应用歌词更新'));
 function fixture() {
   const calls = [], stored = new Map(); let response = { lyric: '[00:01.00]平台歌词' };
-  const context = vm.createContext({ window: {}, console: { warn() {}, log() {}, error() {} }, URLSearchParams,
+  const context = vm.createContext({ window: { DeferredWrites: { enqueue: async (url, data) => calls.push({ url, data, queued: true }) } }, console: { warn() {}, log() {}, error() {} }, URLSearchParams,
     API_BASE: '/api/music', settings: { enableLyricCache: false, enableServerLyricCache: false },
     getUserAuthHeaders: () => ({ 'x-user-name': 'test' }),
     localStorage: { getItem: key => stored.get(key), setItem: (key, value) => stored.set(key, value), removeItem: key => stored.delete(key) },

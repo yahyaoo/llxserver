@@ -29,7 +29,7 @@ class DownloadManager {
         this.speedInterval = setInterval(() => this.updateGlobalSpeed(), 1000);
 
         // [New] Poll for server-side caching progress
-        this.serverPollInterval = setInterval(() => this.pollServerProgress(), 2000);
+        this.serverPollInterval = null;
 
         if (this.listContainer) {
             this.listContainer.addEventListener('scroll', () => this.scheduleScrollRender());
@@ -37,8 +37,8 @@ class DownloadManager {
 
         // Restore tasks from sessionStorage
         this.restoreTasks();
-        setTimeout(() => this.syncServerConcurrency(), 300);
-        setTimeout(() => this.syncServerQueue(true), 500);
+        // 服务端队列只在下载页面读取；离开页面后取消长连接的进度订阅。作者：jingyh
+        window.ClientTransport?.on('downloads', data => this.syncServerQueue(true, data.data || []));
     }
 
     async mapWithConcurrency(items, limit, mapper) {
@@ -106,7 +106,7 @@ class DownloadManager {
     updateMaxConcurrent(value) {
         this.maxConcurrent = this.normalizeConcurrency(value);
         console.log('[DownloadManager] Concurrency limit updated to:', this.maxConcurrent);
-        this.syncServerConcurrency();
+        // 并发设置随统一设置批次上报；显式下载登记也携带最新并发数。
         this.processQueue();
     }
 
@@ -135,7 +135,7 @@ class DownloadManager {
     async requestServerQueue(path, body) {
         const options = { method: body === undefined ? 'GET' : 'POST', headers: this.getServerQueueHeaders() };
         if (body !== undefined) options.body = JSON.stringify(body);
-        const response = await window.fetchDownloadWithAuth(path, options);
+        const response = body !== undefined && window.ClientTransport ? await window.ClientTransport.request(path, options) : await window.fetchDownloadWithAuth(path, options);
         const result = await response.json().catch(() => ({}));
         if (!response.ok || result.success === false) throw new Error(result.message || `HTTP ${response.status}`);
         return result.data;
@@ -184,11 +184,12 @@ class DownloadManager {
         }
     }
 
-    async syncServerQueue(render = false) {
+    async syncServerQueue(render = false, pushedItems = null) {
+        if (!pushedItems) { if (!this.view?.classList.contains('hidden')) window.ClientTransport?.subscribe('downloads', true); return; }
         if (this.serverQueueSyncInFlight) return;
         this.serverQueueSyncInFlight = true;
         try {
-            const items = await this.requestServerQueue('/api/music/cache/queue');
+            const items = pushedItems || await this.requestServerQueue('/api/music/cache/queue');
             if (!Array.isArray(items)) return;
             const remoteIds = new Set();
             const updatedTasks = [];
@@ -842,7 +843,7 @@ class DownloadManager {
                 payload.namingPattern = window.settings.serverCacheNamingPattern;
             }
 
-            const res = await fetch('/api/music/cache/download', {
+            const res = await (window.ClientTransport?.request || fetch)('/api/music/cache/download', {
                 method: 'POST',
                 headers,
                 body: JSON.stringify(payload)
@@ -1106,7 +1107,7 @@ class DownloadManager {
                 const songKey = this.getTaskServerSongKey(task);
                 const headers = { 'Content-Type': 'application/json', ...(window.getUserAuthHeaders ? window.getUserAuthHeaders() : {}) };
 
-                fetch('/api/music/cache/stop', {
+                (window.ClientTransport?.request || fetch)('/api/music/cache/stop', {
                     method: 'POST',
                     headers,
                     body: JSON.stringify(task.serverManaged ? { queueId: task.serverQueueId || task.id } : { songKey })
@@ -1176,7 +1177,7 @@ class DownloadManager {
                 const songKey = this.getTaskServerSongKey(task);
                 const headers = { 'Content-Type': 'application/json', ...(window.getUserAuthHeaders ? window.getUserAuthHeaders() : {}) };
 
-                fetch('/api/music/cache/stop', {
+                (window.ClientTransport?.request || fetch)('/api/music/cache/stop', {
                     method: 'POST',
                     headers,
                     body: JSON.stringify({ songKey })
@@ -1195,7 +1196,7 @@ class DownloadManager {
         const headers = { 'Content-Type': 'application/json', ...(window.getUserAuthHeaders ? window.getUserAuthHeaders() : {}) };
         const hasManagedServerTasks = this.tasks.some(t => t.serverManaged && ['waiting', 'downloading', 'tagging'].includes(t.status));
         if (hasManagedServerTasks) {
-            fetch('/api/music/cache/stop', {
+            (window.ClientTransport?.request || fetch)('/api/music/cache/stop', {
                 method: 'POST', headers, body: JSON.stringify({ all: true })
             }).catch(e => console.warn('[DownloadManager] Failed to pause persistent server queue:', e));
         }
@@ -1205,7 +1206,7 @@ class DownloadManager {
 
             if (t.isServer && !t.serverManaged) {
                 const songKey = this.getTaskServerSongKey(t);
-                fetch('/api/music/cache/stop', {
+                (window.ClientTransport?.request || fetch)('/api/music/cache/stop', {
                     method: 'POST',
                     headers,
                     body: JSON.stringify({ songKey })
@@ -1315,7 +1316,7 @@ class DownloadManager {
 
                 // [NEW] 通知服务器中止所有该用户的缓存任务
                 const username = (window.currentListData && window.currentListData.username) || localStorage.getItem('lx_sync_user') || '';
-                fetch('/api/music/cache/stop', {
+                (window.ClientTransport?.request || fetch)('/api/music/cache/stop', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
