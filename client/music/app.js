@@ -6770,7 +6770,8 @@ async function addToDefaultList(song) {
  * @param {boolean} shouldAddToDefault 是否加入默认(试听)列表
  */
 function updatePlaylist(list, startIndex = 0, scope = 'local_list', shouldAddToDefault = null) {
-    if (list?.length && window.SongFiles && ['local_list', 'local_all'].includes(scope)) {
+    const enrichedLocalQueue = list?.length && window.SongFiles && ['local_list', 'local_all'].includes(scope);
+    if (enrichedLocalQueue) {
         const targetKey = window.SongIdentity.key(list[startIndex]);
         list = window.SongFiles.enrich(list).map(song => window.MusicExperience.playable(song));
         startIndex = Math.max(0, list.findIndex(song => window.SongIdentity.key(song) === targetKey));
@@ -6796,7 +6797,8 @@ function updatePlaylist(list, startIndex = 0, scope = 'local_list', shouldAddToD
     }
 
     // 本地与在线来源的播放队列都使用统一身份；在线页面本身不改变。作者：yahyaoo
-    if (window.SongIdentity) {
+    // 本地队列已由 enrich 聚合并补齐认证定位；重复聚合会丢失账号字段，令选中歌曲误回退到第一首。作者：jingyh
+    if (window.SongIdentity && !enrichedLocalQueue) {
         const targetSong = list[startIndex];
         const targetKey = window.SongIdentity.key(targetSong);
         list = window.SongIdentity.aggregate(list);

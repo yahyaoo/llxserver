@@ -86,3 +86,60 @@ test('下载列表合并跨平台已完成副本为最高音质，运行中的�
  assert.deepEqual(Array.from(manager.displayTasks,task=>task.id),['high','active','waiting']);
  assert.equal(manager.tasks.length,4);
 });
+
+test('音乐库点击未关联本地歌曲，聚合前后保留所选文件而非回退第一首',()=>{
+ const {libraryPlayback}=require('./helpers/libraryPlayback.cjs');
+ const player=libraryPlayback();
+ const local=(name,singer)=>({id:'local_'+name,source:'local',name,singer,filename:name+'.wav',folder:'custom',quality:'128k',songInfo:{id:'local_'+name,source:'local',name,singer}});
+ const old=local('人间雪','慢头妞'),selected=local('白狐','陈瑞');
+ const files=[old,selected];player.setLibrary(files);
+ player.window.LocalMusicManager.playItem(0);
+ assert.equal(player.played.at(-1).song.name,'人间雪');
+ // 模拟间隔后收到相同目录的新对象；账号字段只在构造认证播放对象时出现。
+ player.setLibrary(JSON.parse(JSON.stringify(files)));
+ player.window.LocalMusicManager.playItem(1);
+ const actual=player.played.at(-1);
+ assert.equal(actual.song.name,'白狐');assert.equal(actual.index,1);
+ assert.equal(actual.song._localFilename,'白狐.wav');
+ assert.equal(new URL(actual.song.url,'http://localhost').searchParams.get('filename'),'白狐.wav');
+ assert.equal(player.context.currentPlaylist.length,2);
+});
+
+test('缓存与音乐目录同名未关联文件按位置切换，仍使用当前账号认证',()=>{
+ const {libraryPlayback}=require('./helpers/libraryPlayback.cjs');
+ const player=libraryPlayback('bob','bob-token');
+ const item=location=>({id:'local_same',source:'local',name:'同名歌曲',singer:'歌手',filename:'同名.wav',folder:'music',location,quality:'128k',songInfo:{id:'local_same',source:'local',name:'同名歌曲',singer:'歌手'}});
+ player.setLibrary([item('root'),item('data')]);player.window.LocalMusicManager.playItem(1);
+ const actual=player.played.at(-1),url=new URL(actual.song.url,'http://localhost');
+ assert.equal(actual.index,1);assert.equal(actual.song.location,'data');
+ assert.equal(url.searchParams.get('location'),'data');assert.equal(url.searchParams.get('token'),'bob-token');
+ assert.match(decodeURIComponent(url.pathname),/\/bob\/同名\.wav$/);
+ assert.equal(player.context.currentPlaylist.length,2);
+});
+
+test('关联歌曲切换仍聚合同曲副本并保留最高音质，不改变选择的歌曲',()=>{
+ const {libraryPlayback}=require('./helpers/libraryPlayback.cjs');
+ const player=libraryPlayback();
+ const other=song({name:'人间雪',filename:'人间雪.wav'});
+ const linked=item=>({...item,songInfo:{...item}});
+ player.setLibrary([other,song({name:'白狐',filename:'白狐.mp3',quality:'128k'}),song({name:'白狐',source:'kg',id:'kg_other',filename:'白狐.flac',quality:'flac',folder:'custom'})].map(linked));
+ player.window.LocalMusicManager.playItem(1);
+ const actual=player.played.at(-1);
+ assert.equal(actual.song.name,'白狐');assert.equal(actual.index,1);assert.equal(actual.song.quality,'flac');
+ assert.equal(actual.song.files.length,2);assert.equal(player.context.currentPlaylist.length,2);
+ assert.equal(new URL(actual.song.url,'http://localhost').searchParams.get('filename'),'白狐.flac');
+});
+
+test('本地歌单点击保留过滤后的目标与文件定位，不重复聚合已补全的队列',()=>{
+ const {libraryPlayback}=require('./helpers/libraryPlayback.cjs');
+ const player=libraryPlayback();
+ const item=name=>({id:'local_'+name,source:'local',name,singer:'歌手',filename:name+'.wav',folder:'custom',quality:'128k'});
+ const raw=[item('人间雪'),item('不喜欢的歌曲'),item('白狐')];
+ player.window.SongFiles.setLibrary(raw);
+ player.context.settings.autoFilterDislikedSongs=true;
+ player.window.DislikeManager={isDisliked:song=>song.name==='不喜欢的歌曲'};
+ player.window.updatePlaylist(raw.map(song=>player.window.MusicExperience.playable(song)),2,'local_list');
+ assert.equal(player.played.at(-1).song.name,'白狐');assert.equal(player.played.at(-1).index,1);
+ assert.equal(player.played.at(-1).song._localUsername,'alice');
+ assert.equal(player.context.currentPlaylist.length,2);
+});

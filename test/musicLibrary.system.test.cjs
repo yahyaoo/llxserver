@@ -52,3 +52,38 @@ test('音乐库：多目录同名文件、进度、无阻塞、音质、权限�
   }finally{await runtime.stop()}
 });
 module.exports={wav,waitScan};
+
+test('目录快照经 WS 更新后切歌读取所选音频文件，不回退旧歌曲',{timeout:60000},async()=>{
+  const {libraryPlayback}=require('./helpers/libraryPlayback.cjs');
+  const {WebSocket}=require('ws');
+  let directory,socket;
+  const oldAudio=wav(16,44100,12),selectedAudio=wav(16,22050,12);
+  const runtime=await startAccountRuntime({},root=>{
+    directory=path.join(root,'switch-music');fs.mkdirSync(directory);
+    fs.writeFileSync(path.join(directory,'人间雪 - 慢头妞.wav'),oldAudio);
+    fs.writeFileSync(path.join(directory,'白狐 - 陈瑞.wav'),selectedAudio);
+  });
+  const post=(url,data,headers=runtime.admin)=>fetch(runtime.origin+url,{method:'POST',headers:{...headers,'Content-Type':'application/json'},body:JSON.stringify(data)});
+  try{
+    assert.equal((await post('/api/config',{'user.customMusicDirectories':[{name:'alice',enableCustomMusicDir:true,directories:[{path:directory,scanMinutes:30}]}]})).status,200);
+    const login=await (await post('/api/user/login',{username:'alice',password:'alice123'})).json();
+    const headers={'x-user-name':'alice','x-user-token':login.token};
+    assert.equal((await post('/api/music/library/scan',{},headers)).status,202);await waitScan(runtime,headers);
+    const snapshot=await (await fetch(runtime.origin+'/api/user/client-bootstrap',{headers})).json();
+    const select=items=>[items.find(item=>item.filename.includes('人间雪')),items.find(item=>item.filename.includes('白狐'))];
+    const initial=select(snapshot.entries['/api/music/cache/list'].data.data);assert.ok(initial.every(Boolean));
+    const player=libraryPlayback('alice',login.token);player.setLibrary(initial);
+    player.window.LocalMusicManager.playItem(0);assert.match(player.played.at(-1).song.name,/人间雪/);
+    socket=new WebSocket(runtime.origin.replace('http:','ws:')+'/api/music/client-channel');
+    const pushed=new Promise((resolve,reject)=>{
+      const timer=setTimeout(()=>reject(Error('目录推送超时')),10000);
+      socket.on('message',bytes=>{const message=JSON.parse(bytes);if(message.type==='cache'&&message.entries['/api/music/cache/list']){clearTimeout(timer);resolve(message.entries['/api/music/cache/list'].data.data)}});
+    });
+    await new Promise(resolve=>socket.once('open',resolve));socket.send(JSON.stringify({type:'hello',token:login.token,device:'switch-browser-123456'}));
+    player.setLibrary(select(await pushed));player.window.LocalMusicManager.playItem(1);
+    const actual=player.played.at(-1);assert.equal(actual.index,1);assert.match(actual.song.name,/白狐/);
+    const response=await fetch(new URL(actual.song.url,runtime.origin),{headers:{Range:'bytes=0-63'}});
+    assert.equal(response.status,206);const bytes=Buffer.from(await response.arrayBuffer());
+    assert.deepEqual(bytes,selectedAudio.subarray(0,64));assert.notDeepEqual(bytes,oldAudio.subarray(0,64));
+  }finally{socket?.terminate();await runtime.stop()}
+});
