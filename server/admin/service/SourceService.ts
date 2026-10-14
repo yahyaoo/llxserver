@@ -12,7 +12,14 @@ export type SourceServiceRuntime = Pick<ServerRuntime, 'customSourceHandlers' | 
  */
 export async function postCustomSourceValidate(context: RequestContext, runtime: SourceServiceRuntime) {
   const { req, res } = context
-  const { customSourceHandlers } = runtime
+  const { customSourceHandlers, verifyUserAuth } = runtime
+
+  const isAdmin = req.headers['x-frontend-auth'] === global.lx.config['frontend.password']
+  if (!verifyUserAuth(req) && !isAdmin) {
+    res.writeHead(401, { 'Content-Type': 'application/json' })
+    res.end(JSON.stringify({ valid: false, error: '请先登录账号，再添加个人自定义源。' }))
+    return
+  }
 
         return customSourceHandlers.handleValidate(req, res)
 
@@ -27,9 +34,9 @@ export async function postCustomSourceValidate(context: RequestContext, runtime:
  */
 export async function postCustomSourceImport(context: RequestContext, runtime: SourceServiceRuntime) {
   const { req, res } = context
-  const { customSourceHandlers } = runtime
+  const { customSourceHandlers, verifyUserAuth } = runtime
 
-        return customSourceHandlers.handleImport(req, res)
+        return customSourceHandlers.handleImport(req, res, verifyUserAuth(req) || 'open')
 
 }
 
@@ -42,9 +49,9 @@ export async function postCustomSourceImport(context: RequestContext, runtime: S
  */
 export async function postCustomSourceUpload(context: RequestContext, runtime: SourceServiceRuntime) {
   const { req, res } = context
-  const { customSourceHandlers } = runtime
+  const { customSourceHandlers, verifyUserAuth } = runtime
 
-        return customSourceHandlers.handleUpload(req, res)
+        return customSourceHandlers.handleUpload(req, res, verifyUserAuth(req) || 'open')
 
 }
 
@@ -59,7 +66,7 @@ export async function getCustomSourceList(context: RequestContext, runtime: Sour
   const { urlObj, req, res } = context
   const { verifyUserAuth, customSourceHandlers } = runtime
 
-        const username = urlObj.searchParams.get('username') || 'default'
+        const username = verifyUserAuth(req) || 'default'
 
         // 鉴权逻辑：如果开启了页面公开访问限制
         if (global.lx.config['user.enablePublicRestriction']) {
@@ -86,9 +93,9 @@ export async function getCustomSourceList(context: RequestContext, runtime: Sour
  */
 export async function postCustomSourceToggle(context: RequestContext, runtime: SourceServiceRuntime) {
   const { req, res } = context
-  const { customSourceHandlers } = runtime
+  const { customSourceHandlers, verifyUserAuth } = runtime
 
-        return customSourceHandlers.handleToggle(req, res)
+        return customSourceHandlers.handleToggle(req, res, verifyUserAuth(req) || 'open')
 
 }
 
@@ -101,9 +108,9 @@ export async function postCustomSourceToggle(context: RequestContext, runtime: S
  */
 export async function postCustomSourceDelete(context: RequestContext, runtime: SourceServiceRuntime) {
   const { req, res } = context
-  const { customSourceHandlers } = runtime
+  const { customSourceHandlers, verifyUserAuth } = runtime
 
-        return customSourceHandlers.handleDelete(req, res)
+        return customSourceHandlers.handleDelete(req, res, verifyUserAuth(req) || 'open')
 
 }
 
@@ -116,9 +123,9 @@ export async function postCustomSourceDelete(context: RequestContext, runtime: S
  */
 export async function postCustomSourceReorder(context: RequestContext, runtime: SourceServiceRuntime) {
   const { req, res } = context
-  const { customSourceHandlers } = runtime
+  const { customSourceHandlers, verifyUserAuth } = runtime
 
-        return customSourceHandlers.handleReorder(req, res)
+        return customSourceHandlers.handleReorder(req, res, verifyUserAuth(req) || 'open')
 
 }
 
@@ -131,8 +138,8 @@ export async function postCustomSourceReorder(context: RequestContext, runtime: 
  */
 export async function postCustomSourceUpdatePlatforms(context: RequestContext, runtime: SourceServiceRuntime) {
   const { req, res } = context
-  const { customSourceHandlers } = runtime
+  const { customSourceHandlers, verifyUserAuth } = runtime
 
-        return customSourceHandlers.handleUpdatePlatforms(req, res)
+        return customSourceHandlers.handleUpdatePlatforms(req, res, verifyUserAuth(req) || 'open')
 
 }

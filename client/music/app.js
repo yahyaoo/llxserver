@@ -13152,6 +13152,20 @@ window.handleRemoteBack = handleRemoteBack;
 
 let customSourceMode = 'file'; // 'file' or 'url'
 
+/** 新增个人音源需要账号身份；管理员仍可管理全局公开源。 */
+function canAddCustomSource() {
+    if (getCustomSourceOwner() !== 'default' || localStorage.getItem('lx_admin_password')) return true;
+    showError('请先登录账号，新增的自定义源会与当前账号绑定。');
+    return false;
+}
+
+/** 自定义源仅通过 token/session 识别用户，不向服务端发送用户名请求头。 */
+function getCustomSourceRequestHeaders() {
+    const headers = { ...getUserAuthHeaders() };
+    delete headers['x-user-name'];
+    return headers;
+}
+
 // 切换上传方式
 function switchCustomSourceMode(mode) {
     customSourceMode = mode;
@@ -13172,6 +13186,10 @@ function switchCustomSourceMode(mode) {
 
 // 处理本地文件上传
 async function handleFileUpload(input) {
+    if (!canAddCustomSource()) {
+        input.value = '';
+        return;
+    }
     const file = input.files[0];
     if (!file) return;
 
@@ -13191,15 +13209,14 @@ async function handleFileUpload(input) {
         // 先验证脚本
         showInfo('正在验证脚本...');
         const adminPass = localStorage.getItem('lx_admin_password');
-        const headers = { 'Content-Type': 'application/json', ...getUserAuthHeaders() };
+        const headers = { 'Content-Type': 'application/json', ...getCustomSourceRequestHeaders() };
         if (adminPass) headers['x-frontend-auth'] = adminPass;
 
         let validationRes = await fetch('/api/custom-source/validate', {
             method: 'POST',
             headers: headers,
             body: JSON.stringify({
-                script: content,
-                username: getCustomSourceOwner()
+                script: content
             })
         });
 
@@ -13261,7 +13278,7 @@ async function handleFileUpload(input) {
         // document.getElementById('file-name-display').textContent = '点击选择 .js 文件';
 
         // 刷新源列表
-        loadCustomSources();
+        await loadCustomSources();
     } catch (error) {
         console.error('[CustomSource] 上传失败:', error);
         showError(`上传失败: ${error.message}`);
@@ -13270,6 +13287,7 @@ async function handleFileUpload(input) {
 
 // 处理远程链接导入
 async function handleUrlImport() {
+    if (!canAddCustomSource()) return;
     const input = await showInput("导入远程音源", "请输入自定义源脚本的 URL 地址:", {
         placeholder: "https://example.com/script.js",
         confirmText: "开始导入"
@@ -13286,8 +13304,8 @@ async function handleUrlImport() {
     try {
         showInfo('正在获取并验证远程脚本...');
 
-        const username = getCustomSourceOwner();
-        const headers = { 'Content-Type': 'application/json', ...getUserAuthHeaders() };
+        const filename = url.split('/').pop().split('?')[0] || '';
+        const headers = { 'Content-Type': 'application/json', ...getCustomSourceRequestHeaders() };
         const adminPass = localStorage.getItem('lx_admin_password');
         if (adminPass) headers['x-frontend-auth'] = adminPass;
 
@@ -13297,8 +13315,7 @@ async function handleUrlImport() {
             headers: headers,
             body: JSON.stringify({
                 url,
-                filename: url.split('/').pop().split('?')[0] || '',
-                username: username
+                filename
             })
         });
 
@@ -13325,7 +13342,7 @@ async function handleUrlImport() {
         if (result.requireUnsafe) {
             const confirmed = await showSelect('安全风险确认', result.message || '该脚本需要原生 VM 模式运行，可能存在安全风险，是否继续？', { danger: true, confirmText: '允许并导入' });
             if (confirmed) {
-                const retryHeaders = { 'Content-Type': 'application/json', ...getUserAuthHeaders() };
+                const retryHeaders = { 'Content-Type': 'application/json', ...getCustomSourceRequestHeaders() };
                 if (adminPass) retryHeaders['x-frontend-auth'] = adminPass;
                 const retryResp = await fetch(`/api/custom-source/import`, {
                     method: 'POST',
@@ -13333,7 +13350,6 @@ async function handleUrlImport() {
                     body: JSON.stringify({
                         url,
                         filename,
-                        username: username,
                         allowUnsafeVM: true,
                     })
                 });
@@ -13355,17 +13371,17 @@ async function handleUrlImport() {
         showSuccess(`已导入: ${result.filename}`);
 
         // 刷新源列表
-        loadCustomSources();
+        await loadCustomSources();
     } catch (error) {
         console.error('[CustomSource] 导入失败:', error);
         showError(`导入失败: ${error.message}`);
-        loadCustomSources();
+        await loadCustomSources();
     }
 }
 
 // 上传自定义源到服务器
 async function uploadCustomSource(filename, content, type, allowUnsafeVM = false) {
-    const headers = { 'Content-Type': 'application/json', ...getUserAuthHeaders() };
+    const headers = { 'Content-Type': 'application/json', ...getCustomSourceRequestHeaders() };
     const adminPass = localStorage.getItem('lx_admin_password');
     if (adminPass) headers['x-frontend-auth'] = adminPass;
 
@@ -13376,7 +13392,6 @@ async function uploadCustomSource(filename, content, type, allowUnsafeVM = false
             filename,
             content,
             type,
-            username: getCustomSourceOwner(), // 使用当前登录用户
             allowUnsafeVM
         })
     });
@@ -13422,13 +13437,13 @@ function getCustomSourceOwner() {
 
 async function fetchCustomSources() {
     try {
-        const username = getCustomSourceOwner();
-        const headers = getUserAuthHeaders();
+        const headers = getCustomSourceRequestHeaders();
         const adminPass = localStorage.getItem('lx_admin_password');
         if (adminPass) headers['x-frontend-auth'] = adminPass;
 
-        const res = await fetch(`/api/custom-source/list?username=${username}`, {
-            headers: headers
+        const res = await fetch('/api/custom-source/list', {
+            headers: headers,
+            cache: 'no-store'
         });
 
         if (res.status === 403) {
@@ -13738,15 +13753,14 @@ async function renderCustomSources() {
                     }
 
                     try {
-                        const username = getCustomSourceOwner();
-                        const headers = { 'Content-Type': 'application/json', ...getUserAuthHeaders() };
+                        const headers = { 'Content-Type': 'application/json', ...getCustomSourceRequestHeaders() };
                         const adminPass = localStorage.getItem('lx_admin_password');
                         if (adminPass) headers['x-frontend-auth'] = adminPass;
 
                         const response = await fetch('/api/custom-source/reorder', {
                             method: 'POST',
                             headers: headers,
-                            body: JSON.stringify({ username, sourceIds: finalOrderIds })
+                            body: JSON.stringify({ sourceIds: finalOrderIds })
                         });
 
                         if (response.status === 403) {
@@ -13777,15 +13791,14 @@ async function renderCustomSources() {
 // 重新加载源 (强制重新启用)
 async function reloadSource(sourceId) {
     try {
-        const username = getCustomSourceOwner();
         const adminPass = localStorage.getItem('lx_admin_password');
-        const headers = { 'Content-Type': 'application/json', ...getUserAuthHeaders() };
+        const headers = { 'Content-Type': 'application/json', ...getCustomSourceRequestHeaders() };
         if (adminPass) headers['x-frontend-auth'] = adminPass;
 
         const response = await fetch('/api/custom-source/toggle', {
             method: 'POST',
             headers: headers,
-            body: JSON.stringify({ username, sourceId, enabled: true }) // Force enable triggers reload
+            body: JSON.stringify({ sourceId, enabled: true }) // Force enable triggers reload
         });
 
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -13805,15 +13818,14 @@ async function reloadSource(sourceId) {
 // 切换状态
 async function toggleSource(sourceId, currentEnabled, allowUnsafeVM = false) {
     try {
-        const username = getCustomSourceOwner();
-        const headers = { 'Content-Type': 'application/json', ...getUserAuthHeaders() };
+        const headers = { 'Content-Type': 'application/json', ...getCustomSourceRequestHeaders() };
         const adminPass = localStorage.getItem('lx_admin_password');
         if (adminPass) headers['x-frontend-auth'] = adminPass;
 
         const response = await fetch('/api/custom-source/toggle', {
             method: 'POST',
             headers: headers,
-            body: JSON.stringify({ username, sourceId, enabled: !currentEnabled, allowUnsafeVM }) // Send new state
+            body: JSON.stringify({ sourceId, enabled: !currentEnabled, allowUnsafeVM }) // Send new state
         });
 
         if (response.status === 403) {
@@ -13857,15 +13869,14 @@ async function deleteSource(sourceId) {
     if (!(await showSelect('删除自定义源', '确定要删除这个自定义源吗？', { danger: true }))) return;
 
     try {
-        const username = getCustomSourceOwner();
-        const headers = { 'Content-Type': 'application/json', ...getUserAuthHeaders() };
+        const headers = { 'Content-Type': 'application/json', ...getCustomSourceRequestHeaders() };
         const adminPass = localStorage.getItem('lx_admin_password');
         if (adminPass) headers['x-frontend-auth'] = adminPass;
 
         const response = await fetch('/api/custom-source/delete', {
             method: 'POST',
             headers: headers,
-            body: JSON.stringify({ username, sourceId })
+            body: JSON.stringify({ sourceId })
         });
 
         if (response.status === 403) {
@@ -13978,8 +13989,7 @@ async function batchSourceEnable(scope, enable) {
     const label = enable ? '启用' : '禁用';
     if (!(await showSelect(`批量${label}`, `确定要${label} ${selected.length} 个源吗？`, {}))) return;
 
-    const username = getCustomSourceOwner();
-    const headers = { 'Content-Type': 'application/json', ...getUserAuthHeaders() };
+    const headers = { 'Content-Type': 'application/json', ...getCustomSourceRequestHeaders() };
     const adminPass = localStorage.getItem('lx_admin_password');
     if (adminPass) headers['x-frontend-auth'] = adminPass;
 
@@ -13989,7 +13999,7 @@ async function batchSourceEnable(scope, enable) {
             const response = await fetch('/api/custom-source/toggle', {
                 method: 'POST',
                 headers,
-                body: JSON.stringify({ username, sourceId, enabled: enable })
+                body: JSON.stringify({ sourceId, enabled: enable })
             });
             if (response.ok) successCount++;
         } catch(e) { console.error('[BatchSource] toggle error', sourceId, e); }
@@ -14003,8 +14013,7 @@ async function batchSourceDelete(scope) {
     if (!selected.length) { showInfo('请先选择要删除的源'); return; }
     if (!(await showSelect('批量删除', `确定要删除 ${selected.length} 个源吗？此操作不可撤销。`, { danger: true }))) return;
 
-    const username = getCustomSourceOwner();
-    const headers = { 'Content-Type': 'application/json', ...getUserAuthHeaders() };
+    const headers = { 'Content-Type': 'application/json', ...getCustomSourceRequestHeaders() };
     const adminPass = localStorage.getItem('lx_admin_password');
     if (adminPass) headers['x-frontend-auth'] = adminPass;
 
@@ -14022,7 +14031,7 @@ async function batchSourceDelete(scope) {
             const response = await fetch('/api/custom-source/delete', {
                 method: 'POST',
                 headers,
-                body: JSON.stringify({ username, sourceId })
+                body: JSON.stringify({ sourceId })
             });
             if (response.ok) {
                 successCount++;
@@ -14245,7 +14254,7 @@ async function saveEditSourcePlatforms() {
         const disabledSources = checkboxes.filter(cb => !cb.checked).map(cb => cb.value);
 
         const username = getCustomSourceOwner();
-        const headers = { 'Content-Type': 'application/json', ...getUserAuthHeaders() };
+        const headers = { 'Content-Type': 'application/json', ...getCustomSourceRequestHeaders() };
         const adminPass = localStorage.getItem('lx_admin_password');
         if (adminPass) headers['x-frontend-auth'] = adminPass;
 

@@ -1,7 +1,7 @@
 /** 真实 HTTP：登录门禁、资料、改密、会话到期和远程服务器数据隔离。 */
 const { test } = require('node:test')
 const assert = require('node:assert/strict')
-const path = require('node:path'), crypto = require('node:crypto')
+const path = require('node:path'), fs = require('node:fs'), crypto = require('node:crypto')
 const Database = require('better-sqlite3')
 const { startAccountRuntime } = require('./helpers/accountRuntime.cjs')
 require('tsx/cjs')
@@ -85,6 +85,43 @@ test('HTTP 与 SQLite：必须登录、记住我重启恢复、资料持久化�
     await runtime.restart(); assert.equal((await json(runtime,'/api/user/auth/verify',token)).status,401)
     db.close()
   } finally { if (db?.open) db.close(); await runtime.stop() }
+})
+
+test('自定义音源始终保存并显示在认证用户自己的列表中', {timeout:30000}, async () => {
+  const runtime = await startAccountRuntime()
+  try {
+    const alice = (await login(runtime, true, 'alice', 'alice123')).data.token
+    const bob = (await login(runtime, true, 'bob', 'bob12345')).data.token
+    const publicSourceDir = path.join(runtime.root, 'data/users/source/_open')
+    fs.mkdirSync(publicSourceDir, { recursive: true })
+    const publicSources = [{ id: 'public.js', name: '全局公开源', enabled: true }]
+    fs.writeFileSync(path.join(publicSourceDir, 'sources.json'), JSON.stringify(publicSources))
+    const script = `/** @name 账号隔离测试源 */
+      lx.send(lx.EVENT_NAMES.inited, { sources: { wy: { name: '账号隔离测试源', type: 'music', actions: ['musicUrl'], qualitys: ['320k'] } } });`
+    const upload = await json(runtime, '/api/custom-source/upload', alice, 'POST', {
+      username: 'bob', filename: 'spoofed.js', content: script
+    })
+    assert.equal(upload.status, 200, JSON.stringify(upload.data))
+    assert.equal(upload.data.owner, 'alice')
+
+    const aliceSources = await json(runtime, '/api/custom-source/list?username=bob', alice)
+    const bobSources = await json(runtime, '/api/custom-source/list?username=alice', bob)
+    assert.ok(aliceSources.data.some(source => source.id === upload.data.id && source.owner === 'alice'))
+    assert.ok(!bobSources.data.some(source => source.id === upload.data.id))
+
+    const reorder = await json(runtime, '/api/custom-source/reorder', bob, 'POST', {
+      username: 'alice', sourceIds: ['public.js']
+    })
+    assert.equal(reorder.status, 200)
+    assert.deepEqual(JSON.parse(fs.readFileSync(path.join(publicSourceDir, 'sources.json'), 'utf8')), publicSources)
+
+    const duplicate = await json(runtime, '/api/custom-source/upload', alice, 'POST', {
+      username: 'bob', filename: 'again.js', content: script
+    })
+    assert.equal(duplicate.status, 500)
+    assert.match(duplicate.data.error, /已存在/)
+    assert.ok((await json(runtime, '/api/custom-source/list', alice)).data.some(source => source.id === upload.data.id))
+  } finally { await runtime.stop() }
 })
 test('两个真实服务：远程账号不必存在于绑定服务器，资料与歌单写入远端，退出同时撤销', {timeout:90000}, async () => {
   const local=await startAccountRuntime({users:[{name:'local',password:'local123'}]}), remote=await startAccountRuntime({users:[{name:'remote',password:'remote123'}]})
