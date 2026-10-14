@@ -7,6 +7,7 @@ const vm = require('node:vm')
 
 const read = file => fs.readFileSync(path.join(__dirname, '..', file), 'utf8')
 const appSource = read('client/music/app.js')
+const localMusicSource = read('client/music/js/local_music.js')
 
 /** 隔离浏览器环境，执行真实弹框和音量函数。 */
 function createContext() {
@@ -123,6 +124,38 @@ test('双行歌词同步前进、跳转和末尾，信息刷新不清空共享�
   context.window.playbackLyrics.setLines([], '暂无歌词')
   bar.setLyrics([], '暂无歌词')
   assert.equal(get('player-lyric-current').textContent, '暂无歌词')
+})
+
+test('本地歌曲来源和标准音质在播放器中显示正确标签', () => {
+  const qualityStart = appSource.indexOf('function getQualityTags(item)')
+  const qualityEnd = appSource.indexOf('window.getQualityTags = getQualityTags;', qualityStart) + 'window.getQualityTags = getQualityTags;'.length
+  const sourceStart = appSource.indexOf('function getSourceTag(source)', qualityEnd)
+  const sourceEnd = appSource.indexOf('window.getSourceTag = getSourceTag;', sourceStart) + 'window.getSourceTag = getSourceTag;'.length
+  assert.ok(qualityStart >= 0 && qualityEnd > qualityStart && sourceStart >= qualityEnd && sourceEnd > sourceStart)
+  const context = vm.createContext({ window: { SongMetadata: { render: () => '' } } })
+  vm.runInContext(appSource.slice(qualityStart, qualityEnd) + '\n' + appSource.slice(sourceStart, sourceEnd), context)
+  assert.match(context.window.getSourceTag('custom'), /本地/)
+  assert.match(context.window.getQualityTags({ quality: '128k' }), />128k</)
+})
+
+test('服务端分页按总歌曲数显示翻页控件和总数', () => {
+  const methodStart = localMusicSource.indexOf('    updatePagination() {')
+  const methodEnd = localMusicSource.indexOf('    render() {', methodStart)
+  assert.ok(methodStart >= 0 && methodEnd > methodStart)
+  const context = vm.createContext({})
+  const updatePagination = vm.runInContext(`({${localMusicSource.slice(methodStart, methodEnd)}}).updatePagination`, context)
+  const elements = new Map()
+  for (const id of ['lm-pagination', 'lm-page-info', 'lm-page-first', 'lm-page-prev', 'lm-page-next', 'lm-page-last']) {
+    const classes = new Set(id === 'lm-pagination' ? ['hidden'] : [])
+    elements.set(id, { textContent: '', disabled: false, classList: {
+      add: value => classes.add(value), remove: value => classes.delete(value), contains: value => classes.has(value),
+    } })
+  }
+  context.document = { getElementById: id => elements.get(id) || null }
+  const manager = { pageSize: 60, serverPaged: true, serverTotal: 1000, displayData: Array(60), currentPage: 1, getTotalPages() { return Math.ceil(this.serverTotal / this.pageSize) } }
+  updatePagination.call(manager)
+  assert.equal(elements.get('lm-pagination').classList.contains('hidden'), false)
+  assert.equal(elements.get('lm-page-info').textContent, '第 1 / 17 页 (共 1000 首)')
 })
 
 test('未加载音频和直播时长不进入拖动，松开前时长失效也不写无效进度', () => {

@@ -2477,16 +2477,19 @@ function getQualityTags(item) {
     let hasHiRes = false;
     let hasAtmos = false;
     let hasMaster = false;
+    let hasStandard = false;
 
     if (Array.isArray(rawTypes)) {
         const isConcrete = t => !(t && t.isPlatformQuality);
         has320 = rawTypes.some(t => t.type === '320k');
+        hasStandard = rawTypes.some(t => ['128k', 'standard', 'mq'].includes(t.type));
         hasFlac = rawTypes.some(t => t.type === 'flac');
         hasHiRes = rawTypes.some(t => (t.type === 'flac24bit' || t.type === 'hires') && isConcrete(t));
         hasAtmos = rawTypes.some(t => (t.type === 'atmos' || t.type === 'atmos_plus') && isConcrete(t));
         hasMaster = rawTypes.some(t => t.type === 'master' && isConcrete(t));
     } else {
         has320 = !!rawTypes['320k'];
+        hasStandard = !!(rawTypes['128k'] || rawTypes.standard || rawTypes.mq);
         hasFlac = !!rawTypes['flac'];
         hasHiRes = !!(rawTypes['flac24bit'] && !rawTypes['flac24bit'].isPlatformQuality) || !!(rawTypes.hires && !rawTypes.hires.isPlatformQuality);
         hasAtmos = !!(rawTypes.atmos && !rawTypes.atmos.isPlatformQuality) || !!(rawTypes.atmos_plus && !rawTypes.atmos_plus.isPlatformQuality);
@@ -2501,6 +2504,7 @@ function getQualityTags(item) {
         else if (q === 'flac24bit' || q === 'hires') hasHiRes = true;
         else if (q === 'flac') hasFlac = true;
         else if (q === '320k') has320 = true;
+        else if (q === '128k' || q === 'standard' || q === 'mq') hasStandard = true;
     }
 
     if (hasMaster) tags.push('<span class="flex-shrink-0 px-1 py-0 rounded text-[10px] t-badge-purple border border-purple-200 dark:border-purple-500/30 transition-colors">Master</span>');
@@ -2508,6 +2512,7 @@ function getQualityTags(item) {
     else if (hasHiRes) tags.push('<span class="flex-shrink-0 px-1 py-0 rounded text-[10px] t-badge-yellow border border-yellow-200 dark:border-yellow-500/30 transition-colors">Hi-Res</span>');
     else if (hasFlac) tags.push('<span data-quality="flac" class="music-quality-tag flex-shrink-0 px-1 py-0 rounded text-[10px] t-badge-green border border-emerald-200 dark:border-emerald-500/30 transition-colors">无损</span>');
     else if (has320) tags.push('<span class="flex-shrink-0 px-1 py-0 rounded text-[10px] t-badge-blue border border-blue-200 dark:border-blue-500/30 transition-colors">高品质</span>');
+    else if (hasStandard) tags.push('<span class="flex-shrink-0 px-1 py-0 rounded text-[10px] t-badge-gray border t-border-main transition-colors">128k</span>');
 
     return tags.join('') + (window.SongMetadata?.render(item) || '');
 }
@@ -2521,7 +2526,7 @@ function getSourceTag(source) {
         wy: 't-badge-red border-red-200 dark:border-red-500/30',
         mg: 't-badge-pink border-pink-200 dark:border-pink-500/30'
     };
-    const names = { kw: '酷我', kg: '酷狗', tx: 'QQ', wy: '网易', mg: '咪咕' };
+    const names = { kw: '酷我', kg: '酷狗', tx: 'QQ', wy: '网易', mg: '咪咕', custom: '本地', local: '本地' };
     const color = colors[source] || 't-bg-main t-text-muted t-border-main';
     const name = names[source] || source.toUpperCase();
     return `<span data-source="${colors[source] ? source : 'other'}" class="music-source-tag flex-shrink-0 px-1 py-0 rounded text-[10px] font-bold border ${color} mr-1">${name}</span>`;
@@ -5360,7 +5365,7 @@ function timeToSeconds(timeStr) {
  * 辅助：获取源名称
  */
 function getSourceName(source) {
-    const names = { kw: '酷我', kg: '酷狗', tx: 'QQ', wy: '网易', mg: '咪咕' };
+    const names = { kw: '酷我', kg: '酷狗', tx: 'QQ', wy: '网易', mg: '咪咕', custom: '本地', local: '本地' };
     return names[source] || source.toUpperCase();
 }
 

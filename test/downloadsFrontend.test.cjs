@@ -2,6 +2,14 @@
 const { test } = require('node:test'), assert = require('node:assert/strict')
 const fs = require('node:fs'), vm = require('node:vm')
 
+test('手机下载页为标题和批量操作预留独立行，不压缩标题列', () => {
+ const css = fs.readFileSync('client/music/views/downloads/downloads.css', 'utf8')
+ const mobile = css.match(/@media\s*\(max-width:\s*639px\)\s*\{([\s\S]*?)\n\}/)?.[1] || ''
+ assert.match(mobile, /\.downloads-heading\s*\{[^}]*display:\s*grid/)
+ assert.match(mobile, /\.downloads-title\s*\{[^}]*min-width:\s*0/)
+ assert.match(mobile, /\.downloads-heading\s+\.music-page-controls\s*\{[^}]*grid-column:\s*1\s*\/\s*-1/)
+})
+
 test('下载浮层保留点击坐标，菜单隐藏和歌词自动滚动不会关闭', async () => {
  const events = {}, panels = [];
  const select = () => ({ value: '', appendChild() {}, addEventListener() {}, focus(options) { this.focusOptions = options } });

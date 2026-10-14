@@ -105,7 +105,21 @@
         if (!view || !heading || heading.querySelector('.music-page-controls') || tools.has(heading)) return;
         const bar = document.createElement('div'); bar.className = 'music-page-controls';
         const roam = document.createElement('button'); roam.type = 'button'; roam.innerHTML = '<i class="fas fa-compass roaming-heart"></i><span>漫游播放</span>';
-        roam.onclick = () => window.Roaming.start(songsFor(view));
+        roam.onclick = async () => {
+            if (roam.disabled) return;
+            roam.disabled = true;
+            roam.setAttribute('aria-busy', 'true');
+            try {
+                if (typeof window.Roaming?.start !== 'function') throw new Error('漫游播放暂不可用，请刷新页面后重试');
+                const scope = view.id === 'view-localmusic' ? 'local_all' : 'roaming';
+                await window.Roaming.start(songsFor(view), scope);
+            } catch (error) {
+                window.showError?.(error?.message || '漫游播放失败，请稍后重试');
+            } finally {
+                roam.disabled = false;
+                roam.removeAttribute('aria-busy');
+            }
+        };
         if (!['view-downloads'].includes(view.id) && window.currentViewingListId !== 'dislike_songs') bar.append(roam);
         if (view.id === 'view-localmusic') {
             const filter = document.createElement('button'); filter.type = 'button'; filter.id = 'lm-filter-toggle-btn'; filter.setAttribute('aria-expanded', 'false'); filter.innerHTML = '<i class="fas fa-filter"></i><span>筛选</span>'; filter.onclick = () => window.LocalMusicManager.toggleFilterPanel();
@@ -190,18 +204,38 @@
     };
     shell?.addEventListener('scroll', onScroll, { capture: true, passive: true });
     window.addEventListener('resize', onScroll, { passive: true });
-    // 行挂载只检查addedNodes。timeupdate/style/class不触发全树工具增强。
+    // 每帧合并新增/移除节点，避免列表批量刷新时同步重复增强 DOM。
+    let rowFrame = null, pendingHeadingChange = false;
+    const pendingAddedRows = new Set(), pendingRemovedRows = new Set();
+    const flushRowChanges = () => {
+        rowFrame = null;
+        for (const node of pendingRemovedRows) if (!node.isConnected) window.releaseMarquees?.(node);
+        pendingRemovedRows.clear();
+        const roots = [];
+        for (const node of pendingAddedRows) {
+            if (!node.isConnected) continue;
+            let parent = node.parentElement;
+            while (parent && !pendingAddedRows.has(parent)) parent = parent.parentElement;
+            if (!parent) roots.push(node);
+        }
+        pendingAddedRows.clear();
+        for (const node of roots) { prepareRows(node); window.applyMarqueeChecks?.(node); }
+        if (pendingHeadingChange) { pendingHeadingChange = false; scheduleTools(); }
+    };
+    const scheduleRowChanges = () => {
+        if (rowFrame === null) rowFrame = requestAnimationFrame(flushRowChanges);
+    };
+    // timeupdate/style/class 不触发全树工具增强。
     const rowObserver = new MutationObserver(records => {
         window.PerfProbe?.count('observer:music-tools');
-        let headingChanged = false;
         for (const record of records) {
-            for (const node of record.removedNodes) if (node.nodeType === 1) window.releaseMarquees?.(node);
+            for (const node of record.removedNodes) if (node.nodeType === 1) pendingRemovedRows.add(node);
             for (const node of record.addedNodes) if (node.nodeType === 1) {
-                prepareRows(node); window.applyMarqueeChecks?.(node);
-                if (node.matches('#lm-toolbar,.downloads-heading,.recent-view-header') || node.querySelector('#lm-toolbar,.downloads-heading,.recent-view-header')) headingChanged = true;
+                pendingAddedRows.add(node);
+                if (node.matches('#lm-toolbar,.downloads-heading,.recent-view-header') || node.querySelector('#lm-toolbar,.downloads-heading,.recent-view-header')) pendingHeadingChange = true;
             }
         }
-        if (headingChanged) scheduleTools();
+        if (pendingAddedRows.size || pendingRemovedRows.size || pendingHeadingChange) scheduleRowChanges();
     });
     if (shell) rowObserver.observe(shell, { childList: true, subtree: true });
     const viewObserver = new MutationObserver(scheduleTools);
@@ -210,7 +244,7 @@
     if (title) viewObserver.observe(title, { childList: true });
     const onVisibility = () => {
         if (document.hidden) { if (frame !== null) cancelAnimationFrame(frame); if (dockFrame !== null) cancelAnimationFrame(dockFrame); frame = dockFrame = null; closeMenu?.(); }
-        else scheduleTools();
+        else { scheduleTools(); if (pendingAddedRows.size || pendingRemovedRows.size || pendingHeadingChange) scheduleRowChanges(); }
     };
     document.addEventListener('visibilitychange', onVisibility);
     window.MusicMaintenance = { start, menu, maintenanceEntries, downloadSong, setScan(value) { scan = value; renderProgress(); }, more, refreshTools, songsFor };
@@ -226,6 +260,7 @@
         if (typeof unsubscribeMaintenance === 'function') unsubscribeMaintenance();
         rowObserver.disconnect(); viewObserver.disconnect(); closeMenu?.(); restore(); tools.clear(); slot.remove();
         if (frame !== null) cancelAnimationFrame(frame); if (dockFrame !== null) cancelAnimationFrame(dockFrame);
+        if (rowFrame !== null) cancelAnimationFrame(rowFrame); pendingAddedRows.clear(); pendingRemovedRows.clear();
         shell?.removeEventListener('scroll', onScroll, true); window.removeEventListener('resize', onScroll);
         document.removeEventListener('click', onClick, true); document.removeEventListener('visibilitychange', onVisibility);
         clearInterval(timer);

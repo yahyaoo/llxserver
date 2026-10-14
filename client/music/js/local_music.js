@@ -1254,7 +1254,9 @@ window.LocalMusicManager = {
         this._syncSelectActive('lm-sort-order');
 
         const countEl = document.getElementById('lm-total-count');
-        if (countEl) countEl.innerText = `共 ${current.length} 首`;
+        if (countEl) countEl.innerText = this.serverPaged
+            ? `当前页 ${current.length} 首 / 共 ${this.serverTotal} 首`
+            : `共 ${current.length} 首`;
 
         this.displayData = current;
 
@@ -1314,16 +1316,17 @@ window.LocalMusicManager = {
         if (!pagination) return;
 
         const total = this.displayData.length;
+        const totalItems = this.serverPaged ? this.serverTotal : total;
         const totalPages = this.getTotalPages();
         if (this.currentPage > totalPages) this.currentPage = totalPages;
         if (this.currentPage < 1) this.currentPage = 1;
-        if (total <= this.pageSize) {
+        if (totalItems <= this.pageSize) {
             pagination.classList.add('hidden');
         } else {
             pagination.classList.remove('hidden');
         }
 
-        if (info) info.textContent = `第 ${this.currentPage} / ${totalPages} 页 (${total} 首)`;
+        if (info) info.textContent = `第 ${this.currentPage} / ${totalPages} 页 (共 ${totalItems} 首)`;
         if (first) first.disabled = this.currentPage <= 1;
         if (prev) prev.disabled = this.currentPage <= 1;
         if (next) next.disabled = this.currentPage >= totalPages;

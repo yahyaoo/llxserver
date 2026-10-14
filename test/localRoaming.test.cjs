@@ -61,3 +61,17 @@ test('无网络时 start 从完整本地候选选择，不等待远端权重', a
   assert.ok(index >= 0 && index < songs.length);
   assert.equal(fixture.fetchCalls, 0);
 });
+
+test('音乐库漫游使用本地队列上下文并立即进入选中的歌曲', async () => {
+  const songs = [{ source: 'custom', id: 'file-1', filename: '歌曲.mp3' }, { source: 'custom', id: 'file-2', filename: '歌曲2.mp3' }];
+  const fixture = load();
+  const calls = [];
+  global.setPlayMode = mode => calls.push(['mode', mode]);
+  global.updatePlaylist = (list, index, scope, shouldAddToDefault) => calls.push(['playlist', list, index, scope, shouldAddToDefault]);
+  const index = await fixture.api.start(songs, 'local_all');
+  assert.deepEqual(calls[0], ['mode', 'roaming']);
+  assert.equal(calls[1][0], 'playlist');
+  assert.equal(calls[1][1][index], songs[index]);
+  assert.equal(calls[1][3], 'local_all');
+  assert.equal(calls[1][4], false);
+});

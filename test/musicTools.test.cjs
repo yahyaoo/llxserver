@@ -18,6 +18,12 @@ test('漫游：播放量和模型附加权重决定区间，当前歌曲排除�
   roam.setWeights({'wy:1':NaN},{'wy:1':-2}); assert.equal(roam.weight(songs[0]),1); roam.reset();
 });
 
+test('音乐库漫游入口使用 local_all 播放范围以读取本地文件', () => {
+  const source = fs.readFileSync(path.join(__dirname, '../client/music/components/music-tools/index.js'), 'utf8');
+  assert.match(source, /view\.id === 'view-localmusic' \? 'local_all' : 'roaming'/);
+  assert.match(source, /window\.Roaming\.start\(songsFor\(view\), scope\)/);
+});
+
 test('漫游累计兼容旧记录，清空最近后不丢失，同一会话不重复累计', async () => {
   const { getRoamingWeights,recordRoamingPlay }=require('../server/music/service/RoamingService.ts');
   const documents=new Map([['recent-play.json',[{id:'wy_old',source:'wy',playCount:12}]]]);
