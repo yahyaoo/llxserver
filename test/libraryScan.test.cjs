@@ -21,9 +21,9 @@ test('only audio files are tagged and tag failures are returned per song',async(
   try{
     fs.writeFileSync(path.join(root,'ok.mp3'),'valid');fs.writeFileSync(path.join(root,'broken.mp3'),'broken');fs.writeFileSync(path.join(root,'notes.txt'),'ignore me');fs.writeFileSync(path.join(root,'cover.jpg'),'ignore me');
     const result=await scan(dir,[], 'full', {}, undefined, taggerSource);
-    assert.equal(result.items.length,2);assert.equal(result.stats.fileStat,2);assert.equal(result.stats.tags,1);assert.equal(result.errors.length,1);
+    assert.equal(result.items.length,1);assert.equal(result.stats.fileStat,2);assert.equal(result.stats.tags,1);assert.equal(result.errors.length,1);
     assert.match(result.errors[0].file,/broken\.mp3$/);assert.equal(result.errors[0].code,'InvalidArg');assert.match(result.errors[0].message,/InvalidArg: failed to fill whole buffer/);
-    assert.equal(result.items.find(item=>item.filename.endsWith('/broken.mp3')).metadataPending,true);
+    assert.equal(result.items.some(item=>item.filename.endsWith('/broken.mp3')),false);
   }finally{fs.rmSync(root,{recursive:true,force:true})}
 });
 test('quick unchanged skips enumeration/file stats, checks nested directories; paths detects in-place tag and independent LRC',async()=>{

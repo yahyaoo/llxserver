@@ -53,16 +53,19 @@ async page => {
         switchTab('search'); currentSearchScope = 'local_list';
         const view = document.getElementById('view-search'); view.dataset.onlineSearch = 'false';
         settings.itemsPerPage = 'all';
+        await renderResults([{ id: 'wy_before_refresh', songmid: 'before', source: 'wy', name: '当前歌单歌曲', singer: '歌手', meta: {} }]);
         const songs = Array.from({ length: 2000 }, (_, index) => ({ id: 'wy_perf_' + index, songmid: 'perf_' + index, source: 'wy', name: '歌曲' + index, singer: '歌手' + index, meta: {} }));
         let ticks = 0; const timer = setInterval(() => { ticks++; }, 0);
         const pending = renderResults(songs);
         await new Promise(resolve => setTimeout(resolve, 30));
         const partial = document.getElementById('search-results').children.length;
+        const retainedRows = document.querySelectorAll('#search-results > [data-song-id]').length;
         const small = [{ id: 'wy_latest', songmid: 'latest', source: 'wy', name: '最新歌单', singer: '歌手', meta: {} }];
         const latest = renderResults(small); await Promise.all([pending, latest]); clearInterval(timer);
-        return { partial, ticks, rows: document.querySelectorAll('#search-results > [data-song-id]').length, text: document.getElementById('search-results').textContent };
+        return { partial, retainedRows, ticks, rows: document.querySelectorAll('#search-results > [data-song-id]').length, text: document.getElementById('search-results').textContent };
     });
     check(rendering.ticks > 1 && rendering.partial < 2000, '2000首歌曲分批渲染，期间事件循环保持响应');
+    check(rendering.retainedRows > 0, '后台重绘期间保留当前歌曲行，不闪出空白加载页');
     check(rendering.rows === 1 && rendering.text.includes('最新歌单'), '连续切换列表取消旧任务，旧行不污染新歌单');
     const complete = await page.evaluate(async () => {
         const songs = Array.from({ length: 500 }, (_, index) => ({ id: 'wy_full_' + index, songmid: 'full_' + index, source: 'wy', name: '完整歌曲' + index, singer: '歌手' + index, meta: {} }));

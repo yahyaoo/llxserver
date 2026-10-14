@@ -111,7 +111,11 @@ async function run() {
           const detail = error?.message ? String(error.message) : '无法读取音频标签';
           errors.push({ file: filename, code: code || undefined, message: 'TAG_READ: ' + (code ? code + ': ' : '') + detail });
         } finally { try { tagger?.dispose(); } catch {} }
-        if (metadataPending && existing) { items.push({...existing,metadataPending:true}); completed++; continue; }
+        if (metadataPending) {
+          if (existing) items.push({ ...existing, metadataPending: true });
+          completed++;
+          continue;
+        }
         const after = await fs.promises.stat(full);
         if (after.size !== stat.size || after.mtimeMs !== stat.mtimeMs) throw Error('BUSY: 文件读取时发生变化');
         if (workerData.ioPauseMs > 0) await new Promise(resolve => setTimeout(resolve, workerData.ioPauseMs));

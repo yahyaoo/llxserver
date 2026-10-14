@@ -31,6 +31,7 @@ test('scan API returns invalid music files as per-song errors and ignores other 
     let scan;
     for(let i=0;i<200;i++){scan=(await get('/api/music/library/scan',user)).scan;if(scan.status!=='running')break;await pause(30)}
     assert.equal(scan.status,'error',JSON.stringify(scan));assert.equal(scan.errors.length,1);assert.match(scan.errors[0].file,/broken\.mp3$/);assert.match(scan.errors[0].message,/InvalidArg|TAG_READ/);
+    const library=await get('/api/music/cache/list',user);assert.equal(library.data.some(item=>item.filename?.endsWith('/broken.mp3')),false,'损坏歌曲应跳过，不进入音乐库');
   }finally{await runtime.stop()}
 });
 test('default scan write mode exports embedded lyrics to a missing sidecar without rewriting the audio',{timeout:60000},async()=>{

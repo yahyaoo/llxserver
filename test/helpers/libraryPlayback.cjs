@@ -6,6 +6,8 @@ const read = file => fs.readFileSync(path.join(root, file), 'utf8');
 /** 在隔离账号中运行实际前端模块，媒体入口只记录歌曲和索引。 */
 function libraryPlayback(username = 'alice', token = 'test-token') {
     const played = [], stored = new Map();
+    const listListeners = new Map();
+    const listContainer = { addEventListener: (name, listener) => listListeners.set(name, listener), contains: () => true };
     const window = {
         currentListData: { username },
         getUserAuthHeaders: () => ({ 'x-user-name': username, 'x-user-token': token }),
@@ -13,7 +15,7 @@ function libraryPlayback(username = 'alice', token = 'test-token') {
     };
     const context = vm.createContext({
         window, URL, URLSearchParams, location: { origin: 'http://localhost' },
-        document: { documentElement: {}, addEventListener() {}, getElementById: () => ({ classList: { contains: () => true } }) },
+        document: { documentElement: {}, addEventListener() {}, getElementById: id => id === 'lm-list-container' ? listContainer : ({ classList: { contains: () => true } }) },
         localStorage: { getItem: key => stored.get(key) || null, setItem: (key, value) => stored.set(key, value) },
         console: { log() {}, warn() {}, error() {} },
         setTimeout() {}, clearTimeout() {},
@@ -33,6 +35,13 @@ function libraryPlayback(username = 'alice', token = 'test-token') {
         setLibrary(items) {
             window.LocalMusicManager.displayData = window.SongFiles.setLibrary(items);
             return window.LocalMusicManager.displayData;
+        },
+        /** 通过音乐库真实的委托 click 监听器模拟歌曲标题播放。 */
+        clickLibrarySong(index) {
+            window.LocalMusicManager.bindListEvents();
+            const row = { dataset: { lmRowIndex: String(index) } };
+            const action = { dataset: { lmAction: 'play', lmIndex: String(index) } };
+            listListeners.get('click')({ target: { closest: selector => selector === '[data-lm-action]' ? action : selector === '[data-lm-row-index]' ? row : null } });
         },
     };
 }

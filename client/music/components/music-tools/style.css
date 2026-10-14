@@ -77,9 +77,9 @@
 :root :is(#lm-list-container [data-lm-row-index], #view-downloads .download-task-row) { cursor:pointer; }
 :root :is(#lm-list-container [data-lm-row-index], #view-downloads .download-task-row) :is(.song-row-actions, .song-row-actions *) { cursor:default; }
 :root :is(#lm-list-container [data-lm-row-index], #view-downloads .download-task-row) :is(button, label, input, a, .song-row-actions button, .song-row-actions button *) { cursor:pointer; }
-/* 桌面端歌曲行只显示喜欢和更多；其余按钮保留在 DOM 中，由更多菜单代理点击。 */
+/* 桌面端歌曲行直接显示喜欢、加入播放队列和更多；其余按钮保留在 DOM 中，由更多菜单代理点击。 */
 @media(min-width:768px) {
-    :root .song-row-actions > button:not(.song-love-btn):not(.song-maintenance-menu):not([data-library-more]) { display:none!important; }
+    :root .song-row-actions > button:not(.song-love-btn):not(.song-queue-add-btn):not(.song-maintenance-menu):not([data-library-more]) { display:none!important; }
 }
 @media(max-width:767px) {
     :root #lm-list-container [data-library-more] { display:inline-flex!important; }

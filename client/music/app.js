@@ -1699,6 +1699,23 @@ document.addEventListener('DOMContentLoaded', () => {
 // ==================== 播放队列 (Queue) 逻辑 ====================
 let isQueueRendered = false;
 
+function closeQueueDrawer() {
+    const drawer = document.getElementById('queue-drawer');
+    if (!drawer) return;
+    drawer.classList.add('translate-x-full');
+    window.playbackExperience.closeQueueSettings();
+}
+
+function closeQueueDrawerOnOutsidePointerDown(event) {
+    const drawer = document.getElementById('queue-drawer');
+    if (!drawer || drawer.classList.contains('translate-x-full')) return;
+    const target = event.target;
+    if (drawer.contains(target) || target?.closest?.('[onclick="toggleQueueDrawer()"]')) return;
+    closeQueueDrawer();
+}
+
+document.addEventListener('pointerdown', closeQueueDrawerOnOutsidePointerDown);
+
 function toggleQueueDrawer() {
     const drawer = document.getElementById('queue-drawer');
     if (!drawer) return;
@@ -1720,8 +1737,7 @@ function toggleQueueDrawer() {
             }
         }
     } else {
-        drawer.classList.add('translate-x-full');
-        window.playbackExperience.closeQueueSettings();
+        closeQueueDrawer();
     }
 }
 window.toggleQueueDrawer = toggleQueueDrawer;
@@ -1841,7 +1857,6 @@ async function renderQueue() {
                 </div>
 
                 <div class="queue-song-actions flex items-center gap-1 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button onclick="event.stopPropagation(); window.SongFiles?.open(this, currentPlaylist[${index}])" class="p-2 t-text-muted rounded-lg" title="音质与文件"><i class="fas fa-layer-group text-xs"></i></button>
                     <button data-player-add-to-playlist onclick="event.stopPropagation(); openPlaylistAddModalForSongObject(currentPlaylist[${index}])" class="p-2 text-emerald-500 hover:bg-emerald-50 rounded-lg transition-colors" title="添加到歌单">
                         <i class="fas fa-plus text-xs"></i>
                     </button>
@@ -3309,6 +3324,7 @@ function renderArtistSongsUI(list, page) {
                     <!-- Actions -->
                     <div class="song-row-actions col-span-4 sm:col-span-3 md:col-span-2 lg:col-span-2 flex items-center justify-end gap-1">
                         ${window.SongActions?.renderLoveButton(item) || ''}
+                        ${window.SongActions?.renderQueueButton(item) || ''}
                         <button class="p-0.5 sm:p-1.5 hover:bg-blue-50 rounded-lg text-blue-600 transition-colors" title="下载" onclick="event.stopPropagation(); downloadSong(${JSON.stringify(item).replace(/"/g, '&quot;')})">
                             <i class="fas fa-download w-3.5 h-3.5 flex items-center justify-center"></i>
                         </button>
@@ -4429,9 +4445,15 @@ window.saveGlobalSortOrder = saveGlobalSortOrder;
 async function renderResults(list) {
     const container = document.getElementById('search-results');
     const renderId = (window._resultsRenderId || 0) + 1; window._resultsRenderId = renderId;
+    const preserveRenderedList = container.dataset.resultsReady === 'true';
+    if (container._renderStaging) window.ClientPerformance?.cancel(container._renderStaging);
+    const renderContainer = preserveRenderedList ? document.createElement('div') : container;
+    container._renderStaging = preserveRenderedList ? renderContainer : null;
     window.ClientPerformance?.cancel(container);
-    window.unobserveLazyImages?.(container);
-    container.innerHTML = window.LoadingState?.render('正在加载歌曲…', 'page') || '';
+    if (!preserveRenderedList) {
+        window.unobserveLazyImages?.(container);
+        container.innerHTML = window.LoadingState?.render('正在加载歌曲…', 'page') || '';
+    }
     await window.ClientPerformance?.yieldTask();
     if (window._resultsRenderId !== renderId || document.getElementById('view-search')?.classList.contains('hidden')) return;
     // 在线页保留平台结果，本地收藏和歌单使用统一歌曲及文件聚合。作者：yahyaoo
@@ -4450,7 +4472,7 @@ async function renderResults(list) {
     }
 
     window.ClientPerformance?.cancel(container);
-    container.innerHTML = '';
+    if (!preserveRenderedList) container.innerHTML = '';
 
     if (list && list.length > 0) {
         list.forEach((item, idx) => {
@@ -4463,7 +4485,17 @@ async function renderResults(list) {
     window.viewingPlaylist = list;
 
     if (!list || list.length === 0) {
-        container.innerHTML = '<div class="text-center t-text-muted p-8">未找到相关结果</div>';
+        const empty = document.createElement('div');
+        empty.className = 'text-center t-text-muted p-8';
+        empty.textContent = '未找到相关结果';
+        if (preserveRenderedList) {
+            window.unobserveLazyImages?.(container);
+            container.replaceChildren(empty);
+            container._renderStaging = null;
+        } else {
+            container.replaceChildren(empty);
+        }
+        container.dataset.resultsReady = 'true';
         updatePaginationInfo(0, 0, 0, 1, 1);
         return;
     }
@@ -4491,7 +4523,7 @@ async function renderResults(list) {
         pageList = indexedDisplayList.slice(startIndex, endIndex);
     }
 
-    const completed = await window.ClientPerformance.render(container, pageList, (obj, pageIndex, fragment) => {
+    const completed = await window.ClientPerformance.render(renderContainer, pageList, (obj, pageIndex, fragment) => {
         const { item, originalIndex: actualIndexInOriginal } = obj;
         const row = document.createElement('div');
         row.id = `gl-row-${actualIndexInOriginal}`;
@@ -4597,6 +4629,7 @@ async function renderResults(list) {
             <!-- Actions -->
             <div class="song-row-actions col-span-4 sm:col-span-3 md:col-span-2 lg:col-span-2 flex items-center justify-end gap-0.5 sm:gap-1">
                 ${window.SongActions?.renderLoveButton(item) || ''}
+                ${window.SongActions?.renderQueueButton(item) || ''}
                 <button class="p-1 sm:p-1.5 hover:bg-blue-50 rounded-lg text-blue-600 transition-colors" 
                         title="下载" 
                         onclick="event.stopPropagation(); downloadSong(${JSON.stringify(item).replace(/"/g, '&quot;')})">
@@ -4638,10 +4671,18 @@ async function renderResults(list) {
         window.LibraryArtwork.bind(row.querySelector('.song-cover img'), item);
         fragment.appendChild(row);
     }, batch => {
-        const rows = Array.from(container.children).slice(-batch.length);
+        const rows = Array.from(renderContainer.children).slice(-batch.length);
         rows.forEach(row => lazyLoadImages(row));
     });
     if (!completed) return;
+
+    if (preserveRenderedList) {
+        if (window._resultsRenderId !== renderId || document.getElementById('view-search')?.classList.contains('hidden')) return;
+        window.unobserveLazyImages?.(container);
+        container.replaceChildren(...renderContainer.childNodes);
+        container._renderStaging = null;
+    }
+    container.dataset.resultsReady = 'true';
 
     window.SongFileStatus?.update(container, pageList.map(obj => obj.item));
 
@@ -4870,8 +4911,8 @@ function lazyLoadImages(root = document) {
             if (img.dataset.artworkCandidates) {
                 let candidates = [];
                 try { candidates = JSON.parse(img.dataset.artworkCandidates); } catch {}
-                window.ImageLoader.observe(img, () => candidates, { src: img.dataset.src });
-            } else window.ImageLoader.observe(img, () => [], { src: img.dataset.src });
+                window.ImageLoader.observe(img, () => candidates, { src: img.dataset.src, preserveResolver: true });
+            } else window.ImageLoader.observe(img, () => [], { src: img.dataset.src, preserveResolver: true });
         });
         return;
     }
@@ -6202,8 +6243,7 @@ window.showServerDirectories = showServerDirectories;
  */
 function playFromView(index) {
     if (!viewingPlaylist || !viewingPlaylist[index]) return;
-    // Update playlist and scope when user explicitly clicks a song to play
-    updatePlaylist(viewingPlaylist, index, currentSearchScope);
+    updatePlaylist([viewingPlaylist[index]], 0, currentSearchScope);
 }
 window.playFromView = playFromView;
 
@@ -6935,6 +6975,18 @@ function updatePlaylist(list, startIndex = 0, scope = 'local_list', shouldAddToD
     }
 }
 window.updatePlaylist = updatePlaylist;
+
+/** 将指定歌曲追加到当前播放队列，不打断当前播放。 */
+function addSongToPlaybackQueue(song) {
+    if (!song) return;
+    const queueSong = window.MusicExperience?.playable ? window.MusicExperience.playable(song) : song;
+    currentPlaylist.push(queueSong);
+    if (typeof invalidateRoamingPreselection === 'function') invalidateRoamingPreselection();
+    if (!document.getElementById('queue-drawer').classList.contains('translate-x-full')) renderQueue();
+    savePlaybackState();
+    showSuccess('已加入播放列表');
+}
+window.addSongToPlaybackQueue = addSongToPlaybackQueue;
 
 /** 切换文件仅替换队列中的对应歌曲，不清空顺序和其他歌曲。 @author yahyaoo */
 function playSongFileVersion(song) {
@@ -8817,6 +8869,7 @@ function renderCacheList() {
 
                 <div class="song-row-actions flex items-center gap-2">
                     ${window.SongActions?.renderLoveButton(item) || ''}
+                    ${window.SongActions?.renderQueueButton(item) || ''}
                     ${!cacheBatchMode ? `
                         <button onclick="event.stopPropagation(); openCacheItemPlaylist(${idx})"
                                 class="p-2 text-emerald-500 hover:bg-emerald-50 rounded-lg transition-colors" title="添加到歌单">
@@ -12988,6 +13041,24 @@ async function submitDataChange(listToSave, context = null) {
     }
 }
 /** 推送更新缓存后按当前页面刷新，本地尚未确认的编辑始终优先。 @author jingyh */
+let recentReloadTimer = null;
+function scheduleRecentReload() {
+    if (document.getElementById('view-recent')?.classList.contains('hidden')) return;
+    clearTimeout(recentReloadTimer);
+    recentReloadTimer = setTimeout(() => { recentReloadTimer = null; void window.RecentView?.load(); }, 250);
+}
+/** 返回当前本地歌单页实际展示的数据；默认试听列表更新不应刷新其他歌单。 */
+function getCurrentLocalListData(data, listId) {
+    if (!data || !listId || listId === 'dislike_songs') return null;
+    if (listId === 'love') return data.loveList || [];
+    return data.userList?.find(list => list.id === listId)?.list || [];
+}
+/** 比较用户当前所看歌单的歌曲数据，避免无关同步事件重建整页 DOM。 */
+function sameSongList(left, right) {
+    if (left === null || right === null) return left === right;
+    try { return JSON.stringify(left) === JSON.stringify(right); }
+    catch { return false; }
+}
 window.ClientTransport?.on('cache', async changed => {
     if (Object.keys(changed).some(route => /\/api\/music\/(cache\/(list|directories|subdirs)|custom\/list)/.test(route))) {
         await window.SongFiles?.refresh();
@@ -13003,8 +13074,16 @@ window.ClientTransport?.on('cache', async changed => {
         if (publicSpace) window.publicListData = data; else window.myPersonalListData = data;
         await window.ListStore.cache(data, data.username); window.ClientSync?.seed(channel, data);
         if (publicSpace === !!window.isViewingPublicFavorites) {
+            const previousVisibleList = currentSearchScope === 'local_list'
+                ? getCurrentLocalListData(currentListData, window.currentViewingListId)
+                : null;
             currentListData = data; window.currentListData = data; renderMyLists(data); window.SongActions?.refresh();
-            if (window.currentSearchScope === 'local_list' && window.currentViewingListId) handleListClick(window.currentViewingListId, true, true);
+            const nextVisibleList = currentSearchScope === 'local_list'
+                ? getCurrentLocalListData(data, window.currentViewingListId)
+                : null;
+            if (window.currentSearchScope === 'local_list' && window.currentViewingListId && !sameSongList(previousVisibleList, nextVisibleList)) {
+                handleListClick(window.currentViewingListId, true, true);
+            }
         }
     }
     if (Object.keys(changed).some(route => route.includes('/library/'))) await loadLibraryData();
@@ -13013,9 +13092,9 @@ window.ClientTransport?.on('cache', async changed => {
     if (changed['/api/user/sound-effects'] && !window.ClientSync?.has('sound-effects')) await window.soundEffects?.fetchFromServer();
     if (changed['/api/music/dislike']) await window.DislikeManager?.load(true);
     if (changed['/api/user/account'] || changed['/api/user/account/avatar']) await window.loadAccountProfile?.();
-    if (changed['/api/user/recent'] && !document.getElementById('view-recent')?.classList.contains('hidden')) await window.RecentView?.load();
+    if (changed['/api/user/recent']) scheduleRecentReload();
 });
-window.addEventListener('client-local-event', () => { if (!document.getElementById('view-recent')?.classList.contains('hidden')) void window.RecentView?.load(); });
+window.addEventListener('client-local-event', scheduleRecentReload);
 
 window.ClientSync?.register('lists', submitDataChange);
 window.ClientSync?.register('lists-public', submitDataChange);
@@ -14615,7 +14694,9 @@ async function handleTogglePlaylist(listId, btnElement) {
     const targetId = cleanedSong.id;
 
     // Check against the standardized ID to ensure correct matching
-    const isCurrentlyIncluded = targetListArray.some(s => s.id === targetId);
+    const existingIndex = targetListArray.findIndex(s => s.id === targetId);
+    const isCurrentlyIncluded = existingIndex >= 0;
+    const existingSong = isCurrentlyIncluded ? targetListArray[existingIndex] : null;
     const willAdd = !isCurrentlyIncluded;
 
     // Optimistic UI Update
@@ -14629,11 +14710,19 @@ async function handleTogglePlaylist(listId, btnElement) {
             if (idx >= 0) targetListArray.splice(idx, 1);
         }
 
+        closePlaylistAddModal();
         await pushDataChange(activeListData);
         renderMyLists(currentListData);
+        showSuccess(willAdd ? '已加入歌单' : '已从歌单移除');
     } catch (e) {
-        showError('同步失败: ' + e.message);
-        updateGridItemVisuals(btnElement, !willAdd); // Revert UI
+        if (willAdd) {
+            const addedIndex = targetListArray.findIndex(s => s.id === targetId);
+            if (addedIndex >= 0) targetListArray.splice(addedIndex, 1);
+        } else if (!targetListArray.some(s => s.id === targetId)) {
+            targetListArray.splice(Math.min(existingIndex, targetListArray.length), 0, existingSong);
+        }
+        renderMyLists(currentListData);
+        showError(`${willAdd ? '加入' : '移除'}歌单失败：${e.message || '同步异常'}`);
     }
 }
 

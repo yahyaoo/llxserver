@@ -132,7 +132,7 @@ test('最近播放显示表头、次数及正确播放顺序，音乐库详情�
   assert.equal(window.RecentView.selectedSongs().length, 2);
   window.RecentView.toggleBatch(); window.RecentView.toggleSort();
   assert.equal(bound.selector, '.recent-song-info strong'); assert.deepEqual(bound.items.map(song => song.id), ['high', 'low'])
-  second.onclick(); assert.equal(playlist.songs[playlist.index].id, 'low')
+  second.onclick(); assert.equal(playlist.songs.length, 1); assert.equal(playlist.songs[0].id, 'low'); assert.equal(playlist.index, 0)
   window.RecentView.show('专辑详情', songs)
   assert.match(nodes.get('recent-list').children[0].innerHTML, /专辑/)
   assert.equal(nodes.get('recent-list').children[1].children[3].textContent, '专辑甲')

@@ -116,6 +116,18 @@ test('扫描 2 万 ID 只推摘要；slow socket 断开；close 清除 timer/lis
         assert.equal(serverEvents.listenerCount('download:changed'), baseline);
     } finally { await f.close(); }
 });
+test('扫描异常保留在库状态中，但不会向前端发布通知', async () => {
+    const f = await fixture();
+    try {
+        const alice = await f.connect(); alice.subscribe('library'); await alice.wait(item => item.type === 'library');
+        const before = alice.messages.filter(item => item.type === 'notify').length;
+        serverEvents.emitEvent('library:scan-finished', { username: 'alice', directoryIds: ['one'], reason: 'manual', added: [], changed: [], removed: [], total: 0, durationMs: 1, error: 'TAG_READ: InvalidArg', errors: [{ file: 'broken.mp3', message: 'TAG_READ: InvalidArg' }] });
+        const state = await alice.wait(item => item.type === 'library' && item.data.scan?.errors?.[0]?.file === 'broken.mp3');
+        assert.equal(state.data.scan.error, 'TAG_READ: InvalidArg');
+        await pause(30);
+        assert.equal(alice.messages.filter(item => item.type === 'notify').length, before);
+    } finally { await f.close(); }
+});
 test('浏览器不能发布公告；实例重建换 epoch，旧 cursor 不过滤新通知', async () => {
     let f = await fixture(), epoch;
     try {

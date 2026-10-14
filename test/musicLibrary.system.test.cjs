@@ -83,7 +83,8 @@ test('目录快照经 WS 更新后切歌读取所选音频文件，不回退旧�
     });
     await new Promise(resolve=>socket.once('open',resolve));socket.send(JSON.stringify({type:'hello',token:login.token,device:'switch-browser-123456'}));
     player.setLibrary(select(await pushed));player.window.LocalMusicManager.playItem(1);
-    const actual=player.played.at(-1);assert.equal(actual.index,1);assert.match(actual.song.name,/白狐/);
+    const actual=player.played.at(-1);assert.equal(actual.index,0);assert.match(actual.song.name,/白狐/);
+    assert.equal(player.context.currentPlaylist.length,1);assert.equal(player.context.currentPlaylist[0].name,'白狐');
     const response=await fetch(new URL(actual.song.url,runtime.origin),{headers:{Range:'bytes=0-63'}});
     assert.equal(response.status,206);const bytes=Buffer.from(await response.arrayBuffer());
     assert.deepEqual(bytes,selectedAudio.subarray(0,64));assert.notDeepEqual(bytes,oldAudio.subarray(0,64));

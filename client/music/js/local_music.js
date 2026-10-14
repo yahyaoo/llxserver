@@ -910,15 +910,10 @@ window.LocalMusicManager = {
         clearTimeout(this.scanPollTimer);
         const progress = document.getElementById('library-scan-progress');
         const running = scan?.status === 'running';
-        const errors = Array.isArray(scan?.errors) ? scan.errors : [];
-        const errorDetails = errors.map(error => {
-            const file = error?.file || error?.directory || '未知文件';
-            return file + (error?.message ? '：' + error.message : '');
-        });
         window.MusicMaintenance?.setScan(scan);
         if (progress) {
-            progress.textContent = running ? '扫描中 ' + scan.percent + '%（' + scan.completed + '/' + scan.total + '）' : scan?.status === 'error' ? '扫描完成，异常歌曲 ' + errors.length + ' 首' : scan?.status === 'completed' ? '扫描完成' : '';
-            progress.title = errorDetails.join('\n');
+            progress.textContent = running ? '扫描中 ' + scan.percent + '%（' + scan.completed + '/' + scan.total + '）' : ['error', 'completed'].includes(scan?.status) ? '扫描完成' : '';
+            progress.removeAttribute('title');
         }
         if (running && !this.originalData.length) {
             const container = document.getElementById('lm-list-container');
@@ -1522,6 +1517,7 @@ window.LocalMusicManager = {
                 <!-- Action Button -->
                 <div class="song-row-actions col-span-4 sm:col-span-2 md:col-span-2 lg:col-span-2 flex items-center justify-end gap-0.5 md:gap-2">
                     ${window.SongActions?.renderLoveButton(this.buildPlaylistSong(item) || { ...item, isLocal: true }) || ''}
+                    ${window.SongActions?.renderQueueButton(this.buildPlaylistSong(item) || { ...item, isLocal: true }) || ''}
                     ${this.enableReMapping ? `
                         <button data-lm-action="manual" data-lm-index="${index}"
                                 class="hidden sm:flex w-8 h-8 md:w-7 md:h-7 items-center justify-center rounded-full bg-emerald-500 text-white hover:bg-emerald-600 transition-all shadow-sm shrink-0" title="手动关联">
@@ -1820,9 +1816,9 @@ window.LocalMusicManager = {
 
     playItem(index) {
         if (!this.displayData[index]) return;
-        const playlist = this.displayData.map(item => this.librarySong(item));
-        if (typeof window.updatePlaylist === 'function') window.updatePlaylist(playlist, index, 'local_all');
-        else window.playSong(playlist[index], index);
+        const song = this.librarySong(this.displayData[index]);
+        if (typeof window.updatePlaylist === 'function') window.updatePlaylist([song], 0, 'local_all');
+        else window.playSong(song, 0);
     },
 
     async deleteSingle(index) {

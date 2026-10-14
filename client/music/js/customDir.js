@@ -875,6 +875,7 @@ window.CustomDirManager = {
                 <!-- Action Buttons -->
                 <div class="song-row-actions col-span-4 sm:col-span-2 md:col-span-2 lg:col-span-2 flex items-center justify-end gap-0.5 md:gap-2">
                     ${window.SongActions?.renderLoveButton(window.LocalMusicManager?.buildPlaylistSong({ ...item, songInfo: { ...(item.songInfo || {}), meta: { songId: item.songmid || item.id } } }) || { ...item, isLocal: true }) || ''}
+                    ${window.SongActions?.renderQueueButton(window.LocalMusicManager?.buildPlaylistSong({ ...item, songInfo: { ...(item.songInfo || {}), meta: { songId: item.songmid || item.id } } }) || { ...item, isLocal: true }) || ''}
                     ${this.enableReMapping ? `
                         <button data-lm-action="manual" data-lm-index="${index}"
                                 class="hidden sm:flex w-8 h-8 md:w-7 md:h-7 items-center justify-center rounded-full bg-emerald-500 text-white hover:bg-emerald-600 transition-all shadow-sm shrink-0" title="手动关联">
@@ -997,9 +998,9 @@ window.CustomDirManager = {
         }));
 
         if (typeof window.updatePlaylist === 'function') {
-            window.updatePlaylist(playlist, index, 'custom_dir_all');
+            window.updatePlaylist([playlist[index]], 0, 'custom_dir_all');
         } else if (typeof window.playSong === 'function') {
-            window.playSong(playlist[index], index);
+            window.playSong(playlist[index], 0);
         }
     },
 

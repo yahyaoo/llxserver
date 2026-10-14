@@ -124,7 +124,7 @@
     function rowEntries(actions, song) {
         const maintenance = maintenanceEntries([song]);
         const names = new Set(maintenance.map(([label]) => label));
-        const proxies = [...actions.querySelectorAll(':scope > button:not(.song-love-btn):not(.song-maintenance-menu):not(.song-row-more)')]
+        const proxies = [...actions.querySelectorAll(':scope > button:not(.song-love-btn):not(.song-queue-add-btn):not(.song-maintenance-menu):not(.song-row-more)')]
             .filter(button => !button.disabled && !names.has(button.title))
             .map(button => [button.title || button.textContent.trim() || '操作', [...(button.querySelector('i')?.classList || [])].find(name => /^fa-[a-z]/.test(name)) || 'fa-circle', () => button.click()]);
         const removal = proxies.filter(([, icon]) => /^fa-(trash|trash-alt|times)$/.test(icon));

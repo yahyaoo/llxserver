@@ -24,7 +24,7 @@ async page => {
     await page.locator('[data-lm-row-index="1"]').click();
     await waitPlaying('白狐');
     const selected = await media();
-    if (!selected.filename.includes('白狐') || selected.index !== 1) throw Error('间隔后切歌播放目标不匹配：' + JSON.stringify(selected));
+    if (!selected.filename.includes('白狐') || selected.index !== 0 || selected.queue.join(',') !== '白狐') throw Error('间隔后切歌播放目标不匹配：' + JSON.stringify(selected));
     for (let i = 0; i < 3; i++) {
         await page.locator('[data-lm-row-index="0"]').click();
         await page.locator('[data-lm-row-index="1"]').click();

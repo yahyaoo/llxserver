@@ -51,6 +51,8 @@
 
   window.ImageLoader = {
     observe(image, resolve, options = {}) {
+      // 通用懒加载可能在组件绑定之后再次遇到同一图片；保留组件提供的候选解析器。
+      if (options.preserveResolver && records.get(image)?.resolve) return () => this.unobserve(image)
       const root = options.root || null
       const record = { resolve, src: options.src || image.dataset.src, started: false, visible: false, release: options.release }
       records.set(image, record)

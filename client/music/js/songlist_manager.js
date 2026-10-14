@@ -700,6 +700,7 @@ window.SongListManager = (function () {
                 <!-- Actions -->
                 <div class="song-row-actions col-span-4 sm:col-span-3 md:col-span-2 lg:col-span-2 flex items-center justify-end gap-0 sm:gap-1">
                     ${window.SongActions?.renderLoveButton(song) || ''}
+                    ${window.SongActions?.renderQueueButton(song) || ''}
                     <button class="p-0.5 sm:p-1.5 hover:bg-blue-50 rounded-lg text-blue-600 transition-colors"
                             title="下载"
                             onclick="event.stopPropagation(); downloadSong(${JSON.stringify(song).replace(/"/g, '&quot;')})">
@@ -830,10 +831,9 @@ window.SongListManager = (function () {
         toggleTagSelector,
         playSong: function (index) {
             const song = detailState.list[index];
+            if (!song) return;
             if (typeof window.updatePlaylist === 'function') {
-                const listWithSource = detailState.list.map(s => ({ ...s, source: detailState.source }));
-                // 单曲点击：加入默认列表 (shouldAddToDefault = true)
-                window.updatePlaylist(listWithSource, index, 'songlist', true);
+                window.updatePlaylist([{ ...song, source: song.source || detailState.source }], 0, 'songlist', true);
             }
         },
         addSongToPlaylist: function (index) {

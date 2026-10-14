@@ -38,7 +38,7 @@ test('静态占位装配不改显示状态，重复装配保留业务结果，�
     events.DOMContentLoaded(); assert.ok(late.innerHTML.includes('后续弹窗'));
 });
 
-test('最近播放等待时显示动效，完成后原有列表渲染接管；失败时移除动画', async () => {
+test('最近播放首次加载显示动效，后台刷新保留现有列表，首次失败时显示重试', async () => {
     const { context, view } = fixture();
     const host = { innerHTML: '', querySelector: () => ({ disabled: false }), set textContent(value) { this.innerHTML = value; } };
     context.document.getElementById = () => host;
@@ -53,10 +53,10 @@ test('最近播放等待时显示动效，完成后原有列表渲染接管；�
     assert.equal(host.innerHTML, view.render('正在加载最近播放…', 'page'));
     resolve({ ok: true, json: async () => ({ items: [{ name: '歌曲' }], limit: 100 }) });
     await pending; assert.equal(host.innerHTML, '原有列表'); assert.equal(shown[1][0].name, '歌曲');
-    const failed = context.window.RecentView.load(); resolve({ ok: false }); await failed;
-    assert.ok(host.innerHTML.includes('最近播放暂时无法加载'));
-    assert.ok(host.innerHTML.includes('重新加载'));
-    assert.ok(!host.innerHTML.includes('lx-loading-bars'));
+    const failed = context.window.RecentView.load();
+    assert.equal(host.innerHTML, '原有列表', '已有列表刷新期间不显示 loading 占位');
+    resolve({ ok: false }); await failed;
+    assert.equal(host.innerHTML, '原有列表', '已有列表刷新失败时保留当前内容');
 });
 
 test('失败状态安全转义提示文字，重试期间阻止重复点击', async () => {
@@ -75,7 +75,7 @@ test('失败状态安全转义提示文字，重试期间阻止重复点击', as
     view.showFailure(host); assert.ok(!host.innerHTML.includes('<button'));
 });
 
-test('最近播放网络异常显示中文提示，点击重试恢复列表，过期失败不覆盖页面', async () => {
+test('最近播放首次网络失败显示重试；已有列表刷新失败不覆盖页面，过期失败不生效', async () => {
     const { context } = fixture();
     const button = { disabled: false }, host = { innerHTML: '', querySelector: () => button };
     context.document.getElementById = () => host;
@@ -85,16 +85,16 @@ test('最近播放网络异常显示中文提示，点击重试恢复列表，�
     const recent = context.window.RecentView;
     const render = recent.render;
     recent.show = () => { host.innerHTML = '恢复后的歌曲列表'; };
-    for (const error of [new TypeError('Failed to fetch'), new SyntaxError('Unexpected token < in JSON')]) {
-        context.fetch = async () => { throw error; };
-        await recent.load();
-        assert.ok(host.innerHTML.includes('最近播放暂时无法加载'));
-        assert.ok(!host.innerHTML.includes(error.message));
-        render.call(recent);
-        assert.ok(host.innerHTML.includes('重新加载'), '窗口缩放重绘不覆盖失败提示');
-        context.fetch = async () => ({ ok: true, json: async () => ({ items: [], limit: 100 }) });
-        await button.onclick(); assert.equal(host.innerHTML, '恢复后的歌曲列表');
-    }
+    context.fetch = async () => { throw new TypeError('Failed to fetch'); };
+    await recent.load();
+    assert.ok(host.innerHTML.includes('最近播放暂时无法加载'));
+    assert.ok(!host.innerHTML.includes('Failed to fetch'));
+    render.call(recent);
+    assert.ok(host.innerHTML.includes('重新加载'), '窗口缩放重绘不覆盖失败提示');
+    context.fetch = async () => ({ ok: true, json: async () => ({ items: [], limit: 100 }) });
+    await button.onclick(); assert.equal(host.innerHTML, '恢复后的歌曲列表');
+    context.fetch = async () => { throw new TypeError('Failed to fetch'); };
+    await recent.load(); assert.equal(host.innerHTML, '恢复后的歌曲列表', '已有数据时刷新失败保留原列表');
     let reject;
     context.fetch = () => new Promise((resolve, fail) => { reject = fail; });
     const pending = recent.load();

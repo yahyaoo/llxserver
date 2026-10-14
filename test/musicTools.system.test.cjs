@@ -2,12 +2,13 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const {startAccountRuntime}=require('./helpers/accountRuntime.cjs');
 const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+function wav(){const audio=Buffer.alloc(44+1600);audio.write('RIFF');audio.writeUInt32LE(audio.length-8,4);audio.write('WAVEfmt ',8);audio.writeUInt32LE(16,16);audio.writeUInt16LE(1,20);audio.writeUInt16LE(1,22);audio.writeUInt32LE(8000,24);audio.writeUInt32LE(16000,28);audio.writeUInt16LE(2,32);audio.writeUInt16LE(16,34);audio.write('data',36);audio.writeUInt32LE(1600,40);return audio;}
 async function wait(runtime,headers,url,read) {for(let i=0;i<150;i++){const response=await fetch(runtime.origin+url,{headers});assert.equal(response.status,200);const result=read(await response.json());if(result.status!=='running')return result;await pause(50);}throw new Error('后台任务超时');}
 test('维护接口：权限、重复任务、切页进度、歌词、单首删除和漫游累计',{timeout:60000},async()=>{
   let directory;
   const runtime=await startAccountRuntime({users:[{name:'alice',password:'alice123',allowWriteCustomMusicDir:true,allowOperateCustomMusicDir:true},{name:'bob',password:'bob12345'}]},root=>{
     directory=path.join(root,'library');fs.mkdirSync(directory);
-    for(let i=0;i<30;i++){fs.writeFileSync(path.join(directory,'歌曲'+i+'.mp3'),Buffer.from('ID3test'));fs.writeFileSync(path.join(directory,'歌曲'+i+'.lrc'),'[00:01]已有中文歌词');}
+    for(let i=0;i<30;i++){fs.writeFileSync(path.join(directory,'歌曲'+i+'.wav'),wav());fs.writeFileSync(path.join(directory,'歌曲'+i+'.lrc'),'[00:01]已有中文歌词');}
   });
   const post=(url,body,headers)=>fetch(runtime.origin+url,{method:'POST',headers:{...headers,'Content-Type':'application/json'},body:JSON.stringify(body)});
   try{

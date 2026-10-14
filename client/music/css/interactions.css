@@ -52,6 +52,8 @@
     flex-shrink: 0;
 }
 .song-row-actions > button:not(:disabled):hover > i { animation: page-action-jump .5s cubic-bezier(.3,.7,.4,1); }
+.song-queue-add-btn { position: relative; }
+.song-queue-add-mark { position: absolute; right: -2px; top: -3px; font-size: 8px; background: var(--bg-panel); border-radius: 50%; }
 /* 歌手、专辑和在线歌单卡片同样默认展示已有操作。 */
 :root .music-shell :is(button[id^="singer-fav-"], button[id^="singer-dislike-"],
     button[id^="album-fav-"], button[id^="album-dislike-"], .artist-album-download-btn,

@@ -97,7 +97,7 @@ export class ClientChannel {
         const count = event.added.length + event.changed.length + event.removed.length
         this.library.set(event.username, { ...this.library.get(event.username), scan: { running: false, total: event.total, added: event.added.length, changed: event.changed.length, removed: event.removed.length, durationMs: event.durationMs, error: event.error, errors: event.errors || [] }, changed: count > 0, version: ++this.revision })
         this.invalidate(event.username, ['library', 'maintenance'], true)
-        if (count || event.error) this.publishNotice({ username: event.username, id: randomUUID(), level: event.error ? 'error' : 'success', title: '音乐库扫描完成', message: event.error || `新增 ${event.added.length} 首，更新 ${event.changed.length} 首，移除 ${event.removed.length} 首`, createdAt: Date.now(), link: '#/local' })
+        if (count && !event.error) this.publishNotice({ username: event.username, id: randomUUID(), level: 'success', title: '音乐库扫描完成', message: `新增 ${event.added.length} 首，更新 ${event.changed.length} 首，移除 ${event.removed.length} 首`, createdAt: Date.now(), link: '#/local' })
       }),
       serverEvents.onEvent('library:prefetch-progress', event => {
         const previous = this.library.get(event.username)

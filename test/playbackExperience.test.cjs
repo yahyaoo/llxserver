@@ -6,6 +6,36 @@ const path = require('node:path');
 const vm = require('node:vm');
 const read = file => fs.readFileSync(path.join(__dirname, '..', file), 'utf8').replace(/\r\n/g, '\n');
 
+test('播放队列在抽屉外点击时关闭，内部点击和开关按钮不误关', () => {
+    const source = read('client/music/app.js');
+    const close = source.match(/function closeQueueDrawer\(\) \{[\s\S]*?\n\}/);
+    const outside = source.match(/function closeQueueDrawerOnOutsidePointerDown\(event\) \{[\s\S]*?\n\}/);
+    assert.ok(close && outside, '播放队列应有复用的关闭入口和外部点击处理');
+    assert.match(source, /document\.addEventListener\('pointerdown', closeQueueDrawerOnOutsidePointerDown\)/);
+    let opened = true, settingsClosed = 0;
+    const drawer = { classList: { contains: name => name === 'translate-x-full' && !opened, add: () => { opened = false; } },
+        contains: target => target === 'inside' };
+    const context = vm.createContext({ document: { getElementById: () => drawer },
+        window: { playbackExperience: { closeQueueSettings() { settingsClosed++; } } } });
+    vm.runInContext(close[0] + '\n' + outside[0], context);
+    context.closeQueueDrawerOnOutsidePointerDown({ target: { closest: () => null } });
+    assert.equal(opened, false); assert.equal(settingsClosed, 1);
+    opened = true;
+    context.closeQueueDrawerOnOutsidePointerDown({ target: 'inside' });
+    assert.equal(opened, true);
+    context.closeQueueDrawerOnOutsidePointerDown({ target: { closest: () => ({}) } });
+    assert.equal(opened, true);
+});
+
+test('播放队列歌曲行不提供音质与文件按钮', () => {
+    const source = read('client/music/app.js');
+    const start = source.indexOf('async function renderQueue()');
+    const end = source.indexOf('\nfunction playSongFromQueue', start);
+    const renderQueue = source.slice(start, end);
+    assert.ok(start >= 0, '播放队列渲染函数应存在');
+    assert.doesNotMatch(renderQueue, /SongFiles\?\.open|title="音质与文件"/);
+});
+
 test('播放器从本地定位信息重建认证地址，恢复播放无需先请求在线音源', async () => {
     const source = read('client/music/app.js'), start = source.indexOf('    if ((song.isLocal', source.indexOf('async function fetchSongUrl('));
     const block = source.slice(start, source.indexOf('\n    const shouldBypassServerCache', start));

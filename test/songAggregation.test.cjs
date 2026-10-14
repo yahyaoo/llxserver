@@ -87,7 +87,7 @@ test('下载列表合并跨平台已完成副本为最高音质，运行中的�
  assert.equal(manager.tasks.length,4);
 });
 
-test('音乐库点击未关联本地歌曲，聚合前后保留所选文件而非回退第一首',()=>{
+test('音乐库行点击第二首，单曲队列播放所选本地文件而非第一首',()=>{
  const {libraryPlayback}=require('./helpers/libraryPlayback.cjs');
  const player=libraryPlayback();
  const local=(name,singer)=>({id:'local_'+name,source:'local',name,singer,filename:name+'.wav',folder:'custom',quality:'128k',songInfo:{id:'local_'+name,source:'local',name,singer}});
@@ -97,12 +97,12 @@ test('音乐库点击未关联本地歌曲，聚合前后保留所选文件而�
  assert.equal(player.played.at(-1).song.name,'人间雪');
  // 模拟间隔后收到相同目录的新对象；账号字段只在构造认证播放对象时出现。
  player.setLibrary(JSON.parse(JSON.stringify(files)));
- player.window.LocalMusicManager.playItem(1);
+ player.clickLibrarySong(1);
  const actual=player.played.at(-1);
- assert.equal(actual.song.name,'白狐');assert.equal(actual.index,1);
+ assert.equal(actual.song.name,'白狐');assert.equal(actual.index,0);
  assert.equal(actual.song._localFilename,'白狐.wav');
  assert.equal(new URL(actual.song.url,'http://localhost').searchParams.get('filename'),'白狐.wav');
- assert.equal(player.context.currentPlaylist.length,2);
+ assert.deepEqual(Array.from(player.context.currentPlaylist,song=>song.name),['白狐']);
 });
 
 test('缓存与音乐目录同名未关联文件按位置切换，仍使用当前账号认证',()=>{
@@ -111,10 +111,10 @@ test('缓存与音乐目录同名未关联文件按位置切换，仍使用当�
  const item=location=>({id:'local_same',source:'local',name:'同名歌曲',singer:'歌手',filename:'同名.wav',folder:'music',location,quality:'128k',songInfo:{id:'local_same',source:'local',name:'同名歌曲',singer:'歌手'}});
  player.setLibrary([item('root'),item('data')]);player.window.LocalMusicManager.playItem(1);
  const actual=player.played.at(-1),url=new URL(actual.song.url,'http://localhost');
- assert.equal(actual.index,1);assert.equal(actual.song.location,'data');
+ assert.equal(actual.index,0);assert.equal(actual.song.location,'data');
  assert.equal(url.searchParams.get('location'),'data');assert.equal(url.searchParams.get('token'),'bob-token');
  assert.match(decodeURIComponent(url.pathname),/\/bob\/同名\.wav$/);
- assert.equal(player.context.currentPlaylist.length,2);
+ assert.equal(player.context.currentPlaylist.length,1);
 });
 
 test('关联歌曲切换仍聚合同曲副本并保留最高音质，不改变选择的歌曲',()=>{
@@ -125,8 +125,8 @@ test('关联歌曲切换仍聚合同曲副本并保留最高音质，不改变�
  player.setLibrary([other,song({name:'白狐',filename:'白狐.mp3',quality:'128k'}),song({name:'白狐',source:'kg',id:'kg_other',filename:'白狐.flac',quality:'flac',folder:'custom'})].map(linked));
  player.window.LocalMusicManager.playItem(1);
  const actual=player.played.at(-1);
- assert.equal(actual.song.name,'白狐');assert.equal(actual.index,1);assert.equal(actual.song.quality,'flac');
- assert.equal(actual.song.files.length,2);assert.equal(player.context.currentPlaylist.length,2);
+ assert.equal(actual.song.name,'白狐');assert.equal(actual.index,0);assert.equal(actual.song.quality,'flac');
+ assert.equal(actual.song.files.length,2);assert.equal(player.context.currentPlaylist.length,1);
  assert.equal(new URL(actual.song.url,'http://localhost').searchParams.get('filename'),'白狐.flac');
 });
 
