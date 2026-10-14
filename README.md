@@ -17,41 +17,70 @@
 
 ---
 
-**洛洛雪音乐**是一个支持网页播放、音乐同步和管理后台的开源音乐产品。电脑、手机和 NAS 都可以通过浏览器使用；支持直接运行、Docker、飞牛 fnOS，以及 Windows、macOS、Linux 桌面打包。
+**洛洛雪音乐（llxserver）**是一个集音乐发现、网页播放、个人音乐库、音乐同步和管理后台于一体的开源音乐产品。通过浏览器即可搜索歌曲、浏览在线歌单和排行榜、收藏喜欢的音乐，并管理播放记录与下载任务。电脑、手机和 NAS 都可以使用；支持直接运行、Docker、飞牛 fnOS，以及 Windows、macOS、Linux 桌面打包。
 
 服务端在 **server**，客户端在 **client**。既可整体交付，也可分别打包、独立运行。所有部署入口集中在 **deploy**。
 
-## 客户端功能
+**已适配手机端**：为小屏幕提供底部导航、卡片式音乐库与设置页面，以及竖屏播放详情页，手机浏览器也能方便地管理音乐和控制播放。
+
+## 客户端功能与界面预览
+
+以下截图展示当前开发中的客户端界面；发行包的界面和功能以所安装的版本为准。
+
+### 手机端适配
+
+手机端使用底部导航切换首页、音乐库、搜索和设置与账号，并保留当前播放入口。音乐库将在线歌单、排行榜、最近播放、下载管理和个人歌单集中在卡片中；设置按账号、外观与播放选项分组，便于触屏操作。竖屏播放器展示专辑封面、歌曲与音质信息、播放进度、频谱效果及常用播放控制。
+
+<p align="center">
+  <img src="md/screenshots/mobile-library.png" width="30%" alt="手机端音乐库：卡片式入口、个人歌单与底部导航">
+  <img src="md/screenshots/mobile-settings.png" width="30%" alt="手机端设置：账号资料、外观与播放选项分组">
+  <img src="md/screenshots/mobile-player.png" width="30%" alt="手机端竖屏播放器：专辑封面、频谱效果与播放控制">
+</p>
 
 ### 账号与登录
 
 先使用管理员分配的账号密码登录。默认连接当前部署绑定的服务器；选择「远程同步」可输入远端服务器地址和账号密码。支持「记住我」，有效期在后台系统配置调整。右上角提供账号设置、修改密码和退出登录；头像与昵称可修改，用户名只读。
 
-### 音乐与发现
+### 在线歌单与音乐发现
 
-多平台搜索、歌手与专辑、排行榜、歌单浏览和收藏，在一个客户端中整理自己的音乐。
+多平台搜索、歌手与专辑、在线歌单浏览和收藏，在一个客户端中发现并整理自己的音乐。在线歌单以封面卡片展示，支持按分类和平台筛选；底部播放栏让浏览与听歌同时进行。
 
-<p align="center"><img src="md/player.png" width="850" alt="客户端音乐界面"></p>
-<p align="center"><img src="md/search.png" width="850" alt="多平台音乐搜索"></p>
+<p align="center"><img src="md/screenshots/online-playlists.png" width="100%" alt="樱花粉主题下的在线歌单、底部播放栏与主题快捷面板"></p>
+
+### 搜索与排行榜
+
+顶部搜索框可查找音乐库中的歌曲、歌手和专辑，并提供在线搜索入口。排行榜按平台与榜单切换，展示歌曲、歌手、专辑、时长及音质信息，支持播放全部、收藏和下载。
+
+<p align="center"><img src="md/screenshots/search-suggestions.png" width="829" alt="音乐库搜索建议：歌曲、专辑与在线搜索入口"></p>
+<p align="center"><img src="md/screenshots/rankings.png" width="100%" alt="排行榜页面：榜单切换、音质标签与歌曲操作"></p>
+
+### 最近播放与个人音乐库
+
+通过歌单、收藏和音乐库整理歌曲；最近播放页面展示播放次数与最近播放时间，方便回听。支持播放全部和清空记录，最多保留 100 条最近播放记录。
+
+<p align="center"><img src="md/screenshots/recently-played.png" width="100%" alt="最近播放页面：歌曲、播放次数与最近播放时间"></p>
 
 ### 歌单与播放
 
-歌单详情、拖拽排序、播放队列、多种播放模式、音质选择、歌词、倍速和睡眠定时。
+歌单详情、拖拽排序、播放队列、多种播放模式、音质选择和倍速。播放详情页将专辑封面、播放控制与同步歌词集中展示，并提供频谱视觉效果。
 
-<p align="center"><img src="md/musiclist-detail.png" width="420" alt="歌单详情"> <img src="md/playlist.png" width="420" alt="播放队列"></p>
-<p align="center"><img src="md/controller.png" width="850" alt="播放控制"></p>
+<p align="center"><img src="md/screenshots/lyrics-player.png" width="100%" alt="播放详情页：专辑封面、同步歌词、播放控制与频谱效果"></p>
+
+睡眠定时提供 15、30、45、60、90 分钟和自定义时长，倒计时结束后自动停止当前音乐。
+
+<p align="center"><img src="md/screenshots/sleep-timer.png" width="467" alt="睡眠定时弹窗：预设时长与自定义入口"></p>
 
 ### 下载与缓存
 
-客户端浏览器下载、服务器下载、缓存管理和本地音乐。服务器下载支持可配置目录、文件名模板，以及内嵌歌词或同名 UTF-8 LRC；已下载歌曲支持分段播放和重启恢复。
+客户端浏览器下载、服务器下载、缓存管理和本地音乐。下载管理集中展示下载位置、音质、进度和状态，提供批量暂停、继续、重试、补全歌词及清理任务入口。服务器下载支持可配置目录、文件名模板，以及内嵌歌词或同名 UTF-8 LRC；已下载歌曲支持分段播放和重启恢复。
 
-<p align="center"><img src="md/cache.png" width="850" alt="缓存管理"></p>
+<p align="center"><img src="md/screenshots/download-manager.png" width="100%" alt="下载管理页面：服务器下载、音质、任务状态与批量操作"></p>
 
-### 主题与分享
+### 主题与外观
 
-保留现有深浅色主题、音效、歌词卡片分享、自定义源管理及分组设置。
+支持明亮、暗黑、纯白、纯黑和跟随系统的外观模式，提供樱花粉、森之韵、深海谧、雾青等多种主题配色及自定义主题入口。可从右上角快捷切换，也可在设置中调整界面布局、播放背景与视觉特效；同时提供音效、歌词卡片分享、自定义源管理及分组设置。
 
-<p align="center"><img src="md/theme.png" width="420" alt="主题设置"> <img src="md/share.png" width="420" alt="歌词卡片"></p>
+<p align="center"><img src="md/screenshots/dark-theme-settings.png" width="100%" alt="暗色主题设置：外观模式、主题配色与自定义主题"></p>
 
 ### 同步与开放协议
 
