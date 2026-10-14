@@ -4,6 +4,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import * as fileCache from '../cache/FileCacheService'
 import * as serverDownloads from './ServerDownloadService'
+import { serverEvents } from '../../../application/events/ServerEvents'
 
 /** 服务器下载任务的排队、执行、暂停或结束状态。 @author yahyaoo */
 export type ServerDownloadStatus = 'waiting' | 'downloading' | 'tagging' | 'paused' | 'finished' | 'exists' | 'error'
@@ -246,6 +247,8 @@ const runTask = async (task: ServerDownloadTask) => {
   task.updatedAt = Date.now()
   scheduleSave()
 
+  serverEvents.emitEvent('download:changed', { username: task.username, reason: 'state' })
+
   try {
     // 指定目录任务先查已下载文件，重复任务不触发音源解析。
     if (task.serverDownload && serverDownloads.check(task.identitySong || task.songInfo, task.username, task.requestedQuality, true, true).exists) {
@@ -271,6 +274,7 @@ const runTask = async (task: ServerDownloadTask) => {
           task.progress = total ? Math.min(99, received / total * 100) : 0
           task.speed = received / Math.max(1, (Date.now() - started) / 1000)
           task.updatedAt = Date.now()
+          serverEvents.emitEvent('download:changed', { username: task.username, reason: 'progress' })
         })
     } else {
       await fileCache.downloadAndCache(task.songInfo, resolved.url, task.quality, task.username, controller.signal,
@@ -302,6 +306,8 @@ const runTask = async (task: ServerDownloadTask) => {
     controllers.delete(key)
     task.updatedAt = Date.now()
     scheduleSave()
+    serverEvents.emitEvent('download:changed', { username: task.username, reason: 'state' })
+    if (task.status === 'error') serverEvents.emitEvent('notify', { username: task.username, id: task.id + ':' + task.updatedAt, level: 'error', title: '下载失败', message: task.errorMsg, createdAt: task.updatedAt })
     void processQueue()
   }
 }
@@ -338,6 +344,7 @@ export const setConcurrency = (username: string, value: unknown) => {
   const concurrency = normalizeConcurrency(value)
   concurrencyByUser.set(username, concurrency)
   saveNow()
+  serverEvents.emitEvent('download:changed', { username, reason: 'queue' })
   void processQueue()
   return concurrency
 }
@@ -418,6 +425,7 @@ export const enqueue = (username: string, inputs: QueueInput[]) => {
   }
   saveNow()
   void processQueue()
+  serverEvents.emitEvent('download:changed', { username, reason: 'queue' })
   return added.map(task => getPublicTask(task))
 }
 
@@ -448,6 +456,7 @@ export const pause = (username: string, id?: string) => {
     controllers.get(taskMapKey(username, task.id))?.abort()
   }
   saveNow()
+  serverEvents.emitEvent('download:changed', { username, reason: 'state' })
 }
 
 /**
@@ -471,6 +480,7 @@ export const resume = (username: string, id?: string) => {
     task.updatedAt = Date.now()
   }
   saveNow()
+  serverEvents.emitEvent('download:changed', { username, reason: 'state' })
   void processQueue()
 }
 
@@ -492,5 +502,6 @@ completed?: boolean }) => {
     tasks.delete(key)
   }
   saveNow()
+  serverEvents.emitEvent('download:changed', { username, reason: 'queue' })
   void processQueue()
 }

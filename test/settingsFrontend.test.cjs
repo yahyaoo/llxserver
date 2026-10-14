@@ -15,7 +15,7 @@ test('切换用户保留各自目录草稿，恢复原值后移除草稿', () =>
   const context = vm.createContext({ document: { getElementById: id => fields[id], querySelectorAll: () => fields['config-music-directories'].rows } })
   vm.runInContext('class TestSettings {' + methods + '} globalThis.TestSettings = TestSettings', context)
   const app = new context.TestSettings()
-  app.appendMusicDirectory = directory => { const input={value:directory.path}, frequency={value:directory.scanMinutes}; fields['config-music-directories'].rows.push({input,querySelector:selector=>selector==='[data-music-path]'?input:frequency}) }
+  app.appendMusicDirectory = directory => { const input={value:directory.path}, frequency={value:directory.scanMinutes}, watch={value:directory.watch==null?'':String(directory.watch)}; fields['config-music-directories'].rows.push({input,watch,querySelector:selector=>selector==='[data-music-path]'?input:selector==='[data-music-watch]'?watch:frequency}) }
   app.users = [{ name: 'admin', customMusicDir: '/original', enableCustomMusicDir: false }, { name: 'alice', customMusicDir: '/alice', enableCustomMusicDir: false }]
   app.customDirectoryDrafts = new Map()
   app.renderCustomDirectoryFields()
@@ -35,6 +35,12 @@ test('切换用户保留各自目录草稿，恢复原值后移除草稿', () =>
   fields['config-custom-dir-enabled'].checked = false
   app.updateCustomDirectoryDraft()
   assert.equal(app.customDirectoryDrafts.size, 1)
+  fields['config-music-directories'].rows[0].watch.value = 'false'
+  app.updateCustomDirectoryDraft()
+  assert.equal(app.customDirectoryDrafts.get('admin').directories[0].watch, false)
+  fields['config-music-directories'].rows[0].watch.value = ''
+  app.updateCustomDirectoryDraft()
+  assert.equal(app.customDirectoryDrafts.has('admin'), false, '跟随全局和旧目录未设置监听等价')
   assert.equal(app.users[0].customMusicDir, '/original', '编辑草稿不提前改写已保存配置')
 })
 

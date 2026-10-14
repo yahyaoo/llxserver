@@ -113,7 +113,7 @@ window.LXPlayerBarTemplate = String.raw`
                         <button onclick="setPlayMode('roaming')"
                             class="play-mode-option w-full px-3 py-2 text-left hover:t-bg-item-hover flex items-center gap-2 text-sm transition-colors"
                             data-mode="roaming">
-                            <i class="fas fa-heart-pulse roaming-heart w-4"></i>
+                            <i class="fas fa-compass roaming-heart w-4"></i>
                             <span>漫游播放</span>
                         </button>
                         <button onclick="setPlayMode('order')"

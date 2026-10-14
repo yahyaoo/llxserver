@@ -1,0 +1,9 @@
+/* 显示循环随页面可见性停止；音频、统计和可靠保存继续。 */
+.music-page-hidden .animate-marquee,
+.music-page-hidden .animate-spin,
+.music-page-hidden .playlist-name-track,
+.music-page-hidden .player-metadata-track,
+.music-page-hidden .word-item,
+.music-page-hidden .ext-item {
+    animation-play-state: paused !important;
+}

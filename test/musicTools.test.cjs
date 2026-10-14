@@ -5,7 +5,7 @@ const fs = require('node:fs'), os = require('node:os'), path = require('node:pat
 const roam = require('../client/music/js/roaming.js');
 const { startMusicTask, getMusicTasks } = require('../server/music/service/library/MusicTaskService.ts');
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
-async function wait(owner, id) { for (let i=0;i<100;i++) { const task=getMusicTasks(owner).find(task=>!id || task.id===id); if(task.status!=='running')return task;await pause(20); } throw new Error('任务超时'); }
+async function wait(owner, id) { for (let i=0;i<100;i++) { const task=getMusicTasks(owner,true).find(task=>!id || task.id===id); if(task.status!=='running')return task;await pause(20); } throw new Error('任务超时'); }
 test('漫游：播放量和模型附加权重决定区间，当前歌曲排除，边界安全', () => {
   const songs=[{source:'wy',id:'wy_1'},{source:'wy',id:'wy_2'},{source:'wy',id:'wy_3'}];
   roam.setWeights({'wy:1':9});
@@ -44,6 +44,15 @@ test('后台任务：互斥、真实工作线程写歌词、账号隔离、错�
     assert.equal(fs.readFileSync(path.join(root,'0.lrc'),'utf8'),'[00:01]测试歌词');assert.equal(results.length,3);
     const snapshot=getMusicTasks(owner);snapshot[0].errors.push('改变');assert.equal(getMusicTasks(owner)[0].errors.length,1);
   } finally { fs.rmSync(root,{recursive:true,force:true}); }
+});
+
+test('扫描写入只创建缺失的 LRC，已存在的旁挂歌词不被覆盖', async () => {
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'scan-sidecar-')),lyricPath=path.join(root,'song.lrc');
+  const owner='scan-sidecar-'+Date.now();fs.writeFileSync(lyricPath,'[00:01]用户已有歌词');
+  try {
+    const task=startMusicTask(owner,'lyrics',1,{prepare(){return {path:path.join(root,'song.wav'),lyricPath,origin:'scan',song:{name:'song'}};},lyrics(){return '[00:01]抓取的新歌词';},cover(){return null;},result(){}},{origin:'scan'});
+    const result=await wait(owner,task.id);assert.equal(result.skipped,1);assert.equal(fs.readFileSync(lyricPath,'utf8'),'[00:01]用户已有歌词');
+  }finally{fs.rmSync(root,{recursive:true,force:true});}
 });
 
 test('真实音频标签：中文歌词嵌入、元信息写入和重复嵌入跳过', async () => {

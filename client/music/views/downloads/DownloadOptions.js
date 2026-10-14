@@ -12,6 +12,9 @@
         if (!active) return;
         const previous = active; active = null;
         previous.panel.remove();
+        document.removeEventListener('scroll', schedulePosition, true); window.removeEventListener('resize', schedulePosition);
+        window.removeEventListener('music-account-changed', onAccountChange);
+        if (positionFrame !== null) cancelAnimationFrame(positionFrame); positionFrame = null;
         previous.trigger?.setAttribute('aria-expanded', 'false');
         if (restoreFocus) previous.trigger?.focus();
         previous.resolve(result);
@@ -25,6 +28,12 @@
         panel.style.left = Math.max(12, Math.min(x, innerWidth - width - 12)) + 'px';
         panel.style.top = Math.max(12, Math.min(y == null ? (innerHeight - height) / 2 : y + height + 20 <= innerHeight ? y + 8 : y - height - 8, innerHeight - height - 12)) + 'px';
     }
+    let positionFrame = null;
+    const schedulePosition = () => {
+        if (!active || document.hidden || positionFrame !== null) return;
+        positionFrame = requestAnimationFrame(() => { positionFrame = null; position(); });
+    };
+    const onAccountChange = () => close();
     window.DownloadOptions = {
         anchor,
         choose({ title = '下载歌曲', name, qualities, labels, quality, target = '浏览器下载', trigger = anchor() }) {
@@ -54,6 +63,8 @@
                 const rect = trigger === lastTrigger ? lastRect : trigger?.getBoundingClientRect();
                 const point = trigger === lastTrigger ? lastPoint : null;
                 active = { panel, trigger, resolve, rect, point }; document.body.appendChild(panel);
+                document.addEventListener('scroll', schedulePosition, { capture: true, passive: true }); window.addEventListener('resize', schedulePosition, { passive: true });
+                window.addEventListener('music-account-changed', onAccountChange);
                 trigger?.setAttribute('aria-expanded', 'true'); toggleLyrics(); qualitySelect.focus({ preventScroll: true });
             });
         },
@@ -61,8 +72,8 @@
     document.addEventListener('click', event => { if (active && !active.panel.contains(event.target) && !active.trigger?.contains(event.target)) close(); });
     document.addEventListener('keydown', event => { if (active && event.key === 'Escape') { event.preventDefault(); close(null, true); } });
     // 歌词自动滚动和控件聚焦不应取消用户的下载选择。作者：yahyaoo
-    document.addEventListener('scroll', position, true);
-    window.addEventListener('resize', position);
+    document.addEventListener('visibilitychange', () => { if (document.hidden) close(); });
+    window.addEventListener('pagehide', () => close());
 
     /** 从部署服务器取原文件，缓存目录和自定义目录均不经过云端解析。 */
     window.downloadLibraryFile = (item, { username, custom = false } = {}) => {

@@ -293,7 +293,7 @@ test('底部频谱遵循方块与连体设置，连体柱宽连续覆盖画布',
 
 test('详情频谱真实调度按选项使用不同绘制器，开关与透明度即时生效', () => {
   const env = environment(), animations = [];
-  const canvas = { style: {}, getBoundingClientRect: () => ({ width: 960, height: 120 }) };
+  const canvas = { style: {}, getContext: () => ({ clearRect() {} }), getBoundingClientRect: () => ({ width: 960, height: 120 }) };
   const view = { dataset: {} };
   class Turntable { constructor(options) { this.options = options; } }
   class Glob extends Turntable {} class Flower extends Turntable {}
@@ -306,7 +306,7 @@ test('详情频谱真实调度按选项使用不同绘制器，开关与透明�
   const document = { documentElement: {}, getElementById: id => ({ 'audio-player': audio, 'detail-visualizer': canvas, 'view-player-detail': view })[id] };
   const window = { Wave, AudioContext: class {}, soundEffects: { getAnalyser: () => ({}) }, devicePixelRatio: 1,
     PlayerDetailSpectrum: env.window.PlayerDetailSpectrum, settings: { showDetailVisualizer: true, visualizerOpacity: 0.4 }, addEventListener() {} };
-  const context = vm.createContext({ window, document, Wave, console: { log() {}, error() {} }, getComputedStyle: () => ({ getPropertyValue: () => '#ec4899' }) });
+  const context = vm.createContext({ window, document, Wave, requestAnimationFrame: () => 1, cancelAnimationFrame() {}, console: { log() {}, error(error) { throw error; } }, getComputedStyle: () => ({ getPropertyValue: () => '#ec4899' }) });
   vm.runInContext(read('client/music/js/visualizer.js'), context);
   window.musicVisualizer.init();
   for (const [style, Type] of [['spectrum', window.PlayerDetailSpectrum], ['pulse', Turntable], ['dots', Glob], ['flower', Flower]]) {

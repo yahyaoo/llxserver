@@ -19,7 +19,40 @@
         '/api/music/cache/stats', '/api/custom-source/list', '/api/user/account/avatar', '/api/user/appearance/background',
         '/api/music/storage/playback', '/api/music/storage/queue']);
     const script = new URL(document.currentScript.src);
-    let worker, entries = {}, scope = '', running, initialized, observing = false, enqueueing = Promise.resolve();
+    let worker, entries = {}, scope = '', running, initialized, observing = false, syncPages, enqueueing = Promise.resolve();
+    let config = { reportIntervalMs: 1800000, maxBatchOps: 200, maxBatchBytes: 262144 };
+    let cursor, cursorTimer, notices = [];
+    let accountHooks = false;
+    const cursorKey = name => 'lx_client_notify:' + location.origin + ':' + name;
+    const readCursor = name => { try { return JSON.parse(localStorage.getItem(cursorKey(name)) || 'null') } catch { return null } };
+    const saveCursor = name => {
+        clearTimeout(cursorTimer); cursorTimer = null;
+        if (!cursor || name !== owner()) return;
+        try { localStorage.setItem(cursorKey(name), JSON.stringify(cursor)); } catch {}
+    };
+    /** 只分类写入；GET 不进入上报。未知写入保守按用户数据处理。 */
+    function classify(operation) {
+        const method = String(operation.method || 'GET').toUpperCase();
+        if (['GET', 'HEAD'].includes(method)) return 'read';
+        const path = new URL(operation.url, location.origin).pathname;
+        if (path === '/api/user/recent' && method === 'POST' || path === '/api/music/storage/playback' && method === 'PUT' || path === '/api/music/playback' && method === 'POST') return 'state';
+        if (/^\/api\/music\/(?:cache\/(?:download|queue(?:\/(?:concurrency|pause|resume|remove))?|stop)|remaster\/(?:start|cancel))$/.test(path)) return 'command';
+        return 'data';
+    }
+    /** 现有 toast 采用 HTML 模板，先转义通知正文；链接仅保留同源或站内 hash。 */
+    function acceptNotice(message) {
+        if (!cursor || message.serverEpoch !== cursor.serverEpoch || !Number.isSafeInteger(message.seq) || message.seq <= cursor.seq) return;
+        cursor.seq = message.seq;
+        worker?.postMessage({ type: 'cursor-saved', serverEpoch: cursor.serverEpoch, seq: cursor.seq });
+        if (!cursorTimer) { const name = owner(); cursorTimer = setTimeout(() => saveCursor(name), 5000); cursorTimer.unref?.(); }
+        const notice = { ...message.data };
+        if (notice.link) {
+            try { const link = new URL(notice.link, location.origin); if (link.origin !== location.origin || !['http:', 'https:'].includes(link.protocol)) delete notice.link; } catch { delete notice.link; }
+        }
+        notices.push(notice); if (notices.length > 50) notices.shift();
+        window.showToast?.(notice.level === 'warn' ? 'info' : notice.level, notice.title + (notice.message ? '：' + notice.message : ''));
+        broadcast('notify', notice);
+    }
     const broadcast = (type, data) => { for (const fn of listeners.get(type) || []) { try { fn(data) } catch (error) { console.warn('[ClientChannel]', error) } } };
     const device = () => window.ListStore.deviceId();
     /** 仅登录时获取最新快照，使用按账号 IndexedDB，保留其他账号的未提交修改。 */
@@ -42,9 +75,10 @@
         if (initialized) return initialized;
         const name = owner();
         initialized = window.ListStore.getValue('lx_client_cache:' + name).then(async value => {
-            entries = value || {};
-            await Promise.all(readPatches(name).map(async route => { const patch = await window.ListStore.getValue(entryKey(name, route)); if (patch) entries[route] = patch }));
-            scope = name; return entries;
+            const loaded = value || {};
+            await Promise.all(readPatches(name).map(async route => { const patch = await window.ListStore.getValue(entryKey(name, route)); if (patch) loaded[route] = patch }));
+            if (owner() === name) { entries = loaded; scope = name; }
+            return loaded;
         }).finally(() => { initialized = null });
         return initialized;
     }
@@ -61,9 +95,12 @@
     /** 未确认的有效播放事件本地预览，同一会话及已经推送的记录不重复累计。 */
     function recentPreview(value) {
         const result = { ...value, items: (value?.items || []).map(item => ({ ...item })) };
+        const confirmed = new Set(entries['/api/user/roaming/weights']?.data?.confirmedPlaybackIds || []), seen = new Set();
         for (const event of window.DeferredWrites?.collect?.() || []) {
             const song = event.data;
             if (event.url !== '/api/user/recent' || !song.playbackSucceeded || !(song.playedSeconds > 10)) continue;
+            if (confirmed.has(song.playbackId) || seen.has(song.playbackId)) continue;
+            seen.add(song.playbackId);
             const same = item => window.SongIdentity.key(item) === window.SongIdentity.key(song);
             const previous = result.items.find(same);
             if (previous?.lastPlaybackId === song.playbackId) continue;
@@ -73,40 +110,56 @@
         return result;
     }
     async function apply(message) {
-        await load(); Object.assign(entries, message.entries);
+        const name = owner();
+        await load();
+        if (name !== owner() || scope !== name) return;
+        Object.assign(entries, message.entries);
         // 小进度补丁不复制整库；登录基线和各条目增量在读取时合并。
-        await Promise.all(Object.entries(message.entries).map(([route, value]) => window.ListStore.putValue(entryKey(scope, route), value)));
-        localStorage.setItem(patchKey(scope), JSON.stringify([...new Set([...readPatches(scope), ...Object.keys(message.entries)])]));
-        if (message.versions) localStorage.setItem(versionsKey(scope), JSON.stringify({ ...readVersions(scope), ...message.versions }));
+        await Promise.all(Object.entries(message.entries).map(([route, value]) => window.ListStore.putValue(entryKey(name, route), value)));
+        localStorage.setItem(patchKey(name), JSON.stringify([...new Set([...readPatches(name), ...Object.keys(message.entries)])]));
+        if (message.versions) localStorage.setItem(versionsKey(name), JSON.stringify({ ...readVersions(name), ...message.versions }));
+        if (name !== owner()) return;
         if (message.versions) worker?.postMessage({ type: 'cache-saved', versions: message.versions });
         broadcast('cache', message.entries);
         window.dispatchEvent(new CustomEvent('client-cache-updated', { detail: message.entries }));
     }
     /** 页面订阅跟随实际显隐，设置页展开和页面切换都能及时取消下载进度。 */
     function observePages() {
-        if (observing) return;
+        if (observing) { syncPages?.(); return; }
         observing = true;
-        const topics = new Map();
         const sync = () => {
-            const visible = id => { const view = document.getElementById(id); return view && !view.classList.contains('hidden') };
+            const visible = id => { const view = document.getElementById(id); return document.visibilityState !== 'hidden' && view && !view.classList.contains('hidden') };
             for (const [topic, enabled] of [['downloads', !!visible('view-downloads')], ['maintenance', !!visible('view-localmusic')]]) {
-                if (topics.get(topic) === enabled) continue;
-                topics.set(topic, enabled); window.ClientTransport.subscribe(topic, enabled);
+                if ((subscriptions.get(topic) || false) === enabled) continue;
+                window.ClientTransport.subscribe(topic, enabled);
             }
         };
         const observer = new MutationObserver(sync);
+        syncPages = sync;
+        document.addEventListener('visibilitychange', sync);
         for (const id of ['view-downloads', 'view-localmusic']) { const view = document.getElementById(id); if (view) observer.observe(view, { attributes: true, attributeFilter: ['class'] }) }
         sync();
     }
     function start() {
         if (worker) return;
+        if (!accountHooks && window.AccountSession) {
+            accountHooks = true;
+            const session = window.AccountSession, save = session.save, clear = session.clear;
+            const beforeChange = () => { window.ClientSync?.prepareAccountChange?.(); window.ClientTransport.close(); entries = {}; scope = ''; subscriptions.clear(); };
+            if (save) session.save = data => { if (data.username !== owner()) beforeChange(); return save(data); };
+            if (clear) session.clear = () => { beforeChange(); return clear(); };
+        }
         worker = new Worker(new URL('client-channel-worker.js', script));
+        const activeWorker = worker, name = owner();
+        cursor = readCursor(name); notices = [];
         worker.onerror = () => {
+            if (worker !== activeWorker) return;
             worker?.terminate(); worker = null;
             for (const pending of requests.values()) pending.reject(new Error('发送线程异常，消息保留到下一周期'));
             requests.clear();
         };
         worker.onmessage = async event => {
+            if (worker !== activeWorker || owner() !== name) return;
             const message = event.data;
             if (message.type === 'cache') await apply(message);
             else if (message.type === 'ack' || message.type === 'failed') {
@@ -114,6 +167,17 @@
                 if (message.type === 'ack') pending?.resolve(message); else pending?.reject(new Error(message.message));
                 requests.delete(message.id);
             } else if (message.type === 'expired') window.AccountSession.redirect();
+            else if (message.type === 'ready') {
+                if (message.config) {
+                    for (const key of ['reportIntervalMs', 'maxBatchOps', 'maxBatchBytes']) if (Number.isFinite(message.config[key]) && message.config[key] >= 0) config[key] = message.config[key];
+                }
+                if (!cursor || cursor.serverEpoch !== message.serverEpoch || cursor.seq > message.notifySeq) cursor = { serverEpoch: message.serverEpoch, seq: 0 };
+                worker.postMessage({ type: 'cursor-saved', ...cursor });
+                window.ClientSync?.configure?.(config);
+                broadcast('ready', message);
+                void window.ClientSync?.flush?.();
+                void drain();
+            } else if (message.type === 'notify') acceptNotice(message);
             else {
                 if (message.type === 'downloads') entries['/api/music/cache/queue'] = { status: 200, data: message.data };
                 if (message.type === 'sync-download') entries['/api/user/sync-download/progress'] = { status: 200, data: message.data };
@@ -121,12 +185,14 @@
             }
         };
         const ws = new URL('/api/music/client-channel', location.origin); ws.protocol = ws.protocol === 'https:' ? 'wss:' : 'ws:';
-        worker.postMessage({ type: 'configure', ws: ws.href, http: new URL('/api/user/client-sync', location.origin).href, token: window.AccountSession.getToken(), headers: { ...window.getUserAuthHeaders?.(), 'x-user-token': window.AccountSession.getToken(), 'x-user-name': owner(), 'x-browser-device': device() }, device: device(), mode: window.settings?.clientSyncTransport || 'ws', versions: readVersions(owner()), topics: [...subscriptions].filter(([, enabled]) => enabled).map(([topic]) => topic) });
+        worker.postMessage({ type: 'configure', ws: ws.href, http: new URL('/api/user/client-sync', location.origin).href, token: window.AccountSession.getToken(), headers: { ...window.getUserAuthHeaders?.(), 'x-user-token': window.AccountSession.getToken(), 'x-user-name': name, 'x-browser-device': device() }, device: device(), mode: window.settings?.clientSyncTransport || 'ws', versions: readVersions(name), serverEpoch: cursor?.serverEpoch, lastNotifySeq: cursor?.seq,
+            topics: [...new Set(['downloads:summary', 'library', ...[...subscriptions].filter(([, enabled]) => enabled).map(([topic]) => topic)])] });
         if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', observePages, { once: true }); else observePages();
     }
     /** localStorage 保存队列索引，较大的歌单正文保存 IndexedDB，避免占满同步存储容量。 */
     function report(operations) {
-        const work = enqueueing.catch(() => {}).then(() => reportQueued(operations));
+        const name = owner();
+        const work = enqueueing.catch(() => {}).then(() => { if (owner() !== name) throw new Error('账号已切换，原账号消息保留'); return reportQueued(operations) });
         enqueueing = work;
         return work;
     }
@@ -139,13 +205,20 @@
             const previous = await window.ListStore.getValue('lx_client_message:' + name + ':' + oldId);
             for (const operation of previous?.operations || []) if (!latestChannels.has(operation.channel) && !combined.has(operation.id)) combined.set(operation.id, operation);
         }
-        const message = { type: 'report', id, operations: [...combined.values()] };
-        await window.ListStore.putValue('lx_client_message:' + name + ':' + id, message);
-        writeQueue(name, [id]);
+        const messages = []; let batch = [], bytes = 128;
+        for (const operation of combined.values()) {
+            const size = new Blob([JSON.stringify(operation)]).size + 1;
+            if (batch.length && (batch.length >= Math.min(512, config.maxBatchOps || 200) || bytes + size > (config.maxBatchBytes || 262144))) { messages.push({ type: 'report', id: id + ':' + messages.length, operations: batch }); batch = []; bytes = 128; }
+            batch.push(operation); bytes += size;
+        }
+        if (batch.length) messages.push({ type: 'report', id: id + ':' + messages.length, operations: batch });
+        for (const message of messages) await window.ListStore.putValue('lx_client_message:' + name + ':' + message.id, message);
+        writeQueue(name, messages.map(message => message.id));
         for (const oldId of oldIds) await window.ListStore.deleteValue('lx_client_message:' + name + ':' + oldId);
         const result = await drain();
-        if (!result?.[id]) throw new Error('消息保留在本地队列，等待下一次上报');
-        return result[id];
+        if (messages.some(message => !result?.[message.id])) throw new Error('消息保留在本地队列，等待下一次上报');
+        return { type: 'ack', id, results: Object.assign({}, ...messages.map(message => result[message.id].results)),
+            confirmedPlaybackIds: messages.flatMap(message => result[message.id].confirmedPlaybackIds || []) };
     }
     async function drain() {
         if (running) return running;
@@ -165,6 +238,8 @@
                         worker.postMessage(message);
                     });
                     results[id] = ack;
+                    if (name !== owner()) break;
+                    broadcast('ack', ack);
                     const retry = message.operations.filter(operation => {
                         const status = ack.results[operation.id]?.status;
                         return !status || status >= 300 && ![400, 403, 404, 422].includes(status);
@@ -182,9 +257,10 @@
         return running;
     }
     window.ClientData = { bootstrap, load, request, isCached: path => cachedPaths.has(path), get: route => entries[route]?.data };
-    window.ClientTransport = { report, drain, start, hasPending: () => readQueue(owner()).length > 0,
+    window.ClientTransport = { report, drain, start, classify, get config() { return { ...config } }, get notices() { return notices.slice() }, hasPending: () => readQueue(owner()).length > 0,
         /** 用户显式下载操作也进入同一持久队列和发送线程，复用原接口响应结构。 */
         async request(url, options = {}) {
+            if (['GET', 'HEAD'].includes(String(options.method || 'POST').toUpperCase())) return fetch(url, options);
             const id = 'command:' + uid();
             const ack = await report([{ id, url, method: options.method || 'POST', headers: options.headers, data: options.body ? JSON.parse(options.body) : undefined }]);
             const result = ack.results[id];
@@ -193,10 +269,17 @@
         /** 关闭页面的最后一次提交使用浏览器保活发送，Cookie 鉴权，原状态队列仍保留至确认。 */
         flushOnExit(operations) {
             if (!operations.length) return false;
-            const message = { type: 'report', id: uid(), operations };
-            const body = JSON.stringify(message);
-            const payload = new Blob([body], { type: 'application/json' });
-            return payload.size <= 60000 && !!navigator.sendBeacon?.('/api/user/client-sync', payload);
+            const selected = []; let bytes = 128;
+            for (const operation of operations) {
+                const size = new Blob([JSON.stringify(operation)]).size + 1;
+                if (bytes + size > 59000 || selected.length >= 512) continue;
+                selected.push(operation); bytes += size;
+            }
+            if (!selected.length) return false;
+            const body = JSON.stringify({ type: 'report', id: uid(), operations: selected });
+            // 单次保活总量保守低于 60KB；余下及未确认操作仍在原持久队列。
+            void fetch('/api/user/client-sync', { method: 'POST', headers: { 'Content-Type': 'application/json', ...window.getUserAuthHeaders?.(), 'x-user-token': window.AccountSession.getToken() }, body, keepalive: true }).catch(() => {});
+            return true;
         },
         on(type, listener) { if (!listeners.has(type)) listeners.set(type, new Set()); listeners.get(type).add(listener); return () => listeners.get(type).delete(listener) },
         subscribe(topic, enabled) {
@@ -204,6 +287,7 @@
             subscriptions.set(topic, !!enabled); start(); worker.postMessage({ type: 'subscribe', topic, enabled: !!enabled });
         },
         setMode(mode) { start(); worker.postMessage({ type: 'mode', mode }) },
-        close() { worker?.terminate(); worker = null; for (const item of requests.values()) item.reject(new Error('连接已关闭')); requests.clear() },
+        close() { saveCursor(owner()); worker?.terminate(); worker = null; for (const item of requests.values()) item.reject(new Error('连接已关闭')); requests.clear() },
     };
+    window.addEventListener?.('pagehide', () => saveCursor(owner()));
 })();

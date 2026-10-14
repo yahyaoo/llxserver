@@ -17,6 +17,8 @@
         })();
     </script>
     <script src="/js/config.js"></script>
+    <script src="js/perf_probe.js"></script>
+    <script src="js/local_store.js"></script>
     <script src="js/idb_store.js"></script>
     <script src="js/client-channel.js"></script>
     <script src="js/account-session.js"></script>
@@ -31,13 +33,12 @@
     <link rel="manifest" href="manifest.json">
     <link rel="stylesheet" href="css/theme_variables.css">
     <link rel="stylesheet" href="views/recent/recent.css">
-    <script src="assets/tailwindcss.js"></script>
-    <script src="js/tailwind_setup.js"></script>
+    <script src="js/style_boot.js"></script>
     <link rel="stylesheet" href="assets/fontawesome/css/all.min.css">
-    <script src="js/crypto-js.min.js"></script>
-    <script src="js/marked.min.js"></script>
-    <script src="js/Sortable.min.js"></script>
-    <script src="/js/notification-engine.js"></script>
+    <script src="js/crypto-js.min.js" defer></script>
+    <script src="js/marked.min.js" defer></script>
+    <script src="js/Sortable.min.js" defer></script>
+    <script src="/js/notification-engine.js" defer></script>
     <link rel="stylesheet" href="css/app.css">
     <link rel="stylesheet" href="components/loading-state/loading-state.css">
     <link rel="stylesheet" href="views/main-navigation/main-navigation.css">
@@ -52,6 +53,7 @@
     <link rel="stylesheet" href="components/song-file-status/style.css">
     <link rel="stylesheet" href="views/player-detail/appearance.css">
     <link rel="stylesheet" href="css/interactions.css">
+    <link rel="stylesheet" href="css/runtime.css">
     <link rel="stylesheet" href="css/popovers.css">
     <link rel="stylesheet" href="views/downloads/downloads.css">
     <link rel="stylesheet" href="components/dialog/dialog.css">
@@ -60,6 +62,7 @@
     <link rel="stylesheet" href="assets/element/element-plus.css">
     <link rel="stylesheet" href="assets/element/element-controls.css">
     <link rel="stylesheet" href="components/music-tools/style.css">
+    <link rel="stylesheet" href="components/notification-center/style.css">
     <link rel="stylesheet" href="views/playlists/playlists.css">
     <script src="assets/element/vue.global.prod.js" defer></script>
     <script src="assets/element/element-plus.min.js" defer></script>
@@ -2762,80 +2765,85 @@
     <audio id="audio-player" crossorigin="anonymous"></audio>
 
     <!-- External Scripts Section (Placed at the end for performance) -->
-    <script src="components/loading-state/index.js"></script>
-    <script src="components/library-artwork/index.js"></script>
-    <script src="components/theme-controls/index.js"></script>
-    <script src="components/top-bar/SearchBox.js"></script>
-    <script src="components/top-bar/AccountActions.js"></script>
-    <script src="components/top-bar/index.js"></script>
-    <script src="views/main-navigation/MainNavigation.js"></script>
-    <script src="views/main-navigation/PlaylistActions.js"></script>
-    <script src="views/main-navigation/index.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
-    <script src="js/NoSleep.min.js"></script>
-    <script src="js/log_viewer.js"></script>
-    <script src="js/lyric-utils.js"></script>
-    <script src="js/lyric-parser.js"></script>
-    <script src="js/quality.js"></script>
-    <script src="js/client_performance.js"></script>
-    <script src="js/user_sync.js"></script>
-    <script src="js/batch_pagination.js"></script>
-    <script src="views/downloads/DownloadOptions.js"></script>
-    <script src="js/single_song_ops.js"></script>
-    <script src="views/settings/SettingsView.js"></script>
-    <script src="views/settings/SettingsNavigation.js"></script>
-    <script src="js/theme_manager.js"></script>
-    <script src="views/settings/index.js"></script>
-    <script src="views/settings/SettingsToggle.js"></script>
-    <script src="views/settings/ConfigurationImport.js"></script>
-    <script src="views/settings/AvatarCropper.js"></script>
-    <script src="views/settings/AccountSettings.js"></script>
-    <script src="js/list_search.js"></script>
-    <script src="components/song-file-status/index.js"></script>
-    <script src="js/songlist_manager.js"></script>
-    <script src="views/leaderboard/components/LeaderboardNavigation.js"></script>
-    <script src="views/leaderboard/LeaderboardView.js"></script>
-    <script src="js/leaderboard_manager.js"></script>
-    <script src="js/dislike_manager.js"></script>
-    <script src="js/song_metadata.js"></script>
-    <script src="js/song_actions.js"></script>
-    <script src="js/playback-lyrics.js"></script>
-    <script src="components/player-bar/template.js"></script>
-    <script src="components/player-bar/index.js"></script>
-    <script src="views/player-detail/template.js"></script>
-    <script src="views/player-detail/components/PlayerBackground.js"></script>
-    <script src="views/player-detail/components/Spectrum.js"></script>
-    <script src="views/player-detail/components/LyricSettings.js"></script>
-    <script src="views/player-detail/PlayerDetailView.js"></script>
-    <script src="js/wave.js"></script>
-    <script src="js/visualizer.js"></script>
-    <script src="js/pwa.js"></script>
-    <script src="js/lyric-card.js"></script>
-    <script src="js/ios-background-audio.js"></script>
-    <script src="js/sound-effects.js"></script>
-    <script src="views/downloads/DownloadsView.js"></script>
-    <script src="js/download_manager.js"></script>
-    <script src="js/song_identity.js"></script>
-    <script src="js/song_files.js"></script>
-    <script src="js/local_music.js"></script>
-    <script src="js/customDir.js"></script>
-    <script src="js/common_ui.js"></script>
-    <script src="js/sync_download.js"></script>
-    <script src="views/recent/RecentView.js"></script>
+    <script src="components/loading-state/index.js" defer></script>
+    <script src="js/image_loader.js" defer></script>
+    <script src="js/virtual_list.js" defer></script>
+    <script src="components/library-artwork/index.js" defer></script>
+    <script src="components/theme-controls/index.js" defer></script>
+    <script src="components/top-bar/SearchBox.js" defer></script>
+    <script src="components/top-bar/AccountActions.js" defer></script>
+    <script src="components/top-bar/index.js" defer></script>
+    <script src="components/notification-center/index.js" defer></script>
+    <script src="views/main-navigation/MainNavigation.js" defer></script>
+    <script src="views/main-navigation/PlaylistActions.js" defer></script>
+    <script src="views/main-navigation/index.js" defer></script>
+    <script src="assets/pako/pako-2.1.0.min.js" defer></script>
+    <script src="js/NoSleep.min.js" defer></script>
+    <script src="js/log_viewer.js" defer></script>
+    <script src="js/lyric-utils.js" defer></script>
+    <script src="js/lyric-parser.js" defer></script>
+    <script src="js/quality.js" defer></script>
+    <script src="js/client_performance.js" defer></script>
+    <script src="js/user_sync.js" defer></script>
+    <script src="js/batch_pagination.js" defer></script>
+    <script src="views/downloads/DownloadOptions.js" defer></script>
+    <script src="js/single_song_ops.js" defer></script>
+    <script src="js/media_cache.js" defer></script>
+    <script src="js/media_cache_settings.js" defer></script>
+    <script src="views/settings/SettingsView.js" defer></script>
+    <script src="views/settings/SettingsNavigation.js" defer></script>
+    <script src="js/theme_manager.js" defer></script>
+    <script src="views/settings/index.js" defer></script>
+    <script src="views/settings/SettingsToggle.js" defer></script>
+    <script src="views/settings/ConfigurationImport.js" defer></script>
+    <script src="views/settings/AvatarCropper.js" defer></script>
+    <script src="views/settings/AccountSettings.js" defer></script>
+    <script src="js/list_search.js" defer></script>
+    <script src="components/song-file-status/index.js" defer></script>
+    <script src="js/songlist_manager.js" defer></script>
+    <script src="views/leaderboard/components/LeaderboardNavigation.js" defer></script>
+    <script src="views/leaderboard/LeaderboardView.js" defer></script>
+    <script src="js/leaderboard_manager.js" defer></script>
+    <script src="js/dislike_manager.js" defer></script>
+    <script src="js/song_metadata.js" defer></script>
+    <script src="js/song_actions.js" defer></script>
+    <script src="js/playback-lyrics.js" defer></script>
+    <script src="components/player-bar/template.js" defer></script>
+    <script src="components/player-bar/index.js" defer></script>
+    <script src="views/player-detail/template.js" defer></script>
+    <script src="views/player-detail/components/PlayerBackground.js" defer></script>
+    <script src="views/player-detail/components/Spectrum.js" defer></script>
+    <script src="views/player-detail/components/LyricSettings.js" defer></script>
+    <script src="views/player-detail/PlayerDetailView.js" defer></script>
+    <script src="js/wave.js" defer></script>
+    <script src="js/visualizer.js" defer></script>
+    <script src="js/pwa.js" defer></script>
+    <script src="js/lyric-card.js" defer></script>
+    <script src="js/ios-background-audio.js" defer></script>
+    <script src="js/sound-effects.js" defer></script>
+    <script src="views/downloads/DownloadsView.js" defer></script>
+    <script src="js/download_manager.js" defer></script>
+    <script src="js/song_identity.js" defer></script>
+    <script src="js/song_files.js" defer></script>
+    <script src="js/local_music.js" defer></script>
+    <script src="js/customDir.js" defer></script>
+    <script src="js/common_ui.js" defer></script>
+    <script src="js/sync_download.js" defer></script>
+    <script src="views/recent/RecentView.js" defer></script>
     <script src="js/deferred_writes.js"></script>
-    <script src="js/music_experience.js"></script>
-    <script src="js/play_statistics.js"></script>
-    <script src="components/playback-experience/index.js"></script>
-    <script src="js/roaming.js"></script>
-    <script src="app.js"></script>
-    <script src="views/playlists/PlaylistsView.js"></script>
-    <script src="components/music-tools/index.js"></script>
-    <script src="components/dialog/DialogChrome.js"></script>
+    <script src="js/music_experience.js" defer></script>
+    <script src="js/play_statistics.js" defer></script>
+    <script src="components/playback-experience/index.js" defer></script>
+    <script src="js/roaming.js" defer></script>
+    <script src="app.js" defer></script>
+    <script src="views/playlists/PlaylistsView.js" defer></script>
+    <script src="components/music-tools/index.js" defer></script>
+    <script src="components/dialog/DialogChrome.js" defer></script>
     <link rel="stylesheet" href="components/dialog/playlist-editor.css">
-    <script src="components/dialog/PlaylistEditor.js"></script>
-    <script src="views/mobile-shell/MobileShell.js"></script>
-    <script src="views/mobile-shell/SongRowMenu.js"></script>
-    <script src="views/player-detail/PlayerFeaturePages.js"></script>
+    <script src="components/dialog/PlaylistEditor.js" defer></script>
+    <script src="views/mobile-shell/MobileShell.js" defer></script>
+    <script src="views/mobile-shell/SongRowMenu.js" defer></script>
+    <script src="views/player-detail/PlayerFeaturePages.js" defer></script>
 </body>
 
 <!-- 同步下载面板 Modal -->

@@ -318,6 +318,7 @@ test('移除底栏画布后详情页频谱独立初始化，旧底栏设置不�
   class AudioContext { constructor() { this.state = 'running' } }
   const audio = { addEventListener: (name, callback) => { events[name] = callback }, paused: false }
   const context = vm.createContext({ console: { log() {}, error(error) { throw error } }, Wave,
+    requestAnimationFrame: () => 1, cancelAnimationFrame() {},
     window: { Wave, AudioContext, devicePixelRatio: 2, settings: { showFooterVisualizer: true, showDetailVisualizer: true },
       soundEffects: { getAnalyser: () => ({}) }, addEventListener() {} },
     document: { documentElement: {}, getElementById: id => id === 'audio-player' ? audio : id === 'detail-visualizer' ? canvas : null },

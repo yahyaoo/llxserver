@@ -346,7 +346,6 @@ class RemoteClient {
         this.code = code;
         this.ws = null;
         this.isConnected = false;
-        this.heartbeatTimer = null;
 
         this.authInfo = null;
 
@@ -482,7 +481,6 @@ class RemoteClient {
     handleOpen() {
         console.log('WS Open');
         this.isConnected = true;
-        this.startHeartbeat();
 
         // Trigger Login Success Callback
         if (this.onLogin) this.onLogin(true, 'Connected');
@@ -720,20 +718,11 @@ class RemoteClient {
         });
     }
 
-    startHeartbeat() {
-        if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);
-
-        this.heartbeatTimer = setInterval(() => {
-            // this.ws.send('1'); 
-        }, 30000);
-    }
-
     close() {
         if (this.ws) {
             this.ws.close();
             this.ws = null;
         }
-        if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);
     }
 
     handleClose(e) {

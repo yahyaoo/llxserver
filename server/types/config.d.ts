@@ -57,6 +57,36 @@ declare namespace LX {
   }
 
   interface Config {
+    'library.scan.enabled'?: boolean
+    'library.scan.legacy'?: boolean
+    'library.scan.defaultMinutes'?: number
+    'library.scan.fullScanHours'?: number
+    'library.scan.watch'?: boolean
+    'library.scan.watchDebounceSeconds'?: number
+    'library.scan.startupDelaySeconds'?: number
+    'library.scan.ioPauseMs'?: number
+    'library.scan.watchMode'?: 'auto' | 'native' | 'polling' | 'off'
+    'library.scan.lyricWriteMode'?: 'sidecar' | 'embedded' | 'both'
+    'library.scan.embedCover'?: boolean
+    'library.prefetch.enabled'?: boolean
+    'library.prefetch.cover'?: boolean
+    'library.prefetch.lyric'?: boolean
+    'library.prefetch.network'?: boolean
+    'library.prefetch.concurrency'?: number
+    'library.prefetch.maxCacheMB'?: number
+    'library.prefetch.networkPerMinute'?: number
+    'library.prefetch.backfillOnStartup'?: boolean
+    'library.autoFix.embedLyric'?: 'off' | 'follow-download' | 'on'
+    'library.autoFix.retag'?: 'off' | 'fill-missing'
+    'library.autoFix.scope'?: 'cache' | 'cache+custom'
+    'library.autoFix.maxPerRun'?: number
+    'library.autoFix.quietHours'?: string
+    'library.autoFix.safeWrite'?: boolean
+    'clientChannel.reportIntervalMinutes'?: number
+    'clientChannel.progressThrottleMs'?: number
+    'clientChannel.maxBatchOps'?: number
+    'clientChannel.maxBatchBytes'?: number
+    'clientChannel.legacyProgressPolling'?: boolean
     /**
      * 同步服务名称
      */

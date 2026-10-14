@@ -105,6 +105,7 @@
     }
     let menu, trigger;
     function closeMenu() {
+        window.removeEventListener('resize', closeMenu); document.removeEventListener('scroll', closeMenu, true); window.removeEventListener('music-account-changed', closeMenu);
         menu?.remove(); menu = null;
         trigger?.setAttribute('aria-expanded', 'false'); trigger = null;
     }
@@ -123,10 +124,10 @@
         menu.querySelector('[data-edit]').onclick = e => { closeMenu(); window.handleRenameList(listId, e); };
         menu.querySelector('[data-delete]').onclick = e => { closeMenu(); window.handleRemoveList(listId, e); };
         document.body.append(menu); menu.querySelector('button').focus();
+        window.addEventListener('resize', closeMenu); document.addEventListener('scroll', closeMenu, { capture: true, passive: true }); window.addEventListener('music-account-changed', closeMenu);
     }
     document.addEventListener('click', event => { if (!menu?.contains(event.target) && !trigger?.contains(event.target)) closeMenu(); });
     document.addEventListener('keydown', event => { if (event.key === 'Escape' && menu) { const button = trigger; closeMenu(); button.focus(); } });
-    window.addEventListener('resize', closeMenu);
-    document.addEventListener('scroll', closeMenu, true);
+    window.addEventListener('pagehide', closeMenu);
     window.PlaylistEditor = { open, attach, fallback, readCover, toggleMenu, closeMenu };
 })();

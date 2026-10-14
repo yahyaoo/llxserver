@@ -14,6 +14,9 @@ function environment(mobile = true) {
         getAttribute(name) { return this.attributes[name]; }
         removeAttribute(name) { delete this.attributes[name]; }
         addEventListener(name, fn, capture) { this.events[name + (capture ? 'Capture' : '')] = fn; }
+        removeEventListener(name, fn, capture) { delete this.events[name + (capture ? 'Capture' : '')]; }
+        closest(selector) { return selector === '.song-row-more' ? (this.className === 'song-row-more' ? this : this.parent?.closest(selector)) : selector === '.song-row-actions' ? (this.className === 'song-row-actions' ? this : this.parent?.closest(selector)) : null; }
+        matches(selector) { return selector === '.song-row-actions' && this.className === 'song-row-actions'; }
         querySelector(selector) {
             if (selector.includes(',')) return selector.split(',').map(part => this.querySelector(part.trim())).find(Boolean);
             return selector === '.song-row-more' ? this.children.find(n => n.className === 'song-row-more') : selector === '.song-maintenance-menu' ? this.children.find(n => n.className === 'song-maintenance-menu') : selector === '[data-library-more]' ? this.children.find(n => n.getAttribute('data-library-more') !== undefined) : this.children.find(n => n.tag === 'button');
@@ -28,16 +31,17 @@ function environment(mobile = true) {
     const love = new Node('song-love-btn'); love.tag = 'button';
     const download = new Node(); download.tag = 'button'; download.title = '下载'; download.onclick = () => clicks++;
     const add = new Node(); add.tag = 'button'; add.title = '添加到歌单'; row.append(love, download, add);
-    const document = { body, activeElement: null, createElement: tag => { const node = new Node(); node.tag = tag; return node; }, createComment: () => { const node = new Node(); node.nodeType = 8; return node; }, querySelectorAll: () => [row], addEventListener() {} };
-    const window = { innerWidth: 390, innerHeight: 844, matchMedia: () => ({ matches: mobile, addEventListener() {} }), addEventListener() {} };
-    vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../client/music/views/mobile-shell/SongRowMenu.js'), 'utf8'), { document, window, MutationObserver: class { observe() {} }, queueMicrotask: fn => fn() });
-    return { row, love, download, add, api: window.MobileSongRowMenu, menu: body.children[1], clicks: () => clicks };
+    const events = {}, observers = [];
+    const document = { body, activeElement: null, createElement: tag => { const node = new Node(); node.tag = tag; return node; }, createComment: () => { const node = new Node(); node.nodeType = 8; return node; }, querySelector: () => row, getElementById: () => null, querySelectorAll: () => [row], addEventListener: (name, fn) => { events[name] = fn; }, removeEventListener() {} };
+    const window = { innerWidth: 390, innerHeight: 844, matchMedia: () => ({ matches: mobile, addEventListener() {}, removeEventListener() {} }), addEventListener() {}, removeEventListener() {} };
+    vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../client/music/views/mobile-shell/SongRowMenu.js'), 'utf8'), { document, window, MutationObserver: class { constructor() { this.connected = 0; observers.push(this); } observe() { this.connected++; } disconnect() { this.connected = 0; } }, queueMicrotask: fn => fn() });
+    return { row, love, download, add, api: window.MobileSongRowMenu, menu: body.children[1], clicks: () => clicks, click: target => events.click({ target, stopPropagation() {} }), observers };
 }
 
 test('手机菜单移动原按钮，执行原事件，关闭恢复原顺序与可访问状态', () => {
     const env = environment(), trigger = env.row.querySelector('.song-row-more');
     env.api.prepare(); assert.equal(env.row.children.length, 4);
-    trigger.events.click({ stopPropagation() {} });
+    env.click(trigger);
     assert.equal(env.menu.children[0], env.download); assert.equal(env.menu.children[1], env.add);
     assert.equal(trigger.attributes['aria-expanded'], 'true');
     assert.equal(env.menu.style.left, '200px'); assert.equal(env.menu.style.top, '736px');
@@ -46,7 +50,7 @@ test('手机菜单移动原按钮，执行原事件，关闭恢复原顺序与�
     assert.equal(env.menu.hidden, true); assert.equal(trigger.attributes['aria-expanded'], 'false');
     assert.deepEqual(env.row.children, [env.love, env.download, env.add, trigger]);
     assert.equal(env.download.children.length, 0); assert.equal(env.download.attributes.role, undefined);
-    trigger.events.click({ stopPropagation() {} }); trigger.events.click({ stopPropagation() {} });
+    env.click(trigger); env.click(trigger);
     assert.equal(env.menu.hidden, true);
 });
 
@@ -62,4 +66,5 @@ test('音乐库使用自己的更多菜单，不再追加第二层入口', () =>
 test('桌面不增加菜单按钮也不移动原操作', () => {
     const env = environment(false); env.api.prepare();
     assert.deepEqual(env.row.children, [env.love, env.download, env.add]);
+    assert.equal(env.observers[0].connected, 0);
 });

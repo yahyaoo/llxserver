@@ -5,12 +5,15 @@ import { handleAccount } from '../../music/service/AccountService'
 import { UserSessionStore, USER_SESSION_COOKIE, ADMIN_SESSION_COOKIE, ADMIN_USERNAME } from '../auth/UserSessionStore'
 import { proxyRemoteRequest } from '../auth/RemoteSessionGateway'
 import { clientFileExists, clientMetadata, externalClient } from './ClientAssets'
+import { deliverStatic } from './StaticDelivery'
 import { DatabaseLocationService } from '../persistence/DatabaseLocationService'
 import { reloadActiveUserSpaces } from '../../user'
 import type { UserToken } from '../../common/model/dto/UserTokenDto'
 import { GlobalConfigurationService } from '../../admin/service/GlobalConfigurationService'
 import defaultConfig from '../../defaultConfig'
 import { BrowserStorageService } from '../../music/service/configuration/BrowserStorageService'
+import { handleLibraryAdmin, startLibraryBackground, stopLibraryBackground, refreshLibraryBackground } from '../../music/service/library/LibraryBackgroundService'
+import { installLibraryReadGuard } from '../../music/service/library/LibraryFileGuard'
 import { BrowserStorageRepository } from '../../music/repository/BrowserStorageRepository'
 /** 服务装配与 HTTP 路由：初始化依赖、同步 WebSocket、播放器鉴权和媒体响应。 @author yahyaoo */
 import * as adminOperationsController from '../../admin/controller/OperationsController'
@@ -30,6 +33,7 @@ import * as musicLibraryController from '../../music/controller/LibraryControlle
 import * as musicDownloadController from '../../music/controller/DownloadController'
 import * as musicSettingsController from '../../music/controller/SettingsController'
 import { handleExperience } from '../../music/controller/ExperienceController'
+import { startNotificationPersistence } from '../../music/service/NotificationService'
 import * as musicDiscoveryController from '../../music/controller/DiscoveryController'
 import * as adminSourceController from '../../admin/controller/SourceController'
 import * as adminConfigurationController from '../../admin/controller/ConfigurationController'
@@ -672,6 +676,7 @@ const reloadServerData = async () => {
   }
 
   await reloadActiveUserSpaces()
+  refreshLibraryBackground()
 
   return true
 }
@@ -976,49 +981,7 @@ const serveStatic = (req: IncomingMessage, res: http.ServerResponse, filePath: s
     return
   }
 
-  try {
-    const stats = storageFs.statSync(filePath)
-    const mtime = stats.mtime.getTime()
-    const etag = `W/"${stats.size}-${mtime}"`
-    const lastModified = stats.mtime.toUTCString()
-
-    // Check Cache Validity (Conditional Requests)
-    if (req.headers['if-none-match'] === etag || req.headers['if-modified-since'] === lastModified) {
-      res.writeHead(304)
-      res.end()
-      return
-    }
-
-    storageFs.readFile(filePath, (err, content) => {
-      if (err) {
-        if (err.code === 'ENOENT') {
-          res.writeHead(404)
-          res.end('Not Found')
-        } else {
-          res.writeHead(500)
-          res.end('Server Error')
-        }
-      } else {
-        res.writeHead(200, {
-          'Content-Type': contentType,
-          'ETag': etag,
-          'Last-Modified': lastModified,
-          'Cache-Control': 'no-cache, must-revalidate', // Force browser to revalidate every time
-          'Pragma': 'no-cache',
-          'Expires': '0',
-        })
-        res.end(content, 'utf-8')
-      }
-    })
-  } catch (err: any) {
-    if (err.code === 'ENOENT') {
-      res.writeHead(404)
-      res.end('Not Found')
-    } else {
-      res.writeHead(500)
-      res.end('Server Error')
-    }
-  }
+  void deliverStatic(req, res, filePath, contentType)
 }
 
 /** 应用能力装配，状态通过 getter 保留热更新，避免两个域直接依赖。 @author yahyaoo */
@@ -1081,6 +1044,7 @@ export function createServerRuntime() {
     get playerSessions() { return playerSessions },
     get readBody() { return readBody },
     get reloadServerData() { return reloadServerData },
+    get refreshLibraryBackground() { return refreshLibraryBackground },
     get remasterQueue() { return remasterQueue },
     get removeUpdatedListId() { return removeUpdatedListId },
     get renameUserSpace() { return renameUserSpace },
@@ -1167,6 +1131,8 @@ const handleStartServer = async (port = 9527, ip = '0.0.0.0') => await new Promi
       res.end(JSON.stringify({ success: false, message: '请登录后访问系统' }))
       return
     }
+
+    if (await handleLibraryAdmin(req, res, urlObj)) return
 
     if (pathname === '/api/user/client-bootstrap' && req.method === 'GET') {
       res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' })
@@ -1556,6 +1522,14 @@ enabled?: boolean } = {}
 
       // [新增] Get User List (User Auth)
       // [新增] Get User List (User Auth)
+      if (pathname === '/api/user/list/meta' && req.method === 'GET') {
+        await musicPlaylistController.getUserListMeta({ req, res, pathname, urlObj, ip }, serverRuntime)
+        return
+      }
+      if (pathname === '/api/user/list/songs' && req.method === 'GET') {
+        await musicPlaylistController.getUserListSongs({ req, res, pathname, urlObj, ip }, serverRuntime)
+        return
+      }
       if (pathname === '/api/user/list' && req.method === 'GET') {
         await musicPlaylistController.getUserList({ req, res, pathname, urlObj, ip }, serverRuntime)
         return
@@ -1683,7 +1657,7 @@ enabled?: boolean } = {}
       // ─────────────────────────────────────────────────────────────────────
 
 
-      if (['/api/user/appearance', '/api/user/appearance/background', '/api/user/recent', '/api/user/roaming/weights', '/api/music/library/search', '/api/music/library/avatar', '/api/music/artwork'].includes(pathname)) {
+      if (['/api/user/appearance', '/api/user/appearance/background', '/api/user/notifications', '/api/user/notifications/read', '/api/user/recent', '/api/user/roaming/weights', '/api/music/library/search', '/api/music/library/avatar', '/api/music/artwork'].includes(pathname)) {
         await handleExperience({ req, res, pathname, urlObj, ip }, serverRuntime)
         return
       }
@@ -1947,8 +1921,14 @@ enabled?: boolean } = {}
       if (pathname === '/api/music/library/scan' && (req.method === 'GET' || req.method === 'POST')) {
         const username = req.headers['x-user-name'] === '_open' ? adminAuthenticated ? '_open' : null : verifyUserAuth(req) || (adminAuthenticated ? '_open' : null)
         if (!username) { res.writeHead(401); res.end('Unauthorized'); return }
-        const scan = req.method === 'POST' ? customMusicManager.ensureMusicScan(username, true) : customMusicManager.getScanStatus(username)
+        const mode = urlObj.searchParams.get('mode') || 'full'
+        if (req.method === 'POST' && !['quick', 'full'].includes(mode)) { res.writeHead(400); res.end('Invalid scan mode'); return }
+        const scan = req.method === 'POST' ? customMusicManager.ensureMusicScan(username, true, mode as 'quick' | 'full') : customMusicManager.getScanStatus(username)
         res.writeHead(req.method === 'POST' ? 202 : 200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify({ success: true, scan })); return
+      }
+      if (pathname === '/api/music/cache/page' && req.method === 'GET') {
+        await musicPlaylistController.getMusicCachePage({ req, res, pathname, urlObj, ip }, serverRuntime)
+        return
       }
       if (pathname === '/api/music/cache/list' && req.method === 'GET') {
         await musicPlaylistController.getMusicCacheList({ req, res, pathname, urlObj, ip }, serverRuntime)
@@ -1969,6 +1949,10 @@ enabled?: boolean } = {}
 
       // ===== [新增] Custom Music APIs (独立于 cache/music) =====
       // A. 获取自定义目录歌曲列表
+      if (pathname === '/api/music/custom/page' && req.method === 'GET') {
+        await musicPlaylistController.getMusicCustomPage({ req, res, pathname, urlObj, ip }, serverRuntime)
+        return
+      }
       if (pathname === '/api/music/custom/list' && req.method === 'GET') {
         await musicPlaylistController.getMusicCustomList({ req, res, pathname, urlObj, ip }, serverRuntime)
         return
@@ -2551,6 +2535,9 @@ enabled?: boolean } = {}
   const httpServer = http.createServer(requestHandler)
   const clientChannel = new ClientChannel(requestHandler, verifyUserAuth, req => userSessions.get((req.headers['x-user-token'] as string) || parseCookies(req.headers.cookie)[USER_SESSION_COOKIE]), username => path.join(global.lx.userPath, getUserDirname(username)))
   httpServer.on('close', () => clientChannel.close())
+  httpServer.on('close', startNotificationPersistence())
+  installLibraryReadGuard(httpServer)
+  httpServer.on('close', () => { void stopLibraryBackground().catch(error => console.error('[音乐库] 停止失败', error)) })
 
   wss = new WebSocketServer({
     noServer: true,
@@ -2996,6 +2983,7 @@ export const startServer = async (port: number, ip: string) => {
     // console.log('sync server started')
     status.status = true
     status.message = ''
+    startLibraryBackground()
     scheduler.startScheduler()
     status.address = ip == '0.0.0.0' ? getAddress() : [ip]
 

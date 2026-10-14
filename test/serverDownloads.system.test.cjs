@@ -248,7 +248,8 @@ test('完整接口：配置持久化、队列下载、本地播放、缓存绝�
     assert.equal((await (await fetch(origin + '/api/config', { headers: admin })).json())['update.hasToken'], false)
     const restoredAlice = (await (await fetch(origin + '/api/users', { headers: admin })).json()).find(u => u.name === 'alice')
     assert.equal(restoredAlice.customMusicDir, aliceDirectory)
-    await context.fetchDownloadWithAuth('/api/music/custom/list')
+    // B组04：只读列表不触发扫描；目录变化需由后台调度或显式手动扫描处理。
+    await context.fetchDownloadWithAuth('/api/music/custom/sync', { method: 'POST' })
     for (let attempt = 0; attempt < 100; attempt++) {
       const progress = await (await context.fetchDownloadWithAuth('/api/music/library/scan')).json()
       if (progress.scan.status !== 'running') break

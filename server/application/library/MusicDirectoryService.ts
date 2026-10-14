@@ -4,13 +4,20 @@ import crypto from 'node:crypto'
 import { repositories } from '../persistence/storage'
 import storageFs from '../persistence/documentFileSystem'
 
-export interface MusicDirectory { id: string; path: string; scanMinutes: number }
+export interface MusicDirectory { id: string; path: string; scanMinutes: number; watch?: boolean }
 
 /** 账号重命名时迁移音乐库索引，保留已有平台关联。 */
 export function renameMusicDirectoryIndex(previous: string, next: string): void {
   const index = (name: string) => path.join(global.lx.dataPath, 'library', crypto.createHash('sha256').update(name).digest('hex'), 'custom_index.json')
   const source = index(previous), target = index(next)
   if (storageFs.existsSync(source)) storageFs.renameSync(source, target)
+  const previousRoot = path.dirname(source), nextRoot = path.dirname(target)
+  for (const name of ['scan_state.json', 'prefetch_state.json', 'auto_fix_state.json']) {
+    const oldState = path.join(previousRoot, name)
+    if (storageFs.existsSync(oldState)) storageFs.renameSync(oldState, path.join(nextRoot, name))
+  }
+  const previousMedia = path.join(previousRoot, 'media')
+  if (fs.existsSync(previousMedia)) { fs.mkdirSync(nextRoot, { recursive: true }); fs.renameSync(previousMedia, path.join(nextRoot, 'media')) }
 }
 
 /** 读取子表并一次性迁移旧单目录配置，目录清空后不会重新导入。 */
@@ -58,11 +65,12 @@ export async function validateDirectories(username: string, values: unknown): Pr
   const result: MusicDirectory[] = []
   for (const value of values) {
     const directory = await checkDirectory(value?.path)
-    const scanMinutes = value.scanMinutes ?? 30
+    const scanMinutes = value.scanMinutes ?? previous.find(item => item.path === directory)?.scanMinutes ?? global.lx.config['library.scan.defaultMinutes'] ?? 60
     if (!Number.isInteger(scanMinutes) || scanMinutes < 1 || scanMinutes > 1440) throw new Error('扫描频率必须为 1～1440 分钟')
     if (result.some(item => item.path === directory)) throw new Error('不能重复配置相同的音乐目录')
     const id = previous.find(item => item.path === directory)?.id || crypto.createHash('sha256').update(directory).digest('hex').slice(0, 16)
-    result.push({ id, path: directory, scanMinutes })
+    if (value.watch != null && typeof value.watch !== 'boolean') throw new Error('目录监听必须为布尔值或空值')
+    result.push({ id, path: directory, scanMinutes, ...(value.watch == null ? {} : { watch: value.watch }) })
   }
   return result
 }

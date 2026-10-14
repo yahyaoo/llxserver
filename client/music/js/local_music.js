@@ -8,6 +8,10 @@ window.LocalMusicManager = {
     displayData: [],
     currentPage: 1,
     pageSize: 60,
+    serverPaged: false,
+    serverTotal: 0,
+    pageRequest: null,
+    _fromServer: false,
     batchMode: false,
     selectedItems: new Set(),
     searchKeyword: '',
@@ -906,8 +910,16 @@ window.LocalMusicManager = {
         clearTimeout(this.scanPollTimer);
         const progress = document.getElementById('library-scan-progress');
         const running = scan?.status === 'running';
+        const errors = Array.isArray(scan?.errors) ? scan.errors : [];
+        const errorDetails = errors.map(error => {
+            const file = error?.file || error?.directory || '未知文件';
+            return file + (error?.message ? '：' + error.message : '');
+        });
         window.MusicMaintenance?.setScan(scan);
-        if (progress) progress.textContent = running ? '扫描中 ' + scan.percent + '%（' + scan.completed + '/' + scan.total + '）' : scan?.status === 'error' ? '扫描结束，部分目录读取失败，请检查权限' : scan?.status === 'completed' ? '扫描完成' : '';
+        if (progress) {
+            progress.textContent = running ? '扫描中 ' + scan.percent + '%（' + scan.completed + '/' + scan.total + '）' : scan?.status === 'error' ? '扫描完成，异常歌曲 ' + errors.length + ' 首' : scan?.status === 'completed' ? '扫描完成' : '';
+            progress.title = errorDetails.join('\n');
+        }
         if (running && !this.originalData.length) {
             const container = document.getElementById('lm-list-container');
             if (container) container.innerHTML = window.LoadingState.render('首次扫描音乐库 ' + Number(scan.percent || 0) + '%', 'page');
@@ -925,6 +937,7 @@ window.LocalMusicManager = {
 
         if (this.isFilterPanelOpen) {
             if (panel) panel.classList.remove('hidden');
+            document.getElementById('view-localmusic')?.scrollTo({ top: 0, behavior: 'smooth' });
             if (btn) btn.classList.remove('t-bg-main', 'shadow-inner');
         } else {
             if (panel) panel.classList.add('hidden');
@@ -1025,16 +1038,24 @@ window.LocalMusicManager = {
         }
 
         try {
-            const requestList = () => {
+            const searchInput = document.getElementById('lm-search-input');
+            if (searchInput) this.searchKeyword = this.getRichInputValue(searchInput).trim();
+            const sortBySelect = document.getElementById('lm-sort-by'); if (sortBySelect) this.sortBy = sortBySelect.value;
+            const sortOrderSelect = document.getElementById('lm-sort-order'); if (sortOrderSelect) this.sortOrder = sortOrderSelect.value;
+            const requestList = (paged = true) => {
                 const headers = window.getUserAuthHeaders ? window.getUserAuthHeaders() : {};
                 if (this.isViewingPublicSongs) {
                     headers['x-user-name'] = '_open';
                 }
-                const url = `/api/music/cache/list${this.isViewingPublicSongs ? '?user=_open' : ''}`;
-                return fetch(url, { headers, cache: 'no-store' });
+                const params = new URLSearchParams(); if (this.isViewingPublicSongs) params.set('user', '_open');
+                if (paged) { params.set('offset', String((this.currentPage - 1) * this.pageSize)); params.set('limit', String(this.pageSize)); if (this.searchKeyword) params.set('q', this.searchKeyword); params.set('sort', this.sortBy === 'mtime' ? 'time' : (['name', 'singer', 'album'].includes(this.sortBy) ? this.sortBy : 'time')); params.set('order', this.sortOrder === 'asc' ? 'asc' : 'desc') }
+                return fetch(`/api/music/cache/${paged ? 'page' : 'list'}${params.toString() ? '?' + params : ''}`, { headers, cache: 'no-store', signal: this.pageRequest?.signal });
             };
 
-            let res = await requestList();
+            if (this.pageRequest) this.pageRequest.abort();
+            this.pageRequest = new AbortController();
+            let res = await requestList(true);
+            if (res.status === 404) { this.serverPaged = false; res = await requestList(false); }
             if (res.status === 401 && typeof window.ensureUserAuthToken === 'function') {
                 const refreshed = await window.ensureUserAuthToken({ force: true });
                 if (refreshed) res = await requestList();
@@ -1046,7 +1067,12 @@ window.LocalMusicManager = {
             }
 
             const result = await res.json();
+            if (result.items && Array.isArray(result.items)) {
+                this.serverPaged = true; this.serverTotal = Number(result.total || 0); this.originalData = window.SongFiles?.setLibrary(result.items) || result.items;
+                this._fromServer = true; this.applyFilters(); this._fromServer = false; this.showScanProgress(result.scan); this.pruneRemasterSelection(); return;
+            }
             if (result.success) {
+                this.serverPaged = false; this.serverTotal = 0;
                 this.authExpired = false;
                 this.authExpiredNotified = false;
                 this.originalData = this.isViewingPublicSongs ? window.SongIdentity?.aggregate(result.data || []) || result.data || [] : window.SongFiles?.setLibrary(result.data || []) || result.data || [];
@@ -1095,8 +1121,11 @@ window.LocalMusicManager = {
     },
 
     applyFilters() {
+        if (this.serverPaged && !this._fromServer) {
+            this.currentPage = 1; clearTimeout(this.searchTimer); this.searchTimer = setTimeout(() => this.fetchData(true), 250); return;
+        }
         let current = this.originalData;
-        this.currentPage = 1;
+        if (!this.serverPaged || !this._fromServer) this.currentPage = 1;
 
         // 2. Read current filter values from input
         const searchInput = document.getElementById('lm-search-input');
@@ -1247,13 +1276,14 @@ window.LocalMusicManager = {
     },
 
     getTotalPages() {
-        return Math.max(1, Math.ceil((this.displayData.length || 0) / this.pageSize));
+        return Math.max(1, Math.ceil((this.serverPaged ? this.serverTotal : this.displayData.length || 0) / this.pageSize));
     },
 
     getPageSlice() {
         const totalPages = this.getTotalPages();
         if (this.currentPage > totalPages) this.currentPage = totalPages;
         if (this.currentPage < 1) this.currentPage = 1;
+        if (this.serverPaged) return { start: 0, end: this.displayData.length, list: this.displayData.slice(), totalPages };
         const start = (this.currentPage - 1) * this.pageSize;
         const end = Math.min(start + this.pageSize, this.displayData.length);
         return {
@@ -1273,6 +1303,7 @@ window.LocalMusicManager = {
         const nextPage = page === 'last' ? totalPages : Math.min(totalPages, Math.max(1, Number(page) || 1));
         if (nextPage === this.currentPage) return;
         this.currentPage = nextPage;
+        if (this.serverPaged) { void this.fetchData(true); return; }
         this.render();
         const container = window.getMusicScrollContainer?.('lm-list-container') || document.getElementById('lm-list-container');
         if (container) container.scrollTop = 0;
@@ -1343,14 +1374,14 @@ window.LocalMusicManager = {
         const page = this.getPageSlice();
         this.updatePagination();
 
-        let html = '';
+        const rows = [];
         page.list.forEach((item, pageIndex) => {
             const index = page.start + pageIndex;
             const safeName = this.escapeHtml(item.name || '未知歌曲');
             const safeSinger = this.escapeHtml(item.singer || '未知歌手');
             const safeAlbum = this.escapeHtml(item.album || '--');
             const displayedSource = item.downloadSource || item.source;
-            const safeSource = this.escapeHtml((displayedSource === 'unknown' || displayedSource === 'local') ? '未知' : (displayedSource || ''));
+            const safeSource = this.escapeHtml((displayedSource === 'local' || displayedSource === 'custom') ? '本地' : displayedSource === 'unknown' ? '未知' : (displayedSource || ''));
             const sourceTitle = item.downloadSource && item.downloadSource !== item.source
                 ? `下载来源：${item.downloadSource}；歌曲平台：${item.source || '未知'}`
                 : `歌曲平台：${item.source || '未知'}`;
@@ -1391,12 +1422,12 @@ window.LocalMusicManager = {
             const formatTime = (ts) => {
                 if (!ts) return '';
                 const d = new Date(ts);
-                return d.toLocaleDateString() + ' ' + d.toLocaleTimeString().slice(0, 5);
+                return d.toLocaleDateString();
             };
 
             const folderIcon = item.folder === 'custom' ? '<i class="fas fa-folder text-emerald-500 mr-1" title="音乐目录"></i>' : (item.folder === 'music' || item.folder === 'download') ? '<i class="fas fa-download text-blue-500 mr-1" title="下载目录"></i>' : '<i class="fas fa-hdd text-emerald-500 mr-1" title="缓存目录"></i>';
 
-            html += `
+            rows.push(`
             <div class="grid grid-cols-12 gap-2 md:gap-4 p-3 md:p-2 items-center rounded-xl hover:t-bg-item-hover transition-all t-border-main border-b last:border-b-0 group relative ${isSelected ? 't-bg-item-hover ring-1 ring-emerald-500/30' : ''}" data-lm-row-index="${index}">
                 <!-- # / Batch -->
                 <div class="col-span-1 text-center text-xs font-mono t-text-muted flex-shrink-0 flex items-center justify-center">
@@ -1443,7 +1474,6 @@ window.LocalMusicManager = {
                                 ${missingID3 ? '<span class="px-1.5 py-0.5 bg-red-50 text-red-500 border border-red-100 dark:bg-red-900/20 dark:text-red-400 dark:border-red-900/30 rounded text-[9px] font-medium leading-none shrink-0">缺标签</span>' : ''}
                                 ${missingCover ? '<span class="px-1.5 py-0.5 bg-orange-50 text-orange-500 border border-orange-100 dark:bg-orange-900/20 dark:text-orange-400 dark:border-orange-900/30 rounded text-[9px] font-medium leading-none shrink-0">缺封面</span>' : ''}
                                 ${missingLyric ? '<span class="px-1.5 py-0.5 bg-yellow-50 text-yellow-600 border border-yellow-100 dark:bg-yellow-900/20 dark:text-yellow-400 dark:border-yellow-900/30 rounded text-[9px] font-medium leading-none shrink-0">缺词</span>' : ''}
-                                ${(!missingID3 && !missingCover && !missingLyric) ? '<span class="px-1.5 py-0.5 bg-emerald-50 text-emerald-600 border border-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-900/30 rounded text-[9px] font-medium leading-none shrink-0">完整</span>' : ''}
                             </div>
 
                             <!-- Manual Link Button -->
@@ -1480,12 +1510,11 @@ window.LocalMusicManager = {
                         <span class="truncate font-medium" title="${safeSourceTitle}">${safeSource}</span>
                     </div>
                     ${item.subPath ? `<div class="text-[9px] text-emerald-500 font-mono truncate mb-1" title="${safeSubPath}"><i class="far fa-folder mr-1 opacity-70"></i>${safeSubPath}</div>` : ''}
-                    <div class="flex flex-wrap gap-1">
+                    <div class="flex flex-nowrap gap-1 overflow-x-auto no-scrollbar whitespace-nowrap">
                         ${missingID3 ? '<span class="px-1 py-0 bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400 rounded text-[9px] font-bold">缺标签</span>' : ''}
                         ${missingCover ? '<span class="px-1 py-0 bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400 rounded text-[9px] font-bold">缺封面</span>' : ''}
                         ${missingLyric ? '<span class="px-1 py-0 bg-yellow-100 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400 rounded text-[9px] font-bold">缺词</span>' : ''}
                         ${metadataUnsupported && !missingLyric ? `<span class="px-1 py-0 bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 rounded text-[9px] font-bold" title="${this.escapeAttr(item.embedLyricError || item.metadataError || '音频容器不支持写入标签')}">仅外置词</span>` : ''}
-                        ${(!missingID3 && !missingCover && !missingLyric) ? '<span class="px-1 py-0 bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400 rounded text-[9px] font-bold">完整</span>' : ''}
                     </div>
                     <div class="text-[9px] mt-1 opacity-70 scale-90 origin-left">${formatTime(item.mtime)}</div>
                 </div>
@@ -1502,18 +1531,34 @@ window.LocalMusicManager = {
                     <button data-library-more="${index}" type="button" title="更多"><i class="fas fa-ellipsis-h"></i></button>
                 </div>
             </div>
-            `;
+            `.trim());
         });
 
-        if (typeof window.unobserveLazyImages === 'function') {
-            window.unobserveLazyImages(container);
+        const previousRows = container._lmRows;
+        if (previousRows && rows.length && previousRows.length === rows.length && container.children.length === rows.length && container.firstElementChild?.hasAttribute('data-lm-row-index')) {
+            rows.forEach((row, rowIndex) => {
+                if (previousRows[rowIndex] === row) return;
+                const template = document.createElement('template');
+                template.innerHTML = row;
+                const nextRow = template.content.firstElementChild;
+                window.unobserveLazyImages?.(container.children[rowIndex]);
+                container.replaceChild(nextRow, container.children[rowIndex]);
+                nextRow.dataset.lmChanged = '1';
+            });
+        } else {
+            if (typeof window.unobserveLazyImages === 'function') {
+                window.unobserveLazyImages(container);
+            }
+            container.innerHTML = rows.join('');
+            container.querySelectorAll('[data-lm-row-index]').forEach(row => { row.dataset.lmChanged = '1'; });
         }
-        container.innerHTML = html;
+        container._lmRows = rows;
         window.SongFileStatus?.update(container, page.list);
-        container.querySelectorAll('.lm-cover-image').forEach(img => {
+        container.querySelectorAll('[data-lm-changed] .lm-cover-image').forEach(img => {
             const index = parseInt(img.dataset.lmCoverIndex || '', 10);
             window.LibraryArtwork.bind(img, { ...this.displayData[index], isCustomDir: this.isCustomDirMode });
         });
+        container.querySelectorAll('[data-lm-changed]').forEach(row => row.removeAttribute('data-lm-changed'));
         if (typeof window.lazyLoadImages === 'function') {
             window.lazyLoadImages(container);
         }

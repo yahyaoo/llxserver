@@ -12,8 +12,10 @@ test('下载浮层保留点击坐标，菜单隐藏和歌词自动滚动不会�
      const nodes = new Map();
      return { style: {}, offsetWidth: 320, offsetHeight: 280, elements: { target: select(), quality: select(), lyricMode: select() }, setAttribute() {}, addEventListener() {}, contains: target => target === nodes.get('select'), remove() { panels.splice(panels.indexOf(this), 1) }, querySelector(selector) { if (!nodes.has(selector)) nodes.set(selector, { addEventListener() {} }); return nodes.get(selector) } };
    } };
- const window = { addEventListener() {} };
- vm.runInNewContext(fs.readFileSync('client/music/views/downloads/DownloadOptions.js','utf8'), { window, document, URLSearchParams, innerWidth: 1440, innerHeight: 900 });
+ document.removeEventListener = name => { delete events[name]; };
+ const window = { addEventListener() {}, removeEventListener() {} };
+ const frames = new Map(); let frameId = 0;
+ vm.runInNewContext(fs.readFileSync('client/music/views/downloads/DownloadOptions.js','utf8'), { window, document, URLSearchParams, requestAnimationFrame: fn => { frames.set(++frameId, fn); return frameId; }, cancelAnimationFrame: id => frames.delete(id), innerWidth: 1440, innerHeight: 900 });
  // 使用同一个实际触发节点模拟更多菜单在点击后隐藏。
  const clicked = { ...trigger, getBoundingClientRect: () => ({ top: 380, bottom: 420, right: 1040 }) };
  document.activeElement = clicked;
@@ -23,7 +25,9 @@ test('下载浮层保留点击坐标，菜单隐藏和歌词自动滚动不会�
  assert.equal(panels.length, 1); assert.equal(panels[0].style.left, '1000px'); assert.equal(panels[0].style.top, '408px');
  assert.equal(panels[0].elements.quality.focusOptions.preventScroll, true);
  events.scroll({ target: {} }); assert.equal(panels.length, 1);
+ assert.equal(frames.size, 1); events.scroll({ target: {} }); assert.equal(frames.size, 1);
  events.keydown({ key:'Escape', preventDefault() {} }); assert.equal(await pending, null); assert.equal(panels.length, 0);
+ assert.equal(frames.size, 0); assert.equal(events.scroll, undefined);
 })
 function runtime(choice) {
  const tasks=[],downloads=[]

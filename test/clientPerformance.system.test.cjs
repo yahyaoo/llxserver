@@ -4,9 +4,13 @@ const assert = require('node:assert/strict');
 const vm = require('node:vm');
 const fs = require('node:fs');
 const path = require('node:path');
+const os = require('node:os');
 const Database = require('better-sqlite3');
 const http = require('node:http');
 require('tsx/cjs');
+// DiscoveryService 的兼容导入链包含旧用户数据模块；系统测试在启动真实服务前先提供隔离的最小全局运行时。
+const bootstrapRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'llxserver-client-performance-'));
+global.lx = { dataPath: bootstrapRoot, userPath: bootstrapRoot, config: { users: [] } };
 const { getMusicSongListDetail } = require('../server/music/service/DiscoveryService.ts');
 const { startAccountRuntime } = require('./helpers/accountRuntime.cjs');
 test('本地连续编辑不请求；周期合并写入，喜爱保持独立，播放状态不覆盖歌单或最近播放', { timeout: 40000 }, async () => {
@@ -27,7 +31,7 @@ test('本地连续编辑不请求；周期合并写入，喜爱保持独立，�
         writePending: async (channel, value, owner) => { if (value === null) disk.delete(owner + channel); else disk.set(owner + channel, structuredClone(value)); },
     } };
     vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../client/music/js/client_performance.js'), 'utf8'), {
-        window, console, structuredClone, AbortController, performance, setTimeout, clearTimeout, setInterval() {}, document: { addEventListener() {} },
+        window, console, Blob, structuredClone, AbortController, performance, setTimeout, clearTimeout, setInterval() {}, document: { addEventListener() {} },
     });
     const sync = window.ClientSync;
     for (const [channel, url, method] of [['lists', '/api/user/list', 'POST'], ['settings', '/api/user/settings', 'POST'], ['playback', '/api/music/storage/playback', 'PUT'], ['queue', '/api/music/storage/queue', 'PUT']]) {

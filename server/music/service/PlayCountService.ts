@@ -1,6 +1,18 @@
 import type { ExperienceRepository } from '../repository/ExperienceRepository'
-import { recordRoamingPlay } from './RoamingService'
+import { getRoamingWeights, recordRoamingPlay } from './RoamingService'
 import { songIdentity } from './library/SongIdentity'
+
+/** 03 确认契约：最近 30 天最多 10000 个 playbackId，独立于历史裁剪与最后一次会话。 */
+export function confirmedPlaybackIds(repository: ExperienceRepository): string[] {
+  const ledger = repository.read<Record<string, number>>('client_recent_setting', 'playback-acknowledgements.json', {})
+  return Object.keys(ledger)
+}
+
+/** counts 在 getRoamingWeights 的第一次 await 前读取；确认集合必须先捕获，不能包含等待 extras 期间新计入的播放。 */
+export async function getConfirmedRoamingWeights(username: string, repository: ExperienceRepository) {
+  const confirmed = confirmedPlaybackIds(repository)
+  return { ...await getRoamingWeights(username, repository), confirmedPlaybackIds: confirmed }
+}
 
 /** 公共播放次数校验与持久化服务。 @author yahyaoo @date 2026-10-11 */
 export class PlayCountService {
@@ -35,6 +47,8 @@ export class PlayCountService {
     if (!PlayCountService.qualified(song)) throw new Error('仅统计成功播放且有效时长超过 10 秒的记录')
     return this.repository.transaction(() => {
       const items = this.get()
+      const ledger = this.repository.read<Record<string, number>>('client_recent_setting', 'playback-acknowledgements.json', {})
+      if (Object.prototype.hasOwnProperty.call(ledger, song.playbackId)) return items
       const previous = items.find(item => songIdentity().key(item) === songIdentity().key(song))
       if (previous?.lastPlaybackId === song.playbackId) return items
       if (!recordRoamingPlay(song, this.repository)) return items
@@ -70,6 +84,9 @@ export class PlayCountService {
         .sort((a, b) => (b.playedAt || 0) - (a.playedAt || 0))
       const saved = [clean, ...recent].slice(0, limit)
       this.repository.write('client_recent_play', 'recent-play.json', saved)
+      const updated: Record<string, number> = { ...ledger, [String(song.playbackId)]: Date.now() }
+      const retained = Object.entries(updated).filter(([, at]) => at >= Date.now() - 30 * 86400000).sort((a, b) => b[1] - a[1]).slice(0, 10000)
+      this.repository.write('client_recent_setting', 'playback-acknowledgements.json', Object.fromEntries(retained))
       return PlayCountService.sort(saved)
     })
   }

@@ -1,6 +1,9 @@
 import { readMusicMetadata } from './MusicMetadataWorker'
 import { Worker } from 'node:worker_threads'
 import { musicScanWorker } from './MusicScanWorker'
+import { ScanStateStore } from './ScanStateStore'
+import { pageItems, type PageQuery } from './PagedListService'
+import { serverEvents, type ScanReason } from '../../../application/events/ServerEvents'
 import { getMusicDirectories, resolveMusicFile } from '../../../application/library/MusicDirectoryService'
 /** 用户自定义音乐目录服务：扫描音频、索引元信息、播放、关联与文件维护。 @author yahyaoo */
 import storageFs from '../../../application/persistence/documentFileSystem'
@@ -60,6 +63,9 @@ export interface CustomCacheItem {
     hasLyric?: boolean
     /** 是否已将歌词内嵌到音频。 */
     hasEmbedLyric?: boolean
+    directoryId?: string
+    coverVersion?: string
+    lyricVersion?: string
     /** 音频码率。 */
     bitrate?: number
     /** 音频采样率。 */
@@ -109,6 +115,11 @@ const detectImageMime = (data: Buffer | Uint8Array) => {
 class CustomIndexManager {
     /** 按用户和存储位置分组的内存索引。 */
     private indexes: Map<string, Map<string, CustomCacheItem>> = new Map() // username -> (compositeKey -> CustomCacheItem)
+    private saved = new Map<string, string>()
+    private saveTimers = new Map<string, NodeJS.Timeout>()
+    private revisions = new Map<string, number>()
+    private epoch = crypto.randomUUID()
+    version(username: string) { return `${this.epoch}:${username}:${this.revisions.get(username) || 0}` }
 
     /**
  * 计算自定义歌曲目录对应的用户 SQL 索引文档路径。
@@ -149,6 +160,7 @@ class CustomIndexManager {
         }
         try {
             const data = JSON.parse(storageFs.readFileSync(file, 'utf-8'))
+            this.saved.set(username, JSON.stringify(data, null, 2))
             const map = new Map<string, CustomCacheItem>(Object.entries(data))
             this.indexes.set(username, map)
             return map
@@ -165,16 +177,36 @@ class CustomIndexManager {
  * @author yahyaoo
  */
     save(username: string) {
+        const timer = this.saveTimers.get(username)
+        if (timer) { clearTimeout(timer); this.saveTimers.delete(username) }
         const file = this.getIndexFilePath(username)
         const index = this.indexes.get(username)
         if (!file || !index) return
         try {
             const obj = Object.fromEntries(index)
-            storageFs.writeFileSync(file, JSON.stringify(obj, null, 2), 'utf-8')
+            const text = JSON.stringify(obj, null, 2)
+            if (this.saved.get(username) === text) return
+            // The existing SQLite document adapter is a single atomic commit, not competing file snapshots.
+            storageFs.writeFileSync(file, text, 'utf-8')
+            this.saved.set(username, text)
+            this.revisions.set(username, (this.revisions.get(username) || 0) + 1)
         } catch (e) {
-            console.error(`[自定义音乐] 为用户 ${username} 保存自定义索引失败:`, e)
+            throw e
         }
     }
+
+    /** Merge into the latest in-memory entry; a scan must never overwrite a stale media snapshot. */
+    merge(username: string, filename: string, patch: Partial<CustomCacheItem>, expected?: string) {
+        const item = this.load(username).get(filename)
+        if (!item || (expected && expected !== item.size + ':' + item.mtime)) return false
+        this.set(username, filename, { ...item, ...patch })
+        if (!this.saveTimers.has(username)) {
+            const timer = setTimeout(() => { this.saveTimers.delete(username); try { this.save(username) } catch (error) { console.error('[音乐索引] 保存失败', error) } }, 2000)
+            timer.unref(); this.saveTimers.set(username, timer)
+        }
+        return true
+    }
+    flush() { for (const username of [...this.saveTimers.keys()]) this.save(username) }
 
     /**
  * 返回用户自定义歌曲索引中的全部歌曲记录。
@@ -196,6 +228,7 @@ class CustomIndexManager {
     set(username: string, key: string, item: CustomCacheItem) {
         const index = this.indexes.get(username) || this.load(username)
         index.set(key, item)
+        this.revisions.set(username, (this.revisions.get(username) || 0) + 1)
     }
 
     /**
@@ -221,7 +254,7 @@ class CustomIndexManager {
 export const customIndexManager = new CustomIndexManager()
 
 /** 异步读取目录中的旧索引，保留已有平台关联信息。 */
-const buildLinkedInfoMap = async (rootDir: string): Promise<Map<string, any>> => {
+const buildLinkedInfoMap = async (rootDir: string, onlyFolders?: string[]): Promise<Map<string, any>> => {
     const map = new Map<string, any>()
 
     const scanDir = async (dir: string) => {
@@ -253,6 +286,7 @@ const buildLinkedInfoMap = async (rootDir: string): Promise<Map<string, any>> =>
             }
         }
 
+        if (onlyFolders) return
         // 递归处理子目录
         try {
             const entries = await storageFs.promises.readdir(dir, { withFileTypes: true })
@@ -264,7 +298,8 @@ const buildLinkedInfoMap = async (rootDir: string): Promise<Map<string, any>> =>
         } catch (e) { /* 无权限或不可读时跳过 */ }
     }
 
-    await scanDir(rootDir)
+    if (onlyFolders) { for (const relative of new Set(['', ...onlyFolders])) await scanDir(path.join(rootDir, relative)) }
+    else await scanDir(rootDir)
     return map
 }
 
@@ -277,37 +312,48 @@ const buildLinkedInfoMap = async (rootDir: string): Promise<Map<string, any>> =>
  */
 export interface ScanStatus { status: 'idle' | 'running' | 'completed' | 'error'; completed: number; total: number; percent: number; startedAt?: number; finishedAt?: number; errors: any[] }
 const scans = new Map<string, { state: ScanStatus; pending?: Promise<CustomCacheItem[]>; signature?: string }>()
-const directoryScannedAt = new Map<string, number>()
-let scanThreads = 0
-const waitingScans: Array<() => void> = []
+let scanSerial: Promise<unknown> = Promise.resolve()
+const scanStores = new Map<string, ScanStateStore>()
+export const getScanStateStore = (username: string) => {
+    let store = scanStores.get(username)
+    if (!store) { store = new ScanStateStore(username); scanStores.set(username, store) }
+    return store
+}
+export interface ScanOptions { mode?: 'quick' | 'full' | 'paths'; directoryIds?: string[]; paths?: Record<string, string[]>; reason?: ScanReason }
 const emptyScan = (): ScanStatus => ({ status: 'idle', completed: 0, total: 0, percent: 0, errors: [] })
 
 /** 查询后台扫描进度，客户端轮询不会启动新扫描。 */
 export const getScanStatus = (username: string): ScanStatus => scans.get(username)?.state || emptyScan()
 
 /** 合并重复扫描；标签解析由独立工作线程执行，完成后原子替换索引。 */
-export const syncCustomIndex = (username: string, strict = false, force = true): Promise<CustomCacheItem[]> => {
+export const syncCustomIndex = (username: string, strict = false, force = true, options: ScanOptions = {}): Promise<CustomCacheItem[]> => {
     const directories = getMusicDirectories(username)
     const current = scans.get(username)
-    if (current?.pending) return current.pending
+    if (current?.pending && !options.paths && (options.reason || 'manual') === 'manual') return current.pending
+    // Keep independent dirty paths queued while another scan is running; quick never absorbs them.
     const entry: { state: ScanStatus; pending?: Promise<CustomCacheItem[]>; signature?: string } = { state: { ...emptyScan(), status: 'running', startedAt: Date.now() }, signature: JSON.stringify(directories) }
     scans.set(username, entry)
-    entry.pending = (async () => {
-        if (scanThreads >= 2) await new Promise<void>(resolve => waitingScans.push(resolve)); else scanThreads++
-        const selected = force || current?.signature !== entry.signature ? directories : directories.filter(directory => Date.now() - (directoryScannedAt.get(username + ':' + directory.id) || 0) >= directory.scanMinutes * 60000)
-        const cacheScan = fileCache.syncCacheIndex(username)
+    const operation = async () => {
+        if (options.reason && options.reason !== 'manual' && global.lx.config['library.scan.enabled'] === false) { Object.assign(entry.state, { status: 'idle', finishedAt: Date.now() }); return customIndexManager.getAll(username) }
+        const selected = options.directoryIds ? directories.filter(directory => options.directoryIds!.includes(directory.id)) : directories
+        const store = getScanStateStore(username)
+        const requestedMode = options.mode || 'full'
+        const mode = global.lx.config['library.scan.legacy'] === true || selected.some(directory => !Object.keys(store.get(directory.id, directory.path).folders).length) ? 'full' : requestedMode
+        const reason = options.reason || 'manual'
+        serverEvents.emitEvent('library:scan-started', { username, directoryIds: selected.map(directory => directory.id), reason, startedAt: entry.state.startedAt! })
+        const cacheScan = mode === 'full' || reason === 'manual' ? fileCache.syncCacheIndex(username) : Promise.resolve()
         // 立刻安装失败处理，缓存扫描异常会在索引合并时一并呈现。
         let cacheError: any
         const cacheDone = cacheScan.catch(error => { cacheError = error })
         const beforeScan = new Map(customIndexManager.getAll(username).map(item => [item.filename, JSON.stringify(item)]))
         const prior = new Map<string, CustomCacheItem>()
-        for (const directory of selected) for (const [relative, item] of await buildLinkedInfoMap(directory.path)) {
+        for (const directory of selected) for (const [relative, item] of mode === 'full' ? await buildLinkedInfoMap(directory.path) : new Map<string, any>()) {
             const filename = "@" + directory.id + "/" + relative
             prior.set(filename, { ...item, filename, directoryId: directory.id })
         }
-        for (const item of customIndexManager.getAll(username)) if (directories.some(directory => directory.id === (item as any).directoryId)) prior.set(item.filename, item)
+        for (const item of customIndexManager.getAll(username)) if (selected.some(directory => directory.id === item.directoryId)) prior.set(item.filename, item)
         return new Promise<CustomCacheItem[]>((resolve, reject) => {
-        const worker = new Worker(musicScanWorker, { eval: true, workerData: { directories: selected, previous: Array.from(prior.values()), taggerModule: require.resolve('music-tag-native') } })
+        const worker = new Worker(musicScanWorker, { eval: true, workerData: { directories: selected, previous: Array.from(prior.values()), compact: true, taggerModule: require.resolve('music-tag-native'), mode, paths: options.paths, folders: Object.fromEntries(selected.map(directory => [directory.id, store.get(directory.id, directory.path).folders])), ioPauseMs: global.lx.config['library.scan.ioPauseMs'] || 0 } })
         let done = false
         worker.on('message', async message => {
             if (message.type === 'progress') Object.assign(entry.state, { completed: message.completed, total: message.total, percent: message.total ? Math.min(99, Math.floor(message.completed / message.total * 100)) : 0 })
@@ -315,43 +361,67 @@ export const syncCustomIndex = (username: string, strict = false, force = true):
                 done = true
                 await cacheDone
                 if (cacheError) message.errors.push({ message: cacheError.message })
-                for (const directory of selected) directoryScannedAt.set(username + ':' + directory.id, Date.now())
                 try {
                 // 配置变化时丢弃旧任务，避免旧目录索引再次发布。
-                if (entry.signature !== JSON.stringify(getMusicDirectories(username))) { entry.state.status = 'idle'; resolve(customIndexManager.getAll(username)); return }
+                if (entry.signature !== JSON.stringify(getMusicDirectories(username))) { reject(Error('扫描期间目录配置变化，丢弃旧结果')); return }
                 const index = customIndexManager.load(username)
-                const scanned = new Map<string, CustomCacheItem>(message.items.map((item: CustomCacheItem) => [item.filename, item]))
-                for (const [filename, item] of index) if (beforeScan.get(filename) !== JSON.stringify(item)) scanned.set(filename, item)
+                const scanned = new Map<string, CustomCacheItem>(Array.from(index.values()).filter(item => !selected.some(directory => directory.id === item.directoryId)).map(item => [item.filename, item]))
+                for (const filename of message.unchanged || []) if (prior.has(filename)) scanned.set(filename, prior.get(filename)!)
+                for (const item of message.items as CustomCacheItem[]) scanned.set(item.filename, item)
+                if (mode !== 'full') for (const directory of selected) {
+                    const added = (message.added || []).filter((filename: string) => filename.startsWith('@' + directory.id + '/'))
+                    const linked = await buildLinkedInfoMap(directory.path, added.map((filename: string) => path.posix.dirname(filename.split('/').slice(1).join('/'))))
+                    for (const filename of added) { const link = linked.get(filename.split('/').slice(1).join('/')); if (link) scanned.set(filename, { ...scanned.get(filename)!, ...link, filename, directoryId: directory.id }) }
+                }
+                for (const [filename, item] of index) if (beforeScan.get(filename) !== JSON.stringify(item)) {
+                    const original = beforeScan.has(filename) ? JSON.parse(beforeScan.get(filename)!) : {}
+                    const latest = scanned.get(filename)
+                    const updates = Object.fromEntries(Object.entries(item).filter(([key, value]) => JSON.stringify(value) !== JSON.stringify(original[key])))
+                    if (latest) scanned.set(filename, { ...latest, ...updates })
+                    else if (!beforeScan.has(filename)) scanned.set(filename, item)
+                }
                 for (const filename of beforeScan.keys()) if (!index.has(filename)) scanned.delete(filename)
                 message.items = Array.from(scanned.values())
                 index.clear()
                 for (const item of message.items) customIndexManager.set(username, item.filename, item)
                 customIndexManager.save(username)
+                const added = message.items.filter((item: CustomCacheItem) => !beforeScan.has(item.filename)).map((item: CustomCacheItem) => item.filename)
+                const changed = message.items.filter((item: CustomCacheItem) => beforeScan.has(item.filename) && beforeScan.get(item.filename) !== JSON.stringify(item)).map((item: CustomCacheItem) => item.filename)
+                const removed = [...beforeScan.keys()].filter(filename => !scanned.has(filename))
+                for (const directory of selected) {
+                    if (message.errors.length) continue // Incomplete scans never advance the correctness watermark.
+                    const previous = store.get(directory.id, directory.path)
+                    store.update(directory.id, { ...previous, folders: message.folders[directory.id], lastQuickScanAt: Date.now(), lastFullScanAt: mode === 'full' ? Date.now() : previous.lastFullScanAt })
+                }
                 // 手动和后台扫描都在完成前重建歌曲与文件的聚合子表。作者：yahyaoo
                 const { aggregateLibrary } = require('./LibraryAggregationService')
                 const { getLibraryItems } = require('../download/ServerDownloadService')
-                aggregateLibrary(username, [...await fileCache.getCacheList(username), ...message.items.map((item: any) => ({ ...item, folder: 'custom' })), ...getLibraryItems(username)])
+                if (added.length || changed.length || removed.length || mode === 'full') aggregateLibrary(username, [...await fileCache.getCacheList(username), ...message.items.map((item: any) => ({ ...item, folder: 'custom' })), ...getLibraryItems(username)])
                 Object.assign(entry.state, { status: message.errors.length ? 'error' : 'completed', completed: message.items.length, percent: 100, errors: message.errors, finishedAt: Date.now() })
                 if (strict && message.errors.length) reject(new Error(message.errors[0].message)); else resolve(message.items)
+                serverEvents.emitEvent('library:scan-finished', { username, directoryIds: selected.map(directory => directory.id), reason, added, changed, removed, total: message.items.length, durationMs: Date.now() - entry.state.startedAt!, ...(message.errors.length ? { error: message.errors.map((error: any) => error.message).join('; '), errors: message.errors } : {}) })
                 } catch (error) { reject(error) }
             }
         })
         worker.on('error', reject)
         worker.on('exit', code => { if (!done) reject(new Error('扫描线程退出：' + code)) })
         })
-    })().catch(error => { Object.assign(entry.state, { status: 'error', finishedAt: Date.now(), errors: [{ message: error.message }] }); throw error }).finally(() => { entry.pending = undefined; const next = waitingScans.shift(); if (next) next(); else scanThreads-- })
+    }
+    entry.pending = scanSerial.then(operation).catch(error => {
+        Object.assign(entry.state, { status: 'error', finishedAt: Date.now(), errors: [{ message: error.message }] })
+        serverEvents.emitEvent('library:scan-finished', { username, directoryIds: directories.map(directory => directory.id), reason: options.reason || 'manual', added: [], changed: [], removed: [], total: customIndexManager.getAll(username).length, durationMs: Date.now() - entry.state.startedAt!, error: error.message })
+        throw error
+    }).finally(() => { entry.pending = undefined })
+    scanSerial = entry.pending.catch(() => {})
     return entry.pending
 }
 
 /** 首次读取和周期到期仅安排后台任务，立即返回已有索引。 */
-export const ensureMusicScan = (username: string, force = false): ScanStatus => {
-    const directories = getMusicDirectories(username), entry = scans.get(username)
-    const due = directories.some(directory => Date.now() - (directoryScannedAt.get(username + ':' + directory.id) || 0) >= directory.scanMinutes * 60000)
-    if (!entry?.pending && (force || !entry || due || entry.signature !== JSON.stringify(directories) || Date.now() - (entry.state.finishedAt || 0) >= 30 * 60000)) void syncCustomIndex(username, false, force).catch(error => console.warn('[音乐扫描]', error.message))
+export const ensureMusicScan = (username: string, force = false, mode: 'quick' | 'full' = 'full'): ScanStatus => {
+    if (force) void syncCustomIndex(username, false, true, { mode, reason: 'manual' }).catch(error => console.warn('[音乐扫描]', error.message))
     return getScanStatus(username)
 }
-const scanTimer = setInterval(() => { for (const user of global.lx?.config?.users || []) ensureMusicScan(user.name) }, 60000)
-scanTimer.unref()
+export const waitForScans = async () => { await scanSerial; customIndexManager.flush() }
 
 // 获取自定义音乐列表（带 songInfo 转换）
 /**
@@ -359,11 +429,41 @@ scanTimer.unref()
  * @param username 已解析的用户名称。
  * @author yahyaoo
  */
+export const mapCustomMusicItem = (item: CustomCacheItem) => ({
+        ...item,
+        folder: 'custom',
+        songInfo: {
+            id: item.id, songmid: item.songmid || item.id, name: item.name, singer: item.singer,
+            source: item.source, quality: item.quality, albumName: item.album, albumId: item.albumId,
+            img: item.img, interval: item.interval, type: item.quality,
+            bitrate: item.bitrate, sampleRate: item.sampleRate, bitDepth: item.bitDepth,
+            types: { [item.quality]: {} }, isCustomFile: true, customFilename: item.filename
+        },
+        hasLyric: item.hasLyric || !!item.lyricFilename
+    })
+
+/** 只读原始索引，供分页与缓存库聚合使用，不触发扫描。 */
+export const getCustomRawItems = (username: string) => {
+    const allowed = new Set(getMusicDirectories(username).map(directory => directory.id))
+    return customIndexManager.getAll(username).filter(item => allowed.has(item.directoryId || ''))
+}
+
+/** 先分页后映射，媒体提示只使用既有状态。 */
+export const getCustomMusicPage = (username: string, query: PageQuery, directoryId?: string) => {
+    const directories = getMusicDirectories(username)
+    if (directoryId && !directories.some(directory => directory.id === directoryId)) throw Object.assign(new Error('无权访问该目录'), { statusCode: 403 })
+    const items = getCustomRawItems(username)
+    const version = `${customIndexManager.version(username)}:${directories.map(directory => directory.id).join(',')}`
+    const result = pageItems(items, query, { scope: username + ':custom', version, filterKey: directoryId, filter: item => !directoryId || item.directoryId === directoryId,
+        text: item => `${item.name} ${item.singer} ${item.album || ''}`, id: item => item.filename,
+        sort: { name: item => item.name || '', singer: item => item.singer || '', album: item => item.album || '', mtime: item => item.mtime || 0, interval: item => String(item.interval || '').split(':').reduce((sum, n) => sum * 60 + (Number(n) || 0), 0) } })
+    return { ...result, items: result.items.map(item => ({ ...mapCustomMusicItem(item), coverCached: hasCachedCover(username, item.filename) })), scan: getScanStatus(username) }
+}
+
 export const getCustomMusicList = async (username: string) => {
     const customDir = getCustomMusicDir(username)
     if (!customDir) return []
 
-    ensureMusicScan(username)
     const allowed = new Set(getMusicDirectories(username).map(directory => directory.id))
     const items = customIndexManager.getAll(username).filter(item => allowed.has((item as any).directoryId))
     return items.map(item => ({
@@ -395,35 +495,70 @@ export const getCustomMusicList = async (username: string) => {
  * @param username 已解析的用户名称。
  * @author yahyaoo
  */
-export const getCustomCover = async (filename: string, username: string) => {
+export interface MediaEnsureOptions { network?: boolean; background?: boolean; beforeNetwork?: () => Promise<void>; runNetwork?: (run: () => Promise<any>) => Promise<any> }
+const coverRequests = new Map<string, { promise: Promise<any>; foreground: boolean }>()
+const cachedCovers = new Map<string, { signature: string; version: string }>()
+export const invalidateCustomCoverHints = (username: string) => { for (const key of cachedCovers.keys()) if (key.startsWith(username + ':')) cachedCovers.delete(key) }
+export const hasCachedCover = (username: string, filename: string) => {
+    const item = customIndexManager.load(username).get(filename)
+    return !!item && cachedCovers.get(username + ':' + filename)?.signature === item.size + ':' + item.mtime + ':' + (item.img || '')
+}
+export const getCoverVersion = (username: string, filename: string) => hasCachedCover(username, filename) ? cachedCovers.get(username + ':' + filename)?.version : undefined
+export const ensureCustomCover = async (filename: string, username: string, options: MediaEnsureOptions = {}) => {
+    const item = customIndexManager.load(username).get(filename)
+    const signature = item ? item.size + ':' + item.mtime + ':' + (item.img || '') : ''
+    const key = username + ':' + filename + ':' + signature + ':' + (options.network !== false)
+    const existing = coverRequests.get(key)
+    if (existing) { if (!options.background) existing.foreground = true; return existing.promise }
+    const entry = { foreground: !options.background, promise: Promise.resolve<any>(null) }
+    entry.promise = extractCustomCover(filename, username, options, () => entry.foreground).finally(() => coverRequests.delete(key))
+    coverRequests.set(key, entry); return entry.promise
+}
+export const getCustomCover = (filename: string, username: string) => ensureCustomCover(filename, username)
+const extractCustomCover = async (filename: string, username: string, options: MediaEnsureOptions, foreground: () => boolean) => {
     const customDir = getCustomMusicDir(username)
     if (!customDir) return null
     const filePath = resolveMusicFile(username, filename)
     if (!filePath || !storageFs.existsSync(filePath)) return null
 
     const stats = storageFs.statSync(filePath), item = customIndexManager.load(username).get(filename)
-    // 只回写封面可用来源，标签缺失和内嵌歌词状态由原扫描逻辑判断。
-    const remember = (coverType: CustomCacheItem['coverType']) => {
-        if (!item) return
-        if (item.hasCover && item.coverType === coverType) return
-        item.hasCover = true; item.coverType = coverType
-        customIndexManager.save(username)
+    const signature = stats.size + ':' + stats.mtimeMs
+    const coverKey = 'custom/' + filename + (item?.img ? ':' + crypto.createHash('sha256').update(item.img).digest('hex') : '')
+    const valid = () => {
+        const latest = customIndexManager.load(username).get(filename)
+        const currentPath = resolveMusicFile(username, filename)
+        if (currentPath !== filePath) return false
+        const current = fs.statSync(filePath)
+        return current.size === stats.size && current.mtimeMs === stats.mtimeMs && latest?.img === item?.img
     }
-    const cached = fileCache.readCoverCache('custom/' + filename, username, stats)
-    if (cached) { remember(item?.coverType === 'embedded' ? 'embedded' : 'cached'); return cached }
+    // 只回写封面可用来源，标签缺失和内嵌歌词状态由原扫描逻辑判断。
+    const remember = (coverType: CustomCacheItem['coverType'], data: Buffer) => {
+        if (!item) return
+        const version = crypto.createHash('sha256').update(data).digest('hex')
+        cachedCovers.set(username + ':' + filename, { signature: signature + ':' + (item.img || ''), version })
+        if (item.hasCover && item.coverType === coverType && item.coverVersion === version) return
+        customIndexManager.merge(username, filename, { hasCover: true, coverType, coverVersion: version }, signature)
+    }
+    const cached = fileCache.readCoverCache(coverKey, username, stats)
+    if (cached) { remember(item?.coverType === 'embedded' ? 'embedded' : 'cached', cached.data); return cached }
+    cachedCovers.delete(username + ':' + filename)
 
-    const embedded = await readMusicMetadata(filePath, stats.size + ':' + stats.mtimeMs, 'cover')
+    const embedded = await readMusicMetadata(filePath, signature, 'cover', !!options.background)
+    if (!valid()) throw Error('BUSY: 封面读取时文件变化')
     if (embedded?.data?.length) {
         const data = Buffer.from(embedded.data), mime = detectImageMime(data)
         if (mime) {
-            fileCache.writeCoverCache('custom/' + filename, username, data, mime, stats)
-            remember('embedded')
+            fileCache.writeCoverCache(coverKey, username, data, mime, stats)
+            remember('embedded', data)
             return { data, mime }
         }
     }
-    if (item?.img && /^https?:\/\//.test(item.img)) {
-        const remote = await fileCache.downloadCoverImage(item.img)
-        if (remote && fileCache.writeCoverCache('custom/' + filename, username, remote.data, remote.mime, stats)) { remember('cached'); return remote }
+    if (options.network !== false && item?.img && /^https?:\/\//.test(item.img)) {
+        if (!foreground()) await options.beforeNetwork?.()
+        const remote = options.runNetwork && !foreground() ? await options.runNetwork(() => fileCache.downloadCoverImage(item.img!)) : await fileCache.downloadCoverImage(item.img)
+        if (!valid()) throw Error('BUSY: 封面下载时文件变化')
+        if (remote && fileCache.writeCoverCache(coverKey, username, remote.data, remote.mime, stats)) { remember('cached', remote.data); return remote }
+        if (!remote) throw Error('NETWORK: 封面下载失败')
     }
     return null
 }
@@ -1089,4 +1224,3 @@ export const replaceCustomMusicItem = async (
         } catch (e) { }
     }
 }
-

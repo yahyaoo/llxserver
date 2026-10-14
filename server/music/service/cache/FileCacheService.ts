@@ -1,4 +1,5 @@
 import { readMusicMetadata } from '../library/MusicMetadataWorker'
+import { serverEvents } from '../../../application/events/ServerEvents'
 /** 服务器缓存服务：用户目录、歌曲与封面索引、下载、歌词、元信息和容量清理。 @author yahyaoo */
 import storageFs from '../../../application/persistence/documentFileSystem'
 
@@ -852,7 +853,7 @@ const sanitize = (str: any) => String(str || '').replace(/[\\/:*?"<>|]/g, '_')
 export const syncCacheIndex = async (username?: string, roots: Array<'cache' | 'music'> = ['cache', 'music']) => {
     const normalizedUsername = (username && username !== '_open' && username !== 'default') ? username : '_open'
     void cleanupStaleTempFiles(normalizedUsername)
-    const extensions = ['.mp3', '.flac', '.m4a', '.ogg', '.wav']
+    const extensions = new Set(['.mp3', '.flac', '.m4a', '.ogg', '.wav', '.ape', '.aac', '.opus'])
 
     for (const folder of roots) {
         const index = indexManager.load(normalizedUsername, folder)
@@ -883,7 +884,7 @@ item: CacheItem }>()
                     if (entry.isDirectory()) {
                         const subFiles = await getAllFilesAsync(fullPath, base)
                         acc.push(...subFiles)
-                    } else {
+                    } else if (entry.isFile() && extensions.has(path.extname(entry.name).toLowerCase())) {
                         acc.push(path.relative(base, fullPath).replace(/\\/g, '/'))
                     }
                 }
@@ -897,7 +898,7 @@ item: CacheItem }>()
         for (const file of files) {
             if (file === 'cache_index.json' || file === 'music_index.json') continue
             const ext = path.extname(file).toLowerCase()
-            if (!extensions.includes(ext)) continue
+            if (!extensions.has(ext)) continue
 
             const filePath = path.join(dir, file)
             const stats = await storageFs.promises.stat(filePath)
@@ -2203,6 +2204,7 @@ export const downloadAndCache = async (songInfo: any, url: string, quality?: str
             console.log(`[文件缓存] 歌曲已存在于 ${targetFolder}，跳过下载: ${result.filename}`)
             // 通知前端轮询：目标目录文件已存在，视为立即完成
             cacheProgress.set(songKey, { progress: 100, status: 'exists' })
+            serverEvents.emitEvent('download:changed', { username: username || '_open', reason: 'state' })
             setTimeout(() => cacheProgress.delete(songKey), 30000)
             return Promise.resolve()
         }
@@ -2285,12 +2287,14 @@ export const downloadAndCache = async (songInfo: any, url: string, quality?: str
 
             console.log(`[文件缓存] 已复制缓存歌曲至下载目录: ${path.basename(finalPath)}`)
             cacheProgress.set(songKey, { progress: 100, status: 'finished', total: stat.size, received: stat.size })
+            serverEvents.emitEvent('download:changed', { username: username || '_open', reason: 'state' })
             setTimeout(() => cacheProgress.delete(songKey), 30000)
             return Promise.resolve()
         }
 
         console.log(`[文件缓存] 歌曲已存在于 ${result.folder}，跳过下载: ${result.filename}`)
         cacheProgress.set(songKey, { progress: 100, status: 'exists' })
+        serverEvents.emitEvent('download:changed', { username: username || '_open', reason: 'state' })
         setTimeout(() => cacheProgress.delete(songKey), 30000)
         return Promise.resolve()
     }
@@ -2311,6 +2315,7 @@ export const downloadAndCache = async (songInfo: any, url: string, quality?: str
     // 立即同步占坑标记下载中，关闭“拿到 200 响应前”的并发竞态窗口；
     // 后续到达的相同 songKey 请求会被上面的守卫跳过，不再重复下载。
     cacheProgress.set(songKey, { progress: 0, status: 'downloading', total: 0, received: 0, speed: 0, updatedAt: Date.now() })
+    serverEvents.emitEvent('download:changed', { username: username || '_open', reason: 'state' })
     console.log(`[文件缓存] 开始下载歌曲: ${baseName}`)
 
     return new Promise<void>((resolve, reject) => {
@@ -2340,6 +2345,7 @@ export const downloadAndCache = async (songInfo: any, url: string, quality?: str
             if (settled) return
             const message = err.message || 'Download failed'
             cacheProgress.set(songKey, { progress: 0, status: 'error', errorMsg: message })
+            serverEvents.emitEvent('download:changed', { username: username || '_open', reason: 'state' })
             settle(() => reject(err))
         }
 
@@ -2354,6 +2360,7 @@ export const downloadAndCache = async (songInfo: any, url: string, quality?: str
             if (req) req.destroy()
             safeUnlink(fileStream, tempPath)
             cacheProgress.delete(songKey)
+            serverEvents.emitEvent('download:changed', { username: username || '_open', reason: 'state' })
             settle(() => reject(new Error('Aborted')))
         }
 
@@ -2396,6 +2403,7 @@ export const downloadAndCache = async (songInfo: any, url: string, quality?: str
 
 
             cacheProgress.set(songKey, { progress: 0, status: 'downloading', total: 0, received: 0, speed: 0, updatedAt: Date.now() })
+            serverEvents.emitEvent('download:changed', { username: username || '_open', reason: 'state' })
             const total = parseInt(res.headers['content-length'] || '0', 10)
             let received = 0
             let lastSpeedAt = Date.now()
@@ -2420,6 +2428,7 @@ export const downloadAndCache = async (songInfo: any, url: string, quality?: str
                 }
                 const progress = total > 0 ? Math.round((received / total) * 100) : 0
                 cacheProgress.set(songKey, { progress, status: 'downloading', total, received, speed: currentSpeed, updatedAt: now })
+                serverEvents.emitEvent('download:changed', { username: username || '_open', reason: 'progress' })
             })
 
             res.pipe(fileStream)
@@ -2437,6 +2446,7 @@ export const downloadAndCache = async (songInfo: any, url: string, quality?: str
                     return
                 }
                 cacheProgress.set(songKey, { progress: 100, status: 'tagging', total, received, speed: 0, updatedAt: Date.now() })
+                serverEvents.emitEvent('download:changed', { username: username || '_open', reason: 'state' })
 
                 let ext = headerExt
                 if (storageFs.existsSync(tempPath)) {
@@ -2550,6 +2560,7 @@ export const downloadAndCache = async (songInfo: any, url: string, quality?: str
                     await ensureCachedLyrics(songInfo, actualQuality, username, isOnlyDownload, finalPath, folderType, shouldCacheLyric, shouldEmbedLyric)
 
                     cacheProgress.set(songKey, { progress: 100, status: 'finished', total: total || received, received, speed: 0, updatedAt: Date.now() })
+                    serverEvents.emitEvent('download:changed', { username: username || '_open', reason: 'state' })
                     setTimeout(() => cacheProgress.delete(songKey), 30000)
                     settle(() => { resolve(); void checkAndCleanupCache(username) })
                 })

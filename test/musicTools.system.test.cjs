@@ -13,7 +13,7 @@ test('维护接口：权限、重复任务、切页进度、歌词、单首删�
   try{
     const user={'x-user-token':(await(await post('/api/user/login',{username:'alice',password:'alice123'},{})).json()).token};
     const bob={'x-user-token':(await(await post('/api/user/login',{username:'bob',password:'bob12345'},{})).json()).token};
-    assert.equal((await post('/api/config',{'user.customMusicDirectories':[{name:'alice',enableCustomMusicDir:true,directories:[{path:directory,scanMinutes:30}]}]},runtime.admin)).status,200);
+    assert.equal((await post('/api/config',{'user.customMusicDirectories':[{name:'alice',enableCustomMusicDir:true,directories:[{path:directory,scanMinutes:30}]}],'library.prefetch.enabled':false},runtime.admin)).status,200);
     await post('/api/music/library/scan',{},user);await wait(runtime,user,'/api/music/library/scan',data=>data.scan);
     const library=(await(await fetch(runtime.origin+'/api/music/cache/list',{headers:user})).json()).data.filter(item=>item.folder==='custom');assert.equal(library.length,30);
     assert.equal((await post('/api/music/maintenance',{action:'lyrics',scope:'all'},{})).status,401);

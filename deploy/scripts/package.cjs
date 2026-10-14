@@ -23,8 +23,10 @@ async function packageApplication(mode) {
     fs.writeFileSync(path.join(directory, 'package-lock.json'), JSON.stringify(lock, null, 2));
   }
   if (mode !== 'server') { copy('dist/client', 'client'); copy('deploy/client/gateway.cjs'); }
+  if (mode === 'client') copy('server/application/http/StaticDelivery.js');
   // 歌曲归属规则是后端运行依赖；独立服务端也须携带本次构建的共享实现。作者：jingyh
   if (mode === 'server') copy('dist/client/music/js/song_identity.js', 'client/music/js/song_identity.js');
+  if (mode === 'server' && fs.existsSync(path.join(root, 'dist/client/music/js/roaming_core.js'))) copy('dist/client/music/js/roaming_core.js', 'client/music/js/roaming_core.js');
   // 可选指纹工具属于服务端，独立客户端永远不包含可执行二进制。
   if (mode !== 'client' && fs.existsSync(path.join(root, 'client/music/bin'))) copy('client/music/bin');
   if (mode === 'client') {

@@ -4,7 +4,7 @@ import { SystemConfigurationImportService } from './configuration/SystemConfigur
 import { repositories } from '../../application/persistence/storage'
 import type { RequestContext, ServerRuntime } from '../../common/http/RequestContext'
 /** 系统配置、旧配置导入、本地配置备份与代理连接测试所需的应用依赖契约。 @author yahyaoo */
-export type ConfigurationServiceRuntime = Pick<ServerRuntime, 'serverDownloads' | 'appUpdates' | 'path' | 'readBody' | 'validateCustomDirectoryUpdates' | 'storageFs' | 'saveUsers' | 'getSyncDownloadData' | 'migrateSyncStorage' | 'updateAllUserSnapshotDirs' | 'reloadServerData' | 'needle' | 'databaseLocation'>
+export type ConfigurationServiceRuntime = Pick<ServerRuntime, 'serverDownloads' | 'appUpdates' | 'path' | 'readBody' | 'validateCustomDirectoryUpdates' | 'storageFs' | 'saveUsers' | 'getSyncDownloadData' | 'migrateSyncStorage' | 'updateAllUserSnapshotDirs' | 'reloadServerData' | 'needle' | 'databaseLocation'> & Partial<Pick<ServerRuntime, 'refreshLibraryBackground'>>
 /** 系统配置、旧配置导入、本地配置备份与代理连接测试服务。 @author yahyaoo */
 
 /**
@@ -377,6 +377,7 @@ export async function handleConfig(context: RequestContext, runtime: Configurati
                 } catch (error: any) { console.error('[用户目录] 保存后的目录迁移失败:', error.message) }
               }
               global.lx.saveConfig()
+              runtime.refreshLibraryBackground?.()
 
               // 动态热迁移所有活跃用户空间的快照目录
               if (newConfig['snapshot.backupPath'] !== undefined) {
@@ -658,6 +659,7 @@ export async function postConfigBackupsRestore(context: RequestContext, runtime:
             // 还原业务配置到管理库，禁止覆盖数据库引导文件。
             const imported = new SystemConfigurationImportService(repositories().admin).import(storageFs.readFileSync(filePath, 'utf8'), global.lx.config, global.lx.configPath)
             global.lx.config = imported.config
+            runtime.refreshLibraryBackground?.()
 
             // 执行服务器热重载数据
             await reloadServerData()
@@ -757,6 +759,7 @@ export async function postConfigurationImport(context: RequestContext, runtime: 
     const previousPassword = global.lx.config['frontend.password']
     const imported = new SystemConfigurationImportService(repositories().admin).import(body.content, global.lx.config, global.lx.configPath)
     global.lx.config = imported.config
+    runtime.refreshLibraryBackground?.()
     await runtime.reloadServerData()
     runtime.updateAllUserSnapshotDirs(global.lx.config['snapshot.backupPath'])
     res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ ...imported.result, authenticationChanged: previousPassword !== imported.config['frontend.password'] }))

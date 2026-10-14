@@ -140,8 +140,8 @@
 :root #view-downloads { overflow-y:auto; }
 :root #view-downloads .downloads-list { overflow:visible; flex:none; }
 :root #view-downloads .downloads-toolbar[hidden] { display:none; }
-.roaming-heart { display:inline-block; color:#f43f5e; transform-origin:center; animation:roaming-heart-pulse 1.6s ease-in-out infinite; }
-@keyframes roaming-heart-pulse { 0%, 100% { transform:scale(1); } 15% { transform:scale(1.18); } 30% { transform:scale(1); } 45% { transform:scale(1.12); } }
+.roaming-heart { display:inline-block; color:#f43f5e; transform-origin:center; animation:roaming-compass-spin 6s ease-in-out infinite; }
+@keyframes roaming-compass-spin { 0%, 100% { transform:rotate(-18deg); } 50% { transform:rotate(18deg); } }
 @media(prefers-reduced-motion:reduce) { .roaming-heart { animation:none; } }
 @media(max-width:959px) { .music-page-controls { gap:6px; } :root .music-page-controls button { padding:6px 10px; font-size:12px; } }
 @media(max-width:767px) {
@@ -176,3 +176,30 @@
 #play-mode-menu .play-mode-option:not(.active-option):hover { background:color-mix(in srgb, var(--c-500) 14%, var(--bg-panel)); transform:translateY(-1px); box-shadow:0 6px 14px -8px color-mix(in srgb, var(--c-500) 70%, transparent); }
 #play-mode-menu .play-mode-option:hover > i { animation:page-action-jump .5s cubic-bezier(.3,.7,.4,1); }
 @media(prefers-reduced-motion:reduce) { #play-mode-menu .play-mode-option:hover > i { animation:none; } }
+:root:root :is(.song-love-btn, #player-like-btn, .player-icon-button#player-like-btn):is(:hover, :focus, :focus-visible, :active, [aria-pressed], .is-active) { background:transparent!important; border:0!important; border-radius:8px!important; box-shadow:none!important; outline:none!important; }
+#music-top-bar .top-search-host { order:0; }
+#music-top-bar .page-tools-dock { order:1; }
+#music-top-bar .top-actions-host { order:2; }
+/* 音乐库筛选面板：分行对齐、紧凑标签与自适应重置按钮。 */
+@media(min-width:600px) {
+    :root #lm-filter-panel > div { padding:16px 20px; border-radius:20px; background:color-mix(in srgb, var(--bg-panel) 88%, transparent)!important; border:1px solid color-mix(in srgb, var(--border-dim) 70%, transparent); box-shadow:0 6px 28px rgb(0 0 0 / 5%); }
+    :root #lm-filter-panel > div > div { grid-template-columns:repeat(12,minmax(0,1fr)); gap:14px 24px; align-items:center; }
+    :root #lm-filter-panel > div > div > div { grid-column:span 12; display:flex; align-items:center; gap:12px; }
+    :root #lm-filter-panel > div > div > div:nth-child(2), :root #lm-filter-panel > div > div > div:nth-child(5) { grid-column:span 7; }
+    :root #lm-filter-panel > div > div > div:nth-child(3) { grid-column:span 5; }
+    :root #lm-filter-panel > div > div > div:nth-child(4) { display:grid; grid-template-columns:repeat(3,minmax(0,200px)); gap:12px 20px; }
+    :root #lm-filter-panel > div > div > div:nth-child(4) > div { display:flex; align-items:center; gap:8px; min-width:0; }
+    :root #lm-filter-panel > div > div > div:nth-child(5) { grid-column:span 8; }
+    :root #lm-filter-panel > div > div > div:nth-child(6) { grid-column:span 4; justify-content:flex-end; }
+    :root #lm-filter-panel label { display:inline-block!important; font-size:12px!important; font-weight:700; color:var(--text-muted); text-transform:none; letter-spacing:0; min-width:34px; margin:0!important; }
+    :root #lm-filter-panel .lm-filter-tags { display:flex; flex-wrap:wrap; gap:6px; }
+    :root #lm-filter-panel .lm-filter-tag { font-size:12px!important; line-height:1; padding:7px 13px!important; border-radius:999px!important; }
+    :root #lm-filter-panel .lm-select, :root #lm-filter-panel .cs-trigger { height:34px; min-height:34px; font-size:12px!important; padding:0 12px!important; border-radius:12px; width:100%; }
+    :root #lm-filter-panel .cs-wrapper { min-width:0; flex:1; }
+    :root #lm-filter-panel > div > div > div:nth-child(6) > button { width:auto!important; padding:8px 18px!important; font-size:12px!important; border-radius:999px!important; white-space:nowrap; }
+    :root #lm-filter-panel .lm-rich-search-input { min-height:34px; border-radius:12px; font-size:12px; }
+}
+:root #lm-filter-panel .lm-filter-tag { cursor:pointer; transition:background .18s, border-color .18s, color .18s, box-shadow .18s, transform .18s; }
+:root.music-appearance #lm-filter-panel .lm-filter-tag:not(.active):not(:disabled):hover { background:color-mix(in srgb, var(--c-500) 12%, transparent)!important; border-color:var(--c-400)!important; color:var(--theme-readable-accent, var(--c-600))!important; box-shadow:0 6px 14px -8px color-mix(in srgb, var(--c-500) 70%, transparent); transform:translateY(-1px); }
+:root #lm-filter-panel .lm-filter-tag:not(:disabled):active { transform:translateY(0); }
+:root.music-appearance #lm-filter-panel .lm-filter-tag.active:hover { filter:brightness(1.12); transform:translateY(-1px); }

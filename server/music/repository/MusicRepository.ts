@@ -28,6 +28,25 @@ export class MusicRepository extends SqliteDocumentRepository {
       this.database.prepare('DELETE FROM client_library_song WHERE username = ? AND NOT EXISTS (SELECT 1 FROM client_library_song_file f WHERE f.username=client_library_song.username AND f.song_key=client_library_song.song_key)').run(username)
     })
   }
+  /** 写入一条消息；同账号同标识只保留一条，并把每个账号的积压限制在 200 条内。 */
+  addNotification(username: string, notice: { id: string; level: string; title: string; message?: string; link?: string; createdAt: number }): void {
+    this.transaction(() => {
+      this.database.prepare('INSERT OR REPLACE INTO client_notification (username, notice_id, level, title, message, link, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+        .run(username, notice.id, notice.level, notice.title, notice.message ?? null, notice.link ?? null, notice.createdAt)
+      this.database.prepare('DELETE FROM client_notification WHERE username = ? AND notice_id NOT IN (SELECT notice_id FROM client_notification WHERE username = ? ORDER BY created_at DESC LIMIT 200)').run(username, username)
+    })
+  }
+  /** 按时间倒序读取账号的全部未读消息。 */
+  listNotifications(username: string): Array<{ id: string; level: string; title: string; message?: string; link?: string; createdAt: number }> {
+    return this.database.prepare('SELECT notice_id, level, title, message, link, created_at FROM client_notification WHERE username = ? ORDER BY created_at DESC').all(username)
+      .map((row: any) => ({ id: row.notice_id, level: row.level, title: row.title, message: row.message ?? undefined, link: row.link ?? undefined, createdAt: row.created_at }))
+  }
+  /** 已读即删除；ids 为空表示一键已读，返回删除条数。 */
+  deleteNotifications(username: string, ids?: string[]): number {
+    if (!ids) return this.database.prepare('DELETE FROM client_notification WHERE username = ?').run(username).changes
+    const remove = this.database.prepare('DELETE FROM client_notification WHERE username = ? AND notice_id = ?')
+    return this.transaction(() => ids.reduce((count, id) => count + remove.run(username, id).changes, 0))
+  }
 }
 /** 播放器独立数据库工厂，不读取其他域的表。 @author yahyaoo */
 export function createMusicRepository(dataPath: string, filename = path.join(dataPath, 'database/music.sqlite')): MusicRepository {

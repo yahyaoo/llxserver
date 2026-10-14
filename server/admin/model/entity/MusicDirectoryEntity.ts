@@ -8,6 +8,8 @@ export interface MusicDirectoryEntity {
   path: string
   /** 扫描间隔，单位分钟。 */
   scanMinutes: number
+  /** NULL/undefined follows the global setting. */
+  watch?: boolean
   /** 配置顺序。 */
   sortOrder: number
 }

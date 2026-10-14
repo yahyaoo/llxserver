@@ -758,12 +758,12 @@ window.CustomDirManager = {
             const formatTime = (ts) => {
                 if (!ts) return '';
                 const d = new Date(ts);
-                return d.toLocaleDateString() + ' ' + d.toLocaleTimeString().slice(0, 5);
+                return d.toLocaleDateString();
             };
 
             const folderIcon = '<i class="fas fa-download text-blue-500 mr-1" title="自定义目录"></i>';
             const displayedSource = item.downloadSource || item.source;
-            const safeSource = this.escapeHtml((displayedSource === 'unknown' || displayedSource === 'local' || displayedSource === 'custom' || !displayedSource) ? '未知' : displayedSource);
+            const safeSource = this.escapeHtml((displayedSource === 'local' || displayedSource === 'custom') ? '本地' : (displayedSource === 'unknown' || !displayedSource) ? '未知' : displayedSource);
             const sourceTitle = item.downloadSource && item.downloadSource !== item.source
                 ? `下载来源：${item.downloadSource}；歌曲平台：${(!item.source || item.source === 'custom') ? '未知' : item.source}`
                 : `歌曲平台：${(!item.source || item.source === 'custom') ? '未知' : item.source}`;
@@ -828,7 +828,6 @@ window.CustomDirManager = {
                                 ${missingID3 ? '<span class="px-1.5 py-0.5 bg-red-50 text-red-500 border border-red-100 dark:bg-red-900/20 dark:text-red-400 dark:border-red-900/30 rounded text-[9px] font-medium leading-none shrink-0">缺标签</span>' : ''}
                                 ${missingCover ? '<span class="px-1.5 py-0.5 bg-orange-50 text-orange-500 border border-orange-100 dark:bg-orange-900/20 dark:text-orange-400 dark:border-orange-900/30 rounded text-[9px] font-medium leading-none shrink-0">缺封面</span>' : ''}
                                 ${missingLyric ? '<span class="px-1.5 py-0.5 bg-yellow-50 text-yellow-600 border border-yellow-100 dark:bg-yellow-900/20 dark:text-yellow-400 dark:border-yellow-900/30 rounded text-[9px] font-medium leading-none shrink-0">缺词</span>' : ''}
-                                ${(!missingID3 && !missingCover && !missingLyric) ? '<span class="px-1.5 py-0.5 bg-emerald-50 text-emerald-600 border border-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-900/30 rounded text-[9px] font-medium leading-none shrink-0">完整</span>' : ''}
                             </div>
 
                             <!-- Manual Link Button -->
@@ -865,11 +864,10 @@ window.CustomDirManager = {
                         <span class="truncate font-medium" title="${safeSourceTitle}">${safeSource}</span>
                     </div>
                     ${subPathHtml}
-                    <div class="flex flex-wrap gap-1">
+                    <div class="flex flex-nowrap gap-1 overflow-x-auto no-scrollbar whitespace-nowrap">
                         ${missingID3 ? '<span class="px-1 py-0 bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400 rounded text-[9px] font-bold">缺标签</span>' : ''}
                         ${missingCover ? '<span class="px-1 py-0 bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400 rounded text-[9px] font-bold">缺封面</span>' : ''}
                         ${missingLyric ? '<span class="px-1 py-0 bg-yellow-100 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400 rounded text-[9px] font-bold">缺词</span>' : ''}
-                        ${(!missingID3 && !missingCover && !missingLyric) ? '<span class="px-1 py-0 bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400 rounded text-[9px] font-bold">完整</span>' : ''}
                     </div>
                     <div class="text-[9px] mt-1 opacity-70 scale-90 origin-left">${formatTime(item.mtime)}</div>
                 </div>

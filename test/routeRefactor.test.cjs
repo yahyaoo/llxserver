@@ -22,7 +22,7 @@ test('未变更路由保持原执行语句，移除 WebDAV 后保留路由顺序
   // Windows 检出可能使用 CRLF；统一换行，避免多行路由条件产生误报。
   const http = fs.readFileSync(path.join(__dirname, '../server/application/http/HttpServer.ts'), 'utf8').replace(/\r\n?/g, '\n')
   let position = 0
-  const changed = new Set(['handleUsers','getStatus','getMusicCacheList','getMusicCacheDirectories','getMusicCustomList','postMusicCustomSync','handleMusicCustomFile','getMusicCustomCover','getMusicCustomEmbedLyric','getBackupDownload','postBackupUpload','getMusicDownloadCheck'])
+  const changed = new Set(['handleUsers','getStatus','getMusicCacheList','getMusicCacheDirectories','getMusicCustomList','postMusicCustomSync','handleMusicCustomFile','getMusicCustomCover','getMusicCustomEmbedLyric','getBackupDownload','postBackupUpload','getMusicDownloadCheck','getMusicDownload'])
   for (const route of routes.filter(route => !/Webdav/.test(route.method))) {
     const filename = path.join(__dirname, '..', route.file.replace(/^src\//, 'dist/server/').replace(/\.ts$/, '.js'))
     if (!files.has(filename)) {

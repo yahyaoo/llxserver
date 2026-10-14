@@ -2,24 +2,17 @@
 (() => {
     const versions = new WeakMap();
     let generation = 0;
+    const resolved = new Map();
     const safeUrl = value => typeof value === 'string' && /^(https?:\/\/|\/(?!\/)|data:image\/(?:png|jpeg|webp|gif);base64,|blob:)/i.test(value) ? value : null;
     window.LibraryArtwork = {
         /** 接入已有延迟加载图片；候选顺序与播放栏相同。 */
         bind(image, song) {
-            const candidates = window.MusicExperience.coverCandidates(song);
-            image.dataset.artworkCandidates = JSON.stringify(candidates);
-            const url = candidates[0] || '/music/assets/logo.svg';
-            if (image.dataset.src) image.dataset.src = url;
-            else this.attach(image, candidates);
-            let index = 0;
-            image.onerror = () => {
-                const next = candidates[++index] || '/music/assets/logo.svg';
-                if (next.includes('/assets/logo.svg')) image.onerror = null;
-                image.classList?.toggle('is-placeholder', next.includes('/assets/logo.svg')); image.src = next;
-            };
+            const resolve = () => window.MusicExperience?.coverCandidates(song) || [];
+            if (window.ImageLoader) window.ImageLoader.observe(image, resolve, { src: image.dataset.src });
+            else this.attach(image, resolve());
         },
         async attach(image, value) {
-            const revision = {}, epoch = generation;
+            const revision = {}, epoch = generation, origin = image.dataset.src;
             versions.set(image, revision);
             const candidates = (Array.isArray(value) ? value : [value]).map(safeUrl).filter(Boolean);
             candidates.push('/music/assets/logo.svg');
@@ -36,15 +29,22 @@
                     url = parsed.pathname + parsed.search;
                 }
                 image.classList?.toggle('is-placeholder', url.includes('/assets/logo.svg'));
+                image.dataset.src = url;
                 image.src = url;
             };
             image.onerror = next;
             image.onload = () => {
-                if (versions.get(image) === revision && generation === epoch) image.classList?.toggle('is-placeholder', image.src.includes('/assets/logo.svg'));
+                if (versions.get(image) === revision && generation === epoch) {
+                    const placeholder = image.src.includes('/assets/logo.svg');
+                    image.classList?.toggle('is-placeholder', placeholder);
+                    if (origin && !placeholder) { if (resolved.size > 3000) resolved.clear(); resolved.set(origin, image.getAttribute('src')); }
+                }
             };
             next();
         },
-        clear() { generation++; },
+        /** 已成功加载过的封面地址；列表重绘时直接复用，避免占位图闪烁。 */
+        known(source) { return source ? resolved.get(source) || null : null; },
+        clear() { generation++; resolved.clear(); },
     };
     window.addEventListener('music-account-changed', () => window.LibraryArtwork.clear());
 })();

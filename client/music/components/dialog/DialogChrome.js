@@ -64,11 +64,33 @@
         if (root.matches?.(selector)) enhance(root);
         root.querySelectorAll(selector).forEach(enhance);
     }
-    window.DialogChrome = { enhance, scan };
-    document.addEventListener('DOMContentLoaded', () => {
+    let observer;
+    const waiting = new Map();
+    function watchPending(root) {
+        const selector = 'dialog, .fixed.inset-0, .el-message-box';
+        const overlays = [...(root.matches?.(selector) ? [root] : []), ...root.querySelectorAll(selector)];
+        for (const overlay of overlays) if (overlay.dataset.dialogChrome !== 'true' && !waiting.has(overlay)) {
+            const pending = new MutationObserver(() => {
+                if (!overlay.isConnected) { pending.disconnect(); waiting.delete(overlay); return; }
+                enhance(overlay);
+                if (overlay.dataset.dialogChrome === 'true') { pending.disconnect(); waiting.delete(overlay); }
+            });
+            waiting.set(overlay, pending); pending.observe(overlay, { childList: true, subtree: true });
+        }
+    }
+    function destroy() { observer?.disconnect(); for (const pending of waiting.values()) pending.disconnect(); waiting.clear(); }
+    window.DialogChrome = { enhance, scan, destroy };
+    function init() {
+        if (observer) return;
         scan(document);
-        new MutationObserver(records => {
-            records.forEach(record => record.addedNodes.forEach(node => { if (node.nodeType === 1) scan(node); }));
-        }).observe(document.body, { childList: true, subtree: true });
-    });
+        // 所有动态弹层挂到body；只看body直属新增宿主，不观察歌曲/歌词子树。
+        observer = new MutationObserver(records => {
+            window.PerfProbe?.count('observer:dialog');
+            for (const record of records) for (const node of record.addedNodes) if (node.nodeType === 1) { scan(node); watchPending(node); }
+            for (const [overlay, pending] of waiting) if (!overlay.isConnected) { pending.disconnect(); waiting.delete(overlay); }
+        });
+        observer.observe(document.body, { childList: true });
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true }); else init();
+    window.addEventListener('pagehide', event => { if (!event.persisted) destroy(); });
 })();

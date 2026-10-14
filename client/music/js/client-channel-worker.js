@@ -5,7 +5,8 @@ const emit = message => self.postMessage(message);
 function connect() {
     if (!configuration || socket && [0, 1].includes(socket.readyState)) return;
     socket = new WebSocket(configuration.ws);
-    socket.onopen = () => socket.send(JSON.stringify({ type: 'hello', token: configuration.token, device: configuration.device, versions: configuration.versions }));
+    socket.onopen = () => socket.send(JSON.stringify({ type: 'hello', token: configuration.token, device: configuration.device, versions: configuration.versions,
+        lastNotifySeq: configuration.lastNotifySeq, serverEpoch: configuration.serverEpoch }));
     socket.onmessage = event => {
         let message;
         try { message = JSON.parse(event.data) } catch { return }
@@ -19,6 +20,7 @@ function connect() {
     socket.onerror = () => {};
     socket.onclose = event => {
         ready = false;
+        emit({ type: 'disconnected', data: { code: event.code } });
         for (const item of waiting.values()) { clearTimeout(item.timer); item.reject(new Error('长连接已断开')) } waiting.clear();
         if (event.code === 4401) { emit({ type: 'expired' }); return }
         clearTimeout(reconnectTimer);
@@ -43,6 +45,7 @@ self.onmessage = async event => {
     const message = event.data;
     if (message.type === 'configure') { configuration = message; connect() }
     else if (message.type === 'cache-saved') configuration.versions = { ...configuration.versions, ...message.versions };
+    else if (message.type === 'cursor-saved') { configuration.lastNotifySeq = message.seq; configuration.serverEpoch = message.serverEpoch; }
     else if (message.type === 'mode') configuration.mode = message.mode;
     else if (message.type === 'subscribe') {
         configuration.topics = (configuration.topics || []).filter(topic => topic !== message.topic);

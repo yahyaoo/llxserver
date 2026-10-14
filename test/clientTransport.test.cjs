@@ -23,7 +23,7 @@ function transportFixture(values = new Map(), storage = new Map()) {
     const context = { window, localStorage, sessionStorage: localStorage, location: { origin: 'http://localhost' }, document: { currentScript: { src: 'http://localhost/music/js/client-channel.js' }, readyState: 'loading', addEventListener() {} },
         console, URL, Response, Blob, atob, crypto: { randomUUID }, Worker, setTimeout, clearTimeout, CustomEvent: class {}, fetch: () => { throw Error('缓存读取禁止网络'); } };
     vm.runInNewContext(fs.readFileSync('client/music/js/client-channel.js', 'utf8'), context);
-    return { window, values, storage, sent, workers, fail: value => { fail = value; }, status: value => { status = value; } };
+    return { window, values, storage, sent, workers, context, fail: value => { fail = value; }, status: value => { status = value; } };
 }
 test('断网保留队列、重载后发送、确认清理以及空周期零网络', async () => {
     const f = transportFixture(); f.fail(true);
@@ -72,4 +72,45 @@ test('推送只落盘变更条目，重载合并增量，不重复保存整个�
     const next = transportFixture(f.values, f.storage);
     assert.equal((await (await next.window.ClientData.request('/api/user/settings')).json()).volume, 60);
     assert.equal((await (await next.window.ClientData.request('/api/music/cache/list')).json()).data[0].id, 'unchanged');
+});
+test('按 method/URL 分类，GET 不上报，未知写入为 data；大批次分片保留操作 ID', async () => {
+    const f = transportFixture(), classify = f.window.ClientTransport.classify;
+    assert.equal(classify({ url: '/api/music/cache/queue', method: 'GET' }), 'read');
+    assert.equal(classify({ url: '/api/user/recent', method: 'POST' }), 'state');
+    assert.equal(classify({ url: '/api/music/storage/playback', method: 'PUT' }), 'state');
+    assert.equal(classify({ url: '/api/music/storage/queue', method: 'PUT' }), 'data');
+    assert.equal(classify({ url: '/api/music/cache/download', method: 'POST' }), 'command');
+    assert.equal(classify({ url: '/api/music/cache/lyric', method: 'POST' }), 'data');
+    assert.equal(classify({ url: '/api/future', method: 'PATCH' }), 'data');
+    const operations = Array.from({ length: 601 }, (_, i) => ({ id: 'command:' + i, url: '/api/music/cache/queue', method: 'POST', data: { id: i } }));
+    const ack = await f.window.ClientTransport.report(operations), batches = f.sent.filter(item => item.type === 'report');
+    assert.equal(batches.length, 4); assert.ok(batches.every(item => item.operations.length <= 200)); assert.equal(Object.keys(ack.results).length, 601);
+    assert.deepEqual(batches.flatMap(item => item.operations.map(operation => operation.id)), operations.map(item => item.id));
+    f.window.ClientTransport.close();
+});
+test('ready 配置、通知 cursor/epoch、去重及文本转义，关闭时持久 cursor', async () => {
+    const f = transportFixture(), shown = [], configured = [];
+    f.window.showToast = (type, text) => shown.push({ type, text });
+    f.window.ClientSync = { configure: value => configured.push(value), flush: async () => {} };
+    f.window.ClientTransport.start(); const deliver = data => f.workers[0].onmessage({ data });
+    await deliver({ type: 'ready', serverEpoch: 'epoch-one', notifySeq: 0, config: { reportIntervalMs: 60000, maxBatchOps: 100, maxBatchBytes: 4096 } });
+    assert.equal(configured[0].reportIntervalMs, 60000);
+    const notice = { type: 'notify', serverEpoch: 'epoch-one', seq: 1, data: { title: '<img src=x onerror=alert(1)>', level: 'info', link: 'javascript:alert(1)' } };
+    await deliver(notice); await deliver(notice);
+    assert.equal(shown.length, 1); assert.ok(shown[0].text.startsWith('<img')); assert.equal(f.window.ClientTransport.notices[0].link, undefined);
+    await deliver({ type: 'ready', serverEpoch: 'epoch-two', notifySeq: 0 });
+    await deliver({ ...notice, serverEpoch: 'epoch-two' }); assert.equal(shown.length, 2);
+    f.window.ClientTransport.close();
+    assert.deepEqual(JSON.parse(f.storage.get('lx_client_notify:http://localhost:alice')), { serverEpoch: 'epoch-two', seq: 1 });
+});
+test('退出保活有认证且总量小于 60KB；接受发送不会清理待确认数据', async () => {
+    const f = transportFixture(), requests = [];
+    f.context.fetch = async (url, options) => { requests.push({ url, options }); return { ok: true }; };
+    f.fail(true);
+    await assert.rejects(f.window.ClientTransport.report([{ id: 'state:one', url: '/api/music/storage/playback', method: 'PUT', data: { time: 1 } }]));
+    const items = [{ id: 'large', url: '/api/user/list', method: 'POST', data: { text: '文'.repeat(60000) } }, { id: 'small', url: '/api/user/recent', method: 'POST', data: { playbackId: 'small' } }];
+    assert.equal(f.window.ClientTransport.flushOnExit(items), true);
+    assert.equal(requests[0].options.headers['x-user-token'], 'fixture-token'); assert.equal(requests[0].options.keepalive, true);
+    assert.ok(Buffer.byteLength(requests[0].options.body) < 60000); assert.equal(JSON.parse(requests[0].options.body).operations.length, 1);
+    assert.equal(f.window.ClientTransport.hasPending(), true); f.window.ClientTransport.close();
 });

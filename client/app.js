@@ -898,15 +898,19 @@ class App {
         select.disabled = enabled.disabled = !user;
         container.replaceChildren();
         for (const directory of directories) this.appendMusicDirectory(directory);
-        if (!directories.length) this.appendMusicDirectory({ path: '', scanMinutes: 30 });
+        if (!directories.length) this.appendMusicDirectory({ path: '', scanMinutes: Number(document.querySelector('[name="library.scan.defaultMinutes"]')?.value) || 60 });
     }
 
-    appendMusicDirectory(directory = { path: '', scanMinutes: 30 }) {
+    appendMusicDirectory(directory = { path: '', scanMinutes: Number(document.querySelector('[name="library.scan.defaultMinutes"]')?.value) || 60 }) {
         const row = document.createElement('div'); row.className = 'music-directory-row';
         row.style.cssText = 'display:flex;flex-wrap:wrap;gap:8px;margin:10px 0';
         const input = document.createElement('input'); input.className = 'form-input config-input'; input.style.flex = '1 1 260px'; input.value = directory.path; input.placeholder = '服务器绝对路径'; input.dataset.musicPath = '';
         const frequency = document.createElement('input'); frequency.type = 'number'; frequency.min = 1; frequency.max = 1440; frequency.value = directory.scanMinutes || 30; frequency.className = 'form-input'; frequency.style.width = '95px'; frequency.dataset.scanMinutes = ''; frequency.title = '扫描间隔（分钟）';
         const unit = document.createElement('span'); unit.textContent = '分钟';
+        const watch = document.createElement('select'); watch.className = 'form-input'; watch.dataset.musicWatch = ''; watch.setAttribute('aria-label', '监听变化');
+        for (const [value, label] of [['', '监听：跟随全局'], ['true', '监听：开启'], ['false', '监听：关闭']]) watch.add(new Option(label, value));
+        watch.value = directory.watch == null ? '' : String(directory.watch);
+        watch.onchange = () => this.updateCustomDirectoryDraft();
         const check = document.createElement('button'); check.type = 'button'; check.className = 'btn btn-secondary'; check.textContent = '检测读写';
         const status = document.createElement('span'); status.style.cssText = 'width:100%;font-size:12px'; status.role = 'status';
         check.onclick = async () => {
@@ -916,18 +920,27 @@ class App {
         };
         const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'btn btn-secondary'; remove.textContent = '移除'; remove.onclick = () => { row.remove(); this.updateCustomDirectoryDraft(); };
         input.oninput = frequency.oninput = () => { status.textContent = ''; this.updateCustomDirectoryDraft(); };
-        row.append(input, frequency, unit, check, remove, status);
+        row.append(input, frequency, unit, watch, check, remove, status);
         document.getElementById('config-music-directories').append(row);
+        if (directory.id) {
+            this.libraryScanStatusPromise ||= this.request('/api/admin/library/scan/status');
+            this.libraryScanStatusPromise.then(result => {
+                if (!row.isConnected || input.value !== directory.path) return;
+                const username = document.getElementById('config-custom-dir-user')?.value;
+                const current = result.items?.find(item => item.username === username && item.directoryId === directory.id);
+                if (current) status.textContent = `${current.watch?.state === 'active' ? '监听中' : '定时扫描：' + (current.watch?.reason || '监听关闭')}；上次扫描：${current.lastQuickScanAt ? new Date(current.lastQuickScanAt).toLocaleString() : '尚未完成'}`;
+            }).catch(error => { if (row.isConnected) status.textContent = '状态读取失败：' + error.message; });
+        }
     }
 
     updateCustomDirectoryDraft() {
         const name = document.getElementById('config-custom-dir-user').value;
         if (!this.users.some(user => user.name === name)) return;
-        const directories = Array.from(document.querySelectorAll('#config-music-directories .music-directory-row')).map(row => ({ path: row.querySelector('[data-music-path]').value.trim(), scanMinutes: Number(row.querySelector('[data-scan-minutes]').value) })).filter(item => item.path);
+        const directories = Array.from(document.querySelectorAll('#config-music-directories .music-directory-row')).map(row => ({ path: row.querySelector('[data-music-path]').value.trim(), scanMinutes: Number(row.querySelector('[data-scan-minutes]').value), ...(row.querySelector('[data-music-watch]').value === '' ? {} : { watch: row.querySelector('[data-music-watch]').value === 'true' }) })).filter(item => item.path);
         const enableCustomMusicDir = document.getElementById('config-custom-dir-enabled').checked;
         const user = this.users.find(user => user.name === name);
         const existing = user.directories || (user.customMusicDir ? [{ path: user.customMusicDir, scanMinutes: 30 }] : []);
-        const normalized = values => values.map(item => ({ path: item.path, scanMinutes: item.scanMinutes || 30 }));
+        const normalized = values => values.map(item => ({ path: item.path, scanMinutes: item.scanMinutes || 30, ...(item.watch == null ? {} : { watch: item.watch }) }));
         if (JSON.stringify(normalized(directories)) === JSON.stringify(normalized(existing)) && enableCustomMusicDir === !!user.enableCustomMusicDir) this.customDirectoryDrafts.delete(name);
         else this.customDirectoryDrafts.set(name, { name, directories, customMusicDir: directories[0]?.path || '', enableCustomMusicDir });
         document.getElementById('config-custom-dir-status').textContent = '目录修改待保存，保存前会重新检测所有目录的读写权限。';

@@ -155,6 +155,7 @@ CREATE TABLE IF NOT EXISTS server_user_music_directory (
   id TEXT NOT NULL, -- 目录稳定标识
   path TEXT NOT NULL, -- 服务器绝对路径
   scan_minutes INTEGER NOT NULL DEFAULT 30 CHECK(scan_minutes BETWEEN 1 AND 1440), -- 扫描间隔分钟数
+  watch INTEGER NULL CHECK(watch IS NULL OR watch IN (0, 1)), -- NULL 跟随全局监听配置
   sort_order INTEGER NOT NULL, -- 用户配置顺序
   PRIMARY KEY(username, id),
   UNIQUE(username, path)

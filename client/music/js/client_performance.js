@@ -1,8 +1,8 @@
 /** 客户端分批渲染与按账号持久化的定时同步。 @author jingyh @date 2026-10-12 */
 (() => {
     const jobs = new WeakMap();
-    /** 下一任务让浏览器先绘制加载状态，后台标签页也不会等待动画帧。 */
-    const yieldTask = () => new Promise(resolve => setTimeout(resolve, 0));
+    /** 让出到新任务；能力缺失降级timer，不把微任务当作绘制机会。 */
+    const yieldTask = () => globalThis.scheduler?.yield ? globalThis.scheduler.yield() : new Promise(resolve => setTimeout(resolve, 0));
     /** 保留原行模板，按时间预算提交；同一容器的新任务取消旧任务。 */
     async function render(container, items, append, afterBatch = () => {}) {
         const job = {}; jobs.set(container, job);
@@ -16,6 +16,8 @@
             } while (index < items.length && batch.length < 20 && performance.now() - started < 6);
             container.appendChild(fragment);
             afterBatch(batch);
+            window.PerfProbe?.count('render:batches');
+            if (performance.now() - started > 50) window.PerfProbe?.count('render:slow-batches');
             if (index < items.length) await yieldTask();
         }
         return jobs.get(container) === job;
@@ -43,11 +45,69 @@
             return value;
         } finally { reader.releaseLock(); }
     }
-    window.ClientPerformance = { yieldTask, render, readPlaylist, cancel: container => { if (container) jobs.delete(container); } };
+    // owner: 布局调度器；同owner一帧一次，先读后写，隐藏保留dirty、卸载可取消。
+    const layoutJobs = new Map(); let layoutFrame = null;
+    function scheduleLayout(owner, read, write) {
+        layoutJobs.set(owner, { read, write });
+        if (layoutFrame !== null || document.hidden) return;
+        layoutFrame = requestAnimationFrame(() => {
+            layoutFrame = null;
+            const batch = [...layoutJobs]; layoutJobs.clear();
+            const results = batch.map(([owner, job]) => {
+                try { return [job, job.read()]; } catch (error) { console.warn('[Layout] 测量失败:', error); return null; }
+            });
+            for (const result of results) if (result) { try { result[0].write(result[1]); } catch (error) { console.warn('[Layout] 更新失败:', error); } }
+        });
+    }
+    function cancelLayout(owner) { layoutJobs.delete(owner); if (!layoutJobs.size && layoutFrame !== null) { cancelAnimationFrame(layoutFrame); layoutFrame = null; } }
+    document.addEventListener?.('visibilitychange', () => {
+        if (document.hidden) { if (layoutFrame !== null) cancelAnimationFrame(layoutFrame); layoutFrame = null; }
+        else if (layoutJobs.size) { const [owner, job] = layoutJobs.entries().next().value; scheduleLayout(owner, job.read, job.write); }
+    });
+    window.ClientPerformance = { yieldTask, render, readPlaylist, scheduleLayout, cancelLayout, cancel: container => { if (container) jobs.delete(container); } };
 
     const senders = new Map(), entries = new Map(), loading = new Map();
     const baselines = new Map(), inFlight = new Set(), uncertain = new Map();
     const persistence = new Map();
+    let dataTimer, stateTimer, commandTimer, dataSince = 0, stateSince = 0;
+    let scheduleConfig = { reportIntervalMs: 1800000, maxBatchOps: 200, maxBatchBytes: 262144 };
+    const categoryOf = operation => window.ClientTransport?.classify?.(operation) ||
+        (['/api/user/recent', '/api/music/storage/playback', '/api/music/playback'].includes(operation.url?.split('?')[0]) ? 'state' : /^\/api\/music\/cache\/(download|queue(?:\/.*)?|stop)$/.test(operation.url || '') ? 'command' : 'data');
+    const channelCategory = channel => channel === 'playback' ? 'state' : 'data';
+    const interval = () => ['5', '30', '60'].includes(String(window.settings?.clientStateIntervalMinutes)) ? Number(window.settings.clientStateIntervalMinutes) * 60000 : scheduleConfig.reportIntervalMs;
+    /** 只有 dirty 数据才拥有一次 deadline；持续编辑不会重置最晚提交时间。 */
+    function schedule(retry = false) {
+        // 07b 的租约/ack 也会广播变更；提交中不再排队第二次自动 flush。
+        if (running) return;
+        const retryDelay = retry === true ? 5000 : 0;
+        const name = owner(), pendingEntries = [...entries.values()].filter(entry => entry.name === name);
+        const events = window.DeferredWrites?.collect?.() || [];
+        const states = pendingEntries.filter(entry => channelCategory(entry.channel) === 'state');
+        const stateEvents = events.filter(event => categoryOf(event) === 'state');
+        const dataPending = pendingEntries.some(entry => channelCategory(entry.channel) === 'data') || events.some(event => categoryOf(event) === 'data');
+        if (dataPending) {
+            dataSince ||= Date.now(); clearTimeout(dataTimer);
+            dataTimer = setTimeout(() => { dataTimer = null; dataSince = 0; void flush(undefined, false, 'data') }, Math.max(retryDelay, Math.min(300, dataSince + 2000 - Date.now())));
+            dataTimer.unref?.();
+        } else { clearTimeout(dataTimer); dataTimer = null; dataSince = 0; }
+        if (states.length || stateEvents.length) {
+            stateSince ||= Date.now();
+            const bytes = new Blob([JSON.stringify([...stateEvents, ...states.map(entry => entry.data)])]).size;
+            const threshold = states.length + stateEvents.length >= scheduleConfig.maxBatchOps || bytes >= scheduleConfig.maxBatchBytes;
+            if (threshold) { clearTimeout(stateTimer); stateTimer = null; }
+            if (!stateTimer) {
+                stateTimer = setTimeout(() => { stateTimer = null; stateSince = 0; void flush(undefined, false, 'state') }, Math.max(retryDelay, threshold ? 0 : stateSince + interval() - Date.now()));
+                stateTimer.unref?.();
+            }
+        } else { clearTimeout(stateTimer); stateTimer = null; stateSince = 0; }
+        if (!commandTimer && events.some(event => categoryOf(event) === 'command')) {
+            commandTimer = setTimeout(() => { commandTimer = null; void flush(undefined, false, 'command') }, retryDelay); commandTimer.unref?.();
+        }
+    }
+    function configure(config) {
+        if (config) scheduleConfig = { ...scheduleConfig, ...config };
+        clearTimeout(stateTimer); stateTimer = null; schedule();
+    }
     // 对象字段顺序不影响状态比较，数组顺序仍代表歌单与播放队列的顺序。
     const signature = value => JSON.stringify(value, (property, item) => item && typeof item === 'object' && !Array.isArray(item)
         ? Object.fromEntries(Object.keys(item).sort().map(name => [name, item[name]])) : item);
@@ -83,6 +143,7 @@
                 entries.set(id, { ...saved, name, channel, saved: Promise.resolve() });
                 if (saved.baseline !== undefined) baselines.set(id, saved.baseline);
                 if (saved.uncertainBaseline !== undefined) uncertain.set(id, saved.uncertainBaseline);
+                schedule();
             }
         }).catch(error => console.warn('[ClientSync] 读取本地待同步数据失败:', error)));
         await loading.get(id);
@@ -107,6 +168,7 @@
             await persist(channel, { data: entry.data, revision: entry.revision, baseline: entry.baseline, uncertainBaseline: uncertain.get(id) }, name);
             clearExit(channel, name);
         });
+        schedule();
         return entry.saved;
     }
     /** 配置按字段生成补丁，已尝试但未确认的值也参与比较，保证失败恢复后可纠正。 */
@@ -160,10 +222,12 @@
         return operations.map((item, index) => ({ ...item, id: channel.replace(/[^\w:.-]/g, '-') + ':' + revision + ':' + index }));
     }
     /** 单批次提交全部变动，确认前后产生的新编辑保持在队列中。 */
-    async function flushBatch(only, strict) {
+    async function flushBatch(only, strict, category, eventsOnly = false) {
         const name = owner(), prepared = [], operations = [];
         for (const channel of senders.keys()) {
+            if (eventsOnly) break;
             if (only && channel !== only) continue;
+            if (category !== 'all' && channelCategory(channel) !== category) continue;
             await read(channel);
             const id = key(name, channel), entry = entries.get(id);
             if (!entry) continue;
@@ -175,14 +239,16 @@
             if (!encoded.length) { entries.delete(id); await persist(channel, null, name); continue; }
             prepared.push({ id, entry, operations: encoded }); operations.push(...encoded);
         }
-        const events = only ? [] : window.DeferredWrites?.collect?.() || [];
-        operations.push(...events);
-        if (!operations.length) {
-            await window.ClientTransport.drain?.();
-            if (strict && window.ClientTransport.hasPending?.()) throw new Error('仍有消息未确认，已保留本地重试');
-            return;
-        }
         try {
+            const available = only ? [] : await (window.DeferredWrites?.prepareBatch?.(name) ?? window.DeferredWrites?.collect?.() ?? []);
+            if (owner() !== name) return;
+            const events = available.filter(event => category === 'all' || categoryOf(event) === category);
+            operations.push(...events);
+            if (!operations.length) {
+                if (category === 'all') await window.ClientTransport.drain?.();
+                if (strict && (window.ClientTransport.hasPending?.() || !only && window.DeferredWrites?.collect?.().length)) throw new Error('仍有消息未确认，已保留本地重试');
+                return available.length === 0;
+            }
             for (const { id, entry } of prepared) {
                 inFlight.add(id); uncertain.set(id, signature(entry.data));
                 await persist(entry.channel, { data: entry.data, revision: entry.revision, baseline: baselines.get(id), uncertainBaseline: signature(entry.data) }, name);
@@ -199,23 +265,33 @@
                     await persist(entry.channel, { data: latest.data, revision: latest.revision, baseline: latest.baseline }, name);
                 }
             }
-            window.DeferredWrites?.ack?.(events, ack.results, name);
+            await window.DeferredWrites?.ack?.(events, ack.results, name);
             if (strict && prepared.some(item => uncertain.has(item.id))) throw new Error('部分修改未确认，已保留本地重试');
             if (strict && events.some(item => !ack.results[item.id] || ack.results[item.id].status >= 300 && ![400, 404, 422].includes(ack.results[item.id].status))) throw new Error('部分事件未确认，已保留本地重试');
             if (strict && window.ClientTransport.hasPending?.()) throw new Error('仍有消息未确认，已保留本地重试');
-        } catch (error) { console.warn('[ClientSync] 批次保留本地重试:', error); if (strict) throw error; }
-        finally { for (const { id } of prepared) inFlight.delete(id); }
-    }
-    /** 固定30秒发送一次；无变化无消息；旧同步模式仍使用原发送器。 */
-    function flush(only, strict = false) {
-        if (running) return running.then(() => flush(only, strict));
-        if (window.ClientTransport && window.SyncManager?.mode !== 'remote') {
-            running = flushBatch(only, strict).finally(() => { running = null; }); return running;
+            return operations.every(item => ack.results[item.id]?.status >= 200 && ack.results[item.id]?.status < 300);
+        } catch (error) { console.warn('[ClientSync] 批次保留本地重试:', error); if (strict) throw error; return false; }
+        finally {
+            for (const { id } of prepared) inFlight.delete(id);
+            if (!only) await window.DeferredWrites?.release?.(name);
         }
+    }
+    /** 自动提交按类别筛选；显式保存、退出和重连仍尝试提交全部待确认操作。 */
+    function flush(only, strict = false, category = 'all') {
+        if (category === 'all') { clearTimeout(dataTimer); clearTimeout(stateTimer); clearTimeout(commandTimer); dataTimer = stateTimer = commandTimer = null; dataSince = stateSince = 0; }
+        if (running) return running.then(() => flush(only, strict, category));
+        if (window.ClientTransport && window.SyncManager?.mode !== 'remote') {
+            let retry = false;
+            running = flushBatch(only, strict, category).then(result => { retry = result === false; })
+                .catch(error => { retry = true; if (strict) throw error; console.warn('[ClientSync] 本地提交失败，保留重试:', error); })
+                .finally(() => { running = null; schedule(retry); }); return running;
+        }
+        let retry = false;
         running = (async () => {
             const name = owner();
             for (const [channel, send] of senders) {
                 if (only && channel !== only) continue;
+                if (category !== 'all' && channelCategory(channel) !== category) continue;
                 await read(channel);
                 if (owner() !== name) break;
                 const id = key(name, channel), entry = entries.get(id);
@@ -251,6 +327,7 @@
                     finally { clearTimeout(timeout); inFlight.delete(id); }
                     // 尚未满足同步条件时保留快照，不能把未发送的数据当作已确认。
                     if (submitted === false) {
+                        retry = true;
                         if (previousUncertain === undefined) uncertain.delete(id); else uncertain.set(id, previousUncertain);
                         const latest = entries.get(id);
                         if (latest) { await latest.saved; await persist(channel, { data: latest.data, revision: latest.revision, baseline: baselines.get(id), uncertainBaseline: previousUncertain }, name); }
@@ -270,21 +347,34 @@
                         await persist(channel, { data: latest.data, revision: latest.revision, baseline: latest.baseline }, name);
                     }
                 } catch (error) {
+                    retry = true;
                     console.warn('[ClientSync] 同步失败，保留本地修改:', channel, error);
                     if (strict) throw error;
                 }
             }
-        })().finally(() => { running = null; });
+            // 远程歌单仍使用原 sender；DeferredWrites 复用可代理到远端的批次通道。
+            if (!only && window.ClientTransport && owner() === name) {
+                const confirmed = await flushBatch(undefined, strict, category, true);
+                retry ||= confirmed === false;
+            }
+        })().finally(() => { running = null; schedule(retry); });
         return running;
     }
-    window.ClientSync = { update, read, flush, owner, register: (channel, send) => senders.set(channel, send),
+    window.ClientSync = { update, read, flush, owner, configure, schedule, register: (channel, send) => senders.set(channel, send),
         seed(channel, data) {
             if (channel === 'lists' || channel === 'lists-public') data = { username: data.username, defaultList: data.defaultList || [], userList: data.userList || [] };
             const id = key(owner(), channel); if (!entries.has(id)) baselines.set(id, signature(data));
         },
         has: channel => entries.has(key(owner(), channel)) };
-    setInterval(() => { void flush(); }, 30000);
-    window.addEventListener('pagehide', () => {
+    window.addEventListener('client-local-event', schedule);
+    window.addEventListener('online', () => { void flush(); });
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') void flush(); });
+    // 身份清理前由通道调用；换账号事件只清理旧账号的调度器。
+    window.addEventListener('music-account-changed', () => {
+        clearTimeout(dataTimer); clearTimeout(stateTimer); clearTimeout(commandTimer); dataTimer = stateTimer = commandTimer = null; dataSince = stateSince = 0;
+        schedule();
+    });
+    function prepareAccountChange() {
         if (!window.ClientTransport) { void flush(); return; }
         const operations = [];
         const journal = {}, name = owner();
@@ -300,5 +390,7 @@
             for (const [channel, saved] of Object.entries(journal)) { saved.uncertainBaseline = signature(saved.data); uncertain.set(key(name, channel), saved.uncertainBaseline) }
             try { if (Object.keys(journal).length) localStorage.setItem(exitKey(name), JSON.stringify(journal)) } catch {}
         }
-    });
+    }
+    window.ClientSync.prepareAccountChange = prepareAccountChange;
+    window.addEventListener('pagehide', prepareAccountChange);
 })();

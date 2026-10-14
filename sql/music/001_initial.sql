@@ -400,3 +400,15 @@ CREATE TABLE IF NOT EXISTS client_library_song_file (
 );
 CREATE INDEX IF NOT EXISTS idx_client_library_song_file_song ON client_library_song_file (username, song_key);
 
+-- 消息中心；作者 jingyh。已读即删除，因此表内记录均为未读消息，未读数量即记录数量。
+CREATE TABLE IF NOT EXISTS client_notification (
+  username TEXT NOT NULL, -- 接收消息的账号
+  notice_id TEXT NOT NULL, -- 消息标识，与 WebSocket 推送的标识一致，重复写入按同一条处理
+  level TEXT NOT NULL DEFAULT 'info' CHECK (level IN ('info', 'success', 'warn', 'error')), -- 消息级别
+  title TEXT NOT NULL, -- 标题
+  message TEXT, -- 正文
+  link TEXT, -- 站内跳转地址
+  created_at INTEGER NOT NULL, -- 创建时间，Unix 毫秒
+  PRIMARY KEY (username, notice_id)
+);
+CREATE INDEX IF NOT EXISTS idx_client_notification_time ON client_notification (username, created_at DESC);

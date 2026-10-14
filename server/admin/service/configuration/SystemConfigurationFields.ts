@@ -1,5 +1,12 @@
 /** 后台缺失的系统字段元数据，值类型与现有业务默认值一致。 @author yahyaoo */
+import { libraryConfigurationFields, validateLibraryConfiguration } from './LibraryConfigurationFields'
 export const additionalConfigurationFields = [
+  ...libraryConfigurationFields,
+  { key: 'clientChannel.reportIntervalMinutes', label: '状态上报间隔（分钟）', type: 'number', min: 0, max: 1440, group: '基本配置', hint: '默认 30 分钟；0 恢复立即上报。歌单、收藏与设置仍在 2 秒内提交；新连接生效。' },
+  { key: 'clientChannel.progressThrottleMs', label: '通道进度推送节流（毫秒）', type: 'number', min: 200, max: 5000, group: '基本配置', hint: '默认 500；完成、失败和队列变更立即推送。' },
+  { key: 'clientChannel.maxBatchOps', label: '状态上报条数阈值', type: 'number', min: 1, max: 512, group: '基本配置', hint: '默认 200；达到阈值后分批提交。' },
+  { key: 'clientChannel.maxBatchBytes', label: '状态上报字节阈值', type: 'number', min: 1024, max: 1048576, group: '基本配置', hint: '默认 262144；退出保活提交受浏览器限额限制，未确认数据保留。' },
+  { key: 'clientChannel.legacyProgressPolling', label: '临时进度采样回退', type: 'checkbox', group: '基本配置', hint: '默认关闭。只在已订阅且有活动任务时临时采样；事件完整接入后关闭。' },
   { key: 'auth.sessionDays', label: '普通登录有效期（天）', type: 'number', min: 1, max: 365, group: '基本配置', hint: '账号登录必须验证；普通登录关闭浏览器后需重新登录。修改后立即生效。' },
   { key: 'auth.rememberMeDays', label: '记住我有效期（天）', type: 'number', min: 1, max: 365, group: '基本配置', hint: '记住登录可跨浏览器重开和服务重启；缩短有效期立即生效。' },
   { key: 'bindIP', label: '绑定 IP 配置', type: 'text', group: '基本配置', hint: '保留此配置值；当前主 HTTP 服务固定监听 0.0.0.0。' },
@@ -17,6 +24,7 @@ export const additionalConfigurationFields = [
 
 /** @param input 请求配置。 @returns 通过类型和取值校验的新增字段。 @author yahyaoo */
 export function validateAdditionalConfiguration(input: Record<string, any>): Record<string, any> {
+  validateLibraryConfiguration(input)
   const result: Record<string, any> = {}
   for (const field of additionalConfigurationFields) {
     if (input[field.key] === undefined) continue

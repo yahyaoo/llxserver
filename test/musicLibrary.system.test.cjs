@@ -35,6 +35,8 @@ test('音乐库：多目录同名文件、进度、无阻塞、音质、权限�
     const before=Date.now();assert.equal((await fetch(runtime.origin+'/api/music/library/scan',{headers:user})).status,200);assert.ok(Date.now()-before<1500,'扫描期间进度接口仍响应');
     const finished=await waitScan(runtime,user);assert.equal(finished.status,'completed',JSON.stringify(finished));assert.equal(finished.percent,100);
     const library=await (await fetch(runtime.origin+'/api/music/cache/list',{headers:user})).json();const songs=library.data.filter(item=>item.folder==='custom');assert.equal(songs.length,3);assert.equal(new Set(songs.map(item=>item.id)).size,3);
+    const paged=await fetch(runtime.origin+'/api/music/cache/page?offset=0&limit=2&sort=time&order=desc',{headers:user});assert.equal(paged.status,200);const pagedBody=await paged.json();assert.equal(pagedBody.items.length,2);assert.equal(pagedBody.total,library.data.length);assert.ok(paged.headers.get('etag'));
+    const customPaged=await fetch(runtime.origin+'/api/music/custom/page?offset=0&limit=2&sort=name&order=asc',{headers:user});assert.equal(customPaged.status,200);const customBody=await customPaged.json();assert.equal(customBody.total,3);assert.equal(customBody.items.length,2);
     assert.ok(songs.some(item=>item.id==='wy_123'&&item.source==='wy'),'后台扫描保留旧目录索引的平台关联');
     const standard=songs.find(item=>item.bitDepth===16),high=songs.find(item=>item.bitDepth===24);assert.ok(standard);assert.ok(high);assert.equal(standard.sampleRate,44100);assert.equal(high.sampleRate,96000);assert.equal(high.quality,'flac24bit');assert.notEqual(standard.quality,'custom');
     const file='/api/music/custom/file?filename='+encodeURIComponent(standard.filename);

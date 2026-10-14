@@ -14,7 +14,11 @@
                 if (typeof isLyricViewOpen !== 'undefined' && isLyricViewOpen) return;
                 if (!document.body.classList.contains('player-detail-open')) window.toggleLyrics();
             };
-            this.onLayoutChange = () => this.updateScrollClearance();
+            this.onLayoutChange = () => {
+                if (window.ClientPerformance?.scheduleLayout) window.ClientPerformance.scheduleLayout(this, () => this.measureLayout(), value => this.applyLayout(value));
+                else this.updateScrollClearance();
+            };
+            this.onVisibility = () => { if (!document.hidden) { this.onLayoutChange(); this.updateLyrics(this.pendingLyricIndex ?? this.lyricIndex ?? -1); } };
             this.onDocumentClick = event => {
                 if (!event.target.closest('[data-player-popover]')) this.closePopovers();
                 if (event.target.closest('[data-player-action]')) this.closePopovers();
@@ -40,12 +44,14 @@
             this.destroy();
             root.innerHTML = window.LXPlayerBarTemplate;
             this.root = root;
+            window.invalidatePlayerProgress?.();
             document.getElementById('player-footer').addEventListener('click', this.onBarClick);
             root.classList.add('player-bar-host');
             document.body.classList.add('player-bar-floating');
             document.getElementById('player-volume-popover').inert = true;
             document.addEventListener('click', this.onDocumentClick);
             document.addEventListener('keydown', this.onDocumentKeydown);
+            document.addEventListener('visibilitychange', this.onVisibility);
             document.getElementById('volume-container')?.addEventListener('keydown', this.onVolumeKeydown);
             this.unsubscribeLyrics = window.playbackLyrics?.subscribe(state => {
                 if (this.lyricLines !== state.lines || this.lyricMessage !== state.message) this.setLyrics(state.lines, state.message);
@@ -57,14 +63,29 @@
 
         /** 同步浮层遮挡范围，只用于滚动末尾留白，不改变页面高度。 */
         updateScrollClearance() {
-            this.updateMetadataScroll();
+            this.applyLayout(this.measureLayout());
+        }
+        measureLayout() {
+            if (document.hidden) return null;
             const footer = document.getElementById('player-footer');
-            if (!this.root || !footer) return;
+            if (!this.root || !footer) return null;
             const rect = footer.getBoundingClientRect();
             const viewportHeight = window.innerHeight;
             const visible = rect.height > 0 && rect.top + rect.height > 0 && rect.top < viewportHeight;
             const clearance = visible ? Math.ceil(Math.min(viewportHeight, viewportHeight - rect.top) + 16) : 0;
-            document.body.style.setProperty('--player-bar-clearance', `${clearance}px`);
+            const container = document.getElementById('player-metadata-text'), track = container?.querySelector('.player-metadata-track');
+            return { clearance, container, overflow: container && track ? Math.max(0, track.scrollWidth - container.clientWidth) : 0 };
+        }
+        applyLayout(value) {
+            if (!value || !this.root || document.hidden) return;
+            const { clearance, container, overflow } = value;
+            if (this.clearance !== clearance) { document.body.style.setProperty('--player-bar-clearance', `${clearance}px`); this.clearance = clearance; }
+            if (container && (this.metadataOverflow !== overflow || this.metadataContainer !== container)) {
+                container.setAttribute('data-overflow', String(overflow > 1));
+                container.style.setProperty('--metadata-offset', -overflow + 'px');
+                container.style.setProperty('--metadata-duration', Math.max(8, overflow / 24 + 4) + 's');
+                this.metadataOverflow = overflow; this.metadataContainer = container;
+            }
         }
 
         /** 歌手和专辑保持单行；超长时往返滚动，原节点继续供播放页使用。 @author yahyaoo */
@@ -103,6 +124,8 @@
             document.getElementById('player-footer')?.removeEventListener('click', this.onBarClick);
             document.removeEventListener('click', this.onDocumentClick);
             document.removeEventListener('keydown', this.onDocumentKeydown);
+            document.removeEventListener('visibilitychange', this.onVisibility);
+            window.ClientPerformance?.cancelLayout(this);
             document.getElementById('volume-container')?.removeEventListener('keydown', this.onVolumeKeydown);
             window.removeEventListener('resize', this.onLayoutChange);
             document.getElementById('player-footer')?.removeEventListener('transitionend', this.onLayoutChange);
@@ -115,6 +138,7 @@
             this.root.classList.remove('player-bar-host');
             document.body.classList.remove('player-bar-floating');
             this.root = null;
+            this.clearance = null; this.metadataOverflow = null; this.metadataContainer = null;
         }
 
         /** 歌曲信息刷新不清空歌词；歌词状态由公共会话统一发布。 */
@@ -165,6 +189,8 @@
 
         /** 显示当前与下一句，向前播放和拖动进度均按同一行号更新。 */
         updateLyrics(index) {
+            this.pendingLyricIndex = index;
+            if (document.hidden) return;
             const current = document.getElementById('player-lyric-current');
             const next = document.getElementById('player-lyric-next');
             if (!current || !next) return;
@@ -173,11 +199,13 @@
                 for (const line of [current, next]) line.animate?.([{ transform: 'translateY(8px)', opacity: .4 }, { transform: 'translateY(0)', opacity: 1 }], { duration: 220 });
             }
             this.lyricIndex = index;
-            current.textContent = (this.lyricLines[first]?.text || this.lyricLines[first]?.words?.map(word => word.text).join('')) || this.lyricMessage || '暂无歌词';
+            const currentText = (this.lyricLines[first]?.text || this.lyricLines[first]?.words?.map(word => word.text).join('')) || this.lyricMessage || '暂无歌词';
+            if (current.textContent !== currentText) current.textContent = currentText;
             if (!this.lyricLines.length && this.lyricMessage?.includes('加载')) {
                 current.innerHTML = window.LoadingState.render(this.lyricMessage, 'inline');
             }
-            next.textContent = (this.lyricLines[first + 1]?.text || this.lyricLines[first + 1]?.words?.map(word => word.text).join('')) || '';
+            const nextText = (this.lyricLines[first + 1]?.text || this.lyricLines[first + 1]?.words?.map(word => word.text).join('')) || '';
+            if (next.textContent !== nextText) next.textContent = nextText;
             for (const line of [current, next]) line.setAttribute('title', line.textContent);
         }
 

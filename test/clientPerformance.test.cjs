@@ -13,7 +13,7 @@ function fixture(saved = new Map(), storage = new Map()) {
         ListStore: { readPending: async (channel, name) => structuredClone(saved.get(name + ':' + channel)),
             writePending: async (channel, value, name) => { if (value === null) saved.delete(name + ':' + channel); else saved.set(name + ':' + channel, structuredClone(value)); } } };
     vm.runInNewContext(source, { window, console: { warn() {} }, document: { addEventListener() {} }, structuredClone,
-        localStorage, AbortController, TextDecoder, performance, setTimeout, clearTimeout, setInterval: (fn, ms) => intervals.push({ fn, ms }) });
+        localStorage, Blob, AbortController, TextDecoder, performance, setTimeout, clearTimeout, setInterval: (fn, ms) => intervals.push({ fn, ms }) });
     const api = window.ClientSync;
     api.register('settings', async (data, context) => sent.push({ data: structuredClone(data), owner: context.name }));
     return { api, saved, sent, intervals, window, storage, events, owner: name => { owner = name; } };
@@ -55,8 +55,8 @@ test('实际喜欢模块只发送改变的成员，撤销零上报，排序使�
     data.loveList = [second, song]; await f.api.update('favorites', data.loveList);
     data.loveList = [song, second]; await f.api.update('favorites', data.loveList); await f.api.flush(); assert.equal(requests.length, 0);
 });
-test('固定30秒周期；空周期、相同状态及修改后恢复原值均零请求', async () => {
-    const f = fixture(); assert.equal(f.intervals[0].ms, 30000);
+test('无固定空闲周期；显式提交、相同状态及修改后恢复原值均零请求', async () => {
+    const f = fixture(); assert.equal(f.intervals.length, 0);
     f.api.seed('settings', { enabled: false });
     await f.api.flush(); assert.equal(f.sent.length, 0);
     await f.api.update('settings', { enabled: false }); await f.api.flush(); assert.equal(f.sent.length, 0);

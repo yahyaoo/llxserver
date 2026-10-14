@@ -1,6 +1,8 @@
 import { resolveMusicFile } from '../../application/library/MusicDirectoryService'
 import type { RequestContext, ServerRuntime } from '../../common/http/RequestContext'
 import { removeMatchedDislikes } from './dislike/removeMatched'
+import crypto from 'node:crypto'
+import { ensureCustomLyrics } from './library/CustomLyricCache'
 /** 音乐搜索、歌手专辑查询、自定义歌曲维护和不喜欢规则所需的应用依赖契约。 @author yahyaoo */
 export type DiscoveryServiceRuntime = Pick<ServerRuntime, 'verifyUserAuth' | 'customMusicManager' | 'getUserConfig' | 'readBody' | 'path' | 'storageFs' | 'fileCache' | 'serverDownloads' | 'musicSdk' | 'musicProgressClients' | 'normalizeSongInfo' | 'isSourceSupported' | 'callUserApiGetMusicUrl' | 'needle' | 'getProxyAgent' | 'resolveServerSong' | 'getAudioRemoteSize' | 'formatBytes' | 'getUserSpace' | 'serializeDislikeRules' | 'dislikeMatchOptions' | 'splitSingers' | 'encodeAlbumRule' | 'normalizeText' | 'invalidateDislikeCache'>
 /** 音乐搜索、歌手专辑查询、自定义歌曲维护和不喜欢规则服务。 @author yahyaoo */
@@ -22,7 +24,9 @@ export async function postMusicCustomSync(context: RequestContext, runtime: Disc
           res.end(JSON.stringify({ success: false, message: 'Unauthorized' }))
           return
         }
-        const scan = customMusicManager.ensureMusicScan(verified, true)
+        const mode = context.urlObj.searchParams.get('mode') || 'full'
+        if (!['quick', 'full'].includes(mode)) { res.writeHead(400, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ success: false, message: '扫描模式必须为 quick 或 full' })); return }
+        const scan = customMusicManager.ensureMusicScan(verified, true, mode as 'quick' | 'full')
         res.writeHead(202, { 'Content-Type': 'application/json' })
         res.end(JSON.stringify({ success: true, scan }))
         return
@@ -105,9 +109,12 @@ export async function getMusicCustomCover(context: RequestContext, runtime: Disc
         }
         const cover = await customMusicManager.getCustomCover(filename, verified)
         if (cover && cover.data) {
+          const version = crypto.createHash('sha256').update(cover.data).digest('hex')
+          const etag = '"' + version + '"'
+          const headers = { 'Content-Type': cover.mime || 'image/jpeg', 'ETag': etag, 'Cache-Control': urlObj.searchParams.get('coverVersion') === version || urlObj.searchParams.get('version') === version ? 'private, max-age=604800, immutable' : 'private, no-cache' }
+          if (String(req.headers['if-none-match'] || '').split(',').some(value => value.trim().replace(/^W\//, '') === etag || value.trim() === '*')) { res.writeHead(304, headers); res.end(); return }
           res.writeHead(200, {
-            'Content-Type': cover.mime || 'image/jpeg',
-            'Cache-Control': 'public, max-age=86400',
+            ...headers,
           })
           res.end(cover.data)
         } else {
@@ -288,13 +295,13 @@ export async function getMusicCustomEmbedLyric(context: RequestContext, runtime:
             res.end(JSON.stringify({ success: false, message: '文件不存在' }))
             return
           }
-          const { MusicTagger: MT } = require('music-tag-native')
-          const tagger = new MT()
-          tagger.loadPath(filePath)
-          const lrc = tagger.lyrics || ''
-          tagger.dispose()
-          res.writeHead(200, { 'Content-Type': 'application/json' })
-          res.end(JSON.stringify({ success: true, lrc }))
+          const value = await ensureCustomLyrics(verified, filename, { network: false })
+          const lrc = value?.lyrics?.lrc || ''
+          const etag = value ? '"' + value.version + '"' : undefined
+          const headers = { 'Content-Type': 'application/json', 'Cache-Control': 'private, no-cache', ...(etag ? { ETag: etag } : {}) }
+          if (etag && req.headers['if-none-match'] === etag) { res.writeHead(304, headers); res.end(); return }
+          res.writeHead(200, headers)
+          res.end(JSON.stringify({ success: true, ...(value?.lyrics || {}), lrc, lyricVersion: value?.version }))
         } catch (e: any) {
           res.writeHead(200, { 'Content-Type': 'application/json' })
           res.end(JSON.stringify({ success: false, message: e.message || '读取内嵌歌词失败' }))

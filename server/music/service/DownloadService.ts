@@ -1,4 +1,5 @@
 import type { RequestContext, ServerRuntime } from '../../common/http/RequestContext'
+import { serverEvents } from '../../application/events/ServerEvents'
 /** 自动下载、缓存目录维护、媒体文件响应与歌曲洗版所需的应用依赖契约。 @author yahyaoo */
 export type DownloadServiceRuntime = Pick<ServerRuntime, 'verifyUserAuth' | 'getUserSpace' | 'getSyncDownloadData' | 'getUserSyncProgress' | 'path' | 'File' | 'storageFs' | 'scheduler' | 'getUserSyncStorageLocation' | 'triggerUserSync' | 'cancelUserSync' | 'readBody' | 'isUserSyncRunning' | 'migrateSyncStorage' | 'saveSyncDownloadData' | 'getUpdatedListIds' | 'removeUpdatedListId' | 'getCacheRequestUsername' | 'getUserConfig' | 'remasterQueue' | 'fileCache' | 'serverDownloads' | 'url' | 'serverDownloadQueue' | 'accessLog' | 'customMusicManager' | 'os' | 'crypto' | 'MusicTagger' | 'MetaPicture' | 'musicSdk'>
 import type * as cacheTypes from './cache/FileCacheService'
@@ -2343,6 +2344,7 @@ export async function getMusicDownload(context: RequestContext, runtime: Downloa
 
                   if (taskId) {
                     fileCache.cacheProgress.set(taskId, { progress: 0, status: 'downloading', total, received: 0, speed: 0, updatedAt: Date.now() })
+                    serverEvents.emitEvent('download:proxy-progress', { username: runtime.verifyUserAuth(req) || '_open', taskId, data: fileCache.cacheProgress.get(taskId)! })
                   }
 
                   proxyRes.on('data', (c: any) => {
@@ -2357,15 +2359,18 @@ export async function getMusicDownload(context: RequestContext, runtime: Downloa
                       }
                       const progress = total > 0 ? Math.round((received / total) * 100) : 0
                       fileCache.cacheProgress.set(taskId, { progress, status: 'downloading', total, received, speed: currentSpeed, updatedAt: now })
+                      serverEvents.emitEvent('download:proxy-progress', { username: runtime.verifyUserAuth(req) || '_open', taskId, data: fileCache.cacheProgress.get(taskId)! })
                     }
                   })
                   proxyRes.on('end', async () => {
                     if (taskId) {
                       fileCache.cacheProgress.set(taskId, { progress: 100, status: 'tagging', total, received, speed: 0, updatedAt: Date.now() })
+                      serverEvents.emitEvent('download:proxy-progress', { username: runtime.verifyUserAuth(req) || '_open', taskId, data: fileCache.cacheProgress.get(taskId)! })
                     }
                     const finishProgress = () => {
                       if (!taskId) return
                       fileCache.cacheProgress.set(taskId, { progress: 100, status: 'finished', total: total || received, received, speed: 0, updatedAt: Date.now() })
+                      serverEvents.emitEvent('download:proxy-progress', { username: runtime.verifyUserAuth(req) || '_open', taskId, data: fileCache.cacheProgress.get(taskId)! })
                       setTimeout(() => fileCache.cacheProgress.delete(taskId), 30000)
                     }
                     let tempPath = ''

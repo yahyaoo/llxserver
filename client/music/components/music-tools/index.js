@@ -22,7 +22,11 @@
         for (const task of values) {
             const row = document.createElement('div'); row.className = 'music-task-progress';
             const text = document.createElement('span');
-            text.textContent = `${task.action === 'scan' ? '扫描目录' : labels[task.action]} ${task.percent}% · ${task.completed}/${task.total}` + (task.failed ? ` · 失败 ${task.failed}` : '') + (task.status === 'error' ? ` · ${task.errors?.[0] || '任务失败'}` : '');
+            const errors = Array.isArray(task.errors) ? task.errors : [];
+            const firstError = errors[0];
+            const firstErrorText = typeof firstError === 'string' ? firstError : firstError ? `${firstError.file || firstError.directory || '未知文件'}：${firstError.message || '读取失败'}` : '任务失败';
+            text.textContent = `${task.action === 'scan' ? '扫描目录' : labels[task.action]} ${task.percent}% · ${task.completed}/${task.total}` + (task.failed ? ` · 失败 ${task.failed}` : '') + (task.status === 'error' ? ` · 异常 ${errors.length} 首：${firstErrorText}` : '');
+            if (errors.length) text.title = errors.map(error => typeof error === 'string' ? error : `${error.file || error.directory || '未知文件'}：${error.message || '读取失败'}`).join('\n');
             const bar = document.createElement('progress'); bar.max = 100; bar.value = task.percent || 0; bar.setAttribute('aria-label', text.textContent);
             row.append(text, bar); host.append(row);
         }
@@ -54,7 +58,13 @@
         host.firstElementChild?.focus();
         const close = event => { if (!host.contains(event.target)) cleanup(); };
         const listenerTimer = setTimeout(() => document.addEventListener('pointerdown', close, true));
-        function cleanup() { clearTimeout(listenerTimer); host.remove(); document.removeEventListener('pointerdown', close, true); closeMenu = null; }
+        function cleanup() {
+            clearTimeout(listenerTimer); host.remove(); document.removeEventListener('pointerdown', close, true);
+            document.removeEventListener('scroll', cleanup, true); window.removeEventListener('resize', cleanup);
+            window.removeEventListener('music-account-changed', cleanup); closeMenu = null;
+        }
+        document.addEventListener('scroll', cleanup, { capture: true, passive: true });
+        window.addEventListener('resize', cleanup); window.addEventListener('music-account-changed', cleanup);
         closeMenu = cleanup;
         host.onkeydown = event => { if (event.key === 'Escape') { cleanup(); button.focus(); } };
     }
@@ -72,7 +82,7 @@
     function more(button, view) {
         const songs = songsFor(view), library = view.id === 'view-localmusic';
         const remap = ['重新关联', 'fa-link', () => document.getElementById('lm-remap-toggle-btn')?.click(), !!libraryManager().enableReMapping];
-        const entries = library ? [['扫描目录', 'fa-sync-alt', () => window.LocalMusicManager.refresh()], ...Object.entries(labels).filter(([action]) => action !== 'delete').map(([action, label]) => [label, action === 'lyrics' ? 'fa-closed-captioning' : action === 'embed' ? 'fa-file-audio' : 'fa-tags', () => start(action, [], true)]), remap, ['批量操作', 'fa-tasks', () => window.LocalMusicManager.toggleBatchMode()]] : maintenanceEntries(songs);
+        const entries = library ? [['刷新', 'fa-sync-alt', () => window.LocalMusicManager.refresh()], ['智能检测', 'fa-magic', () => window.LocalMusicManager.autoLinkAll()], ...Object.entries(labels).filter(([action]) => action !== 'delete').map(([action, label]) => [label, action === 'lyrics' ? 'fa-closed-captioning' : action === 'embed' ? 'fa-file-audio' : 'fa-tags', () => start(action, [], true)]), remap, ['批量操作', 'fa-tasks', () => window.LocalMusicManager.toggleBatchMode()]] : maintenanceEntries(songs);
         menu(button, entries);
     }
     const tools = new Map(); let docked = null;
@@ -94,16 +104,14 @@
     function mount(view, heading) {
         if (!view || !heading || heading.querySelector('.music-page-controls') || tools.has(heading)) return;
         const bar = document.createElement('div'); bar.className = 'music-page-controls';
-        const roam = document.createElement('button'); roam.type = 'button'; roam.innerHTML = '<i class="fas fa-heart"></i><span>漫游播放</span>';
+        const roam = document.createElement('button'); roam.type = 'button'; roam.innerHTML = '<i class="fas fa-compass roaming-heart"></i><span>漫游播放</span>';
         roam.onclick = () => window.Roaming.start(songsFor(view));
         if (!['view-downloads'].includes(view.id) && window.currentViewingListId !== 'dislike_songs') bar.append(roam);
         if (view.id === 'view-localmusic') {
             const filter = document.createElement('button'); filter.type = 'button'; filter.id = 'lm-filter-toggle-btn'; filter.setAttribute('aria-expanded', 'false'); filter.innerHTML = '<i class="fas fa-filter"></i><span>筛选</span>'; filter.onclick = () => window.LocalMusicManager.toggleFilterPanel();
-            const refresh = document.createElement('button'); refresh.type = 'button'; refresh.innerHTML = '<i class="fas fa-sync-alt"></i><span>刷新</span>'; refresh.onclick = () => window.LocalMusicManager.refresh();
-            bar.append(filter, refresh);
-            const smart = document.createElement('button'); smart.type = 'button'; smart.innerHTML = '<i class="fas fa-magic"></i><span>智能检测</span>'; smart.onclick = () => window.LocalMusicManager.autoLinkAll();
+            bar.append(filter);
             const link = document.createElement('button'); link.type = 'button'; link.id = 'lm-remap-toggle-btn'; link.hidden = true; link.innerHTML = '<i class="fas fa-link"></i><span>重新关联</span>'; link.onclick = () => window.LocalMusicManager.toggleReMapping();
-            bar.append(smart, link);
+            bar.append(link);
         }
         const original = view.querySelector('.recent-view-actions,.downloads-toolbar');
         if (original) { [...original.children].forEach(button => bar.append(button)); original.hidden = true; }
@@ -122,15 +130,18 @@
         const removal = proxies.filter(([, icon]) => /^fa-(trash|trash-alt|times)$/.test(icon));
         return [...proxies.filter(entry => !removal.includes(entry)), ...maintenance, ...removal];
     }
-    function prepareRows() {
-        document.querySelectorAll('.song-row-actions').forEach(actions => {
+    function prepareRows(root = document) {
+        const rows = [...(root.matches?.('.song-row-actions') ? [root] : []), ...(root.querySelectorAll?.('.song-row-actions') || [])];
+        rows.forEach(actions => {
             if (actions.querySelector('[data-library-more],.song-maintenance-menu')) return;
             const love = actions.querySelector('[data-love-song]');
             if (!love) return;
             const button = document.createElement('button'); button.type = 'button'; button.className = 'song-maintenance-menu'; button.title = '更多'; button.setAttribute('aria-label', '更多操作'); button.setAttribute('aria-haspopup', 'menu'); button.innerHTML = '<i class="fas fa-ellipsis-h"></i>';
             button.onclick = event => {
                 event.stopPropagation();
-                let song = JSON.parse(decodeURIComponent(love.dataset.loveSong));
+                const currentLove = actions.querySelector('[data-love-song]');
+                if (!currentLove) return;
+                let song = JSON.parse(decodeURIComponent(currentLove.dataset.loveSong));
                 if (actions.closest('#view-downloads')) {
                     const task = window.SystemDownloadManager.tasks.find(task => actions.closest('.download-task-row')?.id === 'dl-task-' + task.id);
                     if (task) song = downloadSong(task);
@@ -156,27 +167,68 @@
             if (heading.firstElementChild.textContent !== name) heading.firstElementChild.textContent = name;
             mount(search, heading);
         }
-        prepareRows();
         syncDock();
         for (const tool of tools.values()) {
             const roam = tool.bar.querySelector('button');
             if (roam?.textContent === '漫游播放') roam.hidden = tool.view.id === 'view-search' && (!songsFor(tool.view).length || window.currentViewingListId === 'dislike_songs');
         }
     }
-    document.addEventListener('click', event => {
+    const onClick = event => {
         const button = event.target.closest('[data-library-more]');
         if (button) { event.preventDefault(); event.stopPropagation(); rowMenu(button, Number(button.dataset.libraryMore)); }
-    }, true);
-    document.addEventListener('scroll', syncDock, true);
-    let queued = false;
-    new MutationObserver(() => { prepareRows(); if (queued) return; queued = true; requestAnimationFrame(() => { queued = false; refreshTools(); }); }).observe(document.querySelector('.music-shell'), { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'data-online-search'] });
+    };
+    document.addEventListener('click', onClick, true);
+    const shell = document.querySelector('.music-shell');
+    let frame = null, dockFrame = null;
+    const scheduleTools = () => {
+        if (frame !== null || document.hidden) return;
+        frame = requestAnimationFrame(() => { frame = null; refreshTools(); });
+    };
+    const onScroll = () => {
+        if (dockFrame !== null || document.hidden) return;
+        dockFrame = requestAnimationFrame(() => { dockFrame = null; syncDock(); });
+    };
+    shell?.addEventListener('scroll', onScroll, { capture: true, passive: true });
+    window.addEventListener('resize', onScroll, { passive: true });
+    // 行挂载只检查addedNodes。timeupdate/style/class不触发全树工具增强。
+    const rowObserver = new MutationObserver(records => {
+        window.PerfProbe?.count('observer:music-tools');
+        let headingChanged = false;
+        for (const record of records) {
+            for (const node of record.removedNodes) if (node.nodeType === 1) window.releaseMarquees?.(node);
+            for (const node of record.addedNodes) if (node.nodeType === 1) {
+                prepareRows(node); window.applyMarqueeChecks?.(node);
+                if (node.matches('#lm-toolbar,.downloads-heading,.recent-view-header') || node.querySelector('#lm-toolbar,.downloads-heading,.recent-view-header')) headingChanged = true;
+            }
+        }
+        if (headingChanged) scheduleTools();
+    });
+    if (shell) rowObserver.observe(shell, { childList: true, subtree: true });
+    const viewObserver = new MutationObserver(scheduleTools);
+    for (const view of shell?.querySelectorAll('[id^="view-"]') || []) viewObserver.observe(view, { attributes: true, attributeFilter: ['class', 'data-online-search'] });
+    const title = document.getElementById('page-title');
+    if (title) viewObserver.observe(title, { childList: true });
+    const onVisibility = () => {
+        if (document.hidden) { if (frame !== null) cancelAnimationFrame(frame); if (dockFrame !== null) cancelAnimationFrame(dockFrame); frame = dockFrame = null; closeMenu?.(); }
+        else scheduleTools();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
     window.MusicMaintenance = { start, menu, maintenanceEntries, downloadSong, setScan(value) { scan = value; renderProgress(); }, more, refreshTools, songsFor };
     refreshTools();
+    prepareRows(shell || document);
     // 任务进度由页面订阅的长连接推送，不在空闲播放器轮询。作者：jingyh
-    window.ClientTransport?.on('maintenance', data => { tasks = data.tasks || []; scan = data.scan || null; renderProgress();
+    const unsubscribeMaintenance = window.ClientTransport?.on('maintenance', data => { tasks = data.tasks || []; scan = data.scan || null; renderProgress();
         window.LocalMusicManager?.showScanProgress(scan);
         for (const task of tasks) if (task.status !== 'running' && !completed.has(task.id)) {
             completed.add(task.id); (task.status === 'error' ? window.showError : window.showInfo)?.(`${labels[task.action]}${task.status === 'error' ? '失败' : '完成'}：成功 ${task.succeeded}，跳过 ${task.skipped}，失败 ${task.failed}`);
         } });
-    window.addEventListener('pagehide', () => clearInterval(timer));
+    window.MusicMaintenance.destroy = () => {
+        if (typeof unsubscribeMaintenance === 'function') unsubscribeMaintenance();
+        rowObserver.disconnect(); viewObserver.disconnect(); closeMenu?.(); restore(); tools.clear(); slot.remove();
+        if (frame !== null) cancelAnimationFrame(frame); if (dockFrame !== null) cancelAnimationFrame(dockFrame);
+        shell?.removeEventListener('scroll', onScroll, true); window.removeEventListener('resize', onScroll);
+        document.removeEventListener('click', onClick, true); document.removeEventListener('visibilitychange', onVisibility);
+        clearInterval(timer);
+    };
+    window.addEventListener('pagehide', event => { if (!event.persisted) window.MusicMaintenance.destroy(); });
 })();

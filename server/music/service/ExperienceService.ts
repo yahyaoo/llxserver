@@ -3,6 +3,7 @@ import path from 'node:path'
 import crypto from 'node:crypto'
 import type { ExperienceRepository } from '../repository/ExperienceRepository'
 import { PlayCountService } from './PlayCountService'
+import { pageItems, type PageQuery } from './library/PagedListService'
 
 /** 音乐体验配置与搜索分组业务。 @author jingyh @date 2026-10-10 */
 export const DEFAULT_EXPERIENCE = {
@@ -76,6 +77,15 @@ export function putExperience(repository: ExperienceRepository, cacheDir: string
 /** 返回按正常播放次数降序排列的账号歌曲列表。 */
 export function getRecent(repository: ExperienceRepository): any[] {
   return new PlayCountService(repository).get()
+}
+
+/** 对最近播放执行只读分页；无参数调用仍由旧接口返回完整数组。 */
+export function getRecentPage(repository: ExperienceRepository, query: PageQuery) {
+  const items = getRecent(repository)
+  return pageItems(items, query, {
+    text: item => `${item.name || ''} ${item.singer || ''} ${item.albumName || item.album || ''}`,
+    sort: { time: item => Number(item.playedAt || 0), count: item => Number(item.playCount || 0) },
+  })
 }
 
 /** 委托公共统计服务记录有效播放，沿用账号历史保存上限。 */

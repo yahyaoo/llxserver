@@ -6,6 +6,10 @@
                 <button id="header-settings-trigger" class="top-icon-button" onclick="toggleSettingsPage()" title="设置" aria-label="设置" aria-expanded="false" aria-controls="view-settings"><i class="fas fa-cog"></i></button>
                 <button id="sleep-timer-trigger" class="top-icon-button" onclick="openSleepTimerModal()" title="睡眠定时" aria-label="睡眠定时"><i class="far fa-clock"></i><span id="sleep-timer-countdown" class="hidden"></span></button>
                 <div class="header-dropdown" data-header-dropdown>
+                    <button id="header-notice-trigger" class="top-icon-button" onclick="toggleHeaderDropdown('header-notice-menu')" title="消息中心" aria-label="消息中心" aria-expanded="false" aria-controls="header-notice-menu"><i class="far fa-bell"></i></button>
+                    <div id="header-notice-menu" class="header-dropdown-panel notice-panel hidden" data-header-menu data-header-trigger="header-notice-trigger"></div>
+                </div>
+                <div class="header-dropdown" data-header-dropdown>
                     <button id="header-theme-trigger" class="header-menu-trigger" onclick="toggleHeaderDropdown('header-theme-menu')" aria-expanded="false" aria-controls="header-theme-menu" aria-label="选择主题与外观"><i class="fas fa-palette"></i><span id="header-theme-label">樱花粉</span><i class="fas fa-chevron-down"></i></button>
                     <div id="header-theme-menu" class="header-dropdown-panel theme-menu hidden" data-header-menu data-header-trigger="header-theme-trigger"><p class="header-menu-title">主题与外观</p><div data-theme-controls></div><button class="theme-more" onclick="closeHeaderDropdowns(); switchTab('settings'); selectSettingsSection('theme')">自定义颜色与图片背景 <i class="fas fa-arrow-right"></i></button></div>
                 </div>

@@ -10,10 +10,14 @@
             this.onTrackChange = () => { if (this.open) this.updateTrack(); };
             this.onFullscreenChange = () => this.updateFullscreen();
             this.onAccountChange = () => { if (this.open) this.updateTrack(true); };
+            this.onResize = () => { if (this.open && !document.hidden) this.updateResponsiveLayout(); };
+            this.onMore = () => this.updateSpectrum();
         }
 
         /** 同步挂载页面，确保业务初始化前已有全部歌词与画布节点。 */
         mount() {
+            if (this.mounted) return;
+            this.mounted = true;
             const container = document.getElementById('player-detail-container');
             this.left = document.createElement('section');
             this.left.className = 'player-detail-left';
@@ -37,7 +41,7 @@
             this.lyricsButton.setAttribute('aria-label', '全屏歌词');
             this.lyricsButton.innerHTML = '<i class="fas fa-align-left" aria-hidden="true"></i>';
             this.lyricsButton.addEventListener('click', () => window.PlayerFeaturePages.openLyrics());
-            window.addEventListener('resize', () => this.updateResponsiveLayout());
+            window.addEventListener('resize', this.onResize, { passive: true });
             this.fullscreenButton = document.getElementById('player-detail-fullscreen');
             this.fullscreenButton.addEventListener('click', () => this.toggleFullscreen());
             this.background = new window.PlayerBackground(document.getElementById('player-artist-background'));
@@ -58,7 +62,7 @@
                 this.trackObserver.observe(document.getElementById(id), { childList: true, characterData: true, subtree: true });
             }
             // 频谱快捷键和设置页都可能修改已有开关，菜单打开时读最新状态。
-            document.getElementById('player-more-btn').addEventListener('click', () => this.updateSpectrum());
+            document.getElementById('player-more-btn').addEventListener('click', this.onMore);
             document.addEventListener('fullscreenchange', this.onFullscreenChange);
             window.addEventListener('music-account-changed', this.onAccountChange);
             this.applyBackground();
@@ -181,10 +185,19 @@
             this.fullscreenButton.setAttribute('aria-pressed', String(active));
             this.fullscreenButton.querySelector('i').className = 'fas fa-' + (active ? 'compress' : 'expand');
         }
+        destroy() {
+            this.viewObserver?.disconnect(); this.trackObserver?.disconnect(); this.background?.clear();
+            window.removeEventListener('resize', this.onResize);
+            window.removeEventListener('music-account-changed', this.onAccountChange);
+            document.removeEventListener('fullscreenchange', this.onFullscreenChange);
+            document.getElementById('player-more-btn')?.removeEventListener('click', this.onMore);
+            window.musicVisualizer?.syncLifecycle();
+        }
     }
     window.PlayerDetailView = PlayerDetailView;
     const root = document.getElementById('player-detail-root');
     root.innerHTML = window.LXPlayerDetailTemplate;
     window.playerDetailView = new PlayerDetailView(document.getElementById('view-player-detail'));
     window.playerDetailView.mount();
+    window.addEventListener('pagehide', event => { if (!event.persisted) window.playerDetailView.destroy(); });
 })();

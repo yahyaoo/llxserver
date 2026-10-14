@@ -57,7 +57,8 @@ body:has(#view-search[data-online-search="true"]:not(.hidden)) .library-search {
 }
 .library-search-input { display: flex; align-items: center; padding: 0 18px; gap: 12px; height: 52px; color: var(--text-muted); }
 .library-search-input:focus-within { border-color: var(--c-400); box-shadow: 0 0 0 3px color-mix(in srgb, var(--c-500) 12%, transparent); }
-.library-search-input input { background: transparent; color: var(--text-main); outline: none; width: 100%; min-width: 0; font-size: 14px; }
+.library-search-input input, .library-search-input input:focus, .library-search-input input:focus-visible { background: transparent; color: var(--text-main); outline: none !important; border: 0 !important; border-radius: 0; box-shadow: none !important; -webkit-appearance: none; appearance: none; width: 100%; min-width: 0; padding: 0; font-size: 14px; }
+.library-search-input input::-webkit-search-cancel-button { display: none; }
 .library-search-input input::placeholder { color: var(--text-muted); }
 .header-actions { min-height: 52px; padding: 5px 8px; gap: 5px; }
 /* 胶囊采用稳定的主题底色，滚动的文字与卡片不会透出成局部色块。 @author jingyh */

@@ -97,6 +97,13 @@ export const registerTask = (task: ScheduledTask) => {
   }
 }
 
+/** Release a service-owned task on service stop without disturbing other owners. */
+export const unregisterTask = (id: string) => {
+  const timer = taskTimers.get(id)
+  if (timer) clearTimeout(timer)
+  taskTimers.delete(id); registeredTasks.delete(id)
+}
+
 /**
  * 手动或定时执行任务
  */

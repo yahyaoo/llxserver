@@ -4,7 +4,20 @@ type ExtraWeightProvider = (username: string) => Promise<Record<string, number>>
 let extraWeightProvider: ExtraWeightProvider = async () => ({})
 export const setRoamingWeightProvider = (provider: ExtraWeightProvider) => { extraWeightProvider = provider }
 /** 累计记录使用独立文档，不受最近播放列表清空和裁剪影响。 */
-export const roamingKey = (song: any) => `${song.source}:${String(song.songmid || song.meta?.songmid || song.id).replace(new RegExp('^' + song.source + '_'), '')}`
+export const roamingKey = (song: any) => {
+  const source = typeof song?.source === 'string' && song.source ? song.source : 'local'
+  const value = String(song?.songmid || song?.meta?.songmid || song?.id || song?.filename || song?.path || '')
+  const prefix = source + '_'
+  return `${source}:${value.startsWith(prefix) ? value.slice(prefix.length) : value}`
+}
+/** 与客户端保持一致的有限非负统计值规则。 */
+export const validRoamingNumber = (value: unknown) => typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : 0
+/** 计算单首歌曲的漫游权重，保留历史的 1 + count + extra 公式和单项上限。 */
+export const roamingWeight = (song: any, counts: Record<string, number> = {}, extraWeights: Record<string, number> = {}) => {
+  const key = roamingKey(song)
+  const count = Object.prototype.hasOwnProperty.call(counts, key) ? counts[key] : song?.playCount
+  return Math.min(1e9, 1 + validRoamingNumber(count) + validRoamingNumber(extraWeights[key]))
+}
 /** 首次读取兼容已有播放次数，之后使用独立累计，不受清空最近播放影响。 */
 function readCounts(repository: ExperienceRepository) {
   const counts = repository.read<Record<string, number>>('client_recent_setting', 'roaming-counts.json', {})

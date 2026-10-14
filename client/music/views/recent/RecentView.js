@@ -1,6 +1,6 @@
 /** 最近播放与本地歌手、专辑详情列表组件。 @author yahyaoo @date 2026-10-10 */
 (() => {
-    let entries = [], originalEntries = [], count = 100, recent = true, version = 0, loadState = 'ready';
+    let entries = [], originalEntries = [], count = 100, recent = true, version = 0, loadState = 'ready', pageSize = 100, nextOffset = 0, serverPaged = false, loadingMore = false;
     let query = '', searchOpen = false, batch = false, sortByName = false;
     const selected = new Set();
     window.RecentView = {
@@ -16,11 +16,12 @@
             const requestVersion = ++version;
             const owner = window.MusicExperience.account;
             try {
-                const response = await fetch('/api/user/recent', { headers: window.getUserAuthHeaders() });
+                let response = await fetch(`/api/user/recent?offset=0&limit=${pageSize}&sort=time&order=desc`, { headers: window.getUserAuthHeaders() });
+                if (response.status === 404) { serverPaged = false; response = await fetch('/api/user/recent', { headers: window.getUserAuthHeaders() }); }
                 if (!response.ok) throw new Error('最近播放加载失败');
                 const data = await response.json();
                 if (owner !== window.MusicExperience.account || requestVersion !== version) return;
-                this.show('最近播放', data.items, true, data.limit);
+                serverPaged = Array.isArray(data.items) && Number.isFinite(data.total); nextOffset = serverPaged ? data.offset + data.items.length : data.items?.length || 0; this.show('最近播放', data.items || [], true, data.limit || pageSize, data.total);
             } catch (error) {
                 if (owner !== window.MusicExperience.account || requestVersion !== version) return;
                 loadState = 'error';
@@ -28,15 +29,15 @@
                 window.LoadingState.showFailure(host, { title: '最近播放暂时无法加载', variant: 'page', retry: () => this.load() });
             }
         },
-        show(title, items, isRecent = false, limit) {
+        show(title, items, isRecent = false, limit, total) {
             ++version;
             loadState = 'ready';
             query = ''; searchOpen = batch = sortByName = false; selected.clear();
             items = window.SongFiles?.enrich(items) || items;
-            originalEntries = items.slice();
+            originalEntries = items.slice(); nextOffset = items.length; pageSize = limit || pageSize; this.total = total ?? items.length;
             entries = isRecent ? window.PlayStatistics.sortByPlayCount(items) : items.slice(); count = 100; recent = isRecent;
             document.getElementById('recent-title').textContent = title;
-            document.getElementById('recent-meta').textContent = `${items.length} 首${isRecent ? ` · 最多保留 ${limit} 条` : ' · 音乐库'}`;
+            document.getElementById('recent-meta').textContent = `${total ?? items.length} 首${isRecent ? ` · 最多保留 ${limit} 条` : ' · 音乐库'}`;
             document.getElementById('recent-clear').classList.toggle('hidden', !isRecent);
             this.render();
         },
@@ -92,7 +93,12 @@
                 row.append(number, cover, info, album, date, actions); row.onclick = () => batch ? this.select(index) : this.play(index); host.append(row);
             });
             window.SongFileStatus?.update(host, display.slice(0, count).map(item => item.song), '.recent-song-info strong');
-            if (display.length > count) { const more = document.createElement('button'); more.className = 'recent-more'; more.textContent = `加载更多（剩余 ${display.length - count} 首）`; more.onclick = () => { count += 100; this.render(); }; host.append(more); }
+            if ((serverPaged && nextOffset < (window.RecentView.total || Infinity)) || (!serverPaged && display.length > count)) { const more = document.createElement('button'); more.className = 'recent-more'; more.textContent = loadingMore ? '正在加载…' : '加载更多'; more.onclick = () => serverPaged ? this.loadMore() : (count += 100, this.render()); host.append(more); }
+        },
+        total: 0,
+        async loadMore() {
+            if (loadingMore || !serverPaged) return; loadingMore = true; this.render();
+            try { const response = await fetch(`/api/user/recent?offset=${nextOffset}&limit=${pageSize}&sort=time&order=desc`, { headers: window.getUserAuthHeaders() }); const data = await response.json(); if (!response.ok) throw new Error('加载失败'); this.total = Number(data.total || this.total); const more = data.items || []; originalEntries = originalEntries.concat(more); entries = recent ? window.PlayStatistics.sortByPlayCount(originalEntries) : originalEntries.slice(); nextOffset += more.length; this.render(); } catch (error) { console.warn('[Recent] 加载更多失败', error); } finally { loadingMore = false; }
         },
         /** 排序只调整当前展示；原始顺序可一键恢复，不保存到歌曲数据。 */
         toggleSort() {

@@ -172,7 +172,7 @@ test('主播放器等待长淡出时连续切歌，只允许最新请求暂停�
 test('自然播放提前按配置淡出，短曲只用后半段，拖回前面恢复用户音量', () => {
     const f = fixture(), app = read('client/music/app.js'), fades = [];
     const start = app.indexOf('    // 按配置提前淡出；短音频');
-    const end = app.indexOf("    document.getElementById('time-current')", start);
+    const end = app.indexOf('    refreshPlayerProgress();', start);
     Object.assign(f.context, { settings: { enableCrossfade: true }, audio: { paused: false, volume: 0.2 },
         currentVolume: 0.8, getCrossfadeDuration: () => 5000, fadeVolume: (...values) => fades.push(values),
     });
