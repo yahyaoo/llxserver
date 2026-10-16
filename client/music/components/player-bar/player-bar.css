@@ -35,7 +35,7 @@
     z-index: 60;
 }
 /* 普通页面随账号模糊配置变化；原版与独立播放详情均保留各自效果。作者：jingyh */
-body:not(.player-detail-open):not(:has(#view-player-detail:not(.hidden))) #player-footer.floating-player {
+body:not(.player-detail-open):not(.player-detail-visible) #player-footer.floating-player {
     backdrop-filter: blur(var(--surface-blur, 24px)) saturate(155%);
     -webkit-backdrop-filter: blur(var(--surface-blur, 24px)) saturate(155%);
 }

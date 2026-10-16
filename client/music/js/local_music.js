@@ -804,7 +804,9 @@ window.LocalMusicManager = {
                 window.LocalMusicManager.syncLocationSelector();
                 window.LocalMusicManager.loadFilters();
                 window.LocalMusicManager.syncPublicSongsBtn();
-                window.LocalMusicManager.fetchData(true); // silent fetch
+                const manager = window.LocalMusicManager;
+                // 10 秒内刚取过的数据直接沿用，避免每次回到音乐库都重新请求并重排整页列表。
+                if (!manager.originalData?.length || !manager.lastFetchAt || Date.now() - manager.lastFetchAt > 10000) manager.fetchData(true); // silent fetch
             } else {
                 // Auto exit batch mode when leaving
                 if (window.LocalMusicManager.batchMode) {
@@ -1062,6 +1064,7 @@ window.LocalMusicManager = {
             }
 
             const result = await res.json();
+            this.lastFetchAt = Date.now();
             if (result.items && Array.isArray(result.items)) {
                 this.serverPaged = true; this.serverTotal = Number(result.total || 0); this.originalData = window.SongFiles?.setLibrary(result.items) || result.items;
                 this._fromServer = true; this.applyFilters(); this._fromServer = false; this.showScanProgress(result.scan); this.pruneRemasterSelection(); return;
@@ -1086,6 +1089,8 @@ window.LocalMusicManager = {
                 throw new Error(result.message || 'Failed to fetch local music');
             }
         } catch (err) {
+            // 快速切页会主动取消旧请求；这不是加载故障，也无需在日志面板报告。
+            if (err?.name === 'AbortError') return;
             if (!silent) window.LoadingState.showFailure(document.getElementById('lm-list-container'), {
                 title: '音乐库暂时无法加载', variant: 'page', retry: () => this.fetchData(),
             });

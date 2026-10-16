@@ -85,7 +85,7 @@
         const entries = library ? [['刷新', 'fa-sync-alt', () => window.LocalMusicManager.refresh()], ['智能检测', 'fa-magic', () => window.LocalMusicManager.autoLinkAll()], ...Object.entries(labels).filter(([action]) => action !== 'delete').map(([action, label]) => [label, action === 'lyrics' ? 'fa-closed-captioning' : action === 'embed' ? 'fa-file-audio' : 'fa-tags', () => start(action, [], true)]), remap, ['批量操作', 'fa-tasks', () => window.LocalMusicManager.toggleBatchMode()]] : maintenanceEntries(songs);
         menu(button, entries);
     }
-    const tools = new Map(); let docked = null;
+    const tools = new Map(), scrollPositions = new WeakMap(); let docked = null;
     const slot = document.createElement('div'); slot.className = 'page-tools-dock'; slot.hidden = true;
     document.getElementById('music-top-bar')?.append(slot);
     function restore() {
@@ -94,8 +94,10 @@
         docked = null; slot.hidden = true; document.getElementById('music-top-bar')?.classList.remove('tools-docked');
     }
     function syncDock() {
+        if (innerWidth < 960) { restore(); return; }
         const visible = [...tools.values()].find(tool => !tool.view.classList.contains('hidden') && (tool.view.id !== 'view-search' || tool.view.dataset.onlineSearch !== 'true'));
-        const scrollTop = visible ? Math.max(visible.view.scrollTop, visible.view.id === 'view-search' ? document.getElementById('search-results')?.scrollTop || 0 : 0) : 0;
+        // 顶部工具栏尚未需要停靠时不读取滚动尺寸，避免切页后的强制布局。
+        const scrollTop = visible ? Math.max(scrollPositions.get(visible.view) || 0, visible.view.id === 'view-search' ? scrollPositions.get(document.getElementById('search-results')) || 0 : 0) : 0;
         if (!visible || scrollTop < visible.threshold || innerWidth < 960) { restore(); return; }
         if (docked === visible) return;
         restore(); docked = visible; visible.heading.style.minHeight = visible.heading.getBoundingClientRect().height + 'px'; slot.append(visible.bar); slot.hidden = false; visible.bar.querySelectorAll('button').forEach(button => { button.title ||= button.textContent.trim(); });
@@ -198,7 +200,8 @@
         if (frame !== null || document.hidden) return;
         frame = requestAnimationFrame(() => { frame = null; refreshTools(); });
     };
-    const onScroll = () => {
+    const onScroll = event => {
+        if (event?.type === 'scroll' && event.target?.nodeType === 1) scrollPositions.set(event.target, event.target.scrollTop);
         if (dockFrame !== null || document.hidden) return;
         dockFrame = requestAnimationFrame(() => { dockFrame = null; syncDock(); });
     };

@@ -636,6 +636,10 @@ aside {
     transform: translateY(0);
 }
 
+/* 页面切换淡入：display 从 none 变为显示时自动重播，仅使用 opacity 由合成器处理。 */
+[id^="view-"]:not(.hidden):not(#view-settings):not(#view-player-detail) { animation: fadeIn 0.2s ease-out; }
+@media (prefers-reduced-motion: reduce) { [id^="view-"]:not(.hidden) { animation: none; } }
+
 @keyframes fadeIn {
     from {
         opacity: 0;

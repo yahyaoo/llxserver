@@ -1,19 +1,22 @@
 /** 最近播放与本地歌手、专辑详情列表组件。 @author yahyaoo @date 2026-10-10 */
 (() => {
-    let entries = [], originalEntries = [], count = 100, recent = true, version = 0, loadState = 'ready', hasLoaded = false, loadedOwner = null, pageSize = 100, nextOffset = 0, serverPaged = false, loadingMore = false;
+    let entries = [], originalEntries = [], count = 100, recent = true, version = 0, loadState = 'ready', hasLoaded = false, loadedOwner = null, lastFetchAt = 0, pageSize = 100, nextOffset = 0, serverPaged = false, loadingMore = false;
     let query = '', searchOpen = false, batch = false, sortByName = false;
     const selected = new Set();
     window.RecentView = {
         getEntries() { return entries.slice(); },
+        invalidate() { lastFetchAt = 0; },
         refreshFiles() {
             originalEntries = window.SongFiles?.enrich(originalEntries) || originalEntries;
             entries = sortByName ? originalEntries.slice().sort((a, b) => a.name.localeCompare(b.name)) : recent ? window.PlayStatistics.sortByPlayCount(originalEntries) : originalEntries.slice();
             this.render();
         },
-        async load() {
+        async load(force = false) {
             const host = document.getElementById('recent-list');
             const owner = window.MusicExperience.account;
-            const preserveCurrent = hasLoaded && loadedOwner === owner;
+            const preserveCurrent = hasLoaded && recent && loadedOwner === owner;
+            // 仅复用最近记录；歌手、专辑详情共用此组件，不能当作最近列表缓存。
+            if (!force && preserveCurrent && Date.now() - lastFetchAt < 10000) return;
             if (!preserveCurrent) {
                 loadState = 'loading';
                 host.innerHTML = window.LoadingState.render('正在加载最近播放…', 'page');
@@ -25,6 +28,7 @@
                 if (!response.ok) throw new Error('最近播放加载失败');
                 const data = await response.json();
                 if (owner !== window.MusicExperience.account || requestVersion !== version) return;
+                lastFetchAt = Date.now();
                 serverPaged = Array.isArray(data.items) && Number.isFinite(data.total); nextOffset = serverPaged ? data.offset + data.items.length : data.items?.length || 0; this.show('最近播放', data.items || [], true, data.limit || pageSize, data.total); hasLoaded = true; loadedOwner = owner;
             } catch (error) {
                 if (owner !== window.MusicExperience.account || requestVersion !== version) return;
@@ -78,7 +82,10 @@
                     checkbox.checked = selected.has(index); checkbox.setAttribute('aria-label', '选择 ' + song.name);
                     checkbox.onclick = event => { event.stopPropagation(); this.select(index); }; number.append(checkbox);
                 }
-                const img = document.createElement('img'); img.alt = ''; window.LibraryArtwork.attach(img, window.MusicExperience.coverCandidates(song));
+            const img = document.createElement('img'); img.alt = ''; img.loading = 'lazy';
+            // 最近列表复用统一视口门控，避免进入页面时为所有历史歌曲并发读取封面。
+            if (window.LibraryArtwork?.bind) window.LibraryArtwork.bind(img, song);
+            else window.LibraryArtwork?.attach(img, window.MusicExperience.coverCandidates(song));
                 const cover = document.createElement('button'); cover.type = 'button'; cover.className = 'song-cover recent-song-cover recent-play-button'; cover.title = '播放';
                 const overlay = document.createElement('span'); overlay.className = 'song-cover-play'; overlay.innerHTML = '<i class="fas fa-play"></i>';
                 cover.append(img, overlay);
@@ -131,7 +138,7 @@
             if (typeof showSelect === 'function' && !await showSelect('清空最近播放', '确定清空当前账号的最近播放记录吗？', { danger: true })) return;
             const response = await fetch('/api/user/recent', { method: 'DELETE', headers: window.getUserAuthHeaders() });
             if (!response.ok) { window.showError?.('清空失败'); return; }
-            await this.load();
+            await this.load(true);
         },
     };
 })();

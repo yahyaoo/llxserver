@@ -44,6 +44,30 @@ test('未变更路由保持原执行语句，移除 WebDAV 后保留路由顺序
   }
 })
 
+test('自定义音源校验要求登录，音源操作归属使用已验证账号', async () => {
+  require('tsx/cjs')
+  const service = require('../server/admin/service/SourceService.ts')
+  const previous = global.lx
+  global.lx = { config: { 'frontend.password': 'admin-test', 'user.enablePublicRestriction': false } }
+  let username = null, status, body, validated = 0
+  const owners = []
+  const handlers = { handleValidate() { validated++ } }
+  for (const name of ['Import', 'Upload', 'List', 'Toggle', 'Delete', 'Reorder', 'UpdatePlatforms']) handlers['handle' + name] = (req, res, owner) => owners.push(owner)
+  const context = { req: { headers: {} }, res: { writeHead(value) { status = value }, end(value) { body = JSON.parse(value) } }, urlObj: new URL('http://local/api/custom-source/list?username=bob') }
+  const runtime = { customSourceHandlers: handlers, verifyUserAuth: () => username }
+  try {
+    await service.postCustomSourceValidate(context, runtime)
+    assert.equal(status, 401); assert.equal(body.valid, false); assert.equal(validated, 0)
+    username = 'alice'; await service.postCustomSourceValidate(context, runtime)
+    assert.equal(validated, 1)
+    username = null; context.req.headers['x-frontend-auth'] = 'admin-test'
+    await service.postCustomSourceValidate(context, runtime); assert.equal(validated, 2)
+    username = 'alice'
+    for (const name of ['postCustomSourceImport', 'postCustomSourceUpload', 'getCustomSourceList', 'postCustomSourceToggle', 'postCustomSourceDelete', 'postCustomSourceReorder', 'postCustomSourceUpdatePlatforms']) await service[name](context, runtime)
+    assert.deepEqual(owners, Array(7).fill('alice'), '请求中的 bob 不能覆盖已验证的 alice')
+  } finally { global.lx = previous }
+})
+
 test('管理和播放器业务域不直接导入彼此，业务不导入 SDK 内部文件', () => {
   const root = path.join(__dirname, '../server')
   function walk(directory) {

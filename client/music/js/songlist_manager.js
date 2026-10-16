@@ -245,6 +245,7 @@ window.SongListManager = (function () {
 
         if (page === 1) {
             detailView.classList.remove('hidden');
+            document.getElementById('view-songlist')?.setAttribute('data-detail-open', '');
             setTimeout(() => detailView.classList.remove('translate-x-full'), 10);
             listContainer.innerHTML = window.LoadingState.render('正在加载歌单详情…', 'page');
 
@@ -826,7 +827,7 @@ window.SongListManager = (function () {
             window.ClientPerformance?.cancel(document.getElementById('sl-detail-list'));
             const detailView = document.getElementById('songlist-detail-view');
             detailView.classList.add('translate-x-full');
-            setTimeout(() => detailView.classList.add('hidden'), 300);
+            setTimeout(() => { detailView.classList.add('hidden'); document.getElementById('view-songlist')?.removeAttribute('data-detail-open'); }, 300);
         },
         toggleTagSelector,
         playSong: function (index) {

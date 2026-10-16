@@ -66,6 +66,28 @@ test('输入、开关和保存事件保持字段值、事件种类和冒泡语�
   api.commit(toggle, false, 'change'); assert.equal(toggle.checked, false)
   api.commit(toggle, true, 'change'); assert.equal(toggle.checked, true)
 })
+test('控件相同状态不重复重绘，值、选项和滑块约束变化仍同步', () => {
+  const code = fs.readFileSync(path.join(root, 'client/music/assets/element/element-controls.js'), 'utf8')
+  const tree = require('acorn').parse(code, { ecmaVersion: 'latest' })
+  const body = tree.body[0].expression.callee.body.body
+  const widget = body.find(node => node.type === 'FunctionDeclaration' && node.id.name === 'widget')
+  const sync = widget.body.body.find(node => node.type === 'VariableDeclaration' && node.declarations[0].id.name === 'sync').declarations[0].init
+  for (const kind of ['select', 'slider']) {
+    const state = { options: [], revision: 0 }, host = { hidden: false }
+    const source = { value: '1', disabled: false, hidden: false, style: {}, classList: { contains: () => false }, options: [{ value: '1', text: '选项', disabled: false, parentElement: {} }], min: '0', max: '100', step: '1' }
+    const context = { source, kind, state, host }
+    vm.runInNewContext('let previousSnapshot; globalThis.sync=' + code.slice(sync.start, sync.end), context)
+    context.sync(); assert.equal(state.revision, 1)
+    const options = state.options
+    context.sync(); assert.equal(state.revision, 1); assert.equal(state.options, options)
+    source.value = '2'; context.sync(); assert.equal(state.revision, 2)
+    if (kind === 'select') source.options[0].text = '新选项'
+    else source.max = '200'
+    context.sync(); assert.equal(state.revision, 3)
+    if (kind === 'select') assert.equal(state.options[0].label, '新选项')
+  }
+})
+
 test('Vue 与 Element 本地资源匹配记录的完整性，两个许可证均包含授权正文', () => {
   const directory = path.join(root, 'client/music/assets/element'), manifest = JSON.parse(fs.readFileSync(path.join(directory, 'manifest.json'), 'utf8'))
   for (const entry of manifest) for (const [name, hash] of Object.entries(entry.files)) assert.equal(crypto.createHash('sha256').update(fs.readFileSync(path.join(directory, name))).digest('hex'), hash, name)

@@ -130,10 +130,16 @@
         const ref = { current: null };
         const initialTabIndex = source.getAttribute('tabindex');
         const initialAriaHidden = source.getAttribute('aria-hidden');
+        let previousSnapshot;
         const sync = () => {
+            // 切页会重复同步相同字段；只有实际值或控件约束变化时才通知 Vue 重绘。
+            const options = kind === 'select' ? Array.from(source.options, option => ({ value: option.value, label: option.text, disabled: option.disabled || option.parentElement.disabled })) : [];
+            const snapshot = JSON.stringify([source.value, source.checked, source.disabled, source.readOnly, source.hidden, source.classList.contains('hidden'), source.style.display, source.min, source.max, source.step, source.accept, source.multiple, options]);
+            if (snapshot === previousSnapshot) return;
+            previousSnapshot = snapshot;
             state.value = ['switch', 'checkbox', 'radio'].includes(kind) ? source.checked : kind === 'slider' ? Number(source.value) : source.value;
             state.disabled = source.disabled;
-            if (kind === 'select') state.options = Array.from(source.options, option => ({ value: option.value, label: option.text, disabled: option.disabled || option.parentElement.disabled }));
+            if (kind === 'select') state.options = options;
             const hidden = source.hidden || source.classList.contains('hidden') && !['switch', 'checkbox', 'radio', 'upload'].includes(kind) || source.style.display === 'none'; if (host.hidden !== hidden) host.hidden = hidden;
             state.revision++;
         };

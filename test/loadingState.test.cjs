@@ -59,6 +59,47 @@ test('最近播放首次加载显示动效，后台刷新保留现有列表，�
     assert.equal(host.innerHTML, '原有列表', '已有列表刷新失败时保留当前内容');
 });
 
+test('最近播放短时间内切页复用已加载数据，强制刷新仍请求服务端', async () => {
+    const { context } = fixture();
+    const host = { innerHTML: '', querySelector: () => ({ disabled: false }), set textContent(value) { this.innerHTML = value; } };
+    context.document.getElementById = () => host;
+    context.window.MusicExperience = { account: 'alice' };
+    context.window.getUserAuthHeaders = () => ({});
+    let calls = 0;
+    context.fetch = async () => { calls++; return { ok: true, json: async () => ({ items: [{ name: '歌曲' }], limit: 100, total: 1 }) }; };
+    vm.runInContext(fs.readFileSync(path.join(__dirname, '../client/music/views/recent/RecentView.js'), 'utf8'), context);
+    context.window.RecentView.show = () => { host.innerHTML = '列表'; };
+    await context.window.RecentView.load();
+    await context.window.RecentView.load();
+    assert.equal(calls, 1);
+    await context.window.RecentView.load(true);
+    assert.equal(calls, 2);
+    context.window.RecentView.invalidate();
+    await context.window.RecentView.load();
+    assert.equal(calls, 3, '记录变更使缓存失效，下次进入读取最新记录');
+});
+
+test('最近列表缓存不能复用歌手或专辑详情，返回最近时重新取记录', async () => {
+    const { context } = fixture();
+    const host = { innerHTML: '', classList: { toggle() {} } };
+    context.document.getElementById = () => host;
+    context.window.MusicExperience = { account: 'alice' };
+    context.window.getUserAuthHeaders = () => ({});
+    context.window.PlayStatistics = { sortByPlayCount: items => items.slice() };
+    let calls = 0;
+    context.fetch = async () => { calls++; return { ok: true, json: async () => ({ items: [{ name: '最近歌曲' }], limit: 100, total: 1 }) }; };
+    vm.runInContext(fs.readFileSync(path.join(__dirname, '../client/music/views/recent/RecentView.js'), 'utf8'), context);
+    const view = context.window.RecentView;
+    view.render = () => {};
+    await view.load();
+    view.show('歌手详情', [{ name: '专辑歌曲' }]);
+    await view.load();
+    assert.equal(calls, 2);
+    assert.equal(view.getEntries()[0].name, '最近歌曲');
+    await view.load();
+    assert.equal(calls, 2, '恢复最近后仍可复用缓存');
+});
+
 test('失败状态安全转义提示文字，重试期间阻止重复点击', async () => {
     const { view } = fixture();
     const button = { disabled: false }, host = { innerHTML: '', querySelector: () => button };
@@ -94,17 +135,17 @@ test('最近播放首次网络失败显示重试；已有列表刷新失败不�
     context.fetch = async () => ({ ok: true, json: async () => ({ items: [], limit: 100 }) });
     await button.onclick(); assert.equal(host.innerHTML, '恢复后的歌曲列表');
     context.fetch = async () => { throw new TypeError('Failed to fetch'); };
-    await recent.load(); assert.equal(host.innerHTML, '恢复后的歌曲列表', '已有数据时刷新失败保留原列表');
+    await recent.load(true); assert.equal(host.innerHTML, '恢复后的歌曲列表', '已有数据时刷新失败保留原列表');
     let reject;
     context.fetch = () => new Promise((resolve, fail) => { reject = fail; });
-    const pending = recent.load();
+    const pending = recent.load(true);
     context.window.MusicExperience.account = 'bob'; host.innerHTML = '新账号列表';
     reject(new Error('Failed to fetch')); await pending;
     assert.equal(host.innerHTML, '新账号列表');
     context.window.MusicExperience.account = 'alice';
-    const old = recent.load(); const rejectOld = reject;
+    const old = recent.load(true); const rejectOld = reject;
     context.fetch = async () => ({ ok: true, json: async () => ({ items: [], limit: 100 }) });
-    await recent.load(); rejectOld(new Error('Failed to fetch')); await old;
+    await recent.load(true); rejectOld(new Error('Failed to fetch')); await old;
     assert.equal(host.innerHTML, '恢复后的歌曲列表');
 });
 

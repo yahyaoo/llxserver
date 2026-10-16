@@ -80,6 +80,7 @@
 
         /** 根据原页面显隐状态切换布局，不接管历史导航或播放状态。 */
         sync() {
+            document.body.classList.toggle('player-detail-visible', !this.view.classList.contains('hidden'));
             const open = !this.view.classList.contains('hidden') && !this.view.classList.contains('opacity-0');
             if (open === this.open) return;
             this.open = open;
@@ -120,9 +121,17 @@
                 this.ownsFullscreen = false;
             }
             this.updateResponsiveLayout();
-            window.playerBar?.updateScrollClearance();
             // 布局变化后只同步原画布尺寸，歌词滚动仍由原页面负责。
-            window.musicVisualizer?.applySettings();
+            // 节点搬运后的测量合并到下一帧：先统一读取再写入，避免连续两次强制整页样式与布局重算。
+            if (window.ClientPerformance?.scheduleLayout) {
+                window.ClientPerformance.scheduleLayout(this, () => window.playerBar?.measureLayout?.() ?? null, value => {
+                    window.musicVisualizer?.applySettings();
+                    window.playerBar?.applyLayout?.(value);
+                });
+            } else {
+                window.playerBar?.updateScrollClearance();
+                window.musicVisualizer?.applySettings();
+            }
         }
 
         /** 展示原歌曲的专辑字段，读取现有数据且不改写歌曲对象。 */
@@ -186,6 +195,7 @@
             this.fullscreenButton.querySelector('i').className = 'fas fa-' + (active ? 'compress' : 'expand');
         }
         destroy() {
+            window.ClientPerformance?.cancelLayout(this);
             this.viewObserver?.disconnect(); this.trackObserver?.disconnect(); this.background?.clear();
             window.removeEventListener('resize', this.onResize);
             window.removeEventListener('music-account-changed', this.onAccountChange);

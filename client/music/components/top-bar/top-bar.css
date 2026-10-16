@@ -43,7 +43,7 @@ body > .flex.flex-1 { z-index: 1; }
 }
 .top-search-host, .top-actions-host { pointer-events: auto; }
 /* 在线搜索页已有独立搜索框，仅该页隐藏顶部音乐库搜索，其他页面继续显示。作者：jingyh */
-body:has(#view-search[data-online-search="true"]:not(.hidden)) .library-search { display: none; }
+body.online-search-visible .library-search { display: none; }
 #view-search:not([data-online-search="true"]) #song-search-controls { display: none !important; }
 .top-search-host { display: flex; align-items: center; gap: 8px; width: min(460px, 48%); min-width: 0; }
 .library-search { position: relative; width: 100%; }

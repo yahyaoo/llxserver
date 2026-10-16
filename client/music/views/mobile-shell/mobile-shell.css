@@ -79,8 +79,8 @@
     .is-playing .mobile-playing-indicator { display: block; }
     #mobile-bottom-nav button:focus-visible, #mobile-page-header button:focus-visible, .mobile-menu-row:focus-visible, .mobile-profile:focus-visible { outline: 2px solid var(--c-500); outline-offset: -2px; }
     body.player-detail-open #mobile-page-header, body.player-detail-open #mobile-bottom-nav,
-    body:has(#view-player-detail:not(.hidden)) #mobile-page-header,
-    body:has(#view-player-detail:not(.hidden)) #mobile-bottom-nav { display: none; }
+    body.player-detail-visible #mobile-page-header,
+    body.player-detail-visible #mobile-bottom-nav { display: none; }
     .music-shell :is(#view-search, #view-songlist, #songlist-detail-view, #view-localmusic, #view-leaderboard, #view-recent) { padding-bottom: var(--mobile-nav-clearance) !important; }
     .music-shell .settings-shell { padding-top: var(--top-bar-clearance); padding-bottom: var(--mobile-nav-clearance); }
     .mobile-settings-detail .settings-sidebar, .mobile-settings-detail .settings-mobile-toggle { display: none !important; }

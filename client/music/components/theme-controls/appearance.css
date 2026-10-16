@@ -18,7 +18,7 @@
     .glass, #lb-sidebar, #lb-songs-container, [class*="bg-white/"], [class*="dark:bg-gray-800/"]),
 :root.music-appearance #main-sidebar.main-navigation,
 :root.music-appearance #main-sidebar :is(.t-bg-panel, .t-bg-main, [class~="t-bg-main/50"]),
-:root.music-appearance body.player-bar-floating:not(.player-detail-open):not(:has(#view-player-detail:not(.hidden))) #player-footer.floating-player {
+:root.music-appearance body.player-bar-floating:not(.player-detail-open):not(.player-detail-visible) #player-footer.floating-player {
     background: color-mix(in srgb, var(--bg-panel) calc(var(--surface-opacity) * 100%), transparent) !important;
     backdrop-filter: blur(var(--surface-blur)) !important;
     -webkit-backdrop-filter: blur(var(--surface-blur)) !important;

@@ -1005,7 +1005,7 @@
     "method": "postCustomSourceValidate",
     "route": "/api/custom-source/validate",
     "condition": "pathname === '/api/custom-source/validate' && req.method === 'POST'",
-    "baselineDigest": "691e93c9e4d3a90fcde643b7668f91b7b5bc492a82459f3375971ff4f1ca4cd7"
+    "baselineDigest": "2d5fb66c0a34be0d0a9400af1ad3d4573ad211dfae078eda71289ce87dd961fd"
   },
   {
     "group": "adminSource",
@@ -1013,7 +1013,7 @@
     "method": "postCustomSourceImport",
     "route": "/api/custom-source/import",
     "condition": "pathname === '/api/custom-source/import' && req.method === 'POST'",
-    "baselineDigest": "d45c7b9326a298eba673ea80074aeb626b85f2e06009b720f1b7b70c34065c23"
+    "baselineDigest": "e6d34279640504573455da64dea82fab1f895a2d5103dcddd36284adedf0c2bf"
   },
   {
     "group": "adminSource",
@@ -1021,7 +1021,7 @@
     "method": "postCustomSourceUpload",
     "route": "/api/custom-source/upload",
     "condition": "pathname === '/api/custom-source/upload' && req.method === 'POST'",
-    "baselineDigest": "e84058a305406d8d3d393ec8c9271c8fa6b9f7afdf1fabe4c77ec315aa3774fe"
+    "baselineDigest": "b7e6b74e1ce085ca5f5fbd33f24542f00367323a10c118ed5e800d839ffdf0a5"
   },
   {
     "group": "adminSource",
@@ -1029,7 +1029,7 @@
     "method": "getCustomSourceList",
     "route": "/api/custom-source/list",
     "condition": "pathname === '/api/custom-source/list' && req.method === 'GET'",
-    "baselineDigest": "46512c3526a600f5a5d74b288e83b1dae9d0406c8e2496595ea07453b91658dd"
+    "baselineDigest": "27380281fcc700d8a5019b0b06b0298cff310a4733090fd6ac7c78e876672649"
   },
   {
     "group": "adminSource",
@@ -1037,7 +1037,7 @@
     "method": "postCustomSourceToggle",
     "route": "/api/custom-source/toggle",
     "condition": "pathname === '/api/custom-source/toggle' && req.method === 'POST'",
-    "baselineDigest": "5652550a6d39af4b97383938dcaed5c36a4950c41ca22501d8a9101158d57dd1"
+    "baselineDigest": "6ed72329e0e4ce1ae0027050c5d666afc9e57e0862115dcae5e544e5a9db6341"
   },
   {
     "group": "adminSource",
@@ -1045,7 +1045,7 @@
     "method": "postCustomSourceDelete",
     "route": "/api/custom-source/delete",
     "condition": "pathname === '/api/custom-source/delete' && req.method === 'POST'",
-    "baselineDigest": "f4a74e7c5ed48e0e8f3420a03f23e4883b868f54f1dfb3e9038b209551f11501"
+    "baselineDigest": "785e27f8412a704f4cb84241923bbb7919c6be366f6a587014f6526b038f76ff"
   },
   {
     "group": "adminSource",
@@ -1053,7 +1053,7 @@
     "method": "postCustomSourceReorder",
     "route": "/api/custom-source/reorder",
     "condition": "pathname === '/api/custom-source/reorder' && req.method === 'POST'",
-    "baselineDigest": "9c18812046eb4a671255a7e942bf215014cb4eeca628876c91ff7c23decdee7b"
+    "baselineDigest": "49888beb238a0095ab9a6d55fe05d5f113d0ac9b72d04dd5eac96118b7eacf55"
   },
   {
     "group": "adminSource",
@@ -1061,7 +1061,7 @@
     "method": "postCustomSourceUpdatePlatforms",
     "route": "/api/custom-source/update-platforms",
     "condition": "pathname === '/api/custom-source/update-platforms' && req.method === 'POST'",
-    "baselineDigest": "da185633e293c5e52da57539354850b07136e8b2f4136ded246f049aee967d4b"
+    "baselineDigest": "9a90c4fe8c9aafa62082c80eca9a44d5b60225b01d2494c4a6a602f85648a73d"
   },
   {
     "group": "adminOperations",

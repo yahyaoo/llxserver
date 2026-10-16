@@ -26,7 +26,7 @@
     box-shadow: none !important;
 }
 /* 透明详情层打开时，底层歌单网格不参与显示。 */
-#view-songlist:has(#songlist-detail-view:not(.hidden)) > :not(#songlist-detail-view) { visibility: hidden; }
+#view-songlist[data-detail-open] > :not(#songlist-detail-view) { visibility: hidden; }
 /* 热搜长标题的滚动限制在文字区域内，保留序号与搜索图标的位置。 */
 :root #view-search .hot-search-item { justify-content: flex-start; gap: 0; min-width: 0; }
 :root #view-search .hot-search-item > .keyword { display: block; min-width: 0; overflow: hidden; white-space: nowrap; }

@@ -25,6 +25,18 @@ function functionSource(file, name) {
     const node = ast.body.find(item => item.type === 'FunctionDeclaration' && item.id.name === name);
     assert.ok(node, name); return source.slice(node.start, node.end);
 }
+test('最近记录通知先失效缓存，隐藏页不加载，可见页合并一次刷新', () => {
+    let hidden = true, invalidations = 0, loads = 0, pending;
+    const context = { window: { RecentView: { invalidate() { invalidations++; }, load() { loads++; } } },
+        document: { getElementById: () => ({ classList: { contains: () => hidden } }) },
+        clearTimeout() { pending = null; }, setTimeout(callback) { pending = callback; return 1; } };
+    vm.runInNewContext('let recentReloadTimer = null;' + functionSource('app.js', 'scheduleRecentReload') + ';globalThis.reload = scheduleRecentReload', context);
+    context.reload();
+    assert.equal(invalidations, 1); assert.equal(pending, undefined);
+    hidden = false; context.reload(); context.reload();
+    assert.equal(invalidations, 3); assert.equal(loads, 0);
+    pending(); assert.equal(loads, 1);
+});
 test('单曲及批量删除先修改本地，不请求删除接口或重新拉取歌单', async () => {
     for (const [file, name, args] of [['js/single_song_ops.js', 'deleteSingleSong', ['2']], ['js/batch_pagination.js', 'batchDeleteFromList', []]]) {
         let list = [{ id: 1 }, { id: 2 }], changes = 0;

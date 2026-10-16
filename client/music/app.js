@@ -1479,25 +1479,24 @@ function switchTab(tabId, loadRecent = true) {
     }
     window.settingsPageToggle?.discard();
 
+    const activeView = document.getElementById(`view-${tabId}`);
+    // 只改变状态确实变化的页面；对已隐藏页面重复写 class 也会触发观察器。
     document.querySelectorAll('[id^="view-"]').forEach(el => {
-        el.classList.add('hidden');
-        el.classList.remove('opacity-100');
-        el.classList.add('opacity-0');
+        if (el === activeView) return;
+        if (!el.classList.contains('hidden')) el.classList.add('hidden');
+        if (el.classList.contains('opacity-100')) el.classList.remove('opacity-100');
+        if (!el.classList.contains('opacity-0')) el.classList.add('opacity-0');
     });
 
-    const activeView = document.getElementById(`view-${tabId}`);
     if (!activeView) return;
     if (songSearchView) songSearchView.dataset.onlineSearch = String(tabId === 'search');
 
-    activeView.classList.remove('hidden');
+    // 显示与透明度在同一帧完成，淡入由 CSS 动画负责，避免延迟改 class 造成第二次整页样式重算。
+    activeView.classList.remove('hidden', 'opacity-0');
+    activeView.classList.add('opacity-100');
     window.MobileShell?.sync(tabId);
-    // small delay to allow display block to apply before opacity transition
-    setTimeout(() => {
-        activeView.classList.remove('opacity-0');
-        activeView.classList.add('opacity-100');
-        // [新增] 切换 Tab 时顺便检查并更新一次用户状态
-        if (typeof updateUserUI === 'function') updateUserUI();
-    }, 10);
+    // [新增] 切换 Tab 时顺便检查并更新一次用户状态
+    setTimeout(() => { if (typeof updateUserUI === 'function') updateUserUI(); }, 10);
 
     // [新增] 切换到设置页面时刷新一次管理员状态和设置项 UI
     if (tabId === 'settings') {
@@ -13048,6 +13047,7 @@ async function submitDataChange(listToSave, context = null) {
 /** 推送更新缓存后按当前页面刷新，本地尚未确认的编辑始终优先。 @author jingyh */
 let recentReloadTimer = null;
 function scheduleRecentReload() {
+    window.RecentView?.invalidate();
     if (document.getElementById('view-recent')?.classList.contains('hidden')) return;
     clearTimeout(recentReloadTimer);
     recentReloadTimer = setTimeout(() => { recentReloadTimer = null; void window.RecentView?.load(); }, 250);

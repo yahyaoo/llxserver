@@ -10,6 +10,15 @@ const packages = [
   { name: 'vue', version: '3.5.22', files: { 'dist/vue.global.prod.js': 'vue.global.prod.js', LICENSE: 'VUE-LICENSE' } },
   { name: 'element-plus', version: '2.11.5', licenseUrl: 'https://api.github.com/repos/element-plus/element-plus/contents/LICENSE?ref=2.11.5', files: { 'dist/index.full.min.js': 'element-plus.min.js', 'dist/index.css': 'element-plus.css', 'dist/locale/zh-cn.min.js': 'zh-cn.min.js' } },
 ]
+/**
+ * 删除 el-input-number 在祖先与后代同时使用 class 属性选择器的两条规则。
+ * 此类规则会让浏览器在任意元素 class 变化时重算其整个子树；本项目未使用该控件的 large/small 右侧按钮样式。
+ */
+function trimInvalidatingRules(css) {
+  const pattern = /\.el-input-number\.is-controls-right\[class\*=(?:large|small)\][^{}]*\{[^{}]*\}/g
+  if ((css.match(pattern) || []).length !== 2) throw new Error('Element Plus 样式结构已变化，请更新精简规则')
+  return css.replace(pattern, '')
+}
 /** 只提取白名单常规文件，压缩包路径不参与本地路径计算。 */
 function extract(archive, files) {
   const result = {}, tar = zlib.gunzipSync(archive)
@@ -36,6 +45,7 @@ async function run() {
     const archive = Buffer.from(await response.arrayBuffer()), [algorithm, expected] = metadata.dist.integrity.split('-')
     if (crypto.createHash(algorithm).update(archive).digest('base64') !== expected) throw new Error('资源完整性校验失败')
     const files = extract(archive, spec.files), hashes = {}
+    if (files['element-plus.css']) files['element-plus.css'] = Buffer.from(trimInvalidatingRules(files['element-plus.css'].toString('utf8')))
     if (spec.licenseUrl) {
       const license = await fetch(spec.licenseUrl)
       if (!license.ok) throw new Error('读取官方许可证失败')
@@ -53,4 +63,4 @@ async function run() {
   console.log('Element Plus 与 Vue 官方浏览器资源已校验并保存到 client/music/assets/element')
 }
 if (require.main === module) run().catch(error => { console.error(error); process.exitCode = 1 })
-module.exports = { extract }
+module.exports = { extract, trimInvalidatingRules }

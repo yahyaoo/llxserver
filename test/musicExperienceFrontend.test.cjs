@@ -111,8 +111,8 @@ test('公共排序按次数与时间降序，旧数据显示零次且不改变�
 test('最近播放显示表头、次数及正确播放顺序，音乐库详情保留专辑顺序', () => {
   const element = () => ({ children: [], setAttribute() {}, classList: { toggle() {} }, append(...nodes) { this.children.push(...nodes) }, replaceChildren() { this.children = [] } })
   const nodes = new Map(['recent-list', 'recent-title', 'recent-meta', 'recent-clear'].map(id => [id, element()]))
-  let playlist, bound
-  const window = { PlayStatistics: { sortByPlayCount, playCount }, LibraryArtwork: { attach() {} },
+  let playlist, bound; const boundArtwork = []
+  const window = { PlayStatistics: { sortByPlayCount, playCount }, LibraryArtwork: { attach() {}, bind(image, song) { boundArtwork.push({ image, song }) } },
     MusicExperience: { playable: song => song, coverCandidates: () => [] }, SongFileStatus: { update(host, items, selector) { bound = { items, selector } } },
     updatePlaylist(songs, index) { playlist = { songs, index } } }
   vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../client/music/views/recent/RecentView.js'), 'utf8'), {
@@ -126,6 +126,7 @@ test('最近播放显示表头、次数及正确播放顺序，音乐库详情�
   assert.match(header.innerHTML, /歌曲 \/ 歌手/); assert.match(header.innerHTML, /播放次数 ↓/); assert.match(header.innerHTML, /最近播放时间/)
   assert.equal(first.children[3].textContent, '3 次'); assert.equal(second.children[3].textContent, '1 次')
   assert.equal(first.children[2].children[0].className, 'song-file-title')
+  assert.equal(boundArtwork[0].song.id, 'high', '最近列表把封面交给统一视口懒加载器')
   window.RecentView.toggleSort();
   assert.equal(nodes.get('recent-list').children[1].children[2].children[0].textContent, '多次歌曲');
   window.RecentView.toggleBatch(); window.RecentView.selectAll();
