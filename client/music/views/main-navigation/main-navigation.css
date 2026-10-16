@@ -21,6 +21,31 @@
 .playlist-actions-menu button:hover, .playlist-actions-menu button:focus-visible { outline: none; color: var(--c-500); background: color-mix(in srgb, var(--c-500) 12%, transparent); }
 #playlist-actions-button:focus-visible { outline: 2px solid var(--c-500); outline-offset: 2px; }
 #main-navigation { min-height: 0; padding: 16px 12px; overscroll-behavior: contain; }
+/* 侧栏分组：参考设置页，用小标题和分隔线把发现、我的音乐、收藏与偏好、歌单分开。 */
+#main-navigation > ul > li.nav-group-start::before {
+    content: attr(data-group); display: block; padding: 6px 14px 4px; font-size: 12px; font-weight: 600; letter-spacing: .04em; color: var(--text-dim);
+}
+#main-navigation > ul > li.nav-group-start:not(:first-child),
+#main-navigation > ul > li.nav-group-divider { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border-dim); }
+/* 全部导航文字统一：条目 14px，数量 12px，分组标题 12px；层级只靠缩进和字重区分。 */
+:root #main-navigation { font-size: 14px; }
+:root #main-navigation > ul > li > :is(a, div[onclick]), :root #main-navigation .playlist-sidebar-item,
+:root #main-navigation :is(.playlist-name-text, .playlist-name-copy, .playlist-group-link, .playlist-group-link span) { font-size: 14px !important; line-height: 1.4; }
+:root #main-navigation > ul > li > :is(a, div[onclick]) span { font-size: 14px; }
+:root #main-navigation :is(.sidebar-item-count, [id$="-count"]) { font-size: 12px !important; }
+:root #main-navigation .playlist-group-heading { padding-top: 2px; }
+/* 收藏、不喜欢各自独立成组：行本身作为分组标题，子项始终展开，无需点击。 */
+:root #main-navigation > ul > li.nav-group-folder > div[onclick] {
+    min-height: 0; margin: 0; padding: 6px 14px 4px; gap: 8px; pointer-events: none;
+    justify-content: flex-start; background: transparent !important; color: var(--text-dim) !important;
+}
+:root #main-navigation > ul > li.nav-group-folder > div[onclick] :is(span, i) { font-size: 12px !important; font-weight: 600; letter-spacing: .04em; color: inherit; }
+:root #main-navigation > ul > li.nav-group-folder > div[onclick] i { width: 16px; text-align: center; }
+:root #main-navigation > ul > li.nav-group-folder > div[onclick] > div > span { margin-left: 8px; }
+:root #main-navigation > ul > li.nav-group-folder :is(#favorites-arrow, #dislike-arrow) { display: none; }
+:root #main-sidebar:not(.navigation-collapsed) #main-navigation :is(#favorites-children, #dislike-children) {
+    display: block !important; height: auto !important; overflow: visible; margin: 0; background: transparent;
+}
 #main-navigation > ul > li > :is(a, div[onclick]) {
     min-height: 46px; margin: 2px 0; padding: 12px 14px; border-radius: 12px;
 }
@@ -55,6 +80,10 @@
     #main-sidebar.navigation-collapsed { width: 72px; }
     .navigation-collapsed .main-navigation-brand h1,
     .navigation-collapsed #main-navigation span,
+    .navigation-collapsed #main-navigation > ul > li.nav-group-start::before { display: none; }
+    :root .navigation-collapsed #main-navigation > ul > li.nav-group-folder > div[onclick] { pointer-events: auto; justify-content: center; padding: 10px 0; min-height: 40px; }
+    :root .navigation-collapsed #main-navigation > ul > li.nav-group-folder > div[onclick] i { font-size: 16px !important; }
+    .navigation-collapsed #main-navigation > ul > li.nav-group-start:not(:first-child) { margin-top: 8px; padding-top: 8px; }
     .navigation-collapsed #favorites-arrow,
     .navigation-collapsed #favorites-children,
     .navigation-collapsed #dislike-arrow,

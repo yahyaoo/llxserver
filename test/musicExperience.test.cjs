@@ -15,6 +15,18 @@ function fixture(work) {
 }
 const song = id => ({ id, source: 'wy', name: '歌曲' + id, singer: '周杰伦', albumName: '测试专辑', url: '/api/music/cache/file/alice/song.flac?token=secret&folder=music', pic: '/api/music/cache/cover?filename=song.flac&token=secret', playbackSucceeded: true, playedSeconds: 10.01, playbackId: require('node:crypto').randomUUID() })
 
+test('最近播放保留歌词查询字段，兼容 meta 并保留既有信息', () => fixture(({ root, alice }) => {
+  const input = { ...song('lyrics'), source: 'kg', meta: { songmid: 'mid', hash: 'kg-hash', copyrightId: 'copyright', lrcUrl: 'https://example.test/lyric', token: 'secret' }, _localFilename: '歌曲.flac', _localFolder: 'download' }
+  service.recordRecent(alice, root, input)
+  let restored = service.getRecent(alice)[0]
+  assert.equal(restored.songmid, 'mid'); assert.equal(restored.hash, 'kg-hash')
+  assert.equal(restored.copyrightId, 'copyright'); assert.equal(restored._localFolder, 'download')
+  assert.equal(restored.meta, undefined)
+  service.recordRecent(alice, root, { ...song('lyrics'), source: 'kg' })
+  restored = service.getRecent(alice)[0]
+  assert.equal(restored.hash, 'kg-hash'); assert.equal(restored.songmid, 'mid')
+}))
+
 /** 新主题经过真实账号存储往返校验，防止被旧白名单还原。 @author jingyh */
 test('黑白主题和纯色外观保存后原样读回，其他账号保持默认', () => fixture(({ root, alice, bob }) => {
   for (const theme of ['white', 'black']) for (const appearance of ['pure-white', 'pure-black']) {

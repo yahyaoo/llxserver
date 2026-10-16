@@ -7,6 +7,7 @@ const musicVisualizer = (function () {
     let audioContext, audioSource, audioAnalyser;
     let waveDetail;
     let isInitialized = false;
+    let frame = null, drawing = [], dataArray, context, viewObserver, sizeObserver;
 
     const audio = document.getElementById('audio-player');
     const detailCanvas = document.getElementById('detail-visualizer');
@@ -19,13 +20,13 @@ const musicVisualizer = (function () {
 
         try {
             console.log('[Visualizer] Initializing AudioContext...');
-            audioContext = new (window.AudioContext || window.webkitAudioContext)();
 
             // 如果音效管理器已存在，使用它的分析器
             if (window.soundEffects && window.soundEffects.getAnalyser()) {
                 audioAnalyser = window.soundEffects.getAnalyser();
                 console.log('[Visualizer] Using analyser from SoundEffectsManager');
             } else {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
                 audioSource = audioContext.createMediaElementSource(audio);
                 audioAnalyser = audioContext.createAnalyser();
                 audioSource.connect(audioAnalyser);
@@ -35,7 +36,11 @@ const musicVisualizer = (function () {
             audioAnalyser.smoothingTimeConstant = 0.8;
             audioAnalyser.fftSize = 512;
 
-            waveDetail = new Wave(audioAnalyser, detailCanvas);
+            // 当前随仓库交付的Wave在空输入时只提供动画构造器，不启动音频或rAF。
+            // 不改vendor：各动画的公开draw接口交给此模块唯一、可停止的显示循环。
+            waveDetail = new Wave(null, detailCanvas);
+            context = detailCanvas.getContext('2d');
+            dataArray = new Uint8Array(audioAnalyser.frequencyBinCount);
 
             isInitialized = true;
             console.log('[Visualizer] Initialized successfully');
@@ -56,8 +61,9 @@ const musicVisualizer = (function () {
             const rect = canvas.getBoundingClientRect();
             if (rect.width === 0) return;
             const dpr = window.devicePixelRatio || 1;
-            canvas.width = rect.width * dpr;
-            canvas.height = rect.height * dpr;
+            const width = Math.round(rect.width * dpr), height = Math.round(rect.height * dpr);
+            if (canvas.width !== width) canvas.width = width;
+            if (canvas.height !== height) canvas.height = height;
         });
     }
 
@@ -83,6 +89,7 @@ const musicVisualizer = (function () {
 
         // --- Handle Detail Visualizer ---
         waveDetail.clearAnimations();
+        drawing = [];
         if (s.showDetailVisualizer && detailCanvas) {
             const options = {
                 fillColor: themeColor,
@@ -109,11 +116,13 @@ const musicVisualizer = (function () {
                 AnimationClass = window.PlayerDetailSpectrum;
             }
 
-            waveDetail.addAnimation(new AnimationClass(options));
+            const animation = new AnimationClass(options);
+            waveDetail.addAnimation(animation); drawing = [animation];
             detailCanvas.style.opacity = opacity;
         } else if (detailCanvas) {
             detailCanvas.style.opacity = '0';
         }
+        syncLifecycle();
     }
 
     /**
@@ -123,6 +132,7 @@ const musicVisualizer = (function () {
     function clear(type) {
         if (type === 'detail' && waveDetail) {
             waveDetail.clearAnimations();
+            drawing = []; stop();
             if (detailCanvas) {
                 const ctx = detailCanvas.getContext('2d');
                 ctx.clearRect(0, 0, detailCanvas.width, detailCanvas.height);
@@ -130,22 +140,58 @@ const musicVisualizer = (function () {
         }
     }
 
-    if (audio) {
-        audio.addEventListener('play', () => {
+    function visible() {
+        const view = document.getElementById('view-player-detail');
+        return !document.hidden && detailCanvas?.isConnected !== false && !detailCanvas?.hidden &&
+            !view?.classList?.contains('hidden') && !view?.classList?.contains('opacity-0') && !!window.settings?.showDetailVisualizer;
+    }
+    function stop() { if (frame !== null) cancelAnimationFrame(frame); frame = null; }
+    function draw() {
+        frame = null;
+        if (!isInitialized || audio.paused || !visible() || !drawing.length) return;
+        if (dataArray.length !== audioAnalyser.frequencyBinCount) dataArray = new Uint8Array(audioAnalyser.frequencyBinCount);
+        audioAnalyser.getByteFrequencyData(dataArray);
+        context.clearRect(0, 0, detailCanvas.width, detailCanvas.height);
+        for (const animation of drawing) animation.draw(dataArray, context);
+        frame = requestAnimationFrame(draw);
+    }
+    function syncLifecycle() {
+        if (!isInitialized || audio?.paused || !visible() || !drawing.length) { stop(); return; }
+        if (frame === null) frame = requestAnimationFrame(draw);
+    }
+    const onPlay = () => {
             if (!isInitialized) {
                 init();
             } else if (audioContext && audioContext.state === 'suspended') {
                 audioContext.resume();
             }
-        });
+            syncLifecycle();
+    };
+    const onResize = () => {
+        if (!visible()) return;
+        const measure = () => null, write = () => { syncSize(); if (isInitialized) applySettings(); };
+        if (window.ClientPerformance?.scheduleLayout) window.ClientPerformance.scheduleLayout(musicVisualizer, measure, write);
+        else write();
+    };
+    if (audio) { audio.addEventListener('play', onPlay); for (const event of ['playing', 'pause', 'ended', 'emptied']) audio.addEventListener(event, syncLifecycle); }
+    window.addEventListener('resize', onResize, { passive: true });
+    document.addEventListener?.('visibilitychange', syncLifecycle);
+    if (typeof MutationObserver !== 'undefined') {
+        viewObserver = new MutationObserver(() => { if (visible()) onResize(); syncLifecycle(); });
+        const view = document.getElementById('view-player-detail'); if (view) viewObserver.observe(view, { attributes: true, attributeFilter: ['class'] });
     }
+    if (typeof ResizeObserver !== 'undefined' && detailCanvas) { sizeObserver = new ResizeObserver(onResize); sizeObserver.observe(detailCanvas); }
+    function destroy() {
+        stop(); drawing = []; viewObserver?.disconnect(); sizeObserver?.disconnect();
+        audio?.removeEventListener('play', onPlay); for (const event of ['playing', 'pause', 'ended', 'emptied']) audio?.removeEventListener(event, syncLifecycle);
+        window.removeEventListener('resize', onResize); document.removeEventListener?.('visibilitychange', syncLifecycle);
+        window.removeEventListener('pageshow', syncLifecycle);
+        window.ClientPerformance?.cancelLayout(musicVisualizer);
+    }
+    window.addEventListener('pagehide', event => { stop(); if (!event.persisted) destroy(); });
+    window.addEventListener('pageshow', syncLifecycle);
 
-    window.addEventListener('resize', () => {
-        syncSize();
-        if (isInitialized) applySettings();
-    });
-
-    return { init, applySettings, syncSize, clear };
+    return { init, applySettings, syncSize, clear, syncLifecycle, destroy, get activeLoop() { return frame !== null; } };
 })();
 
 window.musicVisualizer = musicVisualizer;

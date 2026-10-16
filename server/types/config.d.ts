@@ -57,6 +57,36 @@ declare namespace LX {
   }
 
   interface Config {
+    'library.scan.enabled'?: boolean
+    'library.scan.legacy'?: boolean
+    'library.scan.defaultMinutes'?: number
+    'library.scan.fullScanHours'?: number
+    'library.scan.watch'?: boolean
+    'library.scan.watchDebounceSeconds'?: number
+    'library.scan.startupDelaySeconds'?: number
+    'library.scan.ioPauseMs'?: number
+    'library.scan.watchMode'?: 'auto' | 'native' | 'polling' | 'off'
+    'library.scan.lyricWriteMode'?: 'sidecar' | 'embedded' | 'both'
+    'library.scan.embedCover'?: boolean
+    'library.prefetch.enabled'?: boolean
+    'library.prefetch.cover'?: boolean
+    'library.prefetch.lyric'?: boolean
+    'library.prefetch.network'?: boolean
+    'library.prefetch.concurrency'?: number
+    'library.prefetch.maxCacheMB'?: number
+    'library.prefetch.networkPerMinute'?: number
+    'library.prefetch.backfillOnStartup'?: boolean
+    'library.autoFix.embedLyric'?: 'off' | 'follow-download' | 'on'
+    'library.autoFix.retag'?: 'off' | 'fill-missing'
+    'library.autoFix.scope'?: 'cache' | 'cache+custom'
+    'library.autoFix.maxPerRun'?: number
+    'library.autoFix.quietHours'?: string
+    'library.autoFix.safeWrite'?: boolean
+    'clientChannel.reportIntervalMinutes'?: number
+    'clientChannel.progressThrottleMs'?: number
+    'clientChannel.maxBatchOps'?: number
+    'clientChannel.maxBatchBytes'?: number
+    'clientChannel.legacyProgressPolling'?: boolean
     /**
      * 同步服务名称
      */
@@ -164,55 +194,7 @@ declare namespace LX {
      */
     'frontend.password'?: string
 
-    /**
-     * 是否启用 WebDAV 同步服务
-     */
-    'webdav.enable'?: boolean
 
-    /**
-     * WebDAV URL
-     */
-    'webdav.url'?: string
-
-    /**
-     * WebDAV 用户名
-     */
-    'webdav.username'?: string
-
-    /**
-     * WebDAV 密码
-     */
-    'webdav.password'?: string
-
-    /**
-     * WebDAV 增量同步远端路径（默认 /lx-sync）
-     */
-    'webdav.syncPath'?: string
-
-    /**
-     * WebDAV 全量备份远端路径（默认 /lx-sync-backups）
-     */
-    'webdav.backupPath'?: string
-
-    /**
-     * 同步间隔(分钟)
-     */
-    'sync.interval'?: number
-
-    /**
-     * 全量备份间隔(小时)，默认 24
-     */
-    'sync.backupInterval'?: number
-
-    /**
-     * 是否排除缓存目录 (data/<user>/cache) 的增量同步与全量备份
-     */
-    'webdav.excludeCache'?: boolean
-
-    /**
-     * 是否排除音乐下载目录 (data/<user>/music) 的增量同步与全量备份
-     */
-    'webdav.excludeMusic'?: boolean
 
     /**
      * 是否启用本地配置备份（每日导出 SQL 业务配置，保留指定天数）

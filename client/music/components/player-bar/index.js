@@ -14,7 +14,11 @@
                 if (typeof isLyricViewOpen !== 'undefined' && isLyricViewOpen) return;
                 if (!document.body.classList.contains('player-detail-open')) window.toggleLyrics();
             };
-            this.onLayoutChange = () => this.updateScrollClearance();
+            this.onLayoutChange = () => {
+                if (window.ClientPerformance?.scheduleLayout) window.ClientPerformance.scheduleLayout(this, () => this.measureLayout(), value => this.applyLayout(value));
+                else this.updateScrollClearance();
+            };
+            this.onVisibility = () => { if (!document.hidden) { this.onLayoutChange(); this.updateLyrics(this.pendingLyricIndex ?? this.lyricIndex ?? -1); } };
             this.onDocumentClick = event => {
                 if (!event.target.closest('[data-player-popover]')) this.closePopovers();
                 if (event.target.closest('[data-player-action]')) this.closePopovers();
@@ -40,25 +44,59 @@
             this.destroy();
             root.innerHTML = window.LXPlayerBarTemplate;
             this.root = root;
+            window.invalidatePlayerProgress?.();
             document.getElementById('player-footer').addEventListener('click', this.onBarClick);
             root.classList.add('player-bar-host');
             document.body.classList.add('player-bar-floating');
             document.getElementById('player-volume-popover').inert = true;
             document.addEventListener('click', this.onDocumentClick);
             document.addEventListener('keydown', this.onDocumentKeydown);
+            document.addEventListener('visibilitychange', this.onVisibility);
             document.getElementById('volume-container')?.addEventListener('keydown', this.onVolumeKeydown);
+            this.unsubscribeLyrics = window.playbackLyrics?.subscribe(state => {
+                if (this.lyricLines !== state.lines || this.lyricMessage !== state.message) this.setLyrics(state.lines, state.message);
+                this.updateLyrics(state.index);
+            });
+            this.renderTitle();
             this.observeLayout();
         }
 
         /** 同步浮层遮挡范围，只用于滚动末尾留白，不改变页面高度。 */
         updateScrollClearance() {
+            this.applyLayout(this.measureLayout());
+        }
+        measureLayout() {
+            if (document.hidden) return null;
             const footer = document.getElementById('player-footer');
-            if (!this.root || !footer) return;
+            if (!this.root || !footer) return null;
             const rect = footer.getBoundingClientRect();
             const viewportHeight = window.innerHeight;
             const visible = rect.height > 0 && rect.top + rect.height > 0 && rect.top < viewportHeight;
             const clearance = visible ? Math.ceil(Math.min(viewportHeight, viewportHeight - rect.top) + 16) : 0;
-            document.body.style.setProperty('--player-bar-clearance', `${clearance}px`);
+            const container = document.getElementById('player-metadata-text'), track = container?.querySelector('.player-metadata-track');
+            return { clearance, container, overflow: container && track ? Math.max(0, track.scrollWidth - container.clientWidth) : 0 };
+        }
+        applyLayout(value) {
+            if (!value || !this.root || document.hidden) return;
+            const { clearance, container, overflow } = value;
+            if (this.clearance !== clearance) { document.body.style.setProperty('--player-bar-clearance', `${clearance}px`); this.clearance = clearance; }
+            if (container && (this.metadataOverflow !== overflow || this.metadataContainer !== container)) {
+                container.setAttribute('data-overflow', String(overflow > 1));
+                container.style.setProperty('--metadata-offset', -overflow + 'px');
+                container.style.setProperty('--metadata-duration', Math.max(8, overflow / 24 + 4) + 's');
+                this.metadataOverflow = overflow; this.metadataContainer = container;
+            }
+        }
+
+        /** 歌手和专辑保持单行；超长时往返滚动，原节点继续供播放页使用。 @author yahyaoo */
+        updateMetadataScroll() {
+            const container = document.getElementById('player-metadata-text');
+            const track = container?.querySelector('.player-metadata-track');
+            if (!container || !track) return;
+            const overflow = Math.max(0, track.scrollWidth - container.clientWidth);
+            container.setAttribute('data-overflow', String(overflow > 1));
+            container.style.setProperty('--metadata-offset', -overflow + 'px');
+            container.style.setProperty('--metadata-duration', Math.max(8, overflow / 24 + 4) + 's');
         }
 
         /** 窗口和组件尺寸改变时重新测量，避免手机布局沿用桌面补偿值。 */
@@ -81,9 +119,13 @@
         /** 卸载组件并释放事件，不更改音频状态。 */
         destroy() {
             if (!this.root) return;
+            this.unsubscribeLyrics?.();
+            this.unsubscribeLyrics = null;
             document.getElementById('player-footer')?.removeEventListener('click', this.onBarClick);
             document.removeEventListener('click', this.onDocumentClick);
             document.removeEventListener('keydown', this.onDocumentKeydown);
+            document.removeEventListener('visibilitychange', this.onVisibility);
+            window.ClientPerformance?.cancelLayout(this);
             document.getElementById('volume-container')?.removeEventListener('keydown', this.onVolumeKeydown);
             window.removeEventListener('resize', this.onLayoutChange);
             document.getElementById('player-footer')?.removeEventListener('transitionend', this.onLayoutChange);
@@ -96,14 +138,46 @@
             this.root.classList.remove('player-bar-host');
             document.body.classList.remove('player-bar-floating');
             this.root = null;
+            this.clearance = null; this.metadataOverflow = null; this.metadataContainer = null;
         }
 
-        /** 换歌或重载歌词时清空旧内容；底栏复用详情页的歌词时间轴。 */
+        /** 歌曲信息刷新不清空歌词；歌词状态由公共会话统一发布。 */
         setTrack(song) {
-            const key = [song.source, song.id || song.songmid || song._localFilename, song.name, song.singer].join('|');
-            if (this.trackKey === key) return;
-            this.trackKey = key;
-            this.setLyrics([], '暂无歌词');
+            this.trackTitle = song.name || '未知歌曲';
+            this.renderTitle();
+        }
+
+        /** 播放准备进度由真实阶段推进，绑定请求，旧请求不能覆盖新歌曲。 */
+        beginLoading(requestId) {
+            this.loadingRequestId = requestId;
+            this.loading = true;
+            this.loadingProgress = 0;
+            this.loadingSource = '';
+            this.renderTitle();
+        }
+        advanceLoading(percent, requestId = this.loadingRequestId) {
+            if (!this.loading || requestId !== this.loadingRequestId || !Number.isFinite(percent)) return;
+            this.loadingProgress = Math.max(this.loadingProgress, Math.min(99, Math.round(percent)));
+            this.renderTitle();
+        }
+        bindLoadingSource(url, requestId) {
+            if (this.loading && this.loadingRequestId === requestId) this.loadingSource = url;
+        }
+        matchesLoadingSource(url) { return this.loading && !!this.loadingSource && this.loadingSource === url; }
+        finishLoading(requestId = this.loadingRequestId) {
+            if (!this.loading || requestId !== this.loadingRequestId) return;
+            this.loading = false;
+            this.renderTitle();
+        }
+        /** 仅改变歌曲名显示，其他控件和详情页共用原节点。 */
+        renderTitle() {
+            const title = document.getElementById('player-title');
+            if (!title) return;
+            const text = this.loading ? '正在加载中 ' + this.loadingProgress + '%' : this.trackTitle || '暂无播放';
+            title.textContent = text;
+            title.setAttribute('data-text', text);
+            title.setAttribute('aria-busy', String(!!this.loading));
+            title.setAttribute('title', this.loading ? '播放准备进度 · ' + (this.trackTitle || '') : text);
         }
 
         /** 保存当前歌曲的歌词集合。 */
@@ -115,6 +189,8 @@
 
         /** 显示当前与下一句，向前播放和拖动进度均按同一行号更新。 */
         updateLyrics(index) {
+            this.pendingLyricIndex = index;
+            if (document.hidden) return;
             const current = document.getElementById('player-lyric-current');
             const next = document.getElementById('player-lyric-next');
             if (!current || !next) return;
@@ -123,8 +199,13 @@
                 for (const line of [current, next]) line.animate?.([{ transform: 'translateY(8px)', opacity: .4 }, { transform: 'translateY(0)', opacity: 1 }], { duration: 220 });
             }
             this.lyricIndex = index;
-            current.textContent = this.lyricLines[first]?.text || this.lyricMessage || '暂无歌词';
-            next.textContent = this.lyricLines[first + 1]?.text || '';
+            const currentText = (this.lyricLines[first]?.text || this.lyricLines[first]?.words?.map(word => word.text).join('')) || this.lyricMessage || '暂无歌词';
+            if (current.textContent !== currentText) current.textContent = currentText;
+            if (!this.lyricLines.length && this.lyricMessage?.includes('加载')) {
+                current.innerHTML = window.LoadingState.render(this.lyricMessage, 'inline');
+            }
+            const nextText = (this.lyricLines[first + 1]?.text || this.lyricLines[first + 1]?.words?.map(word => word.text).join('')) || '';
+            if (next.textContent !== nextText) next.textContent = nextText;
             for (const line of [current, next]) line.setAttribute('title', line.textContent);
         }
 

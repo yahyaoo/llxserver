@@ -33,12 +33,28 @@
   }
 
   const apiFetch = async (path, options = {}) => {
+    if (path === '/api/user/sync-download/settings' && options.method === 'PUT' && window.ClientSync) {
+      const prior = await window.ClientSync.read('sync-download') || _currentData?.syncDownload || {}
+      window.ClientSync.seed('sync-download', prior)
+      const patch = JSON.parse(options.body || '{}')
+      const next = { ...prior, ...patch }
+      if (patch.playlists) next.playlists = { ...prior.playlists, ...patch.playlists }
+      await window.ClientSync.update('sync-download', next)
+      if (_currentData) _currentData.syncDownload = next
+      return { success: true }
+    }
+    // 手动启动依赖服务端当前配置，先提交已修改项；空队列不会产生请求。
+    if (path.startsWith('/api/user/sync-download/trigger')) await window.ClientSync?.flush('sync-download', true)
     const res = await fetch(path, {
       headers: authHeaders(),
       ...options,
     })
     return res.json()
   }
+  window.ClientSync?.register('sync-download', async (snapshot, context) => {
+    const response = await fetch('/api/user/sync-download/settings', { method: 'PUT', headers: { ...context.headers, 'Content-Type': 'application/json' }, body: JSON.stringify(snapshot), signal: context.signal })
+    if (!response.ok) throw new Error('同步下载设置保存失败: HTTP ' + response.status)
+  })
 
   const _esc = str => {
     if (str === null || str === undefined) return ''
@@ -105,6 +121,9 @@
         return
       }
       _currentData = resp.data
+      const pending = await window.ClientSync?.read('sync-download')
+      if (pending) resp.data.syncDownload = pending
+      else window.ClientSync?.seed('sync-download', resp.data.syncDownload || {})
       renderStatus(resp.data)
       renderPlaylists(resp.data.playlists)
       renderFailedSongs(resp.data.playlists)
@@ -453,21 +472,18 @@
   // ─────────────────────────────────────────────
   const startPolling = () => {
     stopPolling()
-    _pollTimer = setInterval(pollProgress, 1500)
-    pollProgress()
+    window.ClientTransport?.subscribe('sync-download', true)
   }
 
   const stopPolling = () => {
     if (_pollTimer) { clearInterval(_pollTimer); _pollTimer = null }
+    window.ClientTransport?.subscribe('sync-download', false)
   }
 
   const pollProgress = async () => {
-    try {
-      const resp = await apiFetch('/api/user/sync-download/progress')
-      if (!resp.success) return
-      updateProgressUI(resp.data)
-    } catch { }
+    window.ClientTransport?.subscribe('sync-download', true)
   }
+  window.ClientTransport?.on('sync-download', response => { if (response.success) updateProgressUI(response.data) })
 
   // ─────────────────────────────────────────────
   // 同步运行时锁定 / 停止时解锁所有可配置控件

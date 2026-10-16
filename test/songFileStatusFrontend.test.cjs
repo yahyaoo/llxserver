@@ -15,24 +15,27 @@ function runtime(request) {
   const container = { titles:[element()], isConnected:true, querySelectorAll() { return this.titles }, contains(slot) { return this.titles.some(title => title.children.includes(slot)) }, getClientRects:() => [1] };
   return { window,container, account(value) { account=value }, state:() => container.titles[0].querySelector().dataset.fileState };
 }
-const response = states => ({ok:true,json:async() => ({success:true,statuses:states.map(state => ({state}))})});
-test('组件按原顺序分批查询并精简歌曲字段',async() => {
-  const calls=[]; const r=runtime(async(url,options) => {const songs=JSON.parse(options.body).songs;calls.push(songs);return response(songs.map(()=>'downloaded'))});
+test("进入列表只读缓存、无HTTP和定时器，按原行顺序显示文件状态",async() => {
+  const calls=[]; const r=runtime(() => {calls.push(1);throw Error("禁止网络读取")});
+  r.window.SongFiles={enrich: songs => songs.map(song=>({...song,files:[{folder:song.id%2?"cache":"music"}]}))};
   r.container.titles=Array.from({length:501},element);
-  await r.window.SongFileStatus.update(r.container,Array.from({length:501},(_,id)=>({id,meta:{source:'wy',songmid:String(id)},url:'secret'})));
-  assert.deepEqual(calls.map(items=>items.length),[500,1]);assert.equal(calls[1][0].id,500);assert.equal(calls[0][0].url,undefined);assert.equal(r.state(),'downloaded');
+  await r.window.SongFileStatus.update(r.container,Array.from({length:501},(_,id)=>({id})));
+  assert.equal(calls.length,0);assert.equal(r.state(),"downloaded");
+  assert.equal(r.container.titles[1].querySelector().dataset.fileState,"cached");
 });
-test('翻页旧响应与切换账号的响应不会覆盖当前状态',async() => {
-  const pending=[]; const r=runtime(() => new Promise(resolve=>pending.push(resolve)));
-  const first=r.window.SongFileStatus.update(r.container,[{id:1}]);
-  r.container.titles=[element()];const second=r.window.SongFileStatus.update(r.container,[{id:2}]);
-  pending[1](response(['cached']));await second;pending[0](response(['downloaded']));await first;assert.equal(r.state(),'cached');
-  const third=r.window.SongFileStatus.update(r.container,[{id:2}]);r.account('bob');pending[2](response(['downloaded']));await third;assert.equal(r.state(),'loading');
+test("翻页后刷新只更新新节点，推送文件目录移除后显示云端",async() => {
+  const r=runtime(()=>{throw Error("禁止网络读取")});let available=true;
+  r.window.SongFiles={enrich:songs=>songs.map(song=>({...song,files:available?[{folder:"music"}]:[]}))};
+  await r.window.SongFileStatus.update(r.container,[{id:1}]);const old=r.container.titles[0];
+  r.container.titles=[element()];await r.window.SongFileStatus.update(r.container,[{id:2}]);
+  available=false;r.window.SongFileStatus.refresh();
+  assert.equal(r.state(),"cloud");assert.equal(old.querySelector().dataset.fileState,"downloaded");
 });
-test('服务错误与不完整响应显示不可用，真实云端状态显示云图标',async() => {
-  let fail=true;const r=runtime(async() => fail?{ok:false}:response(['cloud']));
-  await r.window.SongFileStatus.update(r.container,[{id:1}]);assert.equal(r.state(),'unknown');
-  fail=false;await r.window.SongFileStatus.update(r.container,[{id:1}]);assert.equal(r.state(),'cloud');
+test("切换账号直接使用新账号缓存，不查询服务器或沿用旧文件状态",async() => {
+  const r=runtime(()=>{throw Error("禁止网络读取")});let files=[{folder:"music"}];
+  r.window.SongFiles={enrich:songs=>songs.map(song=>({...song,files}))};
+  await r.window.SongFileStatus.update(r.container,[{id:1}]);assert.equal(r.state(),"downloaded");
+  r.account("bob");files=[];r.window.SongFileStatus.refresh();assert.equal(r.state(),"cloud");
 });
 function downloadRuntime(choices) {
   const menus=[],tasks=[];const window={settings:{enableOnlyDownloadMode:true},SystemDownloadManager:{addTasks:async items=>tasks.push(...items)}};

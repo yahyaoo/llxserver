@@ -12,6 +12,36 @@
     window.systemLogs = [];
     const MAX_LOGS = 1000;
 
+    const MAX_MESSAGE = 4000, MAX_NODES = 300, MAX_DEPTH = 4, MAX_ITEMS = 30;
+
+    /** 有界预览：只遍历有限节点，避免 console.log 大对象（歌单、列表响应）时整体序列化阻塞主线程。 */
+    function preview(value, budget, depth, seen) {
+        if (typeof value === 'function') return '[Function]';
+        if (typeof value === 'bigint') return value + 'n';
+        if (typeof value === 'string') return value.length > 300 ? value.slice(0, 300) + '…' : value;
+        if (value === null || typeof value !== 'object') return value;
+        if (seen.has(value)) return '[Circular]';
+        if (depth >= MAX_DEPTH || budget.nodes <= 0) return Array.isArray(value) ? '[Array(' + value.length + ')]' : '[Object]';
+        seen.add(value);
+        let result;
+        if (Array.isArray(value)) {
+            result = [];
+            for (let index = 0; index < value.length && index < MAX_ITEMS && budget.nodes > 0; index++) { budget.nodes--; result.push(preview(value[index], budget, depth + 1, seen)); }
+            if (value.length > result.length) result.push('…共 ' + value.length + ' 项');
+        } else {
+            result = {};
+            let count = 0;
+            for (const key in value) {
+                if (!Object.prototype.hasOwnProperty.call(value, key)) continue;
+                if (count++ >= MAX_ITEMS || budget.nodes <= 0) { result['…'] = '已省略其余字段'; break; }
+                budget.nodes--;
+                try { result[key] = preview(value[key], budget, depth + 1, seen); } catch { result[key] = '[Unreadable]'; }
+            }
+        }
+        seen.delete(value);
+        return result;
+    }
+
     function captureLog(type, args) {
         const now = new Date();
         const timeStr = now.toLocaleTimeString() + '.' + String(now.getMilliseconds()).padStart(3, '0');
@@ -24,13 +54,14 @@
                 }
                 if (typeof arg === 'object') {
                     try {
-                        return JSON.stringify(arg, null, 2);
+                        return JSON.stringify(preview(arg, { nodes: MAX_NODES }, 0, new WeakSet()), null, 2);
                     } catch (e) {
                         return '[Circular/Object]';
                     }
                 }
                 return String(arg);
             }).join(' ');
+            if (message.length > MAX_MESSAGE) message = message.slice(0, MAX_MESSAGE) + '…（已截断）';
         } catch (e) {
             message = '[Error processing log arguments]';
         }

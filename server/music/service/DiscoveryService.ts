@@ -1,5 +1,8 @@
+import { resolveMusicFile } from '../../application/library/MusicDirectoryService'
 import type { RequestContext, ServerRuntime } from '../../common/http/RequestContext'
 import { removeMatchedDislikes } from './dislike/removeMatched'
+import crypto from 'node:crypto'
+import { ensureCustomLyrics } from './library/CustomLyricCache'
 /** 音乐搜索、歌手专辑查询、自定义歌曲维护和不喜欢规则所需的应用依赖契约。 @author yahyaoo */
 export type DiscoveryServiceRuntime = Pick<ServerRuntime, 'verifyUserAuth' | 'customMusicManager' | 'getUserConfig' | 'readBody' | 'path' | 'storageFs' | 'fileCache' | 'serverDownloads' | 'musicSdk' | 'musicProgressClients' | 'normalizeSongInfo' | 'isSourceSupported' | 'callUserApiGetMusicUrl' | 'needle' | 'getProxyAgent' | 'resolveServerSong' | 'getAudioRemoteSize' | 'formatBytes' | 'getUserSpace' | 'serializeDislikeRules' | 'dislikeMatchOptions' | 'splitSingers' | 'encodeAlbumRule' | 'normalizeText' | 'invalidateDislikeCache'>
 /** 音乐搜索、歌手专辑查询、自定义歌曲维护和不喜欢规则服务。 @author yahyaoo */
@@ -21,13 +24,11 @@ export async function postMusicCustomSync(context: RequestContext, runtime: Disc
           res.end(JSON.stringify({ success: false, message: 'Unauthorized' }))
           return
         }
-        void customMusicManager.syncCustomIndex(verified).then(() => {
-          res.writeHead(200, { 'Content-Type': 'application/json' })
-          res.end(JSON.stringify({ success: true, message: 'Sync completed' }))
-        }).catch(err => {
-          res.writeHead(500, { 'Content-Type': 'application/json' })
-          res.end(JSON.stringify({ success: false, message: err.message }))
-        })
+        const mode = context.urlObj.searchParams.get('mode') || 'full'
+        if (!['quick', 'full'].includes(mode)) { res.writeHead(400, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ success: false, message: '扫描模式必须为 quick 或 full' })); return }
+        const scan = customMusicManager.ensureMusicScan(verified, true, mode as 'quick' | 'full')
+        res.writeHead(202, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ success: true, scan }))
         return
 
 }
@@ -108,9 +109,12 @@ export async function getMusicCustomCover(context: RequestContext, runtime: Disc
         }
         const cover = await customMusicManager.getCustomCover(filename, verified)
         if (cover && cover.data) {
+          const version = crypto.createHash('sha256').update(cover.data).digest('hex')
+          const etag = '"' + version + '"'
+          const headers = { 'Content-Type': cover.mime || 'image/jpeg', 'ETag': etag, 'Cache-Control': urlObj.searchParams.get('coverVersion') === version || urlObj.searchParams.get('version') === version ? 'private, max-age=604800, immutable' : 'private, no-cache' }
+          if (String(req.headers['if-none-match'] || '').split(',').some(value => value.trim().replace(/^W\//, '') === etag || value.trim() === '*')) { res.writeHead(304, headers); res.end(); return }
           res.writeHead(200, {
-            'Content-Type': cover.mime || 'image/jpeg',
-            'Cache-Control': 'public, max-age=86400',
+            ...headers,
           })
           res.end(cover.data)
         } else {
@@ -283,21 +287,21 @@ export async function getMusicCustomEmbedLyric(context: RequestContext, runtime:
         try {
           const customDir = customMusicManager.getCustomMusicDir(verified)
           if (!customDir) throw new Error('未配置自定义目录')
-          const filePath = path.resolve(customDir, filename)
+          const filePath = resolveMusicFile(verified, filename)
           // 安全检查：防止路径穿越
-          if (!filePath.startsWith(path.resolve(customDir))) throw new Error('非法路径')
+          if (!filePath) throw new Error('非法路径')
           if (!storageFs.existsSync(filePath)) {
             res.writeHead(404, { 'Content-Type': 'application/json' })
             res.end(JSON.stringify({ success: false, message: '文件不存在' }))
             return
           }
-          const { MusicTagger: MT } = require('music-tag-native')
-          const tagger = new MT()
-          tagger.loadPath(filePath)
-          const lrc = tagger.lyrics || ''
-          tagger.dispose()
-          res.writeHead(200, { 'Content-Type': 'application/json' })
-          res.end(JSON.stringify({ success: true, lrc }))
+          const value = await ensureCustomLyrics(verified, filename, { network: false })
+          const lrc = value?.lyrics?.lrc || ''
+          const etag = value ? '"' + value.version + '"' : undefined
+          const headers = { 'Content-Type': 'application/json', 'Cache-Control': 'private, no-cache', ...(etag ? { ETag: etag } : {}) }
+          if (etag && req.headers['if-none-match'] === etag) { res.writeHead(304, headers); res.end(); return }
+          res.writeHead(200, headers)
+          res.end(JSON.stringify({ success: true, ...(value?.lyrics || {}), lrc, lyricVersion: value?.version }))
         } catch (e: any) {
           res.writeHead(200, { 'Content-Type': 'application/json' })
           res.end(JSON.stringify({ success: false, message: e.message || '读取内嵌歌词失败' }))
@@ -1132,7 +1136,19 @@ export async function getMusicSongListDetail(context: RequestContext, runtime: D
           if (!musicSdk[source] || !musicSdk[source].songList) {
             throw new Error(`Source ${source} does not support songList`)
           }
-          const result = await musicSdk[source].songList.getListDetail(id, page)
+          const provider = musicSdk[source].songList as any
+          // 分阶段仅调整返回时间：歌曲列表与详情独立的音源不再等待详情，旧请求仍返回完整 JSON。
+          if (urlObj.searchParams.get('progressive') === '1' && source === 'mg' && /^\d+$/.test(id) && provider.getListDetailList && provider.getListDetailInfo) {
+            const infoPromise = provider.getListDetailInfo(id).catch(() => null)
+            const result = await provider.getListDetailList(id, page)
+            result.list = (result.list || []).map(normalizeSongInfo)
+            res.writeHead(200, { 'Content-Type': 'application/x-ndjson; charset=utf-8', 'Cache-Control': 'no-store', 'X-Accel-Buffering': 'no' })
+            res.write(JSON.stringify({ ...result, info: { name: '歌单', total: result.total } }) + '\n')
+            const info = await infoPromise
+            if (!res.destroyed) res.end(JSON.stringify({ info: info || { name: '歌单', total: result.total } }) + '\n')
+            return
+          }
+          const result = await provider.getListDetail(id, page)
           if (result && result.list) {
             result.list = result.list.map(normalizeSongInfo)
           }

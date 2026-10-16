@@ -58,6 +58,11 @@ test('真实 HTTP：搜索分组、头像缓存、主题上传与丢失回退、
       assert.equal(rejected.status, 400)
     }
     assert.deepEqual((await json('/api/user/recent', alice)).items, [])
+    // 最近记录经过真实 HTTP 和 SQLite 后必须保留平台歌词查询参数。作者：yahyaoo
+    await json('/api/user/recent', alice, 'POST', { ...qualified('lyrics-roundtrip'), source: 'kg', meta: { songmid: 'kg-mid', hash: 'kg-hash' }, _localFilename: '歌曲.flac', _localFolder: 'download' })
+    const lyricRecord = (await json('/api/user/recent', alice)).items[0]
+    assert.equal(lyricRecord.hash, 'kg-hash'); assert.equal(lyricRecord.songmid, 'kg-mid'); assert.equal(lyricRecord._localFolder, 'download')
+    await json('/api/user/recent', alice, 'DELETE')
     for (const id of ['one', 'two', 'three', 'two']) await json('/api/user/recent', alice, 'POST', qualified(id))
     const repeat = qualified('two')
     await json('/api/user/recent', alice, 'POST', repeat)

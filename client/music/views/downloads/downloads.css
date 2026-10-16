@@ -50,6 +50,10 @@
 }
 @media (max-width: 639px) {
     .downloads-view { padding: 12px; }
+    .downloads-heading { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px 12px; }
+    .downloads-title { min-width: 0; }
+    .downloads-heading .music-page-controls { grid-column: 1 / -1; width: 100%; min-width: 0; max-width: 100%; flex-wrap: wrap; }
+    .downloads-heading .music-page-controls button { flex: 0 1 auto; min-width: 0; white-space: nowrap; }
     .downloads-heading h2 { font-size: 16px; }
     .downloads-toolbar { gap: 6px; margin-bottom: 12px; }
     .downloads-toolbar button { padding: 8px; font-size: 12px; }

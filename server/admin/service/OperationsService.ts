@@ -104,7 +104,6 @@ export async function getStatus(context: RequestContext, runtime: OperationsServ
           cpus: os.cpus().length,
           cpuModel: os.cpus()[0]?.model || 'Unknown',
           cpuSpeed: os.cpus()[0]?.speed || 0,
-          isWebDAVConfigured: !!(global.lx.config['webdav.url'] && global.lx.config['webdav.url'].trim() !== '' && global.lx.config['webdav.enable']),
           sourcesCount: getLoadedApisCount ? getLoadedApisCount() : 0,
           nodeVersion: process.version,
           platform: `${os.type()} ${os.arch()}`,

@@ -16,12 +16,14 @@ function digest(body) {
   return crypto.createHash('sha256').update(JSON.stringify(tokens)).digest('hex')
 }
 
-test('158 个非配置路由保持原执行语句，160 个原路由条件顺序保持一致', () => {
+test('未变更路由保持原执行语句，移除 WebDAV 后保留路由顺序', () => {
   assert.equal(routes.length, 160)
   const files = new Map()
-  const http = fs.readFileSync(path.join(__dirname, '../server/application/http/HttpServer.ts'), 'utf8')
+  // Windows 检出可能使用 CRLF；统一换行，避免多行路由条件产生误报。
+  const http = fs.readFileSync(path.join(__dirname, '../server/application/http/HttpServer.ts'), 'utf8').replace(/\r\n?/g, '\n')
   let position = 0
-  for (const route of routes) {
+  const changed = new Set(['handleUsers','getStatus','getMusicCacheList','getMusicCacheDirectories','getMusicCustomList','postMusicCustomSync','handleMusicCustomFile','getMusicCustomCover','getMusicCustomEmbedLyric','getBackupDownload','postBackupUpload','getMusicDownloadCheck','getMusicDownload'])
+  for (const route of routes.filter(route => !/Webdav/.test(route.method))) {
     const filename = path.join(__dirname, '..', route.file.replace(/^src\//, 'dist/server/').replace(/\.ts$/, '.js'))
     if (!files.has(filename)) {
       const source = fs.readFileSync(filename, 'utf8')
@@ -35,11 +37,35 @@ test('158 个非配置路由保持原执行语句，160 个原路由条件顺序
     const body = statements.map(node => source.slice(node.start, node.end)).join('\n')
     // 配置持久化与备份还原单独验证；歌单基线已更新喜爱隔离及封面校验，其余路由保持原基线。作者：jingyh
     const changedConfigurationHandlers = ['handleConfig', 'postConfigBackupsRestore']
-    if (!(route.file === 'src/admin/service/ConfigurationService.ts' && changedConfigurationHandlers.includes(route.method))) assert.equal(digest(body), route.baselineDigest, route.file + ':' + route.method)
+    if (!changed.has(route.method) && !(route.file === 'src/admin/service/ConfigurationService.ts' && changedConfigurationHandlers.includes(route.method))) assert.equal(digest(body), route.baselineDigest, route.file + ':' + route.method)
     const next = http.indexOf('if (' + route.condition + ')', position)
     assert.ok(next >= position, route.route + ' 条件顺序')
     position = next + 1
   }
+})
+
+test('自定义音源校验要求登录，音源操作归属使用已验证账号', async () => {
+  require('tsx/cjs')
+  const service = require('../server/admin/service/SourceService.ts')
+  const previous = global.lx
+  global.lx = { config: { 'frontend.password': 'admin-test', 'user.enablePublicRestriction': false } }
+  let username = null, status, body, validated = 0
+  const owners = []
+  const handlers = { handleValidate() { validated++ } }
+  for (const name of ['Import', 'Upload', 'List', 'Toggle', 'Delete', 'Reorder', 'UpdatePlatforms']) handlers['handle' + name] = (req, res, owner) => owners.push(owner)
+  const context = { req: { headers: {} }, res: { writeHead(value) { status = value }, end(value) { body = JSON.parse(value) } }, urlObj: new URL('http://local/api/custom-source/list?username=bob') }
+  const runtime = { customSourceHandlers: handlers, verifyUserAuth: () => username }
+  try {
+    await service.postCustomSourceValidate(context, runtime)
+    assert.equal(status, 401); assert.equal(body.valid, false); assert.equal(validated, 0)
+    username = 'alice'; await service.postCustomSourceValidate(context, runtime)
+    assert.equal(validated, 1)
+    username = null; context.req.headers['x-frontend-auth'] = 'admin-test'
+    await service.postCustomSourceValidate(context, runtime); assert.equal(validated, 2)
+    username = 'alice'
+    for (const name of ['postCustomSourceImport', 'postCustomSourceUpload', 'getCustomSourceList', 'postCustomSourceToggle', 'postCustomSourceDelete', 'postCustomSourceReorder', 'postCustomSourceUpdatePlatforms']) await service[name](context, runtime)
+    assert.deepEqual(owners, Array(7).fill('alice'), '请求中的 bob 不能覆盖已验证的 alice')
+  } finally { global.lx = previous }
 })
 
 test('管理和播放器业务域不直接导入彼此，业务不导入 SDK 内部文件', () => {

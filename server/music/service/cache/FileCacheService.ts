@@ -1,3 +1,5 @@
+import { readMusicMetadata } from '../library/MusicMetadataWorker'
+import { serverEvents } from '../../../application/events/ServerEvents'
 /** 服务器缓存服务：用户目录、歌曲与封面索引、下载、歌词、元信息和容量清理。 @author yahyaoo */
 import storageFs from '../../../application/persistence/documentFileSystem'
 
@@ -53,7 +55,7 @@ export const CACHE_ROOTS = {
 }
 
 let currentCacheLocation = CACHE_ROOTS.ROOT
-const CACHE_LIST_SYNC_TTL = 30 * 1000
+const CACHE_LIST_SYNC_TTL = 30 * 60 * 1000
 const cacheListSyncState: Map<string, { /** 最近一次同步时间。 */
 lastSync: number,
 pending?: Promise<void> }> = new Map()
@@ -851,7 +853,7 @@ const sanitize = (str: any) => String(str || '').replace(/[\\/:*?"<>|]/g, '_')
 export const syncCacheIndex = async (username?: string, roots: Array<'cache' | 'music'> = ['cache', 'music']) => {
     const normalizedUsername = (username && username !== '_open' && username !== 'default') ? username : '_open'
     void cleanupStaleTempFiles(normalizedUsername)
-    const extensions = ['.mp3', '.flac', '.m4a', '.ogg', '.wav']
+    const extensions = new Set(['.mp3', '.flac', '.m4a', '.ogg', '.wav', '.ape', '.aac', '.opus'])
 
     for (const folder of roots) {
         const index = indexManager.load(normalizedUsername, folder)
@@ -882,7 +884,7 @@ item: CacheItem }>()
                     if (entry.isDirectory()) {
                         const subFiles = await getAllFilesAsync(fullPath, base)
                         acc.push(...subFiles)
-                    } else {
+                    } else if (entry.isFile() && extensions.has(path.extname(entry.name).toLowerCase())) {
                         acc.push(path.relative(base, fullPath).replace(/\\/g, '/'))
                     }
                 }
@@ -896,7 +898,7 @@ item: CacheItem }>()
         for (const file of files) {
             if (file === 'cache_index.json' || file === 'music_index.json') continue
             const ext = path.extname(file).toLowerCase()
-            if (!extensions.includes(ext)) continue
+            if (!extensions.has(ext)) continue
 
             const filePath = path.join(dir, file)
             const stats = await storageFs.promises.stat(filePath)
@@ -969,7 +971,8 @@ item: CacheItem }>()
                     }
 
                     if (needsCoverCheck) {
-                        const hasEmbeddedCover = readEmbeddedCoverState(filePath)
+                        const coverMetadata = await readMusicMetadata(filePath, stats.size + ':' + stats.mtimeMs, 'metadata')
+                        const hasEmbeddedCover = !!coverMetadata?.pictures?.length
                         const hasExternalCover = !hasEmbeddedCover && hasCachedCover(file, normalizedUsername, stats)
                         const coverType: CacheItem['coverType'] = hasEmbeddedCover
                             ? 'embedded'
@@ -991,8 +994,8 @@ item: CacheItem }>()
                     if (!existing.interval || existing.quality === 'unknown' || !existing.bitrate || existing.hasEmbedLyric === undefined || existing.metadataWritable === undefined || qualityCorrectionNeeded) {
                         let tagger: any
                         try {
-                            tagger = new MusicTagger()
-                            tagger.loadPath(filePath)
+                            tagger = await readMusicMetadata(filePath, stats.size + ':' + stats.mtimeMs, 'metadata')
+                            if (!tagger) throw new Error('无法读取标签')
                             // 若为 local 未关联文件，元数据优先校准歌名歌手
                             if (existing.source === 'local' || !existing.source) {
                                 if (tagger.title) existing.name = tagger.title
@@ -1022,7 +1025,7 @@ item: CacheItem }>()
                             existing.metadataError = getMetadataUnsupportedMessage(existing.audioContainer)
                             existing.hasEmbedLyric = false
                         } finally {
-                            try { if (tagger) tagger.dispose() } catch (e) { }
+                            try { if (tagger) tagger.dispose?.() } catch (e) { }
                         }
                         updated = true
                     }
@@ -1040,8 +1043,8 @@ item: CacheItem }>()
                     const audioContainer = detectAudioContainer(filePath)
 
                     try {
-                        const tagger = new MusicTagger()
-                        tagger.loadPath(filePath)
+                        const tagger = await readMusicMetadata(filePath, stats.size + ':' + stats.mtimeMs, 'metadata')
+                            if (!tagger) throw new Error('无法读取标签')
                         // ① 优先从 ID3 读取元数据
                         if (tagger.title) songName = tagger.title
                         if (tagger.artist) singer = tagger.artist
@@ -1061,7 +1064,7 @@ item: CacheItem }>()
                         hasEmbedLyric = !!(lyricsInTag && lyricsInTag.trim().length > 10)
                         metadataWritable = true
 
-                        tagger.dispose()
+                        tagger.dispose?.()
                     } catch (e: any) {
                         metadataError = getMetadataUnsupportedMessage(audioContainer)
                     }
@@ -1173,7 +1176,7 @@ export const getCacheList = async (username?: string) => {
 
     const syncKey = `${currentCacheLocation}:${normalizedUsername}`
     const syncState = cacheListSyncState.get(syncKey) || { lastSync: 0 }
-    const mustSync = !hasCacheIndex || !hasMusicIndex
+    const mustSync = (!hasCacheIndex || !hasMusicIndex) && !syncState.lastSync
     const shouldSync = mustSync || Date.now() - syncState.lastSync > CACHE_LIST_SYNC_TTL
 
     if (shouldSync) {
@@ -1183,12 +1186,15 @@ export const getCacheList = async (username?: string) => {
                 .finally(() => { syncState.pending = undefined })
             cacheListSyncState.set(syncKey, syncState)
         }
-        await syncState.pending
+        if (mustSync) await syncState.pending
     }
 
-    const cacheItems = indexManager.getAll(normalizedUsername, 'cache')
-    const musicItems = indexManager.getAll(normalizedUsername, 'music')
-    const items = [...cacheItems, ...musicItems]
+    const cacheItems = indexManager.getAll(normalizedUsername, 'cache').map(item => ({ ...item, location: currentCacheLocation }))
+    const musicItems = indexManager.getAll(normalizedUsername, 'music').map(item => ({ ...item, location: currentCacheLocation }))
+    const other = currentCacheLocation === CACHE_ROOTS.DATA ? CACHE_ROOTS.ROOT : CACHE_ROOTS.DATA
+    const extra = [...indexManager.getAll(normalizedUsername, 'cache', other), ...indexManager.getAll(normalizedUsername, 'music', other)].map(item => ({ ...item, location: other }))
+    // 不同存储位置都是可管理的副本；歌曲聚合由公共目录服务统一处理。作者：yahyaoo
+    const items = [...cacheItems, ...musicItems, ...extra]
 
     return items.map(item => ({
         ...item,
@@ -1204,7 +1210,7 @@ export const getCacheList = async (username?: string) => {
             img: item.img,
             interval: item.interval,
             type: item.quality, // Compatibility
-            types: {} // To be filled if needed
+            types: { [item.quality]: {} } // 文件实际音质
         },
         hasLyric: item.hasLyric || !!item.lyricFilename
     }))
@@ -1556,16 +1562,18 @@ const setIndexCoverState = (filename: string, username: string, coverType: Cache
  * 读取缓存歌曲封面，优先使用已提取封面，必要时从音频元信息提取。
  * @param filename 文件或文档定位路径。
  * @param username 已解析的用户名称。
+ * @param options 指定副本的目录和位置；省略时兼容旧请求的自动查找。
  * @author yahyaoo
  */
-export const getCacheCover = async (filename: string, username?: string) => {
+export const getCacheCover = async (filename: string, username?: string, options: { folder?: string; location?: string } = {}) => {
     const normalizedUsername = (username && username !== '_open' && username !== 'default') ? username : '_open'
 
-    const locations = [
+    if (options.location && ![currentCacheLocation, CACHE_ROOTS.DATA, CACHE_ROOTS.ROOT].includes(options.location)) return null
+    const locations = options.location ? [options.location] : [
         currentCacheLocation,
         currentCacheLocation === CACHE_ROOTS.DATA ? CACHE_ROOTS.ROOT : CACHE_ROOTS.DATA
     ]
-    const roots: Array<'cache' | 'music'> = ['cache', 'music']
+    const roots: Array<'cache' | 'music'> = options.folder === 'cache' || options.folder === 'music' ? [options.folder] : ['cache', 'music']
 
     for (const loc of locations) {
         for (const folder of roots) {
@@ -1573,10 +1581,12 @@ export const getCacheCover = async (filename: string, username?: string) => {
             const filePath = resolveCacheRelativePath(dir, filename) // [Fix] Allow subfolders safely
 
             if (filePath && storageFs.existsSync(filePath)) {
+                // 显式副本使用位置独立的封面缓存，同名同时间文件不能串用图片。作者：yahyaoo
+                const coverKey = options.folder || options.location ? `${loc}/${folder}/${filename}` : filename
                 let stats: Stats | undefined
                 try {
                     stats = storageFs.statSync(filePath)
-                    const cachedCover = readCoverCache(filename, normalizedUsername, stats)
+                    const cachedCover = readCoverCache(coverKey, normalizedUsername, stats)
                     if (cachedCover) {
                           const indexed = indexManager.getAll(normalizedUsername, folder, loc).find(item => item.filename === filename)
                           setIndexCoverState(filename, normalizedUsername, indexed?.coverType === 'embedded' ? 'embedded' : 'cached', stats, loc)
@@ -1595,7 +1605,7 @@ export const getCacheCover = async (filename: string, username?: string) => {
                     if (pic) {
                         const mime = pic.mimeType || 'image/jpeg'
                         const data = Buffer.from(pic.data)
-                        writeCoverCache(filename, normalizedUsername, data, mime, stats)
+                        writeCoverCache(coverKey, normalizedUsername, data, mime, stats)
                         setIndexCoverState(filename, normalizedUsername, 'embedded', stats, loc)
                         return { data, mime: detectImageMime(data) || mime }
                     }
@@ -1609,7 +1619,7 @@ export const getCacheCover = async (filename: string, username?: string) => {
                     .find(candidate => candidate.filename === filename)
                 if (item && hasUsableRemoteCover(item.img)) {
                     const remoteCover = await downloadCoverImage(item.img!)
-                    if (remoteCover && writeCoverCache(filename, normalizedUsername, remoteCover.data, remoteCover.mime, stats)) {
+                    if (remoteCover && writeCoverCache(coverKey, normalizedUsername, remoteCover.data, remoteCover.mime, stats)) {
                         setIndexCoverState(filename, normalizedUsername, 'cached', stats, loc)
                         return remoteCover
                     }
@@ -2194,6 +2204,7 @@ export const downloadAndCache = async (songInfo: any, url: string, quality?: str
             console.log(`[文件缓存] 歌曲已存在于 ${targetFolder}，跳过下载: ${result.filename}`)
             // 通知前端轮询：目标目录文件已存在，视为立即完成
             cacheProgress.set(songKey, { progress: 100, status: 'exists' })
+            serverEvents.emitEvent('download:changed', { username: username || '_open', reason: 'state' })
             setTimeout(() => cacheProgress.delete(songKey), 30000)
             return Promise.resolve()
         }
@@ -2276,12 +2287,14 @@ export const downloadAndCache = async (songInfo: any, url: string, quality?: str
 
             console.log(`[文件缓存] 已复制缓存歌曲至下载目录: ${path.basename(finalPath)}`)
             cacheProgress.set(songKey, { progress: 100, status: 'finished', total: stat.size, received: stat.size })
+            serverEvents.emitEvent('download:changed', { username: username || '_open', reason: 'state' })
             setTimeout(() => cacheProgress.delete(songKey), 30000)
             return Promise.resolve()
         }
 
         console.log(`[文件缓存] 歌曲已存在于 ${result.folder}，跳过下载: ${result.filename}`)
         cacheProgress.set(songKey, { progress: 100, status: 'exists' })
+        serverEvents.emitEvent('download:changed', { username: username || '_open', reason: 'state' })
         setTimeout(() => cacheProgress.delete(songKey), 30000)
         return Promise.resolve()
     }
@@ -2302,6 +2315,7 @@ export const downloadAndCache = async (songInfo: any, url: string, quality?: str
     // 立即同步占坑标记下载中，关闭“拿到 200 响应前”的并发竞态窗口；
     // 后续到达的相同 songKey 请求会被上面的守卫跳过，不再重复下载。
     cacheProgress.set(songKey, { progress: 0, status: 'downloading', total: 0, received: 0, speed: 0, updatedAt: Date.now() })
+    serverEvents.emitEvent('download:changed', { username: username || '_open', reason: 'state' })
     console.log(`[文件缓存] 开始下载歌曲: ${baseName}`)
 
     return new Promise<void>((resolve, reject) => {
@@ -2331,6 +2345,7 @@ export const downloadAndCache = async (songInfo: any, url: string, quality?: str
             if (settled) return
             const message = err.message || 'Download failed'
             cacheProgress.set(songKey, { progress: 0, status: 'error', errorMsg: message })
+            serverEvents.emitEvent('download:changed', { username: username || '_open', reason: 'state' })
             settle(() => reject(err))
         }
 
@@ -2345,6 +2360,7 @@ export const downloadAndCache = async (songInfo: any, url: string, quality?: str
             if (req) req.destroy()
             safeUnlink(fileStream, tempPath)
             cacheProgress.delete(songKey)
+            serverEvents.emitEvent('download:changed', { username: username || '_open', reason: 'state' })
             settle(() => reject(new Error('Aborted')))
         }
 
@@ -2387,6 +2403,7 @@ export const downloadAndCache = async (songInfo: any, url: string, quality?: str
 
 
             cacheProgress.set(songKey, { progress: 0, status: 'downloading', total: 0, received: 0, speed: 0, updatedAt: Date.now() })
+            serverEvents.emitEvent('download:changed', { username: username || '_open', reason: 'state' })
             const total = parseInt(res.headers['content-length'] || '0', 10)
             let received = 0
             let lastSpeedAt = Date.now()
@@ -2411,6 +2428,7 @@ export const downloadAndCache = async (songInfo: any, url: string, quality?: str
                 }
                 const progress = total > 0 ? Math.round((received / total) * 100) : 0
                 cacheProgress.set(songKey, { progress, status: 'downloading', total, received, speed: currentSpeed, updatedAt: now })
+                serverEvents.emitEvent('download:changed', { username: username || '_open', reason: 'progress' })
             })
 
             res.pipe(fileStream)
@@ -2428,6 +2446,7 @@ export const downloadAndCache = async (songInfo: any, url: string, quality?: str
                     return
                 }
                 cacheProgress.set(songKey, { progress: 100, status: 'tagging', total, received, speed: 0, updatedAt: Date.now() })
+                serverEvents.emitEvent('download:changed', { username: username || '_open', reason: 'state' })
 
                 let ext = headerExt
                 if (storageFs.existsSync(tempPath)) {
@@ -2541,6 +2560,7 @@ export const downloadAndCache = async (songInfo: any, url: string, quality?: str
                     await ensureCachedLyrics(songInfo, actualQuality, username, isOnlyDownload, finalPath, folderType, shouldCacheLyric, shouldEmbedLyric)
 
                     cacheProgress.set(songKey, { progress: 100, status: 'finished', total: total || received, received, speed: 0, updatedAt: Date.now() })
+                    serverEvents.emitEvent('download:changed', { username: username || '_open', reason: 'state' })
                     setTimeout(() => cacheProgress.delete(songKey), 30000)
                     settle(() => { resolve(); void checkAndCleanupCache(username) })
                 })
@@ -2901,17 +2921,25 @@ export const setIndexEmbedLyric = (
  * @author yahyaoo
  */
 export const serveCacheFile = (req: http.IncomingMessage, res: http.ServerResponse, filename: string, username?: string) => {
-    const locations = [
+    const query = new URL(req.url || '/', 'http://localhost').searchParams
+    const requestedLocation = query.get('location')
+    if (requestedLocation && ![currentCacheLocation, CACHE_ROOTS.DATA, CACHE_ROOTS.ROOT].includes(requestedLocation)) {
+        res.writeHead(400); res.end('Invalid cache location'); return
+    }
+    // 显式选择副本时不回退到另一个位置的同名文件，旧链接仍兼容自动查找。
+    const locations = requestedLocation ? [requestedLocation] : [
         currentCacheLocation,
         currentCacheLocation === CACHE_ROOTS.DATA ? CACHE_ROOTS.ROOT : CACHE_ROOTS.DATA
     ]
-    const roots = ['cache', 'music']
+    const requestedFolder = query.get('folder')
+    const roots = requestedFolder === 'cache' || requestedFolder === 'music' ? [requestedFolder] : ['cache', 'music']
     let filePath = ''
     const normalizedUsername = (username && username !== '_open' && username !== 'default') ? username : '_open'
     for (const loc of locations) {
         for (const folder of roots) {
             const dir = getCacheDir(normalizedUsername, folder === 'music', loc)
-            const checkPath = path.join(dir, filename) // [Fix] Allow subfolders
+            const checkPath = path.resolve(dir, filename)
+            if (!checkPath.startsWith(path.resolve(dir) + path.sep)) continue
             if (storageFs.existsSync(checkPath)) { filePath = checkPath; break }
         }
         if (filePath) break
@@ -2926,17 +2954,20 @@ export const serveCacheFile = (req: http.IncomingMessage, res: http.ServerRespon
     const range = req.headers.range
     if (range) {
         const parts = range.replace(/bytes=/, "").split("-")
-        const start = parseInt(parts[0], 10)
-        const end = parts[1] ? parseInt(parts[1], 10) : stat.size - 1
+        const start = parts[0] ? Number(parts[0]) : Math.max(0, stat.size - Number(parts[1]))
+        const end = parts[0] && parts[1] ? Math.min(Number(parts[1]), stat.size - 1) : stat.size - 1
+        if (!/^bytes=\d*-\d*$/.test(range) || !Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start < 0 || start > end || start >= stat.size) {
+            res.writeHead(416, { 'Content-Range': 'bytes */' + stat.size }); res.end(); return
+        }
         const chunksize = (end - start) + 1
         res.writeHead(206, {
             'Content-Range': `bytes ${start}-${end}/${stat.size}`,
             'Accept-Ranges': 'bytes', 'Content-Length': chunksize, 'Content-Type': contentType,
         })
-        storageFs.createReadStream(filePath, { start, end }).pipe(res)
+        if (req.method === 'HEAD') res.end(); else storageFs.createReadStream(filePath, { start, end }).pipe(res)
     } else {
         res.writeHead(200, { 'Content-Length': stat.size, 'Content-Type': contentType, 'Accept-Ranges': 'bytes' })
-        storageFs.createReadStream(filePath).pipe(res)
+        if (req.method === 'HEAD') res.end(); else storageFs.createReadStream(filePath).pipe(res)
     }
 }
 

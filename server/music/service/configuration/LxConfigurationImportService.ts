@@ -5,6 +5,7 @@ import type { LxConfigurationDto } from '../../model/dto/LxConfigurationDto'
 import type { LxConfigurationImportVo } from '../../model/vo/LxConfigurationImportVo'
 import type { UserSpace } from '../../../user'
 import type { ImportedPlaylist } from './PlaylistImportParser'
+import { songIdentity } from '../library/SongIdentity'
 
 /** 同一用户的追加导入串行执行，跨请求服务实例共享队列。 */
 const playlistImports = new WeakMap<UserSpace, Promise<void>>()
@@ -27,7 +28,7 @@ export class LxConfigurationImportService {
     const operation = previous.then(async () => {
       const current = await space.listManage.getListData()
       // 每次导入重新生成内部 ID，避免覆盖内置列表、同名歌单或重复导入。
-      const appended = playlists.map(item => ({ ...item, id: 'import_' + crypto.randomUUID() }))
+      const appended = playlists.map(item => ({ ...item, id: 'import_' + crypto.randomUUID(), list: songIdentity().aggregate(item.list) }))
       const lists = { ...current, userList: [...current.userList, ...appended] }
       await this.import(space, { lists })
       return { success: true, playlists: appended.length, songs: appended.reduce((count, item) => count + item.list.length, 0), lists }
@@ -40,6 +41,7 @@ export class LxConfigurationImportService {
 
   /** @param space 当前已鉴权的用户空间。 @param data 完整校验的导入参数。 @returns 实际覆盖结果。 */
   async import(space: UserSpace, data: LxConfigurationDto): Promise<LxConfigurationImportVo> {
+    if (data.lists) data = { ...data, lists: { ...data.lists, defaultList: songIdentity().aggregate(data.lists.defaultList), loveList: songIdentity().aggregate(data.lists.loveList), userList: data.lists.userList.map(list => ({ ...list, list: songIdentity().aggregate(list.list) })) } };
     await space.listManage.listDataManage.initPromise
     const snapshots = space.listManage.snapshotDataManage
     const text = data.lists ? JSON.stringify(data.lists) : ''

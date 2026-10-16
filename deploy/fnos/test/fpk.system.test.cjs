@@ -38,6 +38,7 @@ test('独立飞牛 FPK：两个实际载荷协同运行，客户端无服务代�
     assert.equal(fs.existsSync(path.join(serverRoot, 'client/index.html')), false);
     assert.equal(fs.existsSync(path.join(clientRoot, 'dist/server')), false);
     assert.equal(fs.existsSync(path.join(clientRoot, 'node_modules')), false);
+    assert.equal(fs.existsSync(path.join(clientRoot, 'server/application/http/StaticDelivery.js')), true);
     // 复用当前锁定的本机生产依赖，两个角色均只从已解压的安装包加载应用文件。
     for (const [relative, item] of Object.entries(require(path.join(root, 'package-lock.json')).packages)) if (relative.startsWith('node_modules/') && !item.dev && fs.existsSync(path.join(root, relative))) fs.cpSync(path.join(root, relative), path.join(serverRoot, relative), { recursive: true });
     async function port() { const probe = http.createServer(); await new Promise(resolve => probe.listen(0, '127.0.0.1', resolve)); const p = probe.address().port; await new Promise(resolve => probe.close(resolve)); return p; }

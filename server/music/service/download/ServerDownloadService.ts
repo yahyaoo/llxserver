@@ -18,6 +18,10 @@ import { getFileName } from '../cache/FileCacheService'
 export type LyricMode = 'embedded' | 'external'
 /** 已下载歌曲记录，关联歌曲元信息、音质与文件路径。 @author yahyaoo */
 interface DownloadItem {
+  /** 下载时的歌曲展示信息，不含认证链接。 */
+  songInfo?: any
+  /** 下载完成时间。 */
+  mtime?: number
   /** 业务记录标识。 */
   id: string
   /** 数据所属用户名。 */
@@ -128,11 +132,57 @@ export const check = (song: any, username: string, quality?: string, exact = fal
 /** 优先返回下载时保存的歌词，断网播放也可显示歌词。 */
 export const getLyric = (song: any, username: string) => findItem(song, username)?.lyric || null
 
+/** 校验归属后提供维护线程使用的文件路径。 @author yahyaoo */
+export const getMaintenanceFile = (id: string, username: string): string | null => {
+  load(); const item = items.find(item => item.id === id && item.username === username)
+  return item ? itemPath(item) : null
+}
+
+/** 工作线程完成后只更新索引，不在 HTTP 主线程再次写入文件。 @author yahyaoo */
+export const finishMaintenance = (id: string, username: string, result: any, lyricPath: string) => {
+  load(); const item = items.find(item => item.id === id && item.username === username)
+  if (!item) return
+  if (result.deleted) items = items.filter(entry => entry !== item)
+  else {
+    for (const key of ['size', 'mtime', 'hasEmbedLyric', 'hasCover']) if (result[key] !== undefined) (item as any)[key] = result[key]
+    if (result.hasLyric) { item.lyricFilename = path.basename(lyricPath); item.lyric = storageFs.readFileSync(lyricPath, 'utf8') as any }
+  }
+  save()
+}
+
+/** 音乐库读取当前账号全部已下载文件，保留旧下载目录中的有效文件。 */
+export const getLibraryItems = (username: string): any[] => {
+  load()
+  return items.filter(item => item.username === username && itemPath(item)).map(item => {
+    const [source, ...parts] = item.identity.split(':')
+    const songInfo = { id: source + '_' + parts.join(':'), ...(item.songInfo || { source, songmid: parts.join(':'), name: path.parse(item.filename).name, singer: '未知歌手' }) }
+    return { ...item, ...songInfo, songInfo: { ...songInfo, quality: item.quality, types: { [item.quality]: {} } },
+      quality: item.quality, filename: item.filename, serverDownloadId: item.id, folder: 'download', name: songInfo.name, singer: songInfo.singer, album: songInfo.albumName || '', source,
+      hasLyric: !!item.lyric, hasCover: !!songInfo.img, mtime: item.mtime || 0 }
+  })
+}
+
+/** 当前账号删除自己的下载文件；先校验归属再删除文件与索引。 */
+export const removeLibraryItems = (ids: string[], username: string): number => {
+  load()
+  const selected = items.filter(item => item.username === username && ids.includes(item.id))
+  for (const item of selected) {
+    const file = itemPath(item)
+    if (file) storageFs.unlinkSync(file)
+    if (item.lyricFilename && path.basename(item.lyricFilename) === item.lyricFilename) {
+      const lyric = path.join(item.root, item.lyricFilename)
+      if (storageFs.existsSync(lyric) && !storageFs.lstatSync(lyric).isSymbolicLink()) storageFs.unlinkSync(lyric)
+    }
+  }
+  items = items.filter(item => !selected.includes(item)); save()
+  return selected.length
+}
+
 /**
  * 批量获取当前用户实际可读取的下载歌曲身份，复用下载文件完整性检查。
  * @param username 已验证的当前用户名称。
  * @returns 文件仍然存在且大小正确的歌曲身份集合。
- * @author jingyh
+ * @author yahyaoo
  */
 export const getAvailableIdentities = (username: string): Set<string> => {
   load()
@@ -277,7 +327,9 @@ export const download = async (song: any, identitySong: any, url: string, qualit
         break
       }
       if (!filename) throw new Error('同名文件过多，请调整命名模板后重试')
-      const item: DownloadItem = { id, username, identity, quality, root, filename, lyricFilename,
+      const metadata = { ...song, ...identitySong }
+      delete metadata.url; delete metadata.pic
+      const item: DownloadItem = { id, username, identity, quality, root, filename, lyricFilename, songInfo: metadata, mtime: Date.now(),
         lyric: lyric || undefined, size: storageFs.statSync(installedAudio!).size }
       load()
       const oldItems = items

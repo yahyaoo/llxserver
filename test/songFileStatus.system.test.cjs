@@ -19,6 +19,12 @@ test('文件状态：下载优先、缓存、自定义目录、真实文件删�
     });
     const login=async(username,password)=>{const res=await fetch(runtime.origin+'/api/user/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username,password,rememberMe:true})});assert.equal(res.status,200);return (await res.json()).token};
     const alice=await login('alice','alice123'),bob=await login('bob','bob12345');
+    await fetch(runtime.origin+'/api/music/library/scan',{method:'POST',headers:{'x-user-token':alice}});
+    for (let i=0;i<100;i++) {
+      const {scan}=await (await fetch(runtime.origin+'/api/music/library/scan',{headers:{'x-user-token':alice}})).json();
+      if(scan.status!=='running') break;
+      await new Promise(resolve=>setTimeout(resolve,50));
+    }
     const songs=[{id:'wy_download-song',source:'wy'},{id:'wy_cache-song',source:'wy'},{id:'wy_old-song',source:'wy'},{id:'wy_local',source:'wy',name:'本地歌',singer:'本地歌手'},{id:'wy_missing',source:'wy'},{id:'tx_download-song',source:'tx'}];
     const query=async(token,body={songs},extra={})=>fetch(runtime.origin+'/api/music/file-status',{method:'POST',headers:{'Content-Type':'application/json','x-user-token':token,...extra},body:JSON.stringify(body)});
     const states=async(token)=>{const res=await query(token);assert.equal(res.status,200,await res.clone().text());return (await res.json()).statuses.map(item=>item.state)};

@@ -8,7 +8,6 @@ declare global {
     userPath: string
     config: LX.Config
     /** 远程备份接口，由应用入口装配。 */
-    webdavSync?: import('../integrations/webdav/WebDavGateway').WebDavGateway
     staticPath: string
     configPath: string
     saveConfig: () => void

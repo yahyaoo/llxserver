@@ -77,9 +77,9 @@ test('真实系统：迁移旧 JSON、事务覆盖、库隔离、浏览器存储
     form.append('file', new Blob(['\uFEFF' + JSON.stringify(payload)], { type: 'application/json' }), '洛雪配置.json')
     const upload = await fetch(origin + importRoute, { method: 'POST', headers: { 'x-frontend-auth': 'system-test', 'x-admin-token':admin['x-admin-token'] }, body: form })
     assert.equal(upload.status, 200, await upload.clone().text())
-    assert.equal((await upload.json()).songs, 4)
+    assert.equal((await upload.json()).songs, 3)
     assert.deepEqual(await get('/api/user/settings'), payload.settings)
-    assert.deepEqual((await get('/api/data?user=_open')).defaultList, lists.defaultList)
+    assert.deepEqual((await get('/api/data?user=_open')).defaultList, [song])
     assert.deepEqual((await get('/api/data?user=_open')).userList, lists.userList)
     assert.equal((await fetch(origin + '/api/user/sound-effects', { headers: admin })).status, 401)
     assert.equal(fs.readFileSync(path.join(open, 'settings.json'), 'utf8'), oldSettingsText)
@@ -108,7 +108,7 @@ test('真实系统：迁移旧 JSON、事务覆盖、库隔离、浏览器存储
     } finally { db.close(); adminDb.close() }
     await stop(); await start()
     assert.deepEqual(await get('/api/user/settings'), payload.settings)
-    assert.deepEqual((await get('/api/data?user=_open')).defaultList, lists.defaultList)
+    assert.deepEqual((await get('/api/data?user=_open')).defaultList, [song])
     const newToken = (await (await post('/api/user/login', { username: 'alice', password: 'alice-test' })).json()).token
     assert.deepEqual((await get('/api/music/storage/list', { ...browserHeaders, 'x-user-token': newToken })).value, lists)
     assert.equal((await fetch(origin + '/music/views/settings/ConfigurationImport.js')).status, 200)

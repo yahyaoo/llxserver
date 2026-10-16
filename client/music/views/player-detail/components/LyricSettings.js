@@ -152,6 +152,11 @@
                         <select id="lyric-font-family-select" aria-label="歌词字体" data-native-select class="lm-select !w-full !py-1.5"
                             onchange="changeLyricFontFamily(this.value)">
                             <option value="">默认字体</option>
+                            <optgroup label="所有设备可用">
+                                <option value="sans-serif">系统无衬线</option>
+                                <option value="serif">系统衬线</option>
+                                <option value="monospace">等宽字体</option>
+                            </optgroup>
                             <optgroup label="常用中文字体">
                                 <option value="Microsoft YaHei">微软雅黑 (Microsoft YaHei)</option>
                                 <option value="SimHei">黑体 (SimHei)</option>
@@ -189,6 +194,7 @@
                             落霞与孤鹜齐飞，秋水共长天一色
                         </div>
                     </div>
+                    <p class="text-xs t-text-muted mt-2">手机建议选择系统字体；指定字体需要在当前设备安装。</p>
                 </div>
             </div>
         </div>

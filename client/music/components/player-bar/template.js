@@ -16,10 +16,17 @@ window.LXPlayerBarTemplate = String.raw`
                 </button>
                 <div class="player-track-copy">
                     <div class="player-title-row">
-                        <div id="player-source"></div>
                         <div id="player-title" class="font-bold truncate dynamic-marquee min-w-0 w-fit" data-text="暂无播放">暂无播放</div>
                     </div>
-                    <div id="player-artist" class="truncate dynamic-marquee min-w-0 w-fit" data-text="选择一首歌曲播放">选择一首歌曲播放</div>
+                    <div class="player-metadata-row">
+                        <div id="player-metadata-text" class="min-w-0">
+                        <div class="player-metadata-track">
+                        <div id="player-artist" class="min-w-0" data-text="选择一首歌曲播放">选择一首歌曲播放</div>
+                        <span id="player-album" hidden></span>
+                        </div>
+                        </div>
+                        <div id="player-source"></div>
+                    </div>
                 </div>
                 <div class="player-bar-lyrics" aria-label="同步歌词">
                     <div id="player-lyric-current">暂无歌词</div>
@@ -102,6 +109,12 @@ window.LXPlayerBarTemplate = String.raw`
                             data-mode="random">
                             <i class="fas fa-random w-4 text-purple-500"></i>
                             <span>随机播放</span>
+                        </button>
+                        <button onclick="setPlayMode('roaming')"
+                            class="play-mode-option w-full px-3 py-2 text-left hover:t-bg-item-hover flex items-center gap-2 text-sm transition-colors"
+                            data-mode="roaming">
+                            <i class="fas fa-compass roaming-heart w-4"></i>
+                            <span>漫游播放</span>
                         </button>
                         <button onclick="setPlayMode('order')"
                             class="play-mode-option w-full px-3 py-2 text-left hover:t-bg-item-hover flex items-center gap-2 text-sm transition-colors"

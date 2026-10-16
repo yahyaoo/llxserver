@@ -82,20 +82,21 @@ test('前端专辑匹配遵守精确歌手与合唱设置', () => {
 })
 function loveFixture() {
   const personal = { username: 'alice', defaultList: [], loveList: [], userList: [] }, publicData = { ...personal, username: '_open', loveList: [] }
-  const writes = [], errors = []; let fail = false
+  const writes = [], errors = []; let fail = false, delay = null
   const window = { myPersonalListData: personal, ListStore: { set: async () => {} }, SyncManager: { mode: 'local' } }
   const context = vm.createContext({ window, document: { querySelectorAll: () => [] }, currentListData: publicData, currentPlayingSong: null,
     isUserLoggedIn: () => true, cleanSongData: value => ({ ...value, id: 'wy_' + value.songmid }),
     ensurePlaylistDataAvailable: async () => personal, getUserAuthHeaders: () => ({ 'x-user-token': 'alice' }),
     addMusicByConfiguredLocation: (list, value) => list.push(value), renderMyLists() {}, showSuccess() {}, showError: value => errors.push(value),
     fetch: async (url, options) => {
+      if (delay) await delay
       writes.push({ url, ...options }); const input = JSON.parse(options.body)
-      const items = input.loved ? [...personal.loveList, input.song] : personal.loveList.filter(item => item.id !== input.song.id)
+      const items = input.loved ? personal.loveList : personal.loveList.filter(item => item.id !== input.song.id)
       return { ok: !fail, text: async () => '保存失败', json: async () => ({ success: true, items }) }
     },
   })
   vm.runInContext(fs.readFileSync(path.join(__dirname, '../client/music/js/song_actions.js'), 'utf8'), context)
-  return { api: window.SongActions, personal, publicData, writes, errors, fail: () => { fail = true } }
+  return { api: window.SongActions, context, personal, publicData, writes, errors, fail: () => { fail = true }, delay: value => { delay = value } }
 }
 test('喜欢直接保存个人列表、不重复，第二次点击取消', async () => {
   const f = loveFixture(); await f.api.toggleLove(song)
@@ -110,11 +111,90 @@ test('喜欢直接保存个人列表、不重复，第二次点击取消', async
   await Promise.all([f.api.toggleLove(song), f.api.toggleLove(song)])
   assert.equal(f.personal.loveList.length, 0)
 })
+test('点击歌曲喜欢只更新喜欢状态，不因过期的歌单选择状态而导航或重绘列表', async () => {
+  const f = loveFixture(); let navigations = 0, listRenders = 0
+  f.context.currentListData = f.personal
+  f.context.window.currentViewingListId = 'love'
+  f.context.handleListClick = () => { navigations++ }
+  f.context.renderMyLists = () => { listRenders++ }
+  await f.api.toggleLove(song)
+  assert.equal(f.api.isLoved(song), true)
+  assert.equal(navigations, 0, '喜欢操作不得把当前页面切到歌单')
+  assert.equal(listRenders, 0, '喜欢操作只更新爱心状态，不重新渲染页面列表')
+})
+test('喜欢保存尚未完成时立即点亮爱心，不重绘列表', async () => {
+  const f = loveFixture(); let release, listRenders = 0
+  f.context.renderMyLists = () => { listRenders++ }
+  f.delay(new Promise(resolve => { release = resolve }))
+  const saving = f.api.toggleLove(song)
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(f.api.isLoved(song), true)
+  assert.equal(listRenders, 0)
+  release(); await saving
+  assert.equal(f.api.isLoved(song), true)
+})
 test('喜欢保存失败保持原列表，特殊字符不会破坏按钮属性', async () => {
   const f = loveFixture(); f.fail(); await f.api.toggleLove(song)
   assert.equal(f.personal.loveList.length, 0); assert.equal(f.errors.length, 1)
   const odd = { ...song, name: `引号'\"<>&歌曲` }, html = f.api.renderLoveButton(odd)
   assert.equal(JSON.parse(decodeURIComponent(html.match(/data-love-song="([^"]+)"/)[1])).name, odd.name)
+})
+
+test('播放队列图标安全携带歌曲数据，加入操作追加队列且不打断当前歌曲', () => {
+  const f = loveFixture(), odd = { ...song, name: `引号'"<>&歌曲` }
+  const html = f.api.renderQueueButton(odd)
+  assert.equal(JSON.parse(decodeURIComponent(html.match(/data-queue-song="([^"]+)"/)[1])).name, odd.name)
+  assert.match(html, /加入播放列表/)
+
+  const app = fs.readFileSync(path.join(__dirname, '../client/music/app.js'), 'utf8')
+  const helper = app.match(/function addSongToPlaybackQueue\(song\) \{[\s\S]*?\n\}/)
+  assert.ok(helper, '歌曲行需要可复用的播放队列追加入口')
+  const existing = { id: 'current' }, queue = [existing]
+  let saved = 0, rendered = 0, played = 0
+  const context = vm.createContext({ window: { MusicExperience: { playable: value => ({ ...value, playable: true }) } }, currentPlaylist: queue,
+    document: { getElementById: () => ({ classList: { contains: () => true } }) }, invalidateRoamingPreselection() {},
+    renderQueue() { rendered++ }, savePlaybackState() { saved++ }, showSuccess() {}, playSong() { played++ } })
+  vm.runInContext(helper[0] + '\nwindow.addSongToPlaybackQueue = addSongToPlaybackQueue;', context)
+  context.window.addSongToPlaybackQueue(song)
+  assert.deepEqual(queue.map(item => item.id), ['current', song.id])
+  assert.equal(queue[1].playable, true)
+  assert.equal(saved, 1); assert.equal(rendered, 0); assert.equal(played, 0)
+})
+
+function playlistToggleFixture(fail = false) {
+  const targetList = [], personal = { username: 'alice', userList: [{ id: 'favorites', list: targetList }] }
+  const events = [], errors = [], successes = []
+  const context = vm.createContext({ window: { myPersonalListData: personal }, currentListData: personal,
+    currentPlayingSong: song, isUserLoggedIn: () => true, cleanSongData: value => ({ ...value }),
+    addMusicByConfiguredLocation: (list, value) => list.push(value), updateGridItemVisuals() {},
+    closePlaylistAddModal() { events.push('closed') }, pushDataChange: async () => {
+      events.push('sync-started'); if (fail) throw new Error('接口异常')
+    }, renderMyLists() {}, showSuccess: value => successes.push(value), showError: value => errors.push(value), showInfo() {} })
+  const source = fs.readFileSync(path.join(__dirname, '../client/music/app.js'), 'utf8')
+  const helper = source.match(/async function handleTogglePlaylist\(listId, btnElement\) \{[\s\S]*?\n\}/)
+  assert.ok(helper, '歌单选择需要具备明确的关闭与同步结果处理')
+  vm.runInContext(helper[0], context)
+  context.window.batchCollectSongs = null
+  context.window.playlistAddTargetSong = song
+  return { context, events, errors, successes, targetList, invoke: () => context.handleTogglePlaylist('favorites', {}) }
+}
+
+test('点击歌单立即关闭弹框，同步成功后提示加入成功', async () => {
+  const f = playlistToggleFixture()
+  await f.invoke()
+  assert.deepEqual(f.events, ['closed', 'sync-started'])
+  assert.equal(f.targetList[0].id, song.id)
+  assert.deepEqual(f.successes, ['已加入歌单'])
+  assert.deepEqual(f.errors, [])
+})
+
+test('加入歌单同步失败时弹框已关闭、列表回滚并提示失败', async () => {
+  const f = playlistToggleFixture(true)
+  await f.invoke()
+  assert.deepEqual(f.events, ['closed', 'sync-started'])
+  assert.deepEqual(f.targetList, [])
+  assert.deepEqual(f.successes, [])
+  assert.match(f.errors[0], /加入歌单失败：接口异常/)
 })
 
 /** 播放控件复用已验证的喜欢操作，不进入歌单选择弹框。 @author jingyh */

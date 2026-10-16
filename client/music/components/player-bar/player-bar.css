@@ -35,7 +35,7 @@
     z-index: 60;
 }
 /* 普通页面随账号模糊配置变化；原版与独立播放详情均保留各自效果。作者：jingyh */
-body:not(.player-detail-open):not(:has(#view-player-detail:not(.hidden))) #player-footer.floating-player {
+body:not(.player-detail-open):not(.player-detail-visible) #player-footer.floating-player {
     backdrop-filter: blur(var(--surface-blur, 24px)) saturate(155%);
     -webkit-backdrop-filter: blur(var(--surface-blur, 24px)) saturate(155%);
 }
@@ -52,13 +52,15 @@ body:not(.player-detail-open):not(:has(#view-player-detail:not(.hidden))) #playe
     font-size: 18px;
     transition: color 0.18s, background-color 0.18s;
 }
-.player-icon-button:hover { color: var(--c-500); background: var(--bg-item-hover); }
-#player-like-btn.text-red-500 { color: #f43f5e; }
-#player-like-btn:hover { color: #f43f5e; }
+.player-icon-button:hover { color: var(--theme-readable-accent); background: var(--bg-item-hover); }
+:root:root #player-like-btn[aria-pressed="true"], :root:root body .song-love-btn[aria-pressed="true"] { color: #f43f5e !important; }
+#player-like-btn[aria-pressed="false"] { color: var(--text-muted); }
+#player-like-btn:hover, .song-love-btn:hover { color: #be123c; }
+:root.dark #player-like-btn:hover, :root.dark .song-love-btn:hover { color: #fda4af; }
 .player-icon-button:focus-visible, .player-cover-button:focus-visible, .player-menu-item:focus-visible,
 .player-volume-track:focus-visible { outline: 2px solid var(--c-500); outline-offset: 3px; }
 #player-footer #btn-play { width: 44px; height: 44px; color: var(--text-main); font-size: 25px; }
-#player-footer #btn-play:hover { color: var(--c-500); }
+#player-footer #btn-play:hover { color: var(--theme-readable-accent); }
 #player-song-info { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
 .player-track { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .player-cover-button { display: block; width: 40px; height: 40px; padding: 0; border: 0; background: transparent; border-radius: 8px; overflow: hidden; flex-shrink: 0; }
@@ -73,8 +75,20 @@ body:not(.player-detail-open):not(:has(#view-player-detail:not(.hidden))) #playe
 @media (max-width: 540px) { .player-bar-lyrics { display: none; } }
 .player-title-row { display: flex; align-items: center; gap: 6px; min-width: 0; }
 #player-source { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+/* 标签沿用洛雪的紧凑尺寸和平台、音质配色；容器间距替代来源标签的额外右边距。作者：jingyh */
+#player-source > span { font-size: 10px; line-height: 14px; padding: 0 4px; border-width: 1px; border-style: solid; border-radius: 4px; margin-right: 0; white-space: nowrap; }
 #player-title { font-size: 14px; }
-#player-artist { color: var(--text-dim); font-size: 12px; margin-top: 2px; }
+.player-metadata-row { display: flex; align-items: center; flex-wrap: nowrap; gap: 2px 4px; min-width: 0; margin-top: 2px; }
+#player-metadata-text { min-width: 0; max-width: 100%; flex: 0 1 auto; white-space: nowrap; overflow: hidden; }
+#player-metadata-text #player-artist { display: inline; white-space: nowrap; }
+#player-metadata-text #player-album { white-space: nowrap; }
+.player-metadata-track { display: inline-flex; align-items: center; white-space: nowrap; gap: 4px; }
+#player-metadata-text[data-overflow="true"] .player-metadata-track { animation: player-metadata-scroll var(--metadata-duration, 12s) linear infinite alternate; }
+@keyframes player-metadata-scroll { 0%, 15% { transform: translateX(0); } 85%, 100% { transform: translateX(var(--metadata-offset, 0px)); } }
+@media (prefers-reduced-motion: reduce) { #player-metadata-text .player-metadata-track { animation: none !important; } }
+#player-artist, #player-album { color: var(--text-dim); font-size: 12px; max-width: 100%; }
+#player-album { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#player-album[hidden] { display: none; }
 .player-progress { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .player-time { font-size: 10px; color: var(--text-dim); font-variant-numeric: tabular-nums; }
 .player-progress-track { flex: 1; min-width: 0; height: 12px; display: flex; align-items: center; }
@@ -128,7 +142,7 @@ body:not(.player-detail-open):not(:has(#view-player-detail:not(.hidden))) #playe
 }
 .player-volume-row { display: flex; align-items: center; gap: 12px; }
 .player-volume-row .player-icon-button { width: 22px; font-size: 14px; }
-.player-volume-track { flex: 1; min-width: 0; height: 24px; display: flex; align-items: center; cursor: pointer; }
+.player-volume-track { flex: 1; min-width: 0; height: 24px; display: flex; align-items: center; cursor: pointer; touch-action: none; user-select: none; }
 .player-volume-rail { width: 100%; height: 6px; background: color-mix(in srgb, var(--text-muted) 32%, transparent); border-radius: 6px; }
 #volume-percent { min-width: 38px; font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; text-align: right; }
 
@@ -143,8 +157,8 @@ body:not(.player-detail-open):not(:has(#view-player-detail:not(.hidden))) #playe
     .player-track { gap: 8px; }
     .player-title-row { flex-wrap: wrap; gap: 3px; }
     #player-title { flex-basis: 100%; font-size: 13px; }
-    #player-source { order: 1; max-width: 100%; }
-    #player-artist { font-size: 11px; }
+    #player-source { max-width: 100%; }
+    #player-artist, #player-album { font-size: 11px; }
     .player-actions { grid-column: 1 / -1; grid-row: 2; gap: 8px; justify-content: flex-end; }
     .player-actions .player-icon-button { width: 28px; height: 30px; font-size: 15px; }
     .player-time { display: none; }

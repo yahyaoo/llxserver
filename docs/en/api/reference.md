@@ -10,7 +10,7 @@ To ensure security, server endpoints enforce different authentication mechanisms
 
 1. **Administrator Authentication (`x-frontend-auth`)**:
    - Header: `x-frontend-auth: <Admin Password>`
-   - Uses the master administrator password (`frontend.password`). Required for global configurations, user administration, file manager, WebDAV backup/restore, and server process restarts.
+   - Uses the master administrator password (`frontend.password`). Required for global configurations, user administration, file manager, local ZIP backup/restore, and server process restarts.
 2. **User Token Authentication (`x-user-token`)**:
    - Header: `x-user-token: <Token>` or Query string: `?token=<Token>` for stream endpoints.
    - Uses a session token issued upon login or a persistent API token. Used for operating user-specific playlists, favorite libraries, dislike rules, cache management, and sound effects.
@@ -29,7 +29,7 @@ To ensure security, server endpoints enforce different authentication mechanisms
 ### 1.1 Admin: Service Status & Monitoring
 - **`GET /api/status`**
   - **Auth**: Administrator (`x-frontend-auth`)
-  - **Description**: Returns CPU usage, memory consumption, active devices, uptime, loaded music sources count, WebDAV status, and operating system info.
+  - **Description**: Returns CPU usage, memory consumption, active devices, uptime, loaded music sources count, and operating system info.
 
 ### 1.2 Admin: User Management
 - **`GET /api/users`**
@@ -251,7 +251,7 @@ Used for managing persistent API Tokens for third-party scripts and clients. Req
 
 ---
 
-## 9. Global Config, WebDAV Backup & Operations (Admin)
+## 9. Global Config, Local Backup & Operations (Admin)
 
 ### 9.1 Global Configuration & Maintenance
 - **`GET /api/config`**: Get full global configuration tree.
@@ -272,16 +272,11 @@ Used for managing persistent API Tokens for third-party scripts and clients. Req
 - **`GET /api/backup/download`**: Export full user data backup.
 - **`POST /api/backup/upload`**: Import and restore user data backup.
 
-### 9.3 WebDAV Cloud Sync & Remote Backups
-- **`POST /api/webdav/test`**: Test WebDAV connection and credentials.
-- **`POST /api/webdav/sync`**: Trigger full bidirectional WebDAV sync.
-- **`POST /api/webdav/sync-file`**: Sync single file to WebDAV.
-- **`POST /api/webdav/backup`**: Create remote WebDAV backup archive.
-- **`GET /api/webdav/backups`**: List backups stored on WebDAV.
-- **`DELETE /api/webdav/backup`**: Delete remote backup (`?file=...`).
-- **`POST /api/webdav/restore`**: Restore data from WebDAV backup.
-- **`GET /api/webdav/logs`**: Get WebDAV synchronization logs.
-- **`GET /api/webdav/progress`**: **SSE streaming endpoint**, real-time sync progress.
+### 9.3 Music Directory Scanning
+
+- **POST /api/music/directories/check**: Administrator read/write permission check; body: `{path}`.
+- **POST /api/music/library/scan**: Start/merge a background scan (202); authenticated user.
+- **GET /api/music/library/scan**: Read `{success, scan}` with status, percent, completed, total and errors.
 
 ### 9.4 File Manager API (ElFinder Connector)
 - **`GET /api/elfinder/connector` / `POST /api/elfinder/connector`**: Backend connector for ElFinder web file manager.

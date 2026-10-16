@@ -30,6 +30,9 @@
 dialog.lx-dialog-panel { width: min(460px, calc(100vw - 20px)); margin: auto; }
 dialog#lyric-settings-dialog.lx-dialog-panel { width: min(720px, calc(100vw - 20px)); }
 dialog.lx-dialog-panel:not([open]) { display: none; }
+@media (max-width: 767px) {
+    :root dialog.lx-dialog-panel { margin: auto; }
+}
 #custom-source-modal-content > .lx-dialog-heading p { display: none; }
 #modal-source-scope-info { display: none; }
 .edit-source-title-line { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; min-width: 0; }
@@ -63,9 +66,9 @@ dialog.lx-dialog-panel:not([open]) { display: none; }
 :root .music-source-tag[data-source="kw"] { background: #fef3c7 !important; color: #b45309 !important; border-color: #fde68a !important; }
 :root .music-source-tag[data-source="wy"] { background: #ffe4e6 !important; color: #be123c !important; border-color: #fecdd3 !important; }
 :root .music-source-tag[data-source="mg"] { background: #fce7f3 !important; color: #be185d !important; border-color: #fbcfe8 !important; }
-:root[data-appearance="dark"] .music-source-tag { background: color-mix(in srgb, currentColor 16%, transparent) !important; }
-:root[data-appearance="dark"] .music-source-tag[data-source="tx"] { color: #34d399 !important; border-color: #10b9814d !important; }
-:root[data-appearance="dark"] .music-source-tag[data-source="kg"] { color: #60a5fa !important; border-color: #3b82f64d !important; }
-:root[data-appearance="dark"] .music-source-tag[data-source="kw"] { color: #fbbf24 !important; border-color: #f59e0b4d !important; }
-:root[data-appearance="dark"] .music-source-tag[data-source="wy"] { color: #fb7185 !important; border-color: #f43f5e4d !important; }
-:root[data-appearance="dark"] .music-source-tag[data-source="mg"] { color: #f472b6 !important; border-color: #ec48994d !important; }
+:root.dark .music-source-tag { background: color-mix(in srgb, currentColor 16%, transparent) !important; }
+:root.dark .music-source-tag[data-source="tx"] { color: #34d399 !important; border-color: #10b9814d !important; }
+:root.dark .music-source-tag[data-source="kg"] { color: #93c5fd !important; border-color: #3b82f64d !important; }
+:root.dark .music-source-tag[data-source="kw"] { color: #fbbf24 !important; border-color: #f59e0b4d !important; }
+:root.dark .music-source-tag[data-source="wy"] { color: #fecdd3 !important; border-color: #f43f5e4d !important; }
+:root.dark .music-source-tag[data-source="mg"] { color: #f9a8d4 !important; border-color: #ec48994d !important; }

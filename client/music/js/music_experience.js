@@ -12,18 +12,34 @@
     /** 将所有本地文件转换为当前账号可认证的播放器 URL；不把令牌存入数据库。 */
     const playable = item => {
         const song = { ...item.songInfo, ...item };
-        if (!item.filename) return song;
+        // 旧最近记录未保存完整音源参数时，从当前账号歌单补齐；只按来源和歌曲标识匹配。作者：yahyaoo
+        const data = window.myPersonalListData || window.currentListData;
+        const sameSong = candidate => {
+            if (!song.source || candidate.source !== song.source) return false;
+            if (song.id != null && candidate.id != null && String(song.id) === String(candidate.id)) return true;
+            const mid = song.songmid || song.songId || song.meta?.songmid || song.meta?.songId;
+            return !!mid && String(mid) === String(candidate.songmid || candidate.songId || candidate.meta?.songmid || candidate.meta?.songId || '');
+        };
+        const match = data && [data.loveList, data.defaultList, ...(data.userList || []).map(list => list.list)].flatMap(list => list || []).find(sameSong);
+        for (const key of ['songmid', 'songId', 'hash', 'copyrightId', 'albumId', 'lrcUrl', 'mrcUrl', 'trcUrl']) {
+            const value = song[key] || song.meta?.[key] || match?.[key] || match?.meta?.[key];
+            if (value != null) song[key] = value;
+        }
+        const filename = song.filename || song._localFilename || song.customFilename;
+        if (!filename && !song.serverDownloadId) return song;
         const username = accountName();
         const token = window.getUserAuthHeaders()['x-user-token'];
-        const custom = item.isCustomDir || item.folder === 'custom';
-        const params = new URLSearchParams({ folder: item.folder || 'music' });
+        const folder = song.folder || song._localFolder || (song.isCustomDir || song._isCustomDir || song.isCustomFile || song.customFilename ? 'custom' : 'music');
+        const custom = folder === 'custom';
+        const params = new URLSearchParams({ folder });
+        if (song.location) params.set('location', song.location);
         if (token) params.set('token', token);
-        song.url = `/api/music/${custom ? 'custom' : 'cache'}/file/${encodeURIComponent(username)}/${encodeURIComponent(item.filename)}?${params}`;
+        song.url = song.serverDownloadId ? '/api/music/server-download/file/' + encodeURIComponent(song.serverDownloadId) + '?username=' + encodeURIComponent(username) + '&' + params : custom ? '/api/music/custom/file?filename=' + encodeURIComponent(filename) + '&user=' + encodeURIComponent(username) + '&' + params : `/api/music/cache/file/${encodeURIComponent(username)}/${encodeURIComponent(filename)}?${params}`;
         const cover = coverUrl(item);
         const coverParams = cover?.startsWith('/api/') ? new URL(cover, location.origin) : null;
         if (coverParams && token) coverParams.searchParams.set('token', token);
         Object.assign(song, { id: item.id || item.songInfo?.id || item.filename, source: item.source || item.songInfo?.source || 'local', isLocal: true, pic: coverParams ? coverParams.pathname + coverParams.search : cover || '/music/assets/logo.svg', albumName: item.album || item.albumName || '', _localLibraryItem: true,
-            _localFilename: item.filename, _localFolder: item.folder || 'cache', _localUsername: username, _isCustomDir: !!custom });
+            _localFilename: filename, _localFolder: folder, _localUsername: username, _isCustomDir: !!custom });
         // 未关联的平台标识是本地索引生成的占位，移除后原歌词流程会优先读取内嵌歌词。
         if (song.source === 'local') {
             delete song.songmid; delete song.songId;
@@ -37,6 +53,7 @@
         const song = { ...item.songInfo, ...item }, candidates = [];
         const add = value => {
             if (typeof value !== 'string' || !/^(https?:\/\/|\/(?!\/)|data:image\/(?:png|jpeg|webp|gif);base64,|blob:)/i.test(value) || value.includes('/assets/logo.svg')) return;
+            if (song.hasCover === false && song.coverType === 'none' && /^\/api\/music\/(custom|cache)\/cover(?:\?|$)/.test(value)) return;
             if (value.startsWith('/api/music/')) {
                 const url = new URL(value, location.origin), auth = window.getUserAuthHeaders?.() || {};
                 url.searchParams.delete('password'); url.searchParams.delete('auth'); url.searchParams.delete('token');
@@ -49,11 +66,12 @@
         const fields = value => {
             for (const url of [value.meta?.picUrl, value.img, value.pic, value.picUrl, value.picture, value.meta?.img, value.meta?.pic, value.meta?.albumPic, value.meta?.cover, value.album?.picUrl, value.album?.img, value.album?.pic, value.album?.cover, value.al?.picUrl, value.al?.img, value.otherSource?.meta?.picUrl]) add(url);
         };
-        const filename = song.filename || song._localFilename;
-        if (filename) {
-            const folder = song.folder || song._localFolder || 'music';
-            const params = new URLSearchParams({ filename, user: accountName(), folder, v: String(song.mtime || '') });
-            add(`/api/music/${song.isCustomDir || song._isCustomDir || folder === 'custom' ? 'custom' : 'cache'}/cover?${params}`);
+        const filename = song.filename || song._localFilename || song.customFilename;
+        if (filename && !(song.hasCover === false && song.coverType === 'none') && song.folder !== 'download') {
+            const folder = song.folder || song._localFolder || (song.isCustomDir || song._isCustomDir || song.isCustomFile || song.customFilename ? 'custom' : 'music');
+            const params = new URLSearchParams({ filename, user: accountName(), folder, v: String(song.coverVersion || song.mtime || '') });
+            if (song.location) params.set('location', song.location);
+            add(`/api/music/${folder === 'custom' ? 'custom' : 'cache'}/cover?${params}`);
         }
         fields(song);
         // 旧历史丢失封面时按平台和歌曲标识补齐；不读取页面 DOM，也不跨账号取数据。
@@ -72,7 +90,8 @@
             for (const url of remote.slice(0, 8)) params.append('url', url);
             const auth = window.getUserAuthHeaders?.() || {};
             if (auth['x-user-token']) params.set('token', auth['x-user-token']);
-            candidates.splice(filename ? 1 : 0, 0, '/api/music/artwork?' + params);
+            const local = candidates.filter(url => !/^https?:\/\//i.test(url));
+            candidates.splice(0, candidates.length, ...local, '/api/music/artwork?' + params);
         }
         return candidates;
     };
@@ -80,7 +99,9 @@
     /** 保存和下载元数据优先保留音源地址；运行时认证参数不进入歌单或任务文档。 */
     const coverReference = item => {
         const candidates = coverCandidates(item);
-        const value = candidates.find(url => /^https?:\/\//.test(url)) || candidates[0];
+        const cached = candidates.find(url => url.startsWith('/api/music/artwork?'));
+        const remote = cached && new URL(cached, location.origin).searchParams.get('url');
+        const value = remote || candidates.find(url => /^https?:\/\//.test(url)) || candidates[0];
         if (!value) return null;
         if (!value.startsWith('/api/music/')) return value;
         const url = new URL(value, location.origin);
@@ -99,7 +120,7 @@
         }
         // 透明度只作用于背景，不能降低文字和按钮的不透明度；0% 模糊不保留固定滤镜。
         root.style.setProperty('--surface-opacity', 1 - value.opacity);
-        root.style.setProperty('--surface-blur', value.glassBlur * 0.4 + 'px');
+        root.style.setProperty('--surface-blur', Math.min(window.matchMedia?.('(max-width: 768px)').matches ? 10 : 40, value.glassBlur * 0.4) + 'px');
         root.classList.add('music-appearance');
         root.style.setProperty('--background-x', (value.background?.x ?? 50) + '%');
         root.style.setProperty('--background-y', (value.background?.y ?? 50) + '%');
@@ -133,6 +154,13 @@
     window.MusicExperience = {
         get account() { return account; },
         get value() { return { ...value }; },
+        /** 服务端主动推送外观，当前账号的本地未提交配置优先。 */
+        async acceptPush(remote) {
+            if (window.ClientSync?.has('appearance')) return;
+            value = { ...defaults, ...remote }; localStorage.setItem(cacheKey(accountName()), JSON.stringify(value)); apply();
+            window.ClientSync?.seed('appearance', value);
+            await loadBackground(++revision, headers());
+        },
         playable, coverUrl, coverCandidates, coverReference,
         playItem(item) { const song = playable(item); window.updatePlaylist([song], 0, 'local_all', false); },
         openCollection(name, items) { window.switchTab('recent', false); window.RecentView.show(name, items); },
@@ -147,13 +175,20 @@
             // 本地缓存按账号分开；数据库配置是最终来源。
             try { value = { ...defaults, ...(JSON.parse(localStorage.getItem(cacheKey(next))) || {}) }; } catch { value = { ...defaults }; }
             value.background = null; apply();
+            window.ClientSync?.seed('appearance', value);
             const auth = headers();
             try {
+                const pending = await window.ClientSync?.read('appearance');
+                if (pending && requestRevision === revision) {
+                    value = { ...defaults, ...pending }; apply();
+                    await loadBackground(requestRevision, auth); return;
+                }
                 const response = await fetch('/api/user/appearance', { headers: auth });
                 if (!response.ok) throw new Error('账号外观配置加载失败');
                 const remote = await response.json();
-                if (requestRevision !== revision) return;
+                if (requestRevision !== revision || window.ClientSync?.has('appearance')) return;
                 value = { ...defaults, ...remote }; localStorage.setItem(cacheKey(next), JSON.stringify(value)); apply();
+                window.ClientSync?.seed('appearance', value);
                 await loadBackground(requestRevision, auth);
             } catch (error) { if (requestRevision === revision) report(error); }
             if (!document.getElementById('view-recent').classList.contains('hidden')) window.RecentView.load();
@@ -163,6 +198,7 @@
             value = { ...value, ...patch }; apply();
             const snapshot = { ...value }, owner = accountName(), auth = headers();
             localStorage.setItem(cacheKey(owner), JSON.stringify(snapshot));
+            if (window.ClientSync) return window.ClientSync.update('appearance', snapshot).catch(report);
             saved = saved.catch(() => {}).then(async () => {
                 const response = await fetch('/api/user/appearance', { method: 'PUT', headers: auth, body: JSON.stringify(snapshot) });
                 if (!response.ok) throw new Error((await response.json()).message || '配置保存失败');
@@ -189,15 +225,17 @@
             const owner = accountName(), auth = headers();
             const data = { ...song, quality, ...playback };
             // 本地播放路径上的实际文件名补入历史，重启后仍可重建认证 URL。
-            if (song.isLocal && song.url) { const parsed = new URL(song.url, location.origin); const match = parsed.pathname.match(/\/api\/music\/(cache|custom)\/file\/[^/]+\/(.+)/); if (match) { data.filename = decodeURIComponent(match[2]); data.folder = parsed.searchParams.get('folder') || 'music'; data.isCustomDir = match[1] === 'custom'; } }
-            recorded = recorded.catch(() => {}).then(() => fetch('/api/user/recent', { method: 'POST', headers: auth, body: JSON.stringify(data) })).then(response => {
-                if (!response.ok) throw new Error('最近播放记录保存失败');
-                if (owner === accountName() && !document.getElementById('view-recent').classList.contains('hidden')) window.RecentView.load();
-            }).catch(report);
+            if (song._localFilename || song.customFilename) { data.filename = song._localFilename || song.customFilename; data.folder = song._localFolder || song.folder || 'custom'; data.isCustomDir = data.folder === 'custom' || !!song.isCustomFile; }
+            else if (song.isLocal && song.url) { const parsed = new URL(song.url, location.origin); const match = parsed.pathname.match(/\/api\/music\/(cache|custom)\/file\/[^/]+\/(.+)/); if (match) { data.filename = decodeURIComponent(match[2]); data.folder = parsed.searchParams.get('folder') || 'music'; data.isCustomDir = match[1] === 'custom'; } }
+            recorded = window.DeferredWrites.enqueue('/api/user/recent', data);
             return recorded;
         },
     };
 
+    window.ClientSync?.register('appearance', async (snapshot, context) => {
+        const response = await fetch('/api/user/appearance', { method: 'PUT', headers: { ...context.headers, 'Content-Type': 'application/json' }, body: JSON.stringify(snapshot), signal: context.signal });
+        if (!response.ok) throw new Error('外观配置同步失败: HTTP ' + response.status);
+    });
     document.addEventListener('DOMContentLoaded', () => {
         document.querySelectorAll('[data-theme-controls]').forEach(container => window.ThemeControls.mount(container));
         document.querySelectorAll('[data-experience-control]').forEach(control => {

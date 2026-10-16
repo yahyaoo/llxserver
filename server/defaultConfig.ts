@@ -1,5 +1,11 @@
 
 const config: LX.Config = {
+  // 客户端通道：状态上报与事件进度节流，新连接握手时生效。
+  'clientChannel.reportIntervalMinutes': 30,
+  'clientChannel.progressThrottleMs': 500,
+  'clientChannel.maxBatchOps': 200,
+  'clientChannel.maxBatchBytes': 262144,
+  'clientChannel.legacyProgressPolling': false,
   serverName: 'llxserver', // 同步服务名称
   'debug.enabled': false, // 是否启用 DEBUG 模式 (开发人员使用)
   'proxy.enabled': false, // 是否使用代理转发请求到本服务器
@@ -41,17 +47,6 @@ const config: LX.Config = {
 
   'frontend.password': '123456',
 
-  // WebDAV 配置
-  'webdav.enable': false,
-  'webdav.url': '',
-  'webdav.username': '',
-  'webdav.password': '',
-  'webdav.syncPath': '/lx-sync', // 增量同步远程路径
-  'webdav.backupPath': '/lx-sync-backups', // 全量备份远程路径
-  'sync.interval': 60, // 同步间隔（分钟）默认1小时
-  'sync.backupInterval': 24, // 全量备份间隔（小时）默认24小时
-  'webdav.excludeCache': false, // 是否排除缓存目录 (data/<user>/cache) 的同步与备份
-  'webdav.excludeMusic': false, // 是否排除音乐下载目录 (data/<user>/music) 的同步与备份
 
 
   // 每日导出当前 SQLite 业务配置为可手动导入的本地备份文件。
@@ -124,6 +119,31 @@ const config: LX.Config = {
   serverCacheLocation: 'root', // 缓存位置：data、root 或管理员配置的绝对路径
   'download.directory': '', // 服务器下载目录，留空使用 DATA_PATH/downloads
   'download.lyricMode': 'embedded', // 默认内嵌歌词，也可选择 external 外部 LRC
+  'library.scan.enabled': true,
+  'library.scan.legacy': false,
+  'library.scan.defaultMinutes': 60,
+  'library.scan.fullScanHours': 24,
+  'library.scan.watch': true,
+  'library.scan.watchDebounceSeconds': 10,
+  'library.scan.startupDelaySeconds': 60,
+  'library.scan.ioPauseMs': 0,
+  'library.scan.watchMode': 'auto',
+  'library.scan.lyricWriteMode': 'sidecar',
+  'library.scan.embedCover': false,
+  'library.prefetch.enabled': true,
+  'library.prefetch.cover': true,
+  'library.prefetch.lyric': true,
+  'library.prefetch.network': true,
+  'library.prefetch.concurrency': 2,
+  'library.prefetch.maxCacheMB': 256,
+  'library.prefetch.networkPerMinute': 30,
+  'library.prefetch.backfillOnStartup': true,
+  'library.autoFix.embedLyric': 'off',
+  'library.autoFix.retag': 'off',
+  'library.autoFix.scope': 'cache',
+  'library.autoFix.maxPerRun': 200,
+  'library.autoFix.quietHours': '',
+  'library.autoFix.safeWrite': true,
   'download.nameTemplate': '', // 留空沿用现有歌曲命名方式，填写模板时覆盖
   'update.enabled': false, // 默认不检查更新
   'update.server': 'https://api.github.com/repos/yahyaoo/llxserver/releases/latest',

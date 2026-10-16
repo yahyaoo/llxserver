@@ -64,8 +64,9 @@ window.LeaderboardManager = (function () {
             }
         } catch (e) {
             console.error('[Leaderboard] loadBoards failed:', e);
-            document.getElementById('lb-boards-list').innerHTML =
-                `<div class="p-4 text-red-500 text-sm">加载失败: ${e.message}</div>`;
+            window.LoadingState.showFailure(document.getElementById('lb-boards-list'), {
+                title: '榜单暂时无法加载', variant: 'inline', retry: () => loadBoards(source),
+            });
         } finally {
             showBoardsLoading(false);
         }
@@ -78,10 +79,7 @@ window.LeaderboardManager = (function () {
         const container = document.getElementById('lb-songs-list');
         if (page === 1) {
             state.localPage = 1;
-            container.innerHTML = `
-                <div class="flex items-center justify-center py-20">
-                    <i class="fas fa-spinner fa-spin text-4xl text-emerald-500"></i>
-                </div>`;
+            container.innerHTML = window.LoadingState.render('正在加载榜单歌曲…', 'page');
         }
 
         try {
@@ -137,7 +135,7 @@ window.LeaderboardManager = (function () {
             renderPagination();
         } catch (e) {
             console.error('[Leaderboard] loadSongs failed:', e);
-            container.innerHTML = `<div class="text-center text-red-500 p-10">加载失败: ${e.message}</div>`;
+            window.LoadingState.showFailure(container, { title: '榜单歌曲暂时无法加载', variant: 'page', retry: () => loadSongs(bangid, source, page) });
         } finally {
             state.loading = false;
         }
@@ -248,6 +246,7 @@ window.LeaderboardManager = (function () {
                 <!-- 操作 -->
                 <div class="song-row-actions col-span-4 sm:col-span-3 md:col-span-2 lg:col-span-2 flex items-center justify-end gap-0 sm:gap-1">
                     ${window.SongActions?.renderLoveButton(song) || ''}
+                    ${window.SongActions?.renderQueueButton(song) || ''}
                     <button class="p-0.5 sm:p-1.5 hover:bg-blue-50 rounded-lg text-blue-600 transition-colors"
                             title="下载"
                             onclick="event.stopPropagation(); downloadSong(${JSON.stringify(song).replace(/"/g, '&quot;')})">
@@ -268,6 +267,7 @@ window.LeaderboardManager = (function () {
             `;
         }).join('');
 
+        if (window.LibraryArtwork) container.querySelectorAll('.song-cover img').forEach((image, index) => window.LibraryArtwork.bind(image, pageList[index].item));
         window.SongFileStatus?.update(container, pageList.map(obj => obj.item));
 
         if (typeof window.lazyLoadImages === 'function') window.lazyLoadImages();
@@ -337,16 +337,12 @@ window.LeaderboardManager = (function () {
     }
 
     function playSong(index) {
-        const displayList = window.ListSearch && window.ListSearch.state && window.ListSearch.state.active && window.ListSearch.state.id === 'leaderboard'
-            ? window.ListSearch.getDisplayList(state.songs).map(item => item.item)
-            : state.songs;
-
-        const song = displayList[index];
+        // 行事件传入的是原始列表索引；过滤列表只用于展示，不能再次按显示索引取歌。
+        const song = state.songs[index];
         if (!song) return;
 
         if (typeof window.updatePlaylist === 'function') {
-            const listWithSource = displayList.map(s => ({ ...s, source: s.source || state.source }));
-            window.updatePlaylist(listWithSource, index, 'leaderboard', true);
+            window.updatePlaylist([{ ...song, source: song.source || state.source }], 0, 'leaderboard', true);
         }
     }
 

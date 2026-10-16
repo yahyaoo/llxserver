@@ -1,5 +1,6 @@
 /** 歌单自动下载任务：比较歌单与本地记录，按用户音质和存储位置下载及清理文件。 @author yahyaoo */
 import storageFs from '../../../application/persistence/documentFileSystem'
+import { serverEvents } from '../../../application/events/ServerEvents'
 import fs from 'node:fs'
 import path from 'node:path'
 import * as fileCache from '../cache/FileCacheService'
@@ -201,6 +202,7 @@ export const cancelUserSync = (username: string): boolean => {
     progress.isPaused = false
     progress.currentSongName = ''
     addLog(progress, '用户已暂停/停止同步任务')
+    serverEvents.emitEvent('task:changed', { username, topic: 'sync-download', reason: 'state' })
     return true
   }
   return false
@@ -209,6 +211,7 @@ export const cancelUserSync = (username: string): boolean => {
 const addLog = (progress: SyncProgress, msg: string) => {
   progress.log.push({ time: Date.now(), msg })
   if (progress.log.length > 100) progress.log.shift()
+  serverEvents.emitEvent('task:changed', { username: [...progressMap].find(([, value]) => value === progress)![0], topic: 'sync-download', reason: 'progress' })
 }
 
 /**
@@ -1174,6 +1177,7 @@ const syncUserPlaylists = async (username: string, signal?: AbortSignal, targetP
   progress.currentSongIndex = 0
   progress.currentListTotalSongs = 0
   progress.log = []
+  serverEvents.emitEvent('task:changed', { username, topic: 'sync-download', reason: 'state' })
   const totalCheck = plans.reduce((s, p) => s + p.remoteSongs.length, 0)
   addLog(progress, `开始同步用户 ${username} 的 ${targetLists.length} 个歌单，核对 ${totalCheck} 首，其中需下载 ${overallTotal} 首 (目标音质: ${quality})`)
 
@@ -1326,6 +1330,7 @@ const syncUserPlaylists = async (username: string, signal?: AbortSignal, targetP
     progress.startTime = null
     progress.currentSongName = ''
     syncLog.info(`[同步下载] 用户 ${username} ${syncData.lastSyncResult}`)
+    serverEvents.emitEvent('task:changed', { username, topic: 'sync-download', reason: 'state' })
   }
 }
 

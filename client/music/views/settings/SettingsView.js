@@ -22,6 +22,22 @@
             <div class="settings-content-heading"><h2 id="settings-section-title">源与基础设置</h2></div>
     <!-- System Settings Panel -->
     <div id="settings-panel-system" class="space-y-6 animate-fade-in">
+        <div id="settings-section-advanced" data-settings-section="advanced" class="settings-form-card hidden">
+            <h3>高级</h3>
+            <label class="settings-field">状态上报方式
+                <select id="setting-client-sync-transport" class="settings-text-input" onchange="updateSetting('clientSyncTransport', this.value)">
+                    <option value="ws">WebSocket（默认，不可用时回退 HTTP）</option>
+                    <option value="http">HTTP</option>
+                </select>
+            </label>
+            <label class="settings-field">状态同步间隔
+                <select id="setting-client-state-interval" class="settings-text-input" onchange="updateSetting('clientStateIntervalMinutes', this.value)">
+                    <option value="server">跟随服务端（默认）</option>
+                    <option value="5">5 分钟</option><option value="30">30 分钟</option><option value="60">60 分钟</option>
+                </select>
+            </label>
+            <p class="account-field-hint">播放状态与记录默认每 30 分钟上报；隐藏页面时尝试补发。最近播放与漫游权重在其他设备上可能延迟。歌单、收藏及设置在 2 秒内提交。</p>
+        </div>
         <!-- 源与基础设置 -->
         <div id="settings-section-sources" data-settings-section="sources" class="col-span-full pt-2 space-y-4">
             <h4 class="text-sm font-bold t-text-main flex items-center">
@@ -38,14 +54,6 @@
                     </h3>
                     <div id="settings-source-scope-tag" class="hidden flex items-center gap-1">
                     </div>
-                    <span id="settings-admin-tag"
-                        class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-50 text-orange-500 whitespace-nowrap hidden">管理员</span>
-                    <button id="btn-admin-logout" onclick="handleAdminLogout()"
-                        class="text-[10px] px-3 py-1 bg-red-50 text-red-500 rounded-full hover:bg-red-100 transition-all border border-red-100 hidden">退出管理员</button>
-                    <button id="btn-admin-login" onclick="handleAdminLogin()"
-                        class="text-[10px] px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full hover:bg-emerald-100 transition-all border border-emerald-100 flex items-center gap-1.5 hidden">
-                        <i class="fas fa-user-shield"></i> 管理员登录
-                    </button>
                     <button id="btn-custom-source-manage" onclick="openCustomSourceModal()"
                         class="ml-auto flex-shrink-0 px-4 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs rounded-lg shadow shadow-emerald-200/50 transition-all hover:scale-105 active:scale-95 flex items-center gap-1.5">
                         <i class="fas fa-plus-circle"></i> 管理 / 添加
@@ -364,12 +372,12 @@
                             <span id="task-last-run-badge"
                                 class="text-[11px] px-2 py-0.5 rounded-lg border t-border-main text-gray-500 dark:text-gray-400 font-normal bg-gray-50/50 dark:bg-gray-800/50 flex items-center gap-1">
                                 <i class="fas fa-history text-[9px] text-emerald-500"></i>
-                                <span id="task-last-run-text">上次执行: 加载中...</span>
+                                <span id="task-last-run-text">${window.LoadingState.render('上次执行: 加载中…', 'inline')}</span>
                             </span>
                             <span id="task-next-run-badge"
                                 class="text-[11px] px-2 py-0.5 rounded-lg border t-border-main text-gray-500 dark:text-gray-400 font-normal bg-gray-50/50 dark:bg-gray-800/50 flex items-center gap-1">
                                 <i class="far fa-clock text-[9px] text-emerald-500"></i>
-                                <span id="task-next-run-text">下次执行: 加载中...</span>
+                                <span id="task-next-run-text">${window.LoadingState.render('下次执行: 加载中…', 'inline')}</span>
                             </span>
                         </div>
                         <div class="text-xs t-text-muted mt-1.5">
@@ -606,6 +614,41 @@
                 <div class="flex items-center justify-between pb-3 border-b t-border-main">
                     <div>
                         <div class="text-sm font-bold t-text-main flex items-center">
+                            本地持久化封面
+                            <span class="setting-tooltip-trigger ml-1">
+                                <i class="fas fa-question-circle"></i>
+                                <span class="setting-tooltip-content">只保存实际显示过的封面到当前账号的本地媒体缓存，不会预热整张歌单。</span>
+                            </span>
+                        </div>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="setting-enable-cover-local-cache" class="sr-only peer"
+                            onchange="updateSetting('enableCoverLocalCache', this.checked)" data-media-cache-cover>
+                        <div
+                            class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500 transition-all">
+                        </div>
+                    </label>
+                </div>
+
+                <div data-media-cache-settings class="space-y-2 pb-3 border-b t-border-main">
+                    <div class="flex items-center justify-between text-[11px] t-text-muted">
+                        <span data-media-cache-status>媒体缓存统计读取中…</span>
+                        <label class="inline-flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" id="setting-clear-media-cache-on-logout" class="accent-emerald-500"
+                                onchange="updateSetting('clearMediaCacheOnLogout', this.checked)" data-media-cache-clear-on-exit>
+                            退出时清理本账号媒体缓存
+                        </label>
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                        <button type="button" class="px-2.5 py-1.5 rounded-lg border t-border-main text-[11px] t-text-muted hover:text-emerald-500" data-media-cache-clear-cover>清理封面</button>
+                        <button type="button" class="px-2.5 py-1.5 rounded-lg border t-border-main text-[11px] t-text-muted hover:text-emerald-500" data-media-cache-clear-lyrics>清理歌词</button>
+                        <button type="button" class="px-2.5 py-1.5 rounded-lg border t-border-main text-[11px] t-text-muted hover:text-emerald-500" data-media-cache-clear-all>清理全部媒体</button>
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-between pb-3 border-b t-border-main">
+                    <div>
+                        <div class="text-sm font-bold t-text-main flex items-center">
                             缓存歌曲链接
                             <span class="setting-tooltip-trigger ml-1">
                                 <i class="fas fa-question-circle"></i>
@@ -757,7 +800,7 @@
                     <select id="setting-server-cache-location"
                         onchange="selectServerCacheLocation(this.value)"
                         class="lm-select !w-full !py-2.5">
-                        <option value="data">DATA_PATH (WebDAV同步)</option>
+                        <option value="data">服务器数据路径</option>
                         <option value="root">运行目录 (仅本地)</option>
                         <option value="custom">自定义目录（输入绝对路径）</option>
                     </select>
@@ -1826,6 +1869,7 @@
         static mount(container) {
             if (!container || container.dataset.settingsMounted === 'true') return;
             container.innerHTML = template;
+            window.MediaCacheSettings?.mount(container.querySelector('[data-media-cache-settings]'));
             decorateSettings(container);
             window.SettingsCards?.apply(container);
             container.dataset.settingsMounted = 'true';

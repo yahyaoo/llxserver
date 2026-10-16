@@ -6,6 +6,7 @@ import { FavoriteRepository } from '../../repository/FavoriteRepository'
 import { PlaylistRepository } from '../../repository/PlaylistRepository'
 import { repositories } from '../../../application/persistence/storage'
 import path from 'node:path'
+import { songIdentity } from '../library/SongIdentity'
 
 /** 维护歌单定义和歌曲映射，实现歌单及歌曲增删改与排序。 @author yahyaoo */
 export class ListDataManage {
@@ -41,7 +42,7 @@ export class ListDataManage {
       if (!listData) listData = { defaultList: [], loveList: [], userList: [] }
       const covers = (repositories().music.read('client_playlist_cover', this.coverKey)?.value || {}) as Record<string, string>
       for (const list of listData.userList) if (list.cover === undefined && covers[list.id] !== undefined) list.cover = covers[list.id]
-      this.allMusicList.set(LIST_IDS.DEFAULT, listData.defaultList)
+      this.allMusicList.set(LIST_IDS.DEFAULT, songIdentity().aggregate(listData.defaultList))
       this.allMusicList.set(LIST_IDS.LOVE, this.favorites.initialize(listData.loveList || []))
       const playlists = this.playlists.initialize(listData.userList, listData.defaultList)
       this.userLists.push(...playlists.map(({ list, ...l }) => {
@@ -67,10 +68,10 @@ export class ListDataManage {
     this.allMusicList.clear()
     this.userLists = []
 
-    this.allMusicList.set(LIST_IDS.DEFAULT, listData.defaultList)
-    this.allMusicList.set(LIST_IDS.LOVE, favorites)
+    this.allMusicList.set(LIST_IDS.DEFAULT, songIdentity().aggregate(listData.defaultList))
+    this.allMusicList.set(LIST_IDS.LOVE, songIdentity().aggregate(favorites))
     this.userLists.push(...listData.userList.map(({ list, ...l }) => {
-      this.allMusicList.set(l.id, list)
+      this.allMusicList.set(l.id, songIdentity().aggregate(list))
       return l
     }))
     this.persistFavorites()
@@ -84,9 +85,9 @@ export class ListDataManage {
   ))
 
   /** 在同步快照提交前持久化喜爱，覆盖洛雪与 Subsonic 的现有歌曲增删及排序入口。 @author jingyh */
-  persistFavorites = () => this.favorites.save(this.allMusicList.get(LIST_IDS.LOVE) ?? [])
+  persistFavorites = () => this.favorites.save(this.setMusicList(LIST_IDS.LOVE, this.allMusicList.get(LIST_IDS.LOVE) ?? []))
   /** 保存普通歌单及歌曲，兼容同步、历史恢复与网页现有操作入口。@author jingyh */
-  persistPlaylists = () => this.playlists.save(this.userLists.map(l => ({ ...l, list: this.allMusicList.get(l.id) ?? [] })))
+  persistPlaylists = () => this.playlists.save(this.userLists.map(l => ({ ...l, list: this.setMusicList(l.id, this.allMusicList.get(l.id) ?? []) })))
   /**
  * 读取当前用户的默认列表、收藏列表和自定义歌单数据。
  * @author yahyaoo
@@ -94,9 +95,9 @@ export class ListDataManage {
   getListData = async (): Promise<LX.Sync.List.ListData> => {
     await this.initPromise
     return {
-      defaultList: this.allMusicList.get(LIST_IDS.DEFAULT) ?? [],
-      loveList: this.allMusicList.get(LIST_IDS.LOVE) ?? [],
-      userList: this.userLists.map(l => ({ ...l, list: this.allMusicList.get(l.id) ?? [] })),
+      defaultList: songIdentity().aggregate(this.allMusicList.get(LIST_IDS.DEFAULT) ?? []),
+      loveList: songIdentity().aggregate(this.allMusicList.get(LIST_IDS.LOVE) ?? []),
+      userList: this.userLists.map(l => ({ ...l, list: songIdentity().aggregate(this.allMusicList.get(l.id) ?? []) })),
     }
   }
 
@@ -118,8 +119,9 @@ export class ListDataManage {
  * @author yahyaoo
  */
   private readonly setMusicList = (listId: string, musicList: LX.Music.MusicInfo[]): LX.Music.MusicInfo[] => {
-    this.allMusicList.set(listId, musicList)
-    return musicList
+    const songs = songIdentity().aggregate(musicList)
+    this.allMusicList.set(listId, songs)
+    return songs
   }
 
   /**

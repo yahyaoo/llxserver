@@ -35,10 +35,28 @@ window.SystemConfigurationView = class SystemConfigurationView {
         this.form.insertBefore(storage, this.form.querySelector('.config-actions-bar'));
         this.cards.set('数据库与迁移', storage);
         storage.querySelector('#legacy-system-config-import').addEventListener('click', () => this.importLegacy());
+        // B-group panels are independent additions; existing settings cards keep their controls and handlers.
+        for (const title of ['音乐库扫描', '封面与歌词预取', '自动修复']) {
+            const card = document.createElement('section'); card.className = 'config-card glass'; card.id = 'system-library-' + this.cards.size;
+            const heading = document.createElement('h3'); heading.className = 'config-card-title'; heading.textContent = title;
+            const body = document.createElement('div'); body.className = 'config-card-body';
+            card.append(heading, body); this.form.insertBefore(card, this.form.querySelector('.config-actions-bar')); this.cards.set(title, card);
+            if (title !== '音乐库扫描') {
+                const status = document.createElement('p'); status.className = 'config-hint'; status.role = 'status';
+                const refresh = document.createElement('button'); refresh.type = 'button'; refresh.className = 'btn-secondary'; refresh.textContent = title === '自动修复' ? '读取最近审计' : '读取预取状态';
+                refresh.onclick = async () => { refresh.disabled = true; try { const result = await this.app.request(title === '自动修复' ? '/api/admin/library/autofix/log' : '/api/admin/library/prefetch/status'); status.textContent = result.items?.length ? result.items.map(item => title === '自动修复' ? `${new Date(item.at).toLocaleString()} ${item.username} · ${item.filename}：${item.status}${item.reason ? '（' + item.reason + '）' : ''}` : `${item.username}：排队 ${item.queued}，已处理 ${item.done}，失败 ${item.failed}，${item.running ? '进行中' : '已空闲'}`).join('；') : '暂无记录'; } catch (error) { status.textContent = error.message; } finally { refresh.disabled = false; } };
+                body.append(refresh, status);
+                if (title === '封面与歌词预取') {
+                    const run = document.createElement('button'); run.type = 'button'; run.className = 'btn-secondary'; run.textContent = '补齐所选用户';
+                    run.onclick = async () => { const user = document.getElementById('config-custom-dir-user')?.value; if (!user) { status.textContent = '请先选择用户'; return; } run.disabled = true; try { await this.app.request('/api/admin/library/prefetch/run?user=' + encodeURIComponent(user) + '&mode=backfill', { method: 'POST' }); status.textContent = '补齐任务已排队'; } catch (error) { status.textContent = error.message; } finally { run.disabled = false; } };
+                    body.append(run);
+                }
+            }
+        }
         const groups = [
             { label: '服务与访问', items: ['基本配置', '代理配置', '前端访问配置', '用户路径配置', '访问路径配置'] },
-            { label: '音乐与缓存', items: ['自定义歌曲目录', '服务器下载配置', '权限与缓存限制', 'Subsonic 协议配置'] },
-            { label: '同步与数据', items: ['WebDAV 同步配置', '备份与恢复', '数据库与迁移', '版本更新'] },
+            { label: '音乐与缓存', items: ['自定义歌曲目录', '音乐库扫描', '封面与歌词预取', '自动修复', '服务器下载配置', '权限与缓存限制', 'Subsonic 协议配置'] },
+            { label: '同步与数据', items: ['用户音乐目录', '备份与恢复', '数据库与迁移', '版本更新'] },
         ];
         groups.forEach(group => {
             const section = document.createElement('section');
@@ -90,12 +108,23 @@ window.SystemConfigurationView = class SystemConfigurationView {
             if (!card) return;
             const wrapper = document.createElement('div');
             wrapper.className = 'config-field';
+            wrapper.hidden = field.hidden === true;
             const label = document.createElement('label');
             label.className = 'config-label';
             label.textContent = field.label;
             const control = document.createElement(field.type === 'select' ? 'select' : 'input');
             control.name = field.key;
             control.id = 'system-extra-' + field.key.replace(/\./g, '-');
+            if (['library.autoFix.embedLyric', 'library.autoFix.retag', 'library.autoFix.scope', 'library.scan.lyricWriteMode', 'library.scan.embedCover'].includes(field.key)) {
+                control.addEventListener('change', () => {
+                    const changed = field.key === 'library.autoFix.scope' ? control.value === 'cache+custom' : field.key === 'library.scan.embedCover' ? control.checked : field.key === 'library.scan.lyricWriteMode' ? control.value !== 'sidecar' : control.value !== 'off';
+                    if (changed && !window.confirm('所选扫描策略可能修改音频文件的内嵌标签，请先备份。关闭策略不会恢复已写入内容；自定义目录还需用户写权限和安全写入检查。确认启用？')) {
+                        const previous = this.loadedLibraryConfig?.[field.key];
+                        if (control.type === 'checkbox') control.checked = previous === true;
+                        else control.value = previous ?? (field.key.endsWith('.scope') ? 'cache' : field.key === 'library.scan.lyricWriteMode' ? 'sidecar' : 'off');
+                    }
+                });
+            }
             label.htmlFor = control.id;
             if (field.type === 'select') field.options.forEach(value => { const option = document.createElement('option'); option.value = value; option.textContent = value; control.appendChild(option); });
             else control.type = field.type;
@@ -108,6 +137,7 @@ window.SystemConfigurationView = class SystemConfigurationView {
             wrapper.append(label, control, hint);
             card.querySelector('.config-card-body').appendChild(wrapper);
         });
+        this.loadedLibraryConfig = { ...config };
         [...this.fields.map(field => field.key), 'database.adminPath', 'database.musicPath'].forEach(key => {
             const control = this.form.elements[key];
             if (!control) return;

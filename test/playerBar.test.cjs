@@ -7,6 +7,7 @@ const vm = require('node:vm')
 
 const read = file => fs.readFileSync(path.join(__dirname, '..', file), 'utf8')
 const appSource = read('client/music/app.js')
+const localMusicSource = read('client/music/js/local_music.js')
 
 /** 隔离浏览器环境，执行真实弹框和音量函数。 */
 function createContext() {
@@ -48,6 +49,7 @@ function createContext() {
   const volumeFunctions = appSource.slice(appSource.indexOf('let currentVolume ='), appSource.indexOf('// ========== 播放模式'))
   const changeVolume = appSource.slice(appSource.indexOf('function changeVolume(delta)'), appSource.indexOf('// 注册全局键盘监听'))
   vm.runInContext(read('client/music/components/playback-experience/index.js'), context)
+  vm.runInContext(read('client/music/js/playback-lyrics.js'), context)
   vm.runInContext(read('client/music/components/player-bar/template.js'), context)
   vm.runInContext(read('client/music/components/player-bar/index.js'), context)
   vm.runInContext(volumeFunctions + changeVolume, context)
@@ -75,6 +77,18 @@ test('更多与音量面板互斥，重复点击关闭，无效入口保留当�
   assert.equal(get('player-volume-popover').hidden, true)
 })
 
+test('歌手和专辑共用单行容器，溢出滚动且缩短后复原', () => {
+  const { context, get } = createContext()
+  const container = get('player-metadata-text'), track = { scrollWidth: 600 }
+  container.clientWidth = 250; container.querySelector = () => track
+  context.window.playerBar.updateMetadataScroll()
+  assert.equal(container.attributes['data-overflow'], 'true')
+  assert.equal(container.style['--metadata-offset'], '-350px')
+  track.scrollWidth = 100; context.window.playerBar.updateMetadataScroll()
+  assert.equal(container.attributes['data-overflow'], 'false')
+  assert.equal(container.style['--metadata-offset'], '0px')
+})
+
 test('底栏普通位置打开播放页，按钮、进度、音量和弹框不触发导航', () => {
   const { context, get } = createContext()
   let opened = 0
@@ -91,7 +105,7 @@ test('底栏普通位置打开播放页，按钮、进度、音量和弹框不�
   assert.equal(get('player-footer').events.click, undefined)
 })
 
-test('双行歌词同步前进、跳转和末尾，换歌清空旧歌词', () => {
+test('双行歌词同步前进、跳转和末尾，信息刷新不清空共享歌词', () => {
   const { context, get } = createContext()
   const bar = context.window.playerBar
   bar.setLyrics([{ text: '第一句' }, { text: '第二句' }, { text: '第三句' }])
@@ -105,10 +119,43 @@ test('双行歌词同步前进、跳转和末尾，换歌清空旧歌词', () =>
   bar.updateLyrics(0)
   assert.equal(get('player-lyric-current').textContent, '第一句')
   bar.setTrack({ id: 'next', name: '下一首' })
-  assert.equal(get('player-lyric-current').textContent, '暂无歌词')
-  assert.equal(get('player-lyric-next').textContent, '')
+  assert.equal(get('player-lyric-current').textContent, '第一句')
+  assert.equal(get('player-lyric-next').textContent, '第二句')
+  context.window.playbackLyrics.setLines([], '暂无歌词')
   bar.setLyrics([], '暂无歌词')
   assert.equal(get('player-lyric-current').textContent, '暂无歌词')
+})
+
+test('本地歌曲来源和标准音质在播放器中显示正确标签', () => {
+  const qualityStart = appSource.indexOf('function getQualityTags(item)')
+  const qualityEnd = appSource.indexOf('window.getQualityTags = getQualityTags;', qualityStart) + 'window.getQualityTags = getQualityTags;'.length
+  const sourceStart = appSource.indexOf('function getSourceTag(source)', qualityEnd)
+  const sourceEnd = appSource.indexOf('window.getSourceTag = getSourceTag;', sourceStart) + 'window.getSourceTag = getSourceTag;'.length
+  assert.ok(qualityStart >= 0 && qualityEnd > qualityStart && sourceStart >= qualityEnd && sourceEnd > sourceStart)
+  const context = vm.createContext({ window: { SongMetadata: { render: () => '' } } })
+  vm.runInContext(appSource.slice(qualityStart, qualityEnd) + '\n' + appSource.slice(sourceStart, sourceEnd), context)
+  assert.match(context.window.getSourceTag('custom'), /本地/)
+  assert.match(context.window.getQualityTags({ quality: '128k' }), />128k</)
+})
+
+test('服务端分页按总歌曲数显示翻页控件和总数', () => {
+  const methodStart = localMusicSource.indexOf('    updatePagination() {')
+  const methodEnd = localMusicSource.indexOf('    render() {', methodStart)
+  assert.ok(methodStart >= 0 && methodEnd > methodStart)
+  const context = vm.createContext({})
+  const updatePagination = vm.runInContext(`({${localMusicSource.slice(methodStart, methodEnd)}}).updatePagination`, context)
+  const elements = new Map()
+  for (const id of ['lm-pagination', 'lm-page-info', 'lm-page-first', 'lm-page-prev', 'lm-page-next', 'lm-page-last']) {
+    const classes = new Set(id === 'lm-pagination' ? ['hidden'] : [])
+    elements.set(id, { textContent: '', disabled: false, classList: {
+      add: value => classes.add(value), remove: value => classes.delete(value), contains: value => classes.has(value),
+    } })
+  }
+  context.document = { getElementById: id => elements.get(id) || null }
+  const manager = { pageSize: 60, serverPaged: true, serverTotal: 1000, displayData: Array(60), currentPage: 1, getTotalPages() { return Math.ceil(this.serverTotal / this.pageSize) } }
+  updatePagination.call(manager)
+  assert.equal(elements.get('lm-pagination').classList.contains('hidden'), false)
+  assert.equal(elements.get('lm-page-info').textContent, '第 1 / 17 页 (共 1000 首)')
 })
 
 test('未加载音频和直播时长不进入拖动，松开前时长失效也不写无效进度', () => {
@@ -275,6 +322,20 @@ test('组件加载先于依赖其节点的模块，保留唯一控件 ID 和有�
   for (const match of template.matchAll(/\bonclick="([^"]+)"/g)) new vm.Script(match[1])
 })
 
+test('音质标签沿用洛雪配色，实际无损与高解析度不混淆', () => {
+  const context = vm.createContext({ window: {} })
+  const start = appSource.indexOf('function getQualityTags(')
+  const end = appSource.indexOf('window.getSourceTag = getSourceTag;', start)
+  vm.runInContext(appSource.slice(start, end), context)
+  const lossless = context.getQualityTags({ quality: 'flac' })
+  assert.match(lossless, /t-badge-green/)
+  assert.match(lossless, />无损<\/span>/)
+  assert.match(context.getQualityTags({ quality: 'hires' }), /t-badge-yellow/)
+  assert.match(context.getSourceTag('kg'), /t-badge-blue/)
+  assert.match(context.getSourceTag('tx'), /t-badge-green/)
+  assert.equal(context.getQualityTags({ types: [{ type: 'hires', isPlatformQuality: true }] }), '')
+})
+
 test('移除底栏画布后详情页频谱独立初始化，旧底栏设置不影响页面布局', () => {
   const canvases = [], styles = {}, events = {}, waveInstances = []
   const canvas = { style: styles, getBoundingClientRect: () => ({ width: 120, height: 80 }), getContext: () => ({ clearRect() {} }) }
@@ -290,6 +351,7 @@ test('移除底栏画布后详情页频谱独立初始化，旧底栏设置不�
   class AudioContext { constructor() { this.state = 'running' } }
   const audio = { addEventListener: (name, callback) => { events[name] = callback }, paused: false }
   const context = vm.createContext({ console: { log() {}, error(error) { throw error } }, Wave,
+    requestAnimationFrame: () => 1, cancelAnimationFrame() {},
     window: { Wave, AudioContext, devicePixelRatio: 2, settings: { showFooterVisualizer: true, showDetailVisualizer: true },
       soundEffects: { getAnalyser: () => ({}) }, addEventListener() {} },
     document: { documentElement: {}, getElementById: id => id === 'audio-player' ? audio : id === 'detail-visualizer' ? canvas : null },
@@ -308,3 +370,34 @@ test('移除底栏画布后详情页频谱独立初始化，旧底栏设置不�
   assert.equal(styles.opacity, '0')
   context.window.musicVisualizer.clear('footer')
 })
+
+/** 请求与界面状态回归：底栏是共享歌词的双行呈现层。 @author jingyh */
+test('共享歌词行号更新、同曲信息刷新、组件重挂载均保持双行一致', () => {
+  const { context, get } = createContext();
+  const { playerBar: bar, playbackLyrics: lyrics } = context.window;
+  const lines = [{ text: '第一句' }, { text: '第二句' }, { text: '第三句' }];
+  lyrics.setLines(lines); lyrics.setIndex(1);
+  bar.setTrack({ id: 'a', source: 'kg', name: '补全标题', singer: '补全歌手' });
+  assert.equal(get('player-lyric-current').textContent, '第二句');
+  assert.equal(get('player-lyric-next').textContent, '第三句');
+  bar.destroy(); bar.mount(get('player-bar-root'));
+  assert.equal(get('player-lyric-current').textContent, '第二句');
+  lyrics.setLines([], '暂无歌词');
+  assert.equal(get('player-lyric-current').textContent, '暂无歌词');
+});
+
+test('加载标题显示阶段百分比，刷新歌曲信息保留进度，旧请求不能结束新请求', () => {
+  const { context, get } = createContext(), bar = context.window.playerBar;
+  bar.setTrack({ name: '原歌曲' }); bar.beginLoading(1);
+  assert.equal(get('player-title').textContent, '正在加载中 0%');
+  bar.advanceLoading(30, 1); bar.setTrack({ name: '补全歌曲' }); bar.advanceLoading(10, 1);
+  assert.equal(get('player-title').textContent, '正在加载中 30%');
+  bar.beginLoading(2); bar.advanceLoading(99, 1); bar.finishLoading(1);
+  assert.equal(get('player-title').textContent, '正在加载中 0%');
+  bar.bindLoadingSource('new-url', 2);
+  assert.equal(bar.matchesLoadingSource('old-url'), false);
+  assert.equal(bar.matchesLoadingSource('new-url'), true);
+  bar.advanceLoading(95, 2); bar.finishLoading(2);
+  assert.equal(get('player-title').textContent, '补全歌曲');
+  assert.equal(get('player-title').attributes['aria-busy'], 'false');
+});

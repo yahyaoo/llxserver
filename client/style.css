@@ -2535,12 +2535,8 @@ select.form-input option:checked {
 
 /* 改进的响应式设计 */
 
-/* =============== WebDAV 同步现代化设计 =============== */
-.webdav-container {
-    display: flex;
-    flex-direction: column;
-    gap: 1.75rem;
-}
+/* =============== 同步状态设计 =============== */
+
 
 /* 区域标头装饰徽章 */
 .section-badge-header {
@@ -2982,17 +2978,9 @@ select.form-input option:checked {
 }
 
 /* 状态与日志并排区域 */
-.webdav-status-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1.25rem;
-}
 
-@media (max-width: 900px) {
-    .webdav-status-grid {
-        grid-template-columns: 1fr;
-    }
-}
+
+
 
 .sync-status-section,
 .sync-logs-section {
@@ -4983,7 +4971,7 @@ input:-webkit-autofill:active {
     opacity: 0.5;
 }
 
-/* WebDAV & Placeholder Styles */
+/* Placeholder Styles */
 .setup-guide-card {
     padding: 3rem 2rem;
     text-align: center;
@@ -5531,7 +5519,7 @@ input:-webkit-autofill:active {
 }
 
 /* =========================================================
-   WebDAV 使用场景与同步原理说明模态框与现代化按钮
+   使用说明模态框与按钮
 ========================================================= */
 .btn-help-guide {
     display: inline-flex;

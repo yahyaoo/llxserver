@@ -57,6 +57,7 @@
     padding: 76px 64px 54px !important; margin: 0; min-height: 0; overflow: visible;
 }
 .player-detail-left { width: min(100%, max(240px, calc(100dvh - 360px))); justify-self: end; min-width: 0; position: relative; }
+.player-cover-stage { display: contents; }
 #view-player-detail #mobile-player-cover-container {
     width: 100%; height: auto; min-width: 0; min-height: 0; max-width: none; max-height: none;
     aspect-ratio: 1; border: 0; border-radius: 28px; background: transparent !important; box-shadow: 0 24px 60px rgb(0 0 0 / 18%);
@@ -76,14 +77,15 @@
 #view-player-detail .player-title-row { display: block; }
 #view-player-detail #player-title { font-size: clamp(22px, 1.7vw, 30px); font-weight: 650; line-height: 1.4; max-width: 100%; }
 #view-player-detail #player-artist { display: inline; font-size: 14px; line-height: 1.7; color: var(--text-dim); }
-.player-detail-album { font-size: 14px; color: var(--text-dim); }
+#player-album { font-size: 14px; color: var(--text-dim); }
 .player-detail-album[hidden] { display: none; }
 #view-player-detail .player-track-copy { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+#view-player-detail .player-bar-lyrics { display: none; }
 #view-player-detail .player-actions { grid-column: 2; grid-row: 1; align-self: center; gap: 2px; }
 #view-player-detail .player-actions .player-icon-button, #view-player-detail .player-detail-direct-action { width: 30px; height: 38px; font-size: 17px; padding: 0; justify-content: center; color: var(--text-muted); border-radius: 50%; }
 #view-player-detail .player-detail-direct-action > span { display: none; }
 #view-player-detail .player-detail-direct-action > i { color: inherit; width: auto; }
-#view-player-detail #player-like-btn.text-red-500 { color: #f43f5e; }
+
 /* 播放页只提供喜欢；退出播放页后队列恢复原有加入歌单入口。作者：jingyh */
 body.player-detail-open #queue-drawer [data-player-add-to-playlist] { display: none; }
 #view-player-detail #player-more-btn i::before { content: '\f142'; }
@@ -95,9 +97,10 @@ body.player-detail-open #queue-drawer [data-player-add-to-playlist] { display: n
 #view-player-detail .player-time { display: inline; font-size: 12px; color: var(--text-dim); }
 #view-player-detail #time-current { grid-column: 1; }
 #view-player-detail #time-total { grid-column: 3; text-align: right; }
-#view-player-detail #player-source { grid-column: 2; grid-row: 2; justify-content: center; max-width: 100%; }
+#view-player-detail .player-metadata-row { margin-top: 6px; gap: 2px 5px; }
+#view-player-detail #player-source { max-width: 100%; }
 @media (min-width: 768px) {
-    #view-player-detail #player-source > span { background: rgb(255 255 255 / 12%); border-color: transparent; color: #d5cddc; font-size: 10px; }
+    #view-player-detail #player-source > span { font-size: 10px; }
 }
 #view-player-detail .player-transport { grid-column: 1 / -1; grid-row: 3; justify-content: space-between; gap: 12px; margin-top: 26px; }
 #view-player-detail .player-transport .player-icon-button, #view-player-detail #play-mode-btn { width: 38px; height: 44px; display: inline-flex; align-items: center; justify-content: center; font-size: 22px; color: #d1cad7; border-radius: 50%; }

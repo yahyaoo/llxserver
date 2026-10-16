@@ -35,18 +35,7 @@ async function readBody(req: IncomingMessage): Promise<string> {
 export async function handleValidate(req: IncomingMessage, res: ServerResponse) {
     try {
         const body = await readBody(req)
-        const { script, username, allowUnsafeVM } = JSON.parse(body)
-
-        // 鉴权逻辑：只有已登录用户（非 default）可以免密码验证
-        const targetOwner = (username && username !== 'default') ? username : 'open'
-        if (targetOwner === 'open') {
-            const auth = req.headers['x-frontend-auth']
-            if (auth !== global.lx.config['frontend.password']) {
-                res.writeHead(403, { 'Content-Type': 'application/json' })
-                res.end(JSON.stringify({ success: false, error: '权限不足：管理自定义源需要先验证管理员身份。' }))
-                return
-            }
-        }
+        const { script, allowUnsafeVM } = JSON.parse(body)
 
         if (!script || typeof script !== 'string') {
             throw new Error('Invalid script content')
@@ -184,13 +173,13 @@ function generateId(name?: string, fallbackFilename?: string): string {
  * @param res HTTP 响应，用于写入状态码、数据或媒体流。
  * @author yahyaoo
  */
-export async function handleUpload(req: IncomingMessage, res: ServerResponse) {
+export async function handleUpload(req: IncomingMessage, res: ServerResponse, authenticatedOwner?: string) {
     try {
         const body = await readBody(req)
         const { filename, content, username, allowUnsafeVM } = JSON.parse(body)
 
         // 确定 owner 用于后续标识
-        const targetOwner = (username && username !== 'default') ? username : 'open'
+        const targetOwner = authenticatedOwner ?? ((username && username !== 'default') ? username : 'open')
 
         // 检查权限限制 (针对公开源)
         if (targetOwner === 'open') {
@@ -202,7 +191,7 @@ export async function handleUpload(req: IncomingMessage, res: ServerResponse) {
             }
         }
 
-        const sourcesDir = getSourceDir(username)
+        const sourcesDir = getSourceDir(targetOwner)
         const metaPath = path.join(sourcesDir, 'sources.json')
 
         // 创建目录
@@ -296,7 +285,7 @@ export async function handleUpload(req: IncomingMessage, res: ServerResponse) {
  * @param res HTTP 响应，用于写入状态码、数据或媒体流。
  * @author yahyaoo
  */
-export async function handleImport(req: IncomingMessage, res: ServerResponse) {
+export async function handleImport(req: IncomingMessage, res: ServerResponse, authenticatedOwner?: string) {
     try {
         const body = await readBody(req)
         const { url, filename, username, allowUnsafeVM } = JSON.parse(body)
@@ -385,7 +374,7 @@ export async function handleImport(req: IncomingMessage, res: ServerResponse) {
             }
         }
 
-        const targetOwner = (username && username !== 'default') ? username : 'open'
+        const targetOwner = authenticatedOwner ?? ((username && username !== 'default') ? username : 'open')
 
         // 检查权限限制
         if (targetOwner === 'open') {
@@ -397,7 +386,7 @@ export async function handleImport(req: IncomingMessage, res: ServerResponse) {
             }
         }
 
-        const sourcesDir = getSourceDir(username)
+        const sourcesDir = getSourceDir(targetOwner)
         const metaPath = path.join(sourcesDir, 'sources.json')
 
         // 创建目录
@@ -601,13 +590,13 @@ export async function handleList(req: IncomingMessage, res: ServerResponse, user
  * @param res HTTP 响应，用于写入状态码、数据或媒体流。
  * @author yahyaoo
  */
-export async function handleToggle(req: IncomingMessage, res: ServerResponse) {
+export async function handleToggle(req: IncomingMessage, res: ServerResponse, authenticatedOwner?: string) {
     try {
         const body = await readBody(req)
         const { id, sourceId, enabled, username, allowUnsafeVM } = JSON.parse(body)
         const targetId = id || sourceId
 
-        let targetOwner = (username && username !== 'default') ? username : 'open'
+        let targetOwner = authenticatedOwner ?? ((username && username !== 'default') ? username : 'open')
 
         // 检查权限限制
         if (targetOwner === 'open') {
@@ -765,7 +754,7 @@ export async function handleToggle(req: IncomingMessage, res: ServerResponse) {
  * @param res HTTP 响应，用于写入状态码、数据或媒体流。
  * @author yahyaoo
  */
-export async function handleReorder(req: IncomingMessage, res: ServerResponse) {
+export async function handleReorder(req: IncomingMessage, res: ServerResponse, authenticatedOwner?: string) {
     try {
         const body = await readBody(req)
         const { username, sourceIds } = JSON.parse(body)
@@ -774,7 +763,7 @@ export async function handleReorder(req: IncomingMessage, res: ServerResponse) {
             throw new Error('sourceIds must be an array')
         }
 
-        let targetOwner = (username && username !== 'default') ? username : 'open'
+        let targetOwner = authenticatedOwner ?? ((username && username !== 'default') ? username : 'open')
 
         // 检查权限限制 (公开源排序)
         if (targetOwner === 'open') {
@@ -797,9 +786,7 @@ export async function handleReorder(req: IncomingMessage, res: ServerResponse) {
         // 保存混合列表的绝对顺序到 order.json（用于 handleList 展示排序）
         storageFs.writeFileSync(orderPath, JSON.stringify(sourceIds, null, 2))
 
-        // 同时尝试重排各自存在的 sources.json，并记录是否修改了 open 的源
-        let openSourcesModified = false
-
+        // 同步重排当前 owner 自己的 sources.json（如存在）
         if (storageFs.existsSync(metaPath)) {
             const sources = JSON.parse(storageFs.readFileSync(metaPath, 'utf-8'))
             const currentSourcesMap = new Map(sources.map((s: any) => [s.id, s]))
@@ -815,38 +802,10 @@ export async function handleReorder(req: IncomingMessage, res: ServerResponse) {
                 newSources.push(source)
             }
             storageFs.writeFileSync(metaPath, JSON.stringify(newSources, null, 2))
-        } else if (targetOwner !== 'open') {
-            // 用户没有私有源时，重排 open 的 sources.json
-            const openSourcesDir = getSourceDir('open')
-            const openMetaPath = path.join(openSourcesDir, 'sources.json')
-            const openOrderPath = path.join(openSourcesDir, 'order.json')
-            if (storageFs.existsSync(openMetaPath)) {
-                const sources = JSON.parse(storageFs.readFileSync(openMetaPath, 'utf-8'))
-                const currentSourcesMap = new Map(sources.map((s: any) => [s.id, s]))
-                const newSources: any[] = []
-
-                for (const id of sourceIds) {
-                    if (currentSourcesMap.has(id)) {
-                        newSources.push(currentSourcesMap.get(id))
-                        currentSourcesMap.delete(id)
-                    }
-                }
-                for (const [id, source] of currentSourcesMap) {
-                    newSources.push(source)
-                }
-                storageFs.writeFileSync(openMetaPath, JSON.stringify(newSources, null, 2))
-                // 同时把 order.json 写入 open 目录，供 loadSourcesFromDir 按序加载
-                storageFs.writeFileSync(openOrderPath, JSON.stringify(sourceIds, null, 2))
-                openSourcesModified = true
-            }
         }
 
-        // 重新加载 API，使新顺序立即生效于解析优先级
+        // 重新加载当前 owner 的 API，使私有源顺序立即生效于解析优先级
         await initUserApis(targetOwner)
-        // 若修改了 open 的源顺序，也必须重载 open，否则 loadedApis 里顺序不变
-        if (openSourcesModified) {
-            await initUserApis('open')
-        }
 
         res.writeHead(200, { 'Content-Type': 'application/json' })
         res.end(JSON.stringify({ success: true }))
@@ -864,14 +823,14 @@ export async function handleReorder(req: IncomingMessage, res: ServerResponse) {
  * @param res HTTP 响应，用于写入状态码、数据或媒体流。
  * @author yahyaoo
  */
-export async function handleDelete(req: IncomingMessage, res: ServerResponse) {
+export async function handleDelete(req: IncomingMessage, res: ServerResponse, authenticatedOwner?: string) {
     try {
         const body = await readBody(req)
         const { id, sourceId, username } = JSON.parse(body)
         const targetId = id || sourceId
 
         // 查找逻辑同 Toggle
-        let targetOwner = (username && username !== 'default') ? username : 'open'
+        let targetOwner = authenticatedOwner ?? ((username && username !== 'default') ? username : 'open')
 
         // 检查权限限制
         if (targetOwner === 'open') {
@@ -956,7 +915,7 @@ export async function handleDelete(req: IncomingMessage, res: ServerResponse) {
  * @param res HTTP 响应，用于写入状态码、数据或媒体流。
  * @author yahyaoo
  */
-export async function handleUpdatePlatforms(req: IncomingMessage, res: ServerResponse) {
+export async function handleUpdatePlatforms(req: IncomingMessage, res: ServerResponse, authenticatedOwner?: string) {
     try {
         const body = await readBody(req)
         const { id, sourceId, username, disabledSources } = JSON.parse(body)
@@ -966,7 +925,7 @@ export async function handleUpdatePlatforms(req: IncomingMessage, res: ServerRes
             throw new Error('缺少音源ID')
         }
 
-        let targetOwner = (username && username !== 'default') ? username : 'open'
+        let targetOwner = authenticatedOwner ?? ((username && username !== 'default') ? username : 'open')
 
         // 核心安全逻辑：如果是全局公开源且为 open 模式，需要验证管理员身份
         if (targetOwner === 'open') {

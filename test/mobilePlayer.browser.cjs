@@ -10,6 +10,14 @@ async (page) => {
         await route.fulfill({ json: { total: 40, maxPage: 2, comments: [{ userName: '隔离测试用户', text: `${body.type === 'hot' ? '最热' : '最新'}评论第 ${body.page} 页`, likedCount: 12 }] } });
     });
     const shot = name => page.screenshot({ path: `D:/opensource/fn-lxserver/output/playwright/${name}.png`, animations: 'disabled' });
+    const dragVolume = async (vertical, name) => {
+        await page.locator('#player-volume-btn').click();
+        const rect = await page.locator('#volume-container').boundingBox();
+        const point = pct => vertical ? [rect.x + rect.width / 2, rect.y + rect.height * (1 - pct)] : [rect.x + rect.width * pct, rect.y + rect.height / 2];
+        await page.mouse.move(...point(.2)); await page.mouse.down(); await page.mouse.move(...point(.8), { steps: 8 });
+        check(await page.evaluate(() => Math.abs(document.getElementById('audio-player').volume - .8) < .04), name);
+        await page.mouse.up(); await page.keyboard.press('Escape');
+    };
     try {
         await page.evaluate(() => { localStorage.setItem('lx_agreement_accepted', 'true'); localStorage.removeItem('lx_playback_state'); });
         await page.reload();
@@ -40,7 +48,7 @@ async (page) => {
         await page.waitForTimeout(650);
         check(await page.locator('#player-footer').isVisible(), '手机播放页显示完整播放器');
         check(!await page.locator('#lyrics-wrapper').isVisible(), '播放主页隐藏歌词内容');
-        check(await page.locator('#player-source').evaluate(n => n.previousElementSibling.id === 'player-title'), '原音源标签位于歌曲标题后');
+        check(await page.locator('#player-source').evaluate(n => n.previousElementSibling.id === 'player-album'), '原音源标签位于歌手专辑后');
         check(await page.locator('#player-source').evaluate(n => getComputedStyle(n.children[0]).color !== getComputedStyle(n.children[1]).color), '酷狗和 Hi-Res 保留原标签颜色');
         check(await page.locator('.player-detail-album').innerText() === ' - 人间雪', '第二行显示歌手与专辑');
         check(await page.locator('#view-player-detail .player-actions').evaluate(n => {
@@ -48,6 +56,22 @@ async (page) => {
             return buttons.length === 6 && buttons[0].id === 'player-like-btn' && buttons[1].id === 'player-mobile-lyrics' && buttons[2].getAttribute('onclick') === 'toggleQueueDrawer()' && buttons[3].id === 'btn-sound-effects' && buttons[4].getAttribute('onclick').includes('toggleCommentModal') && buttons[5].id === 'player-more-btn';
         }), '操作顺序为喜欢、歌词、列表、均衡器、评论、更多');
         check(await page.locator('#detail-cover').evaluate(n => Number(getComputedStyle(n.parentElement).opacity) < 1), '封面半透明展示背景特效');
+        check(!await page.locator('#player-detail-fullscreen').isVisible(), '手机隐藏右上角放大按钮');
+        check(await page.locator('#detail-visualizer').evaluate(n => Math.abs(n.getBoundingClientRect().bottom - document.getElementById('mobile-player-cover-container').getBoundingClientRect().bottom) < 1), '频谱底边与封面下沿对齐');
+        await page.evaluate(() => { playerBar.setLyrics([{ text: '同步歌词第一行' }, { text: '同步歌词第二行' }]); playerBar.updateLyrics(0); });
+        check(await page.locator('.player-detail-left > .player-bar-lyrics').isVisible(), '封面和标题之间显示同步歌词');
+        await page.evaluate(() => playerBar.updateLyrics(1));
+        check(await page.locator('#player-lyric-current').innerText() === '同步歌词第二行', '同步歌词随播放行变化滚动更新');
+        await dragVolume(true, '手机竖向音量可连续鼠标拖动');
+        await page.locator('#player-volume-btn').click();
+        const cdp = await page.context().newCDPSession(page);
+        const track = await page.locator('#volume-container').boundingBox();
+        const touch = pct => [{ x: track.x + track.width / 2, y: track.y + track.height * (1 - pct) }];
+        await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: touch(.15) });
+        await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: touch(.85) });
+        check(await page.evaluate(() => Math.abs(document.getElementById('audio-player').volume - .85) < .04), '手机原生触摸拖动持续调节音量');
+        await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }); await cdp.detach();
+        await page.keyboard.press('Escape');
         await page.evaluate(async () => {
             // 生成短 PCM 音频，真实驱动已有音频分析器与画布，无外部音源依赖。
             const rate = 16000, length = rate * 3, buffer = new ArrayBuffer(44 + length * 2), data = new DataView(buffer);
@@ -115,7 +139,14 @@ async (page) => {
         for (const width of [320, 375, 390, 767]) {
             await page.setViewportSize({ width, height: 844 });
             check(await page.locator('#view-player-detail').evaluate(n => n.scrollWidth <= n.clientWidth), `${width}px 播放页面无横向溢出`);
+            check(await page.locator('#player-detail-container').evaluate(n => n.scrollHeight <= n.clientHeight + 1 && getComputedStyle(n).scrollbarWidth === 'none'), `${width}px 竖屏内容完整且无滚动条`);
             check(await page.locator('#view-player-detail .player-actions').evaluate(n => [...n.querySelectorAll(':scope > button, :scope > div > button')].every(b => b.getBoundingClientRect().right <= innerWidth)), `${width}px 操作入口均在视口内`);
+        }
+        for (const height of [568, 667, 740]) {
+            await page.setViewportSize({ width: 320, height });
+            await page.waitForTimeout(600);
+            check(await page.locator('#player-detail-container').evaluate(n => n.scrollHeight <= n.clientHeight + 1), `320×${height} 矮屏竖屏控制区完整显示`);
+            check(await page.locator('#detail-visualizer').evaluate(n => Math.abs(n.getBoundingClientRect().bottom - document.getElementById('mobile-player-cover-container').getBoundingClientRect().bottom) < 1), `${height}px 高度下频谱跟随封面下沿`);
         }
         await page.setViewportSize({ width: 667, height: 390 });
         check(await page.locator('#player-detail-container').evaluate(n => n.scrollHeight > n.clientHeight), '横屏可滚动访问下方播放控制');
@@ -123,6 +154,9 @@ async (page) => {
         await page.locator('#lyrics-wrapper').waitFor({ state: 'visible' });
         check(await page.locator('#player-mobile-lyrics').isVisible() === false, '桌面隐藏手机歌词按钮');
         check(await page.locator('#lyrics-wrapper').isVisible(), '桌面仍并排展示歌词');
+        check(!await page.locator('#view-player-detail .player-bar-lyrics').isVisible(), '桌面左侧隐藏重复同步歌词，仅保留右侧歌词');
+        check(await page.locator('#player-detail-fullscreen').isVisible(), '桌面保留放大按钮');
+        await dragVolume(true, '桌面播放页竖向音量可连续拖动');
         check(await page.locator('#btn-sound-effects').evaluate(n => getComputedStyle(n).borderTopWidth === '0px' && !n.classList.contains('lx-el-button')), '桌面均衡器入口恢复无边框图标');
         await page.locator('#player-more-btn').click();
         check(await page.locator('#player-more-menu button').first().evaluate(n => getComputedStyle(n).borderTopWidth === '0px' && getComputedStyle(n).justifyContent === 'normal'), '桌面更多菜单恢复无边框左对齐');
@@ -132,7 +166,28 @@ async (page) => {
         check(await page.locator('#sound-effects-modal').isVisible() && !await page.locator('#player-feature-page').isVisible(), '桌面均衡器保留弹框展示');
         await page.evaluate(() => window.soundEffects.close()); await page.waitForTimeout(350);
         await page.evaluate(() => toggleLyrics()); await page.waitForTimeout(650);
-        check(await row.locator('button:visible').count() === 5, '桌面列表原五个操作恢复');
+        await dragVolume(false, '桌面底部横向音量可连续拖动');
+        check(await row.locator('.song-row-actions > button:visible').count() === 2, '桌面列表只显示喜欢和更多');
+        await page.setViewportSize({ width: 390, height: 844 });
+        await page.evaluate(() => MobileShell.open('mobile-library'));
+        check(await page.locator('#mobile-pages .favorite-sidebar-drag-handle:visible').count() === 0, '手机收藏和歌单隐藏拖拽图标');
+        check(await page.locator('#mobile-pages [aria-label="导出歌单到本地"]:visible').count() === 0, '手机收藏和歌单隐藏下载图标');
+        check(await page.evaluate(() => ['my-lists-container', 'playlist-lists-container'].every(id => Sortable.get(document.getElementById(id)).option('disabled'))), '手机收藏和歌单禁用拖拽排序');
+        await page.evaluate(() => {
+            if (document.getElementById('favorites-children').style.height === '0px') handleFavoritesClick();
+            if (document.getElementById('dislike-children').classList.contains('hidden')) handleDislikeFolderClick();
+        });
+        check(await page.evaluate(() => {
+            const favorite = document.querySelector('#my-lists-container .playlist-sidebar-item'), dislike = document.querySelector('#dislike-lists-container .playlist-sidebar-item');
+            const geometry = row => { const icon = row.querySelector('.sidebar-item-icon').getBoundingClientRect(), label = row.querySelector('.playlist-name-wrapper').getBoundingClientRect(); return [icon.width, icon.height, label.left - row.getBoundingClientRect().left]; };
+            return geometry(favorite).every((value, index) => Math.abs(value - geometry(dislike)[index]) < 1);
+        }), '不喜欢与收藏子项图标和文字对齐');
+        await shot('mobile-library-refined');
+        await page.evaluate(() => MobileShell.open('mobile-settings'));
+        check(await page.locator('#mobile-settings-groups').getByText('后台管理').count() === 0, '手机设置隐藏后台管理入口');
+        await shot('mobile-settings-refined');
+        await page.setViewportSize({ width: 1440, height: 900 });
+        check(await page.evaluate(() => ['my-lists-container', 'playlist-lists-container'].every(id => !Sortable.get(document.getElementById(id)).option('disabled'))), '切回桌面自动恢复收藏歌单排序');
         check(errors.length === 0, `无新增脚本异常：${errors.join('; ')}`);
         await page.unroute('**/api/music/comment');
         await page.evaluate(() => { URL.revokeObjectURL(window.__mobileTestAudio); delete window.__mobileTestAudio; localStorage.removeItem('lx_playback_state'); });

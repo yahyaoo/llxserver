@@ -1,0 +1,30 @@
+require('tsx/cjs');
+const {test,after}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),os=require('node:os');
+const root=fs.mkdtempSync(path.join(process.env.GUSH_SESSION_TMP||os.tmpdir(),'library-media-'));
+global.lx={dataPath:root,config:{users:[{name:'alice',enableCustomMusicDir:true,musicDirectoriesMigrated:true},{name:'bob',enableCustomMusicDir:true,musicDirectoriesMigrated:true}],'library.prefetch.maxCacheMB':1}};
+const directory=path.join(root,'music');fs.mkdirSync(directory);const file=path.join(directory,'song.mp3');fs.writeFileSync(file,'untouched audio');
+const filename='@1234567890abcdef/song.mp3',stat=fs.statSync(file),records=new Map([['alice',new Map([[filename,{id:'song',source:'custom',filename,size:stat.size,mtime:stat.mtimeMs}]])],['bob',new Map([[filename,{id:'song',source:'custom',filename,size:stat.size,mtime:stat.mtimeMs}]])]]);
+const customPath=require.resolve('../server/music/service/library/CustomMusicService.ts'),cachePath=require.resolve('../server/music/service/cache/FileCacheService.ts');
+let invalidations=0;
+require.cache[customPath]={id:customPath,filename:customPath,loaded:true,exports:{customIndexManager:{load:name=>records.get(name)},invalidateCustomCoverHints:()=>invalidations++}};
+require.cache[cachePath]={id:cachePath,filename:cachePath,loaded:true,exports:{getCoverCacheDir:name=>path.join(root,name,'cover'),getLyricFetcher:()=>{throw Error('unlinked local files must not fetch network lyrics')}}};
+const {repositories,closeStorage}=require('../server/application/persistence/storage.ts');
+for(const name of ['alice','bob'])repositories().admin.saveMusicDirectories(name,[{id:'1234567890abcdef',path:directory,scanMinutes:30}]);
+const {ensureCustomLyrics,readCachedCustomLyrics,getLyricVersion}=require('../server/music/service/library/CustomLyricCache.ts');
+const {pruneLibraryMedia}=require('../server/music/service/library/LibraryMediaQuota.ts');
+const {libraryStatePath}=require('../server/music/service/library/ScanStateStore.ts');
+const {buildLyrics}=require('../server/utils/lrcTool.ts');
+after(()=>{closeStorage(root);fs.rmSync(root,{recursive:true,force:true});});
+test('local lyric cache preserves all fields, shared request misses once, sidecar invalidates independently, scope/missing cache safe',async()=>{
+  const data={lyric:'[00:01.00]original',tlyric:'[00:01.00]translation',rlyric:'[00:01.00]romaji',klyric:'[00:01.00]<0,100>word'};
+  fs.writeFileSync(path.join(directory,'song.lrc'),buildLyrics(data));
+  const [first,shared]=await Promise.all([ensureCustomLyrics('alice',filename,{network:false}),ensureCustomLyrics('alice',filename,{network:false})]);assert.equal(first.version,shared.version);
+  for(const key of ['tlyric','rlyric','klyric'])assert.equal(first.lyrics[key],data[key]);assert.equal(first.lyrics.lrc,data.lyric);assert.ok(await readCachedCustomLyrics('alice',filename));assert.equal(await readCachedCustomLyrics('bob',filename),null);
+  records.get('alice').get(filename).lyricVersion='index-refresh';assert.equal(getLyricVersion('alice',filename),undefined);await readCachedCustomLyrics('alice',filename);assert.equal(getLyricVersion('alice',filename),first.version);
+  fs.writeFileSync(path.join(directory,'song.lrc'),'[00:01]changed lyric with longer content');const changed=await ensureCustomLyrics('alice',filename,{network:false});assert.notEqual(changed.version,first.version);assert.equal(changed.lyrics.lrc,'[00:01]changed lyric with longer content');
+  const media=path.join(path.dirname(libraryStatePath('alice','prefetch_state.json')),'media');for(const name of fs.readdirSync(media))fs.unlinkSync(path.join(media,name));assert.equal(await readCachedCustomLyrics('alice',filename),null);assert.equal(fs.readFileSync(file,'utf8'),'untouched audio');
+});
+test('media quota evicts only hashed cache assets, leaves audio and unknown files intact',async()=>{
+  const cover=path.join(root,'alice','cover');fs.mkdirSync(cover,{recursive:true});fs.writeFileSync(path.join(cover,'a'.repeat(32)+'.bin'),Buffer.alloc(2*1024*1024));fs.writeFileSync(path.join(cover,'keep.mp3'),'audio');fs.writeFileSync(path.join(cover,'unknown.bin'),'keep');
+  await pruneLibraryMedia('alice');assert.equal(fs.existsSync(path.join(cover,'a'.repeat(32)+'.bin')),false);assert.equal(fs.existsSync(path.join(cover,'keep.mp3')),true);assert.equal(fs.existsSync(path.join(cover,'unknown.bin')),true);assert.ok(invalidations);assert.equal(fs.existsSync(file),true);
+});

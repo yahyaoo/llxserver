@@ -58,6 +58,7 @@ test('数字与字符串榜单标识保持同一选中态，重复渲染不会�
 
 test('页面重复挂载保留现有 DOM，榜单选择沿用原业务入口', () => {
   const { context, host, calls } = fixture()
+  require('./helpers/loadingState.cjs')(context)
   context.window.LeaderboardManager = { selectBoard: (...args) => calls.push(args) }
   vm.runInContext(fs.readFileSync(path.join(__dirname, '../client/music/views/leaderboard/LeaderboardView.js'), 'utf8'), context)
   const view = context.window.LeaderboardView
@@ -69,4 +70,63 @@ test('页面重复挂载保留现有 DOM，榜单选择沿用原业务入口', (
   view.mount(host)
   assert.equal(host.innerHTML, '保留已加载内容')
   assert.equal(view.navigation, navigation)
+})
+
+test('排行榜搜索过滤后点击歌曲仍按原列表索引播放单曲', async () => {
+  const elements = new Map()
+  const getElement = id => {
+    if (!elements.has(id)) elements.set(id, {
+      innerHTML: '', innerText: '', disabled: false,
+      classList: { add() {}, remove() {}, toggle() {} },
+      scrollTo() {},
+    })
+    return elements.get(id)
+  }
+  const songs = Array.from({ length: 80 }, (_, index) => ({
+    id: `song-${index}`, songmid: `board-1_${index}`, name: `歌曲 ${index}`, source: 'wy',
+  }))
+  const played = []
+  const listSearch = {
+    state: { active: false, id: '', onlyShowMatches: false, matches: [] },
+    init(id) { this.state = { active: false, id, onlyShowMatches: false, matches: [] } },
+    resetState() {},
+    getDisplayList(list) {
+      return list.map((item, originalIndex) => ({ item, originalIndex }))
+        .filter(entry => !this.state.active || !this.state.onlyShowMatches || this.state.matches.includes(entry.originalIndex))
+    },
+    isMatched() { return false },
+    isCurrentMatch() { return false },
+  }
+  const window = {
+    ListSearch: listSearch,
+    LeaderboardView: { navigation: { setActive() {}, render() {} } },
+    LoadingState: { render() { return '' } },
+    SongFileStatus: { update() {} },
+    selectedItems: new Set(),
+    updatePlaylist: (...args) => played.push(args),
+    getImgUrl: () => '', getSourceTag: () => '', getQualityTags: () => '',
+    lazyLoadImages() {}, applyMarqueeChecks() {},
+  }
+  const context = vm.createContext({
+    window,
+    document: { getElementById: getElement },
+    settings: { itemsPerPage: 'all' },
+    localStorage: { getItem() { return null } },
+    fetch: async () => ({ json: async () => ({ list: songs, total: songs.length, limit: 100 }) }),
+    console,
+  })
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '../client/music/js/leaderboard_manager.js'), 'utf8'), context)
+  window.LeaderboardManager.selectBoard('board-1', '测试榜')
+  for (let i = 0; i < 10 && window.LeaderboardManager.getCurrentList().length === 0; i++) {
+    await new Promise(resolve => setImmediate(resolve))
+  }
+  listSearch.state = { active: true, id: 'leaderboard', onlyShowMatches: true, matches: [79] }
+
+  window.LeaderboardManager.handleRowClick(79)
+
+  assert.equal(played.length, 1)
+  assert.equal(played[0][0][0].songmid, 'board-1_79')
+  assert.equal(played[0][0].length, 1)
+  assert.equal(played[0][1], 0)
+  assert.equal(played[0][2], 'leaderboard')
 })

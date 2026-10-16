@@ -58,7 +58,9 @@ function environment() {
   const transport = add('transport', footer, 'player-transport');
   add('prev', transport, '', 'button'); add('btn-play', transport, '', 'button'); add('next', transport, '', 'button');
   const song = add('player-song-info', footer), copy = add('track-copy', song);
-  add('player-title', copy); add('player-artist', copy); add('player-source', copy);
+  const miniLyrics = add('mini-lyrics', song, 'player-bar-lyrics');
+  add('detail-visualizer', view);
+  add('player-title', copy); const metadata = add('metadata', copy, 'player-metadata-row'); add('player-artist', metadata); add('player-album', metadata); add('player-source', metadata);
   const progress = add('progress', song, 'player-progress');
   add('time-current', progress); add('progress-container', progress); add('time-total', progress);
   const actions = add('actions', footer, 'player-actions'), more = add('more-anchor', actions);
@@ -79,7 +81,7 @@ function environment() {
   const document = { body, documentElement: { requestFullscreen: async () => { document.fullscreenElement = document.documentElement; } },
     fullscreenElement: null, exitFullscreen: async () => { document.fullscreenElement = null; },
     getElementById: id => nodes.get(id), createElement: tag => new Node(tag), createComment: () => new Node('#comment'),
-    querySelector: () => comment, addEventListener: (key, handler) => { documentEvents[key] = handler; },
+    querySelector: selector => selector === '.player-bar-lyrics' ? miniLyrics : comment, addEventListener: (key, handler) => { documentEvents[key] = handler; },
   };
   const context = vm.createContext({ window, document, MutationObserver: Observer, console });
   vm.runInContext(read(pagePath + 'template.js'), context);
@@ -100,8 +102,8 @@ test('进入播放页复用唯一控件，按钮顺序正确，退出恢复原�
   assert.equal(nodes.get('player-bar-root').parent, page.left);
   assert.deepEqual(nodes.get('actions').children.filter(node => node.tagName !== '#comment').map(node => node.id), ['player-like-btn', 'player-mobile-lyrics', 'queue', 'btn-sound-effects', 'comment', 'more-anchor']);
   assert.deepEqual(nodes.get('transport').children.filter(node => node.tagName !== '#comment').map(node => node.id), ['mode-anchor', 'prev', 'btn-play', 'next', 'volume-anchor']);
-  assert.equal(nodes.get('player-source').parent, nodes.get('progress'));
-  assert.equal(page.album.textContent, ' · 测试专辑');
+  assert.equal(nodes.get('player-source').parent, nodes.get('metadata'));
+  assert.equal(page.album.textContent, ' - 测试专辑');
   env.close();
   for (const id of ['player-bar-root', 'play-mode-btn', 'btn-sound-effects', 'comment', 'player-source', 'player-like-btn', 'queue', 'volume-anchor']) {
     const { node, parent, index } = original.get(id);
@@ -125,14 +127,14 @@ test('背景模式保留旧值并支持页面与歌手模式；无效值安全�
   assert.equal(nodes.get('view-player-detail').getAttribute('data-player-background'), 'dark');
 });
 
-test('手机歌曲标签跟随标题，切换到桌面恢复进度区，关闭时还原节点', () => {
+test('歌曲标签始终位于歌手专辑后，切换尺寸和关闭时保持原节点', () => {
   const env = environment(); env.window.innerWidth = 390; env.open();
-  assert.equal(env.nodes.get('player-source').parent, env.nodes.get('player-title').parentElement);
+  assert.equal(env.nodes.get('player-source').parent, env.nodes.get('metadata'));
   assert.equal(env.page.album.textContent, ' - 测试专辑');
   env.window.innerWidth = 1440; env.page.updateResponsiveLayout();
-  assert.equal(env.nodes.get('player-source').parent, env.nodes.get('progress'));
+  assert.equal(env.nodes.get('player-source').parent, env.nodes.get('metadata'));
   env.close();
-  assert.equal(env.nodes.get('player-source').parent, env.nodes.get('track-copy'));
+  assert.equal(env.nodes.get('player-source').parent, env.nodes.get('metadata'));
 });
 
 test('退出歌手背景后，迟到的头像请求和旧图片回调不能重新显示背景', async () => {
@@ -146,15 +148,20 @@ test('退出歌手背景后，迟到的头像请求和旧图片回调不能重�
   assert.equal(image.onload, null); assert.equal(image.onerror, null);
 });
 
-test('竖向音量只换算坐标并调用原入口；退出后不拦截横向点击', () => {
-  const env = environment(); env.open();
-  const control = env.nodes.get('volume-container'), handler = control.events.click[0];
-  let stopped = 0;
-  for (const [y, x] of [[100, 44], [150, 32], [200, 20], [0, 44], [999, 20]]) {
-    handler({ currentTarget: control, clientY: y, stopImmediatePropagation: () => stopped++ });
-    assert.deepEqual(env.calls.at(-1), ['volume', x]);
-  }
-  env.close(); handler({}); assert.equal(stopped, 5);
+test('手机歌词位于封面和控制区之间，画布跟随封面，切回桌面和退出恢复节点', () => {
+  const env = environment(); env.window.innerWidth = 390;
+  const lyric = env.nodes.get('mini-lyrics'), canvas = env.nodes.get('detail-visualizer');
+  const lyricParent = lyric.parent, canvasParent = canvas.parent;
+  env.open();
+  assert.equal(canvas.parent, env.page.coverStage); assert.equal(lyric.parent, env.page.left);
+  assert.ok(env.page.left.children.indexOf(lyric) > env.page.left.children.indexOf(env.page.coverStage));
+  assert.ok(env.page.left.children.indexOf(lyric) < env.page.left.children.indexOf(env.nodes.get('player-bar-root')));
+  assert.equal(env.nodes.get('volume-container').attributes['aria-orientation'], 'vertical');
+  env.window.innerWidth = 1440; env.page.updateResponsiveLayout();
+  assert.equal(canvas.parent, canvasParent); assert.equal(lyric.parent, lyricParent);
+  env.window.innerWidth = 390; env.page.updateResponsiveLayout(); env.close();
+  assert.equal(canvas.parent, canvasParent); assert.equal(lyric.parent, lyricParent);
+  assert.equal(env.nodes.get('volume-container').attributes['aria-orientation'], 'horizontal');
 });
 
 test('频谱菜单调用原设置，显示开关与原快捷键修改保持一致', () => {
@@ -286,7 +293,7 @@ test('底部频谱遵循方块与连体设置，连体柱宽连续覆盖画布',
 
 test('详情频谱真实调度按选项使用不同绘制器，开关与透明度即时生效', () => {
   const env = environment(), animations = [];
-  const canvas = { style: {}, getBoundingClientRect: () => ({ width: 960, height: 120 }) };
+  const canvas = { style: {}, getContext: () => ({ clearRect() {} }), getBoundingClientRect: () => ({ width: 960, height: 120 }) };
   const view = { dataset: {} };
   class Turntable { constructor(options) { this.options = options; } }
   class Glob extends Turntable {} class Flower extends Turntable {}
@@ -299,7 +306,7 @@ test('详情频谱真实调度按选项使用不同绘制器，开关与透明�
   const document = { documentElement: {}, getElementById: id => ({ 'audio-player': audio, 'detail-visualizer': canvas, 'view-player-detail': view })[id] };
   const window = { Wave, AudioContext: class {}, soundEffects: { getAnalyser: () => ({}) }, devicePixelRatio: 1,
     PlayerDetailSpectrum: env.window.PlayerDetailSpectrum, settings: { showDetailVisualizer: true, visualizerOpacity: 0.4 }, addEventListener() {} };
-  const context = vm.createContext({ window, document, Wave, console: { log() {}, error() {} }, getComputedStyle: () => ({ getPropertyValue: () => '#ec4899' }) });
+  const context = vm.createContext({ window, document, Wave, requestAnimationFrame: () => 1, cancelAnimationFrame() {}, console: { log() {}, error(error) { throw error; } }, getComputedStyle: () => ({ getPropertyValue: () => '#ec4899' }) });
   vm.runInContext(read('client/music/js/visualizer.js'), context);
   window.musicVisualizer.init();
   for (const [style, Type] of [['spectrum', window.PlayerDetailSpectrum], ['pulse', Turntable], ['dots', Glob], ['flower', Flower]]) {

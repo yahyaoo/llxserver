@@ -1,6 +1,42 @@
 /** 下载浮层、权限与服务器原文件入口回归。 @author jingyh */
 const { test } = require('node:test'), assert = require('node:assert/strict')
 const fs = require('node:fs'), vm = require('node:vm')
+
+test('手机下载页为标题和批量操作预留独立行，不压缩标题列', () => {
+ const css = fs.readFileSync('client/music/views/downloads/downloads.css', 'utf8')
+ const mobile = css.match(/@media\s*\(max-width:\s*639px\)\s*\{([\s\S]*?)\n\}/)?.[1] || ''
+ assert.match(mobile, /\.downloads-heading\s*\{[^}]*display:\s*grid/)
+ assert.match(mobile, /\.downloads-title\s*\{[^}]*min-width:\s*0/)
+ assert.match(mobile, /\.downloads-heading\s+\.music-page-controls\s*\{[^}]*grid-column:\s*1\s*\/\s*-1/)
+})
+
+test('下载浮层保留点击坐标，菜单隐藏和歌词自动滚动不会关闭', async () => {
+ const events = {}, panels = [];
+ const select = () => ({ value: '', appendChild() {}, addEventListener() {}, focus(options) { this.focusOptions = options } });
+ const trigger = { tagName: 'BUTTON', setAttribute() {}, focus() {}, contains: target => target === trigger, getBoundingClientRect: () => ({ top: 0, bottom: 0, right: 0 }) };
+ const document = { activeElement: trigger, addEventListener: (name, fn) => { events[name] = fn }, body: { appendChild: panel => panels.push(panel) },
+   createElement: tag => {
+     if (tag === 'option') return {};
+     const nodes = new Map();
+     return { style: {}, offsetWidth: 320, offsetHeight: 280, elements: { target: select(), quality: select(), lyricMode: select() }, setAttribute() {}, addEventListener() {}, contains: target => target === nodes.get('select'), remove() { panels.splice(panels.indexOf(this), 1) }, querySelector(selector) { if (!nodes.has(selector)) nodes.set(selector, { addEventListener() {} }); return nodes.get(selector) } };
+   } };
+ document.removeEventListener = name => { delete events[name]; };
+ const window = { addEventListener() {}, removeEventListener() {} };
+ const frames = new Map(); let frameId = 0;
+ vm.runInNewContext(fs.readFileSync('client/music/views/downloads/DownloadOptions.js','utf8'), { window, document, URLSearchParams, requestAnimationFrame: fn => { frames.set(++frameId, fn); return frameId; }, cancelAnimationFrame: id => frames.delete(id), innerWidth: 1440, innerHeight: 900 });
+ // 使用同一个实际触发节点模拟更多菜单在点击后隐藏。
+ const clicked = { ...trigger, getBoundingClientRect: () => ({ top: 380, bottom: 420, right: 1040 }) };
+ document.activeElement = clicked;
+ events.pointerdown({ target: { closest: () => clicked }, clientX: 1000, clientY: 400 });
+ clicked.getBoundingClientRect = () => ({ top: 0, bottom: 0, right: 0 });
+ const pending = window.DownloadOptions.choose({ name:'歌曲', qualities:['128k'], labels:['标准'], trigger:clicked });
+ assert.equal(panels.length, 1); assert.equal(panels[0].style.left, '1000px'); assert.equal(panels[0].style.top, '408px');
+ assert.equal(panels[0].elements.quality.focusOptions.preventScroll, true);
+ events.scroll({ target: {} }); assert.equal(panels.length, 1);
+ assert.equal(frames.size, 1); events.scroll({ target: {} }); assert.equal(frames.size, 1);
+ events.keydown({ key:'Escape', preventDefault() {} }); assert.equal(await pending, null); assert.equal(panels.length, 0);
+ assert.equal(frames.size, 0); assert.equal(events.scroll, undefined);
+})
 function runtime(choice) {
  const tasks=[],downloads=[]
  const window={DownloadOptions:{anchor:()=>null,choose:async()=>choice},SystemDownloadManager:{addTasks:async items=>tasks.push(...items)},downloadLibraryFile:item=>{downloads.push(item);return true}}

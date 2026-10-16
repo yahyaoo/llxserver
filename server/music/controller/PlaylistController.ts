@@ -111,6 +111,9 @@ export const postUserList = (context: RequestContext, runtime: PlaylistServiceRu
  */
 export const getMusicCacheList = (context: RequestContext, runtime: PlaylistServiceRuntime) => service.getMusicCacheList(context, runtime)
 
+/** 查询缓存库分页只读视图。 */
+export const getMusicCachePage = (context: RequestContext, runtime: PlaylistServiceRuntime) => service.getMusicCachePage(context, runtime)
+
 /**
  * 查询用户自定义音乐目录歌曲列表；委托业务服务执行。
  * @param context /api/music/custom/list 请求上下文，包括请求头、查询参数和 HTTP 响应对象。
@@ -119,6 +122,15 @@ export const getMusicCacheList = (context: RequestContext, runtime: PlaylistServ
  * @author yahyaoo
  */
 export const getMusicCustomList = (context: RequestContext, runtime: PlaylistServiceRuntime) => service.getMusicCustomList(context, runtime)
+
+/** 查询自定义音乐目录分页只读视图。 */
+export const getMusicCustomPage = (context: RequestContext, runtime: PlaylistServiceRuntime) => service.getMusicCustomPage(context, runtime)
+
+/** 查询歌单元信息。 */
+export const getUserListMeta = (context: RequestContext, runtime: PlaylistServiceRuntime) => service.getUserListMeta(context, runtime)
+
+/** 查询歌单分页歌曲。 */
+export const getUserListSongs = (context: RequestContext, runtime: PlaylistServiceRuntime) => service.getUserListSongs(context, runtime)
 
 /**
  * 删除指定歌单并更新用户数据；委托业务服务执行。

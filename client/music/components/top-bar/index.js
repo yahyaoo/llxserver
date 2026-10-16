@@ -16,4 +16,11 @@
     container.innerHTML = '<div class="top-search-host"></div><div class="top-actions-host"></div>';
     window.LibrarySearchBox.mount(container.firstElementChild);
     window.TopAccountActions.mount(container.lastElementChild);
+    const searchView = document.getElementById('view-search');
+    if (searchView) {
+        /** 在线搜索页自带搜索框；用 body 类取代 body:has()，避免任意类名变化触发整页样式重算。 */
+        const syncOnlineSearch = () => document.body.classList.toggle('online-search-visible', searchView.dataset.onlineSearch === 'true' && !searchView.classList.contains('hidden'));
+        new MutationObserver(syncOnlineSearch).observe(searchView, { attributes: true, attributeFilter: ['class', 'data-online-search'] });
+        syncOnlineSearch();
+    }
 })();

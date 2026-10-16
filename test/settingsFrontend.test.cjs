@@ -9,31 +9,38 @@ test('切换用户保留各自目录草稿，恢复原值后移除草稿', () =>
   const source = fs.readFileSync(path.join(__dirname, '../client/app.js'), 'utf8')
   const methods = source.slice(source.indexOf('    renderCustomDirectoryFields() {'), source.indexOf('    /** 预览文件名模板'))
   const fields = {
-    'config-custom-dir-user': { value: 'admin' }, 'config-custom-dir-path': {},
+    'config-custom-dir-user': { value: 'admin' }, 'config-music-directories': { rows: [], replaceChildren() { this.rows=[] } },
     'config-custom-dir-enabled': {}, 'config-custom-dir-status': {},
   }
-  const context = vm.createContext({ document: { getElementById: id => fields[id] } })
+  const context = vm.createContext({ document: { getElementById: id => fields[id], querySelectorAll: () => fields['config-music-directories'].rows } })
   vm.runInContext('class TestSettings {' + methods + '} globalThis.TestSettings = TestSettings', context)
   const app = new context.TestSettings()
+  app.appendMusicDirectory = directory => { const input={value:directory.path}, frequency={value:directory.scanMinutes}, watch={value:directory.watch==null?'':String(directory.watch)}; fields['config-music-directories'].rows.push({input,watch,querySelector:selector=>selector==='[data-music-path]'?input:selector==='[data-music-watch]'?watch:frequency}) }
   app.users = [{ name: 'admin', customMusicDir: '/original', enableCustomMusicDir: false }, { name: 'alice', customMusicDir: '/alice', enableCustomMusicDir: false }]
   app.customDirectoryDrafts = new Map()
   app.renderCustomDirectoryFields()
-  fields['config-custom-dir-path'].value = '/changed-admin'
+  fields['config-music-directories'].rows[0].input.value = '/changed-admin'
   fields['config-custom-dir-enabled'].checked = true
   app.updateCustomDirectoryDraft()
   fields['config-custom-dir-user'].value = 'alice'
   app.renderCustomDirectoryFields()
-  fields['config-custom-dir-path'].value = '/changed-alice'
+  fields['config-music-directories'].rows[0].input.value = '/changed-alice'
   app.updateCustomDirectoryDraft()
   fields['config-custom-dir-user'].value = 'admin'
   app.renderCustomDirectoryFields()
-  assert.equal(fields['config-custom-dir-path'].value, '/changed-admin')
+  assert.equal(fields['config-music-directories'].rows[0].input.value, '/changed-admin')
   assert.equal(fields['config-custom-dir-enabled'].checked, true)
   assert.equal(app.customDirectoryDrafts.size, 2)
-  fields['config-custom-dir-path'].value = '/original'
+  fields['config-music-directories'].rows[0].input.value = '/original'
   fields['config-custom-dir-enabled'].checked = false
   app.updateCustomDirectoryDraft()
   assert.equal(app.customDirectoryDrafts.size, 1)
+  fields['config-music-directories'].rows[0].watch.value = 'false'
+  app.updateCustomDirectoryDraft()
+  assert.equal(app.customDirectoryDrafts.get('admin').directories[0].watch, false)
+  fields['config-music-directories'].rows[0].watch.value = ''
+  app.updateCustomDirectoryDraft()
+  assert.equal(app.customDirectoryDrafts.has('admin'), false, '跟随全局和旧目录未设置监听等价')
   assert.equal(app.users[0].customMusicDir, '/original', '编辑草稿不提前改写已保存配置')
 })
 
@@ -174,7 +181,8 @@ test('设置树完整分组，切换仅改变可见性并保留控件状态；�
   assert.deepEqual(groups.map(group => group.children[0].textContent), ['账号设置', '显示', '逻辑', '系统', '应用'])
   assert.deepEqual(groups.at(-1).children.slice(1).map(button => button.dataset.settingsTarget), ['admin', 'logs', 'about'])
   assert.equal(groups.at(-1).children[2].getAttribute('aria-controls'), 'settings-section-logs')
-  assert.equal(get('settings-navigation').children.flatMap(group => group.children.slice(1)).length, 18)
+  assert.equal(get('settings-navigation').children.flatMap(group => group.children.slice(1)).length, 19)
+  assert.ok(groups[3].children.some(button => button.dataset.settingsTarget === 'advanced'))
   const control = { value: '未保存的输入' }
   get('settings-section-account').appendChild(control)
   context.selectSettingsSection('account')
@@ -290,6 +298,7 @@ test('设置页铺满高度，补偿加在滚动区域末尾，不再扣减页�
 
 test('独立设置页面组件同步挂载，重复挂载保留控件草稿；模板和资源入口完整', () => {
   const { context } = createMusicSettingsContext()
+  require('./helpers/loadingState.cjs')(context)
   context.document.getElementById = () => null
   vm.runInContext(fs.readFileSync(path.join(__dirname, '../client/music/views/settings/SettingsView.js'), 'utf8'), context)
   const container = { dataset: {}, innerHTML: '' }
@@ -299,7 +308,8 @@ test('独立设置页面组件同步挂载，重复挂载保留控件草稿；�
   assert.ok(container.innerHTML.includes('id="account-username"'))
   assert.ok(!container.innerHTML.includes('id="sync-local-pass"'))
   assert.ok(container.innerHTML.includes('id="account-password-section"'))
-  assert.equal([...container.innerHTML.matchAll(/data-settings-section=/g)].length, 18)
+  assert.equal([...container.innerHTML.matchAll(/data-settings-section=/g)].length, 19)
+  assert.ok(container.innerHTML.includes('id="setting-client-sync-transport"'))
   assert.ok(container.innerHTML.includes('data-theme-controls'))
   assert.ok(container.innerHTML.includes('data-experience-control="color"'))
   assert.ok(container.innerHTML.includes('id="nav-admin-link"'))
@@ -349,6 +359,7 @@ test('应用分组切换后台和关于；移除左侧设置入口后旧关于�
 
 test('主导航独立组件同步挂载，重复挂载保留收藏树；管理和关于只在设置中提供', () => {
   const { context } = createMusicSettingsContext()
+  require('./helpers/loadingState.cjs')(context)
   context.document.getElementById = () => null
   vm.runInContext(fs.readFileSync(path.join(__dirname, '../client/music/views/main-navigation/MainNavigation.js'), 'utf8'), context)
   const container = { dataset: {}, innerHTML: '' }

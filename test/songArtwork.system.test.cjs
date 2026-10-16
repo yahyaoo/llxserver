@@ -21,5 +21,14 @@ test('真实接口缓存图片、回写歌曲状态、无源命中缓存与认�
     assert.equal((await fetch(runtime.origin + saved.artworkUrl + '&user=test&token=bad')).status, 401)
     const invalid = '/api/music/artwork?' + new URLSearchParams({ source: 'kg', id: 'invalid', url: 'data:image/png;base64,aGVsbG8=' })
     assert.equal((await fetch(runtime.origin + invalid, { headers: runtime.headers })).status, 404)
+    for (const source of ['custom', 'local']) {
+      const query = new URLSearchParams({ source, id: 'local-cover', url: image })
+      const first = await fetch(runtime.origin + '/api/music/artwork?' + query, { headers: runtime.headers })
+      assert.equal(first.status, 200)
+      query.delete('url')
+      const cached = await fetch(runtime.origin + '/api/music/artwork?' + query, { headers: runtime.headers })
+      assert.equal(cached.status, 200)
+      assert.deepEqual(Buffer.from(await cached.arrayBuffer()), Buffer.from(image.split(',')[1], 'base64'))
+    }
   } finally { await runtime.stop() }
 })

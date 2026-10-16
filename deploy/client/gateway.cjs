@@ -7,6 +7,8 @@ const http = require('node:http');
 const https = require('node:https');
 const fs = require('node:fs');
 const path = require('node:path');
+const deliveryPath = path.resolve(__dirname, '../../dist/server/application/http/StaticDelivery.js');
+const { deliverStatic } = require(fs.existsSync(deliveryPath) ? deliveryPath : '../../server/application/http/StaticDelivery.js');
 
 /**
  * 创建客户端 HTTP 服务；调用方负责 listen 和 close。
@@ -27,18 +29,7 @@ function createGateway({ upstream, root }) {
         try {
           const filename = fs.realpathSync(path.resolve(root, decodeURIComponent(asset)));
           if (!filename.startsWith(root + path.sep)) throw new Error('资源路径超出客户端目录');
-          const stat = fs.statSync(filename);
-          if (!stat.isFile()) throw new Error('资源不是文件');
-          const etag = `W/"${stat.size}-${stat.mtimeMs}"`;
-          if (req.headers['if-none-match'] === etag || req.headers['if-modified-since'] === stat.mtime.toUTCString()) { res.writeHead(304); res.end(); return; }
-          const headers = { ...response.headers, 'content-length': stat.size, etag, 'last-modified': stat.mtime.toUTCString(), 'cache-control': 'no-cache, must-revalidate' };
-          delete headers['x-llx-client-asset']; delete headers['transfer-encoding'];
-          res.writeHead(200, headers);
-          if (req.method === 'HEAD') { res.end(); return; }
-          const stream = fs.createReadStream(filename);
-          stream.on('error', () => res.destroy());
-          res.on('close', () => stream.destroy());
-          stream.pipe(res);
+          void deliverStatic(req, res, filename, response.headers['content-type'] || 'application/octet-stream', response.headers);
         } catch { res.writeHead(404); res.end('Not Found'); }
       } else {
         const headers = { ...response.headers }; delete headers['x-llx-client-asset'];

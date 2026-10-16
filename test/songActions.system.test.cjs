@@ -51,3 +51,42 @@ test('真实接口：歌手统计、解除全部命中规则、重复切换、�
     assert.equal((await request('/api/user/list')).loveList.some(item => item.id === song.id), false)
   } finally { await runtime.stop() }
 })
+
+test('真实歌单接口：点击歌单立即关闭，歌曲保存后显示成功', { timeout: 30000 }, async () => {
+  const runtime = await require('./helpers/accountRuntime.cjs').startAccountRuntime()
+  try {
+    const login = await fetch(runtime.origin + '/api/user/login', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: 'alice', password: 'alice123' }) })
+    assert.equal(login.status, 200)
+    const token = (await login.json()).token
+    const headers = { 'Content-Type': 'application/json', 'x-user-token': token }
+    const initial = await fetch(runtime.origin + '/api/user/list', { headers })
+    assert.equal(initial.status, 200)
+    const personal = await initial.json()
+    const targetList = personal.userList[0]
+    assert.ok(targetList, '测试账号应有可选歌单')
+    const song = { id: 'wy_add_modal_test', name: '弹框交互测试歌曲', singer: '测试歌手', source: 'wy', meta: { songId: 'add_modal_test' } }
+    let modalClosed = false
+    const successes = [], errors = []
+    const window = { myPersonalListData: personal, playlistAddTargetSong: song, batchCollectSongs: null }
+    const context = vm.createContext({ window, currentListData: personal, currentPlayingSong: song, isUserLoggedIn: () => true,
+      cleanSongData: value => ({ ...value }), addMusicByConfiguredLocation: (list, value) => list.push(value),
+      updateGridItemVisuals() {}, closePlaylistAddModal() { modalClosed = true }, renderMyLists() {}, showSuccess: value => successes.push(value),
+      showError: value => errors.push(value), showInfo() {}, pushDataChange: async list => {
+        const response = await fetch(runtime.origin + '/api/user/list', { method: 'POST', headers, body: JSON.stringify(list) })
+        assert.equal(response.status, 200, await response.clone().text())
+      } })
+    const app = fs.readFileSync(path.join(__dirname, '../client/music/app.js'), 'utf8')
+    const handler = app.match(/async function handleTogglePlaylist\(listId, btnElement\) \{[\s\S]*?\n\}/)
+    assert.ok(handler, '系统测试应执行页面实际使用的歌单点击处理函数')
+    vm.runInContext(handler[0], context)
+    await context.handleTogglePlaylist(targetList.id, {})
+
+    assert.equal(modalClosed, true)
+    assert.deepEqual(successes, ['已加入歌单'])
+    assert.deepEqual(errors, [])
+    const saved = await fetch(runtime.origin + '/api/user/list', { headers })
+    assert.equal(saved.status, 200)
+    assert.ok((await saved.json()).userList.find(list => list.id === targetList.id).list.some(item => item.id === song.id))
+  } finally { await runtime.stop() }
+})

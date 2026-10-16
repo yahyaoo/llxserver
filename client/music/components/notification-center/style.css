@@ -1,0 +1,59 @@
+/* macOS 风格通知横幅与消息中心。 @author jingyh */
+#toast-stack { position:fixed; top:88px; right:20px; z-index:1000; display:flex; flex-direction:column; gap:10px; width:min(360px, calc(100vw - 24px)); pointer-events:none; }
+.mac-toast {
+    --toast-tone:#0a84ff; pointer-events:auto; cursor:pointer; display:flex; align-items:center; gap:12px; padding:12px 14px; border-radius:18px;
+    color:var(--text-main); background:color-mix(in srgb, var(--bg-panel) 78%, transparent);
+    -webkit-backdrop-filter:blur(28px) saturate(180%); backdrop-filter:blur(28px) saturate(180%);
+    border:1px solid color-mix(in srgb, var(--border-dim) 55%, transparent);
+    box-shadow:0 12px 36px rgb(0 0 0 / 16%), 0 1px 0 rgb(255 255 255 / 35%) inset;
+    animation:mac-toast-in .42s cubic-bezier(.2,.9,.3,1.15) both; transition:opacity .26s ease, transform .26s ease;
+}
+.mac-toast.is-success { --toast-tone:#30d158; }
+.mac-toast.is-error { --toast-tone:#ff453a; }
+.mac-toast.is-leaving { opacity:0; transform:translateX(24px) scale(.96); }
+.mac-toast.is-pulse { animation:mac-toast-pulse .3s ease; }
+.mac-toast-icon { flex:none; display:grid; place-items:center; width:34px; height:34px; border-radius:10px; color:#fff; font-size:15px; background:linear-gradient(160deg, color-mix(in srgb, var(--toast-tone) 78%, #fff), var(--toast-tone)); box-shadow:0 4px 10px -4px var(--toast-tone); }
+.mac-toast-body { min-width:0; display:flex; flex-direction:column; gap:1px; }
+.mac-toast-body strong { font-size:13px; font-weight:600; letter-spacing:.2px; }
+.mac-toast-text { font-size:12.5px; line-height:1.4; color:var(--text-muted); display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; word-break:break-word; }
+@keyframes mac-toast-in { from { opacity:0; transform:translateX(36px) scale(.92); } }
+@keyframes mac-toast-pulse { 50% { transform:scale(1.03); } }
+@media (max-width:959px) { #toast-stack { top:68px; right:12px; } }
+@media (prefers-reduced-motion:reduce) { .mac-toast { animation:none; transition:none; } }
+
+#header-notice-trigger { position:relative; }
+#header-notice-trigger.has-unread::after {
+    content:''; position:absolute; top:6px; right:7px; width:9px; height:9px; border-radius:50%; background:#ff3b30;
+    box-shadow:0 0 0 2px var(--bg-panel), 0 0 8px rgb(255 59 48 / 55%); animation:notice-dot-pop .35s cubic-bezier(.2,.9,.3,1.4);
+}
+#header-notice-trigger.has-unread > i { animation:notice-bell-ring 1.2s ease 1; transform-origin:50% 0; }
+@keyframes notice-dot-pop { from { transform:scale(0); } }
+@keyframes notice-bell-ring { 0%, 100% { transform:rotate(0); } 15% { transform:rotate(14deg); } 30% { transform:rotate(-12deg); } 45% { transform:rotate(8deg); } 60% { transform:rotate(-5deg); } }
+#header-notice-menu.notice-panel { width:min(380px, calc(100vw - 24px)); padding:0; border-radius:20px; overflow:hidden; display:flex; flex-direction:column; background:color-mix(in srgb, var(--bg-panel) 86%, transparent); -webkit-backdrop-filter:blur(32px) saturate(180%); backdrop-filter:blur(32px) saturate(180%); }
+#header-notice-menu.hidden { display:none; }
+.notice-header { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:16px 18px 12px; border-bottom:1px solid color-mix(in srgb, var(--border-dim) 60%, transparent); }
+.notice-header h3 { font-size:15px; font-weight:700; }
+.notice-subtitle { margin-top:2px; font-size:12px; color:var(--text-muted); }
+.notice-read-all { display:inline-flex; align-items:center; gap:6px; padding:6px 12px; border-radius:999px; font-size:12px; font-weight:600; color:var(--theme-readable-accent, var(--c-500)); background:color-mix(in srgb, var(--c-500) 12%, transparent); transition:background .18s, transform .18s, opacity .18s; }
+.notice-read-all:not(:disabled):hover { background:color-mix(in srgb, var(--c-500) 22%, transparent); transform:translateY(-1px); }
+.notice-read-all:disabled { opacity:.4; cursor:default; }
+.notice-list { max-height:min(460px, calc(100dvh - 260px)); overflow-y:auto; overscroll-behavior:contain; padding:8px; }
+.notice-item { position:relative; display:flex; align-items:flex-start; gap:12px; padding:11px 10px; border-radius:14px; cursor:pointer; transition:background .18s; animation:notice-item-in .25s ease both; }
+.notice-item:hover, .notice-item:focus-visible { background:var(--bg-item-hover); outline:none; }
+.notice-item::before { content:''; position:absolute; left:2px; top:50%; width:6px; height:6px; margin-top:-3px; border-radius:50%; background:#0a84ff; }
+.notice-icon { flex:none; display:grid; place-items:center; width:32px; height:32px; border-radius:10px; color:#fff; font-size:13px; margin-left:6px; background:#0a84ff; }
+.notice-icon.is-success { background:#30d158; } .notice-icon.is-error { background:#ff453a; } .notice-icon.is-warn { background:#ff9f0a; }
+.notice-content { min-width:0; flex:1; display:flex; flex-direction:column; gap:2px; }
+.notice-content strong { font-size:13px; font-weight:600; }
+.notice-message { font-size:12.5px; line-height:1.45; color:var(--text-muted); word-break:break-word; }
+.notice-content time { font-size:11px; color:var(--text-muted); opacity:.75; }
+.notice-read { flex:none; display:grid; place-items:center; width:26px; height:26px; border-radius:50%; font-size:11px; color:var(--text-muted); opacity:0; transform:scale(.8); transition:opacity .18s, transform .18s, background .18s, color .18s; }
+.notice-item:hover .notice-read, .notice-item:focus-within .notice-read { opacity:1; transform:none; }
+.notice-read:hover { background:#30d158; color:#fff; }
+@media (hover:none) { .notice-read { opacity:1; transform:none; } }
+.notice-empty { display:flex; flex-direction:column; align-items:center; gap:10px; padding:44px 0 38px; color:var(--text-muted); }
+.notice-empty i { font-size:30px; opacity:.4; }
+.notice-empty p { font-size:13px; }
+@keyframes notice-item-in { from { opacity:0; transform:translateY(-4px); } }
+@media (max-width:959px) { #header-notice-menu.notice-panel { position:fixed; top:64px; right:12px; left:12px; width:auto; } }
+@media (prefers-reduced-motion:reduce) { #header-notice-trigger.has-unread > i, .notice-item, #header-notice-trigger.has-unread::after { animation:none; } }

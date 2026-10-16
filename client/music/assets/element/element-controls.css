@@ -1,6 +1,7 @@
 /* 全系统 Element Plus 主题与原生节点适配。 @author jingyh @date 2026-10-11 */
 :root.lx-element-ui {
     --el-color-primary: var(--c-500, var(--accent-primary, #ec4899));
+    --el-color-danger: #b91c1c;
     --el-color-primary-light-3: color-mix(in srgb, var(--el-color-primary) 70%, white);
     --el-color-primary-light-5: color-mix(in srgb, var(--el-color-primary) 50%, white);
     --el-color-primary-light-7: color-mix(in srgb, var(--el-color-primary) 30%, white);
@@ -19,8 +20,8 @@
     --el-fill-color-darker: color-mix(in srgb, var(--el-text-color-primary) 22%, var(--el-bg-color));
     --el-text-color-primary: var(--text-main, var(--text-primary, #303133));
     --el-text-color-regular: var(--text-muted, var(--text-secondary, #606266));
-    --el-text-color-secondary: var(--text-dim, #909399);
-    --el-text-color-placeholder: var(--text-dim, #a8abb2);
+    --el-text-color-secondary: var(--text-muted, #606266);
+    --el-text-color-placeholder: var(--text-muted, #606266);
     --el-border-color: var(--border-main, var(--glass-border, #dcdfe6));
     --el-border-color-light: var(--el-border-color);
     --el-border-color-lighter: color-mix(in srgb, var(--el-border-color) 70%, transparent);
@@ -31,6 +32,7 @@
     --el-disabled-text-color: var(--el-text-color-secondary);
     --el-disabled-border-color: var(--el-border-color-light);
 }
+:root.dark.lx-element-ui { --el-color-danger: #fca5a5; }
 .lx-element-ui .lx-element-source { position: absolute !important; width: 1px !important; height: 1px !important; margin: -1px !important; padding: 0 !important; overflow: hidden !important; clip-path: inset(50%) !important; white-space: nowrap !important; border: 0 !important; opacity: 0 !important; pointer-events: none !important; }
 .lx-element-ui .lx-element-legacy-track { display: none !important; }
 .lx-element-ui .lx-el-button {
@@ -44,6 +46,9 @@
     box-shadow: none !important; transform: none !important; cursor: pointer;
 }
 .lx-element-ui :is(.lx-el-button,.lx-el-input)[hidden], .lx-element-ui .lx-el-button.hidden { display: none !important; }
+/* Element 为按钮内 span 设置 flex，隐藏标记必须保留原页面语义。 */
+.lx-element-ui .lx-el-button [hidden],
+.lx-element-ui .lx-el-button > span[id^="lm-filter-active-dot"].hidden { display: none !important; }
 .lx-element-ui .lx-element-checkbox .el-checkbox__label, .lx-element-ui .lx-element-radio .el-radio__label { display: none; }
 @media (min-width: 640px) { .lx-element-ui .lx-el-button.sm\:hidden { display: none !important; } }
 @media (min-width: 768px) { .lx-element-ui .lx-el-button.md\:hidden { display: none !important; } }
@@ -54,12 +59,27 @@
 @media (min-width: 1024px) { .lx-element-ui .lx-el-button.hidden.lg\:flex { display: flex !important; } }
 .lx-element-ui .lx-el-button.el-button--primary { --el-button-bg-color: var(--el-color-primary); --el-button-border-color: var(--el-color-primary); --el-button-text-color: var(--theme-on-accent, #fff); --el-button-hover-bg-color: var(--el-color-primary); --el-button-hover-border-color: var(--el-color-primary); --el-button-hover-text-color: var(--theme-on-accent, #fff); }
 .lx-element-ui .lx-el-button.el-button--danger { --el-button-bg-color: var(--el-color-danger-light-9); --el-button-border-color: var(--el-color-danger-light-7); --el-button-text-color: var(--el-color-danger); --el-button-hover-bg-color: var(--el-color-danger); --el-button-hover-border-color: var(--el-color-danger); --el-button-hover-text-color: #fff; }
+:root.dark.lx-element-ui .lx-el-button.el-button--danger { --el-button-hover-text-color: #171717; }
 .lx-element-ui .lx-el-button:hover { background: var(--el-button-hover-bg-color) !important; color: var(--el-button-hover-text-color) !important; border-color: var(--el-button-hover-border-color) !important; }
 .lx-element-ui .lx-el-button:disabled { opacity: .5; cursor: not-allowed !important; }
 .lx-element-ui .lx-el-button.is-circle { width: 36px; height: 36px; padding: 8px; border-radius: 50% !important; }
-.lx-element-ui .lx-el-button.is-text { --el-button-bg-color: transparent; --el-button-border-color: transparent; }
+.lx-element-ui .lx-el-button.is-text { --el-button-bg-color: transparent; --el-button-border-color: transparent; --el-button-text-color: var(--el-text-color-regular); }
+/* 浅色强调色用于背景，文字和图标混入主文字色以保证明暗模式下的对比。 */
+.lx-element-ui .lx-el-button { --el-button-hover-text-color: var(--theme-readable-accent, var(--el-text-color-primary)); }
+.lx-element-ui .lx-el-button.el-button--primary:not(.is-text) { --el-button-text-color: var(--theme-on-accent, #fff); --el-button-hover-text-color: var(--theme-on-accent, #fff); }
+.lx-element-ui .lx-el-button.is-text.el-button--danger { --el-button-text-color: var(--el-color-danger); }
+.lx-element-ui .lx-el-button.is-text > :is(i,svg) { color: inherit; }
+/* 消息类型用图标区分，正文与关闭按钮使用界面实色，避免固定浅色造成低对比。 */
+.lx-element-ui .el-message { --el-message-text-color: var(--text-main, #303133); background: var(--bg-panel, #fff); }
+.lx-element-ui .el-message :is(.el-message__content,.el-message__icon,.el-message__closeBtn) { color: var(--text-main, #303133); }
+.lx-element-ui .el-button--primary.is-plain { --el-button-text-color: var(--theme-readable-accent, var(--el-text-color-primary)); --el-button-bg-color: var(--el-bg-color); }
+.lx-element-ui .el-button--primary.is-plain:hover { --el-button-hover-text-color: var(--theme-on-accent, #fff); }
+.lx-element-ui .el-message-box .el-button--primary { --el-button-text-color: var(--theme-on-accent, #fff); --el-button-hover-text-color: var(--theme-on-accent, #fff); --el-button-active-text-color: var(--theme-on-accent, #fff); }
+.lx-element-ui .el-button:not(.el-button--primary):not(.el-button--danger) { --el-button-hover-text-color: var(--theme-readable-accent, var(--el-text-color-primary)); }
+.lx-element-ui .lx-el-button.active-option { background: var(--el-color-primary-light-9) !important; color: var(--theme-readable-accent, var(--el-text-color-primary)) !important; }
+.lx-element-ui .lx-el-button.active-option :is(i,span) { color: inherit !important; }
 .lx-element-ui .lx-el-button.lx-el-navigation { justify-content: flex-start; }
-.lx-element-ui .lx-el-button:is(.is-active,.active-tab,[aria-current="page"],[aria-pressed="true"],[data-active="true"]) { background: var(--el-color-primary-light-9) !important; color: var(--el-color-primary) !important; }
+.lx-element-ui .lx-el-button:is(.is-active,.active-tab,[aria-current="page"],[aria-pressed="true"],[data-active="true"]) { background: var(--el-color-primary-light-9) !important; color: var(--theme-readable-accent, var(--el-text-color-primary)) !important; }
 .lx-element-ui .lx-el-button:focus-visible { outline: 2px solid var(--el-color-primary); outline-offset: 2px; }
 .lx-element-ui .lx-el-button .settings-field-caption, .lx-element-ui .lx-el-button .settings-field-caption > i { color: inherit; }
 .lx-element-ui .lx-el-input { display: inline-flex; flex: 0 1 auto; width: 100%; max-width: 100%; min-width: 0; vertical-align: middle; }

@@ -18,6 +18,7 @@ const SETTINGS_NAVIGATION = [
         { id: 'devices', label: '系统交互与外设', icon: 'fa-keyboard' },
     ] },
     { id: 'system', label: '系统', icon: 'fa-sliders-h', items: [
+        { id: 'advanced', label: '高级', icon: 'fa-cogs' },
         { id: 'sources', label: '源与基础设置', icon: 'fa-server' },
         { id: 'network', label: '网络设置', icon: 'fa-globe' },
         { id: 'updates', label: '版本更新', icon: 'fa-arrow-circle-up' },

@@ -8,6 +8,41 @@ import type { LoginSessionDto } from '../model/dto/LoginSessionDto'
 export type LoginSessionRecord = LoginSessionEntity
 /** 管理域登录会话仓储，随数据库迁移交换连接。 */
 export class AdminRepository extends SqliteDocumentRepository {
+  constructor(...args: ConstructorParameters<typeof SqliteDocumentRepository>) {
+    super(...args)
+    // Idempotent upgrade for databases created before directory watch preferences existed.
+    if (!this.database.prepare('PRAGMA table_info(server_user_music_directory)').all().some((column: any) => column.name === 'watch')) this.database.exec('ALTER TABLE server_user_music_directory ADD COLUMN watch INTEGER NULL CHECK(watch IS NULL OR watch IN (0, 1))')
+  }
+  /** 读取账号的音乐目录子表，空数组也表示已完成旧目录迁移。 */
+  readMusicDirectories(username: string): Array<{ id: string; path: string; scanMinutes: number; watch?: boolean }> {
+    return this.database.prepare('SELECT id, path, scan_minutes AS scanMinutes, watch FROM server_user_music_directory WHERE username = ? ORDER BY sort_order').all(username).map(({ watch, ...row }: any) => ({ ...row, ...(watch == null ? {} : { watch: !!watch }) }))
+  }
+  /** 在事务内替换目录集合；目录标识由服务生成并保持稳定。 */
+  saveMusicDirectories(username: string, directories: Array<{ id: string; path: string; scanMinutes: number; watch?: boolean }>): void {
+    this.transaction(() => {
+      this.database.prepare('DELETE FROM server_user_music_directory WHERE username = ?').run(username)
+      const insert = this.database.prepare('INSERT INTO server_user_music_directory(username, id, path, scan_minutes, sort_order, watch) VALUES (?, ?, ?, ?, ?, ?)')
+      directories.forEach((directory, order) => insert.run(username, directory.id, directory.path, directory.scanMinutes, order, directory.watch == null ? null : Number(directory.watch)))
+    })
+  }
+  /** 账号重命名时迁移目录归属。 */
+  renameMusicDirectories(previous: string, next: string): void {
+    this.database.prepare('UPDATE server_user_music_directory SET username = ? WHERE username = ?').run(next, previous)
+  }
+  /** 导出全部目录配置，供业务 ZIP 备份恢复。 */
+  exportMusicDirectories(): Array<{ username: string; id: string; path: string; scanMinutes: number; watch?: boolean }> {
+    return this.database.prepare('SELECT username, id, path, scan_minutes AS scanMinutes, watch FROM server_user_music_directory ORDER BY username, sort_order').all().map(({ watch, ...row }: any) => ({ ...row, ...(watch == null ? {} : { watch: !!watch }) }))
+  }
+  /** 在单个事务中恢复目录子表，旧备份不调用此方法。 */
+  restoreMusicDirectories(rows: Array<{ username: string; id: string; path: string; scanMinutes: number; watch?: boolean }>): void {
+    this.transaction(() => {
+      this.database.prepare('DELETE FROM server_user_music_directory').run()
+      const groups = new Map<string, typeof rows>()
+      for (const row of rows) groups.set(row.username, [...(groups.get(row.username) || []), row])
+      const insert = this.database.prepare('INSERT INTO server_user_music_directory(username, id, path, scan_minutes, sort_order, watch) VALUES (?, ?, ?, ?, ?, ?)')
+      for (const [username, directories] of groups) directories.forEach((row, order) => insert.run(username, row.id, row.path, row.scanMinutes, order, row.watch == null ? null : Number(row.watch)))
+    })
+  }
 
   /** 读取账号令牌总开关；空值表示尚未迁移旧数据。 */
   readApiTokenEnabled(username: string): boolean | undefined {
@@ -64,4 +99,3 @@ export function createAdminRepository(dataPath: string, filename = path.join(dat
   const schema = fs.readFileSync(fs.existsSync(bundled) ? bundled : source, 'utf8')
   return new AdminRepository(filename, schema, adminTables, dataPath, 'server_storage_document')
 }
-

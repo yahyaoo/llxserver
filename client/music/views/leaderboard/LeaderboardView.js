@@ -3,7 +3,7 @@
     const template = `<div class="leaderboard-shell">
 <aside id="lb-sidebar" class="-translate-x-full custom-scrollbar" aria-label="榜单目录">
     <div class="leaderboard-sidebar-heading"><span>排行榜</span><button type="button" onclick="toggleLbSidebar(false)" aria-label="关闭榜单目录"><i class="fas fa-times"></i></button></div>
-    <div id="lb-boards-loading" class="hidden flex items-center justify-center py-8"><i class="fas fa-circle-notch fa-spin text-emerald-500 text-xl"></i></div>
+    <div id="lb-boards-loading" class="hidden flex items-center justify-center py-8">${window.LoadingState.render('正在加载榜单…', 'inline')}</div>
     <nav id="lb-boards-list" class="custom-scrollbar" aria-label="榜单列表" onclick="if(window.innerWidth <= 1024) toggleLbSidebar(false)"></nav>
 </aside>
 <div id="lb-sidebar-overlay" onclick="toggleLbSidebar(false)" class="bg-black/40 hidden transition-opacity duration-300 opacity-0"></div>
@@ -131,7 +131,7 @@
                             <!-- 列表表头 -->
                             <div
                                 class="flex-shrink-0 grid grid-cols-12 gap-2 md:gap-4 px-5 py-2.5 border-b t-border-main t-bg-panel/80 text-gray-500 text-[10px] md:text-xs font-bold uppercase tracking-wider items-center pr-6">
-                                <div class="col-span-1 text-center flex items-center justify-center gap-1">
+                                <div class="song-header-controls col-span-1 text-center flex items-center justify-center gap-1">
                                     <div class="flex items-center gap-0.5 md:gap-1 ml-0.5">
                                         <button onclick="toggleLbBatchMode()"
                                             class="text-[10px] md:text-xs text-emerald-600 hover:text-emerald-700"

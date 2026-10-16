@@ -1,6 +1,20 @@
 import type { ExperienceRepository } from '../repository/ExperienceRepository'
+import { getRoamingWeights, recordRoamingPlay } from './RoamingService'
+import { songIdentity } from './library/SongIdentity'
 
-/** 公共播放次数校验与持久化服务。 @author jingyh @date 2026-10-11 */
+/** 03 确认契约：最近 30 天最多 10000 个 playbackId，独立于历史裁剪与最后一次会话。 */
+export function confirmedPlaybackIds(repository: ExperienceRepository): string[] {
+  const ledger = repository.read<Record<string, number>>('client_recent_setting', 'playback-acknowledgements.json', {})
+  return Object.keys(ledger)
+}
+
+/** counts 在 getRoamingWeights 的第一次 await 前读取；确认集合必须先捕获，不能包含等待 extras 期间新计入的播放。 */
+export async function getConfirmedRoamingWeights(username: string, repository: ExperienceRepository) {
+  const confirmed = confirmedPlaybackIds(repository)
+  return { ...await getRoamingWeights(username, repository), confirmedPlaybackIds: confirmed }
+}
+
+/** 公共播放次数校验与持久化服务。 @author yahyaoo @date 2026-10-11 */
 export class PlayCountService {
   constructor(private readonly repository: ExperienceRepository) {}
 
@@ -24,7 +38,7 @@ export class PlayCountService {
 
   /** 获取当前账号统计；历史文档兼容旧数据。 */
   get(): any[] {
-    return PlayCountService.sort(this.repository.read('client_recent_play', 'recent-play.json', []))
+    return PlayCountService.sort(songIdentity().aggregate(this.repository.read('client_recent_play', 'recent-play.json', [])))
   }
 
   /** 成功播放超过十秒才累计一次，客户端不能指定次数；同会话重复上报不累加。 */
@@ -33,11 +47,19 @@ export class PlayCountService {
     if (!PlayCountService.qualified(song)) throw new Error('仅统计成功播放且有效时长超过 10 秒的记录')
     return this.repository.transaction(() => {
       const items = this.get()
-      const previous = items.find(item => String(item.id) === String(song.id) && item.source === song.source)
+      const ledger = this.repository.read<Record<string, number>>('client_recent_setting', 'playback-acknowledgements.json', {})
+      if (Object.prototype.hasOwnProperty.call(ledger, song.playbackId)) return items
+      const previous = items.find(item => songIdentity().key(item) === songIdentity().key(song))
       if (previous?.lastPlaybackId === song.playbackId) return items
+      if (!recordRoamingPlay(song, this.repository)) return items
       const clean: any = {}
-      for (const key of ['id', 'songmid', 'songId', 'name', 'singer', 'source', 'albumName', 'albumId', 'interval', 'quality', 'type', 'types', 'isLocal', '_localLibraryItem', 'filename', 'folder', 'isCustomDir', 'hasCover', 'mtime']) {
+      for (const key of ['id', 'songmid', 'songId', 'name', 'singer', 'source', 'albumName', 'albumId', 'interval', 'quality', 'type', 'types', 'isLocal', '_localLibraryItem', 'filename', 'folder', 'location', 'isCustomDir', 'hasCover', 'mtime', 'serverDownloadId', 'customFilename', 'isCustomFile']) {
         if (song[key] !== undefined) clean[key] = song[key]
+      }
+      // 歌词查询标识采用字段白名单，兼容平台 meta；不保存账号令牌或整份运行状态。作者：yahyaoo
+      for (const key of ['songmid', 'songId', 'hash', 'copyrightId', 'albumId', 'lrcUrl', 'mrcUrl', 'trcUrl', '_localFilename', '_localFolder', '_isCustomDir']) {
+        const value = song[key] ?? song.meta?.[key] ?? previous?.[key]
+        if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') clean[key] = value
       }
       // 展示元数据兼容收藏歌曲的 meta 字段；不参与次数计算。
       for (const key of ['size', 'fileSize', 'bitDepth', 'bitsPerSample', 'sampleRate', 'samplingRate', 'bitrate']) {
@@ -58,10 +80,13 @@ export class PlayCountService {
       clean.lastPlaybackId = song.playbackId
       clean.playedAt = Date.now()
       // 展示次数排序与历史保留上限分开：始终保留最近听过的歌曲。
-      const recent = items.filter(item => !(String(item.id) === String(song.id) && item.source === song.source))
+      const recent = items.filter(item => songIdentity().key(item) !== songIdentity().key(song))
         .sort((a, b) => (b.playedAt || 0) - (a.playedAt || 0))
       const saved = [clean, ...recent].slice(0, limit)
       this.repository.write('client_recent_play', 'recent-play.json', saved)
+      const updated: Record<string, number> = { ...ledger, [String(song.playbackId)]: Date.now() }
+      const retained = Object.entries(updated).filter(([, at]) => at >= Date.now() - 30 * 86400000).sort((a, b) => b[1] - a[1]).slice(0, 10000)
+      this.repository.write('client_recent_setting', 'playback-acknowledgements.json', Object.fromEntries(retained))
       return PlayCountService.sort(saved)
     })
   }

@@ -1,5 +1,5 @@
 appname         = llxserver.client
-version         = 2.1.4
+version         = 2.1.5
 desc            = 洛洛雪音乐客户端 播放器 - 聚合多平台音乐搜索与在线播放
 arch            = x86_64
 platform        = x86

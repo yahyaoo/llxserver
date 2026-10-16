@@ -1,5 +1,6 @@
 /** 歌曲洗版队列：按目标音质解析并替换本地文件，跟踪逐首结果与取消状态。 @author yahyaoo */
 import crypto from 'node:crypto'
+import { serverEvents } from '../../../application/events/ServerEvents'
 import * as fileCache from '../cache/FileCacheService'
 import * as customMusicManager from '../library/CustomMusicService'
 
@@ -129,6 +130,7 @@ const addResult = (task: RemasterTask, result: Omit<RemasterResult, 'index'>) =>
   if (result.status === 'skipped') task.skipped++
   if (result.status === 'failed') task.failed++
   task.updatedAt = Date.now()
+  serverEvents.emitEvent('task:changed', { username: task.username, topic: 'remaster', reason: 'progress' })
 }
 
 const isRetryableError = (err: any) => {
@@ -287,6 +289,7 @@ const runTask = async (task: RemasterTask, items: RemasterableItem[], allItems: 
 
   task.status = task.controller.signal.aborted ? 'cancelled' : 'completed'
   task.updatedAt = Date.now()
+  serverEvents.emitEvent('task:changed', { username: task.username, topic: 'remaster', reason: 'state' })
 }
 
 /**
@@ -365,10 +368,12 @@ export const start = async (username: string, targetQuality: string, filenames: 
     controller: new AbortController(),
   }
   tasks.set(username, task)
+  serverEvents.emitEvent('task:changed', { username, topic: 'remaster', reason: 'state' })
   void runTask(task, items, allItems).catch((err: any) => {
     task.status = task.controller.signal.aborted ? 'cancelled' : 'error'
     task.errorMsg = err?.message || '洗版任务异常终止'
     task.updatedAt = Date.now()
+    serverEvents.emitEvent('task:changed', { username, topic: 'remaster', reason: 'state' })
   })
   return getStatus(username, 0, 0)
 }
@@ -383,6 +388,7 @@ export const cancel = (username: string) => {
   if (!task || task.status !== 'running') return false
   task.controller.abort()
   task.updatedAt = Date.now()
+  serverEvents.emitEvent('task:changed', { username, topic: 'remaster', reason: 'state' })
   return true
 }
 

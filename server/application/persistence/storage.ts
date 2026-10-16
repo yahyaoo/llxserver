@@ -21,7 +21,7 @@ export interface StorageTarget {
 export const storageEvents = new EventEmitter()
 const stores = new Map<string, { /** 管理域 SQLite 仓储。 */
 admin: ReturnType<typeof createAdminRepository>,
-music: SqliteDocumentRepository }>()
+music: ReturnType<typeof createMusicRepository> }>()
 
 /** @returns 当前数据根目录，沿用原 DATA_PATH 配置优先级。 */
 export function dataRoot(): string { return path.resolve(global.lx?.dataPath || process.env.DATA_PATH || path.join(process.cwd(), 'data')) }

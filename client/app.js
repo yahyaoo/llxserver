@@ -174,9 +174,6 @@ class App {
         document.querySelector('input[name="subsonic.publicLeaderboards"]')?.addEventListener('change', () => {
             this.toggleSubsonicLeaderboardVisibility();
         });
-        document.querySelector('input[name="webdav.enable"]')?.addEventListener('change', () => {
-            this.toggleWebdavVisibility();
-        });
         this.initTagSelectors();
 
         // 日志查看
@@ -196,8 +193,6 @@ class App {
 
         // 快照管理用户选择事件
         // document.getElementById('snapshot-user-select')?.addEventListener('change', () => this.loadSnapshots());
-        // WebDAV 和文件管理器
-        this.bindWebDAVEvents();
         this.bindFileManagerEvents();
 
         // PWA 安装事件
@@ -322,7 +317,6 @@ class App {
             data: '数据查看',
             config: '系统配置',
             logs: '系统日志',
-            webdav: 'WebDAV同步',
             files: '文件管理',
             snapshots: '快照管理',
             about: '关于'
@@ -348,15 +342,6 @@ class App {
             case 'logs':
                 this.loadLogs();
                 this.startLogsAutoRefresh();
-                break;
-            case 'webdav':
-                try {
-                    const status = await this.request('/api/status');
-                    this.checkWebDAVConfig(status.isWebDAVConfigured);
-                    this.loadSyncLogs();
-                } catch (e) {
-                    console.error('Failed to check webdav status:', e);
-                }
                 break;
             case 'backups':
             case 'snapshots':
@@ -651,25 +636,9 @@ class App {
             cpuModelText.textContent = `${status.cpus} Cores @ ${status.cpuModel}`;
         }
 
-        // 更新音源总数与 WebDAV 运行标徽
         const statSourcesInfo = document.getElementById('stat-sources-info');
         if (statSourcesInfo && status.sourcesCount !== undefined) {
             statSourcesInfo.textContent = `已挂载自定义源: ${status.sourcesCount} 个`;
-        }
-
-        const webdavPill = document.getElementById('dash-webdav-status-pill');
-        if (webdavPill) {
-            if (status.isWebDAVConfigured) {
-                webdavPill.textContent = 'WebDAV 已就绪';
-                webdavPill.style.background = 'rgba(16, 185, 129, 0.15)';
-                webdavPill.style.color = '#34d399';
-                webdavPill.style.borderColor = 'rgba(16, 185, 129, 0.3)';
-            } else {
-                webdavPill.textContent = 'WebDAV 未配置';
-                webdavPill.style.background = 'rgba(245, 158, 11, 0.15)';
-                webdavPill.style.color = '#fbbf24';
-                webdavPill.style.borderColor = 'rgba(245, 158, 11, 0.3)';
-            }
         }
     }
 
@@ -919,31 +888,62 @@ class App {
     /** 展示选中用户已有目录及启用状态。 @author jingyh */
     renderCustomDirectoryFields() {
         const select = document.getElementById('config-custom-dir-user');
-        const input = document.getElementById('config-custom-dir-path');
+        const container = document.getElementById('config-music-directories');
         const enabled = document.getElementById('config-custom-dir-enabled');
-        if (!select || !input || !enabled) return;
+        if (!select || !container || !enabled) return;
         const user = this.users.find(user => user.name === select.value);
         const value = this.customDirectoryDrafts.get(select.value) || user;
-        select.disabled = input.disabled = enabled.disabled = !user;
-        input.value = value?.customMusicDir || '';
+        const directories = value?.directories || (value?.customMusicDir ? [{ path: value.customMusicDir, scanMinutes: 30 }] : []);
         enabled.checked = value?.enableCustomMusicDir === true;
-        document.getElementById('config-custom-dir-status').textContent = user
-            ? (this.customDirectoryDrafts.size ? `有 ${this.customDirectoryDrafts.size} 个用户的目录修改待保存，请点击页面底部“保存配置”。` : '用户目录与总开关统一使用页面底部“保存配置”保存。')
-            : '请先在用户管理中创建用户，再配置歌曲目录。';
+        select.disabled = enabled.disabled = !user;
+        container.replaceChildren();
+        for (const directory of directories) this.appendMusicDirectory(directory);
+        if (!directories.length) this.appendMusicDirectory({ path: '', scanMinutes: Number(document.querySelector('[name="library.scan.defaultMinutes"]')?.value) || 60 });
     }
 
-    /** 切换用户前保留目录草稿，统一保存时仅提交目录字段。 @author jingyh */
+    appendMusicDirectory(directory = { path: '', scanMinutes: Number(document.querySelector('[name="library.scan.defaultMinutes"]')?.value) || 60 }) {
+        const row = document.createElement('div'); row.className = 'music-directory-row';
+        row.style.cssText = 'display:flex;flex-wrap:wrap;gap:8px;margin:10px 0';
+        const input = document.createElement('input'); input.className = 'form-input config-input'; input.style.flex = '1 1 260px'; input.value = directory.path; input.placeholder = '服务器绝对路径'; input.dataset.musicPath = '';
+        const frequency = document.createElement('input'); frequency.type = 'number'; frequency.min = 1; frequency.max = 1440; frequency.value = directory.scanMinutes || 30; frequency.className = 'form-input'; frequency.style.width = '95px'; frequency.dataset.scanMinutes = ''; frequency.title = '扫描间隔（分钟）';
+        const unit = document.createElement('span'); unit.textContent = '分钟';
+        const watch = document.createElement('select'); watch.className = 'form-input'; watch.dataset.musicWatch = ''; watch.setAttribute('aria-label', '监听变化');
+        for (const [value, label] of [['', '监听：跟随全局'], ['true', '监听：开启'], ['false', '监听：关闭']]) watch.add(new Option(label, value));
+        watch.value = directory.watch == null ? '' : String(directory.watch);
+        watch.onchange = () => this.updateCustomDirectoryDraft();
+        const check = document.createElement('button'); check.type = 'button'; check.className = 'btn btn-secondary'; check.textContent = '检测读写';
+        const status = document.createElement('span'); status.style.cssText = 'width:100%;font-size:12px'; status.role = 'status';
+        check.onclick = async () => {
+            const checkedPath = input.value.trim(); check.disabled = true; status.textContent = '正在检测…';
+            try { const result = await this.request('/api/music/directories/check', { method: 'POST', body: JSON.stringify({ path: checkedPath }) }); if (input.value.trim() !== checkedPath) return; status.textContent = result.message; status.style.color = 'var(--accent-success)'; }
+            catch (error) { status.textContent = error.message; status.style.color = '#f87171'; } finally { check.disabled = false; }
+        };
+        const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'btn btn-secondary'; remove.textContent = '移除'; remove.onclick = () => { row.remove(); this.updateCustomDirectoryDraft(); };
+        input.oninput = frequency.oninput = () => { status.textContent = ''; this.updateCustomDirectoryDraft(); };
+        row.append(input, frequency, unit, watch, check, remove, status);
+        document.getElementById('config-music-directories').append(row);
+        if (directory.id) {
+            this.libraryScanStatusPromise ||= this.request('/api/admin/library/scan/status');
+            this.libraryScanStatusPromise.then(result => {
+                if (!row.isConnected || input.value !== directory.path) return;
+                const username = document.getElementById('config-custom-dir-user')?.value;
+                const current = result.items?.find(item => item.username === username && item.directoryId === directory.id);
+                if (current) status.textContent = `${current.watch?.state === 'active' ? '监听中' : '定时扫描：' + (current.watch?.reason || '监听关闭')}；上次扫描：${current.lastQuickScanAt ? new Date(current.lastQuickScanAt).toLocaleString() : '尚未完成'}`;
+            }).catch(error => { if (row.isConnected) status.textContent = '状态读取失败：' + error.message; });
+        }
+    }
+
     updateCustomDirectoryDraft() {
         const name = document.getElementById('config-custom-dir-user').value;
-        const customMusicDir = document.getElementById('config-custom-dir-path').value.trim();
+        if (!this.users.some(user => user.name === name)) return;
+        const directories = Array.from(document.querySelectorAll('#config-music-directories .music-directory-row')).map(row => ({ path: row.querySelector('[data-music-path]').value.trim(), scanMinutes: Number(row.querySelector('[data-scan-minutes]').value), ...(row.querySelector('[data-music-watch]').value === '' ? {} : { watch: row.querySelector('[data-music-watch]').value === 'true' }) })).filter(item => item.path);
         const enableCustomMusicDir = document.getElementById('config-custom-dir-enabled').checked;
         const user = this.users.find(user => user.name === name);
-        if (!user) return;
-        if (customMusicDir === (user.customMusicDir || '') && enableCustomMusicDir === !!user.enableCustomMusicDir) this.customDirectoryDrafts.delete(name);
-        else this.customDirectoryDrafts.set(name, { name, customMusicDir, enableCustomMusicDir });
-        document.getElementById('config-custom-dir-status').textContent = this.customDirectoryDrafts.size
-            ? `有 ${this.customDirectoryDrafts.size} 个用户的目录修改待保存，请点击页面底部“保存配置”。`
-            : '用户目录与总开关统一使用页面底部“保存配置”保存。';
+        const existing = user.directories || (user.customMusicDir ? [{ path: user.customMusicDir, scanMinutes: 30 }] : []);
+        const normalized = values => values.map(item => ({ path: item.path, scanMinutes: item.scanMinutes || 30, ...(item.watch == null ? {} : { watch: item.watch }) }));
+        if (JSON.stringify(normalized(directories)) === JSON.stringify(normalized(existing)) && enableCustomMusicDir === !!user.enableCustomMusicDir) this.customDirectoryDrafts.delete(name);
+        else this.customDirectoryDrafts.set(name, { name, directories, customMusicDir: directories[0]?.path || '', enableCustomMusicDir });
+        document.getElementById('config-custom-dir-status').textContent = '目录修改待保存，保存前会重新检测所有目录的读写权限。';
     }
 
     /** 预览文件名模板，使用文本节点展示用户输入。 @author jingyh */
@@ -2512,37 +2512,11 @@ class App {
                 form.elements['player.password'].value = config['player.password'] || '';
             }
 
-            // WebDAV 配置
-            if (form.elements['webdav.enable']) {
-                form.elements['webdav.enable'].checked = config['webdav.enable'] === true;
-            }
-            this.toggleWebdavVisibility();
-            if (form.elements['webdav.url']) {
-                form.elements['webdav.url'].value = config['webdav.url'] || '';
-            }
-            if (form.elements['webdav.username']) {
-                form.elements['webdav.username'].value = config['webdav.username'] || '';
-            }
-            if (form.elements['webdav.password']) {
-                form.elements['webdav.password'].value = config['webdav.password'] || '';
-            }
-            if (form.elements['webdav.syncPath']) {
-                form.elements['webdav.syncPath'].value = config['webdav.syncPath'] || '/lx-sync';
-            }
-            if (form.elements['webdav.backupPath']) {
-                form.elements['webdav.backupPath'].value = config['webdav.backupPath'] || '/lx-sync-backups';
-            }
             if (form.elements['sync.interval']) {
                 form.elements['sync.interval'].value = config['sync.interval'] || 60;
             }
             if (form.elements['sync.backupInterval']) {
                 form.elements['sync.backupInterval'].value = config['sync.backupInterval'] || 24;
-            }
-            if (form.elements['webdav.excludeCache']) {
-                form.elements['webdav.excludeCache'].checked = config['webdav.excludeCache'] === true;
-            }
-            if (form.elements['webdav.excludeMusic']) {
-                form.elements['webdav.excludeMusic'].checked = config['webdav.excludeMusic'] === true;
             }
 
             // 本地配置备份
@@ -2727,20 +2701,7 @@ class App {
         }
     }
 
-    toggleWebdavVisibility() {
-        const webdavCb = document.querySelector('input[name="webdav.enable"]');
-        const childWrapper = document.getElementById('webdav-options');
-        const hintWrapper = document.getElementById('webdav-disabled-hint');
-        if (webdavCb && childWrapper && hintWrapper) {
-            if (webdavCb.checked) {
-                childWrapper.style.display = 'block';
-                hintWrapper.style.display = 'none';
-            } else {
-                childWrapper.style.display = 'none';
-                hintWrapper.style.display = 'block';
-            }
-        }
-    }
+
 
     toggleSubsonicLeaderboardVisibility() {
         const lbCb = document.querySelector('input[name="subsonic.publicLeaderboards"]');
@@ -3141,16 +3102,6 @@ class App {
             'frontend.password': formData.get('frontend.password'),
             'player.enableAuth': formData.get('player.enableAuth') === 'on',
             'player.password': formData.get('player.password'),
-            'webdav.enable': formData.get('webdav.enable') === 'on',
-            'webdav.url': formData.get('webdav.url'),
-            'webdav.username': formData.get('webdav.username'),
-            'webdav.password': formData.get('webdav.password'),
-            'webdav.syncPath': (formData.get('webdav.syncPath') || '').trim() || '/lx-sync',
-            'webdav.backupPath': (formData.get('webdav.backupPath') || '').trim() || '/lx-sync-backups',
-            'sync.interval': parseInt(formData.get('sync.interval')) || 60,
-            'sync.backupInterval': parseInt(formData.get('sync.backupInterval')) || 24,
-            'webdav.excludeCache': formData.get('webdav.excludeCache') === 'on',
-            'webdav.excludeMusic': formData.get('webdav.excludeMusic') === 'on',
             'configBackup.enable': formData.get('configBackup.enable') === 'on',
             'configBackup.retentionDays': parseInt(formData.get('configBackup.retentionDays')) || 7,
             'configBackup.dir': (formData.get('configBackup.dir') || '').trim(),
@@ -3391,20 +3342,8 @@ class App {
         div.textContent = text;
         return div.innerHTML;
     }
-    // ========== WebDAV 功能 ==========
 
-    async testWebDAV() {
-        try {
-            const result = await this.request('/api/webdav/test', { method: 'POST' });
-            if (result.success) {
-                showSuccess('✅ WebDAV连接成功！\n' + result.message);
-            } else {
-                showError('❌ WebDAV连接失败\n' + result.message);
-            }
-        } catch (err) {
-            showError('❌ 连接失败: ' + err.message);
-        }
-    }
+
 
     // 代理地址输入框只在真正需要填地址时出现：
     // - 统一代理开关关闭 -> 隐藏统一代理地址
@@ -3449,47 +3388,9 @@ class App {
         }
     }
 
-    async backupToWebDAV() {
-        if (!(await showSelect('WebDAV 备份', '确定要创建全量备份并上传到 WebDAV 吗？\n\n系统将自动扫描本地数据、压缩打包为 ZIP 并流式传输至云端。'))) return;
 
-        const statusEl = document.getElementById('sync-status-content');
-        if (statusEl) {
-            statusEl.innerHTML = '<div style="display:flex;align-items:center;gap:0.6rem;color:var(--accent-primary);"><span class="task-spinner" style="width:18px;height:18px;"></span><span>正在扫描本地文件并打包上传...</span></div>';
-        }
-        this.showProgress(true, '全量 ZIP 备份与云端归档', '正在扫描并打包服务器数据...');
 
-        try {
-            const result = await this.request('/api/webdav/backup', {
-                method: 'POST',
-                body: JSON.stringify({ force: true })
-            });
-            if (result.success) {
-                if (statusEl) {
-                    statusEl.innerHTML = '<p style="color: var(--accent-success); font-weight: 600;">✅ 全量备份已成功上传至 WebDAV 云端！</p>';
-                }
-                this.loadSyncLogs();
-            } else {
-                if (statusEl) {
-                    statusEl.innerHTML = '<p style="color: var(--accent-error);">❌ 备份失败: 服务器返回异常</p>';
-                }
-            }
-        } catch (err) {
-            if (statusEl) {
-                statusEl.innerHTML = '<p style="color: var(--accent-error);">❌ 备份失败: ' + this.escapeHtml(err.message) + '</p>';
-            }
-        }
-    }
 
-    async restoreFromWebDAV() {
-        const modal = document.getElementById('restore-choice-modal');
-        if (modal) {
-            modal.classList.remove('hidden');
-            this.switchRestoreTab('zip');
-        } else {
-            // 降级兼容
-            this.executeZipRestore();
-        }
-    }
 
     closeRestoreModal() {
         document.getElementById('restore-choice-modal')?.classList.add('hidden');
@@ -3515,192 +3416,15 @@ class App {
         }
     }
 
-    async loadBackupList() {
-        const container = document.getElementById('backup-list-container');
-        if (!container) return;
 
-        container.innerHTML = `
-            <div style="text-align:center; padding: 2rem; color: var(--text-muted);">
-                <span class="task-spinner" style="width:20px;height:20px;display:inline-block;vertical-align:middle;margin-right:6px;"></span>
-                正在获取云端备份列表...
-            </div>
-        `;
 
-        try {
-            const res = await this.request('/api/webdav/backups', { method: 'GET' });
-            if (res.success && res.backups && res.backups.length > 0) {
-                let html = '<div class="backup-zip-list">';
-                res.backups.forEach((item, index) => {
-                    const isLatest = index === 0;
-                    const sizeStr = item.size ? (item.size / (1024 * 1024)).toFixed(1) + ' MB' : '大小未知';
-                    const timeStr = item.timeStr || (item.time ? new Date(item.time).toLocaleString() : '未知时间');
-                    const escapedFilename = this.escapeHtml(item.filename || item.basename);
-                    const escapedBasename = this.escapeHtml(item.basename);
 
-                    html += `
-                        <div class="backup-zip-card ${isLatest ? 'latest' : ''}">
-                            <div class="backup-zip-info">
-                                <div class="backup-zip-name">
-                                    <span>📦 ${escapedBasename}</span>
-                                    ${isLatest ? '<span class="backup-latest-tag">最新快照</span>' : ''}
-                                </div>
-                                <div class="backup-zip-meta">
-                                    <span>🕒 备份时间: ${timeStr}</span>
-                                    <span>💾 体积: ${sizeStr}</span>
-                                </div>
-                            </div>
-                            <div class="backup-zip-actions">
-                                <button type="button" class="btn-primary restore-btn-single" onclick="app.executeZipRestore('${escapedFilename}', '${escapedBasename}')">
-                                    恢复此快照
-                                </button>
-                                <button type="button" class="btn-danger-outline backup-del-btn" title="删除此备份" onclick="app.executeDeleteBackup('${escapedFilename}', '${escapedBasename}')">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 15px; height: 15px;">
-                                        <polyline points="3 6 5 6 21 6"></polyline>
-                                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                                    </svg>
-                                    删除
-                                </button>
-                            </div>
-                        </div>
-                    `;
-                });
-                html += '</div>';
-                container.innerHTML = html;
-            } else {
-                container.innerHTML = `
-                    <div style="text-align:center; padding: 2rem; color: var(--text-muted); background: rgba(0,0,0,0.2); border-radius: 12px;">
-                        <p style="margin: 0; font-size: 0.9rem;">⚠️ 云端备份目录暂无可恢复的 ZIP 备份文件</p>
-                        <p style="margin: 6px 0 0 0; font-size: 0.78rem;">您可以先点击主页的「立即全量备份」进行首次归档。</p>
-                    </div>
-                `;
-            }
-        } catch (err) {
-            container.innerHTML = `
-                <div style="text-align:center; padding: 1.5rem; color: var(--accent-error);">
-                    获取云端备份列表失败: ${this.escapeHtml(err.message)}
-                </div>
-            `;
-        }
-    }
 
-    async executeDeleteBackup(targetFilename, targetBasename) {
-        const displayName = targetBasename || targetFilename;
-        if (!(await showSelect('删除云端备份', `确定要从 WebDAV 云端永久删除备份快照「${displayName}」吗？\n\n此操作不可撤销！`, { danger: true }))) return;
 
-        try {
-            showInfo(`正在删除备份: ${displayName}...`);
-            const res = await this.request('/api/webdav/backup', {
-                method: 'DELETE',
-                body: JSON.stringify({ filename: targetFilename })
-            });
 
-            if (res.success) {
-                showSuccess(`已成功删除备份: ${displayName}`);
-                // 重新刷新备份列表
-                this.loadBackupList();
-                this.loadSyncLogs();
-            } else {
-                showError(`删除失败: ${res.message || '未知错误'}`);
-            }
-        } catch (err) {
-            showError(`删除失败: ${err.message}`);
-        }
-    }
 
-    async executeZipRestore(targetFilename, targetBasename) {
-        const displayName = targetBasename ? `备份快照「${targetBasename}」` : '最新全量备份';
-        if (!(await showSelect('全量 ZIP 恢复', `⚠️ 警告：恢复${displayName}将覆盖本地数据！\n\n确定要立即恢复吗？建议恢复前确保本地数据已妥善归档。`, { danger: true }))) return;
 
-        this.closeRestoreModal();
 
-        const statusEl = document.getElementById('sync-status-content');
-        if (statusEl) {
-            statusEl.innerHTML = `<div style="display:flex;align-items:center;gap:0.6rem;color:var(--accent-warning);"><span class="task-spinner" style="width:18px;height:18px;"></span><span>正在从云端下载并恢复${displayName}...</span></div>`;
-        }
-        this.showProgress(true, '全量快照还原', `正在从云端下载${displayName}并完全还原系统状态...`);
-
-        try {
-            const result = await this.request('/api/webdav/restore', {
-                method: 'POST',
-                body: JSON.stringify({ mode: 'zip', targetFilename: targetFilename || undefined })
-            });
-            if (result.success) {
-                if (statusEl) {
-                    statusEl.innerHTML = '<p style="color: var(--accent-success); font-weight: 600;">✅ 全量恢复成功！数据已更新，页面即将刷新...</p>';
-                }
-                setTimeout(() => location.reload(), 2000);
-            } else {
-                if (statusEl) {
-                    statusEl.innerHTML = '<p style="color: var(--accent-error);">❌ 恢复失败</p>';
-                }
-            }
-        } catch (err) {
-            if (statusEl) {
-                statusEl.innerHTML = '<p style="color: var(--accent-error);">❌ 恢复失败: ' + this.escapeHtml(err.message) + '</p>';
-            }
-        }
-    }
-
-    async executeScatteredRestore() {
-        if (!(await showSelect('散文件增量恢复', '确定要从云端增量恢复散文件吗？\n\n系统将比对云端散列文件并下载新增或变动的文件，本地独有文件将予以保留。'))) return;
-
-        this.closeRestoreModal();
-
-        const statusEl = document.getElementById('sync-status-content');
-        if (statusEl) {
-            statusEl.innerHTML = '<div style="display:flex;align-items:center;gap:0.6rem;color:var(--accent-primary);"><span class="task-spinner" style="width:18px;height:18px;"></span><span>正在比对并增量恢复散文件...</span></div>';
-        }
-        this.showProgress(true, '散文件增量恢复', '正在比对云端散文件并增量下载还原...');
-
-        try {
-            const result = await this.request('/api/webdav/restore', {
-                method: 'POST',
-                body: JSON.stringify({ mode: 'files' })
-            });
-            if (result.success) {
-                if (statusEl) {
-                    statusEl.innerHTML = '<p style="color: var(--accent-success); font-weight: 600;">✅ 散文件已成功增量同步还原！</p>';
-                }
-                this.loadSyncLogs();
-            } else {
-                if (statusEl) {
-                    statusEl.innerHTML = '<p style="color: var(--accent-error);">❌ 散文件恢复失败</p>';
-                }
-            }
-        } catch (err) {
-            if (statusEl) {
-                statusEl.innerHTML = '<p style="color: var(--accent-error);">❌ 散文件恢复失败: ' + this.escapeHtml(err.message) + '</p>';
-            }
-        }
-    }
-
-    async syncFilesToWebDAV() {
-        if (!(await showSelect('同步文件', '确定要强制同步所有本地文件到 WebDAV 吗？\n\n系统将自动检测文件变动并进行多线程增量传输。'))) return;
-
-        const statusEl = document.getElementById('sync-status-content');
-        if (statusEl) {
-            statusEl.innerHTML = '<div style="display:flex;align-items:center;gap:0.6rem;color:var(--accent-primary);"><span class="task-spinner" style="width:18px;height:18px;"></span><span>正在比对本地与云端散文件...</span></div>';
-        }
-        this.showProgress(true, '批量文件多线程同步', '正在比对本地散文件并同步至云端...');
-
-        try {
-            const result = await this.request('/api/webdav/sync', { method: 'POST' });
-            if (result.success) {
-                if (statusEl) {
-                    statusEl.innerHTML = '<p style="color: var(--accent-success); font-weight: 600;">✅ 散文件已全部同步至云端！</p>';
-                }
-                this.loadSyncLogs();
-            } else {
-                if (statusEl) {
-                    statusEl.innerHTML = '<p style="color: var(--accent-error);">❌ 同步失败</p>';
-                }
-            }
-        } catch (err) {
-            if (statusEl) {
-                statusEl.innerHTML = '<p style="color: var(--accent-error);">❌ 同步失败: ' + this.escapeHtml(err.message) + '</p>';
-            }
-        }
-    }
 
     showProgress(show, title = '任务进行中', subtext = '正在与存储系统交互...') {
         const container = document.getElementById('sync-progress-container');
@@ -3819,109 +3543,7 @@ class App {
         `;
     }
 
-    initSSE() {
-        if (this.sseSource) return;
 
-        const auth = this.password || localStorage.getItem('lx_auth');
-        if (!auth) return;
-
-        this.sseSource = new EventSource(`/api/webdav/progress?auth=${encodeURIComponent(auth)}`);
-
-        this.sseSource.onmessage = (event) => {
-            try {
-                const data = JSON.parse(event.data);
-
-                // 1. 实时日志推送
-                if (data.type === 'sync_log' && data.log) {
-                    this.appendLiveSyncLog(data.log);
-                    return;
-                }
-
-                // 2. 备份进度处理
-                if (data.type === 'backup') {
-                    this.showProgress(true, '全量 ZIP 备份进行中', '正在将数据压缩并上传至云端');
-                    if (data.status === 'preparing') {
-                        this.setTaskStep(1);
-                        this.updateProgress(2, data.message || '正在扫描与准备数据...', '');
-                    } else if (data.status === 'packing') {
-                        this.setTaskStep(2);
-                        const percent = data.percent || (data.current && data.total ? Math.min(48, Math.round(5 + (data.current / data.total) * 43)) : 15);
-                        const meta = data.total ? `打包进度: ${data.current || 0}/${data.total} 文件` : '';
-                        this.updateProgress(percent, data.message || `正在压缩文件: ${data.file || ''}`, meta);
-                    } else if (data.status === 'packed') {
-                        this.setTaskStep(3);
-                        this.updateProgress(50, data.message || '压缩包创建完成，准备传输...', '');
-                    } else if (data.status === 'uploading') {
-                        this.setTaskStep(3);
-                        // 上传占用 50% ~ 98%
-                        const uploadRatio = data.total > 0 ? (data.current / data.total) : 0;
-                        const percent = Math.min(98, Math.round(50 + uploadRatio * 48));
-                        const meta = `${this.formatFileSize(data.current)} / ${this.formatFileSize(data.total)}`;
-                        this.updateProgress(percent, `正在上传云端: ${data.file || 'backup.zip'}`, meta);
-                    } else if (data.status === 'success') {
-                        this.setTaskStep(4);
-                        this.updateProgress(100, '✅ 全量备份并上传完成！', '云端归档成功');
-                        setTimeout(() => this.showProgress(false), 3500);
-                        this.loadSyncLogs();
-                    } else if (data.status === 'error') {
-                        this.updateProgress(0, `❌ 备份失败: ${data.error || '未知错误'}`, '');
-                        setTimeout(() => this.showProgress(false), 5000);
-                    }
-                } else if (data.type === 'sync') {
-                    this.showProgress(true, '文件多线程同步中', '正在与 WebDAV 云端比对并同步变化');
-                    if (data.status === 'start') {
-                        this.setTaskStep(1);
-                        this.updateProgress(5, `开始同步，共 ${data.total || 0} 个文件...`, '');
-                    } else if (data.status === 'processing') {
-                        this.setTaskStep(3);
-                        const percent = data.total > 0 ? Math.min(99, Math.round((data.current / data.total) * 100)) : 50;
-                        const meta = `已完成: ${data.current}/${data.total}`;
-                        this.updateProgress(percent, `正在同步文件: ${data.file || ''}`, meta);
-                    } else if (data.status === 'finish') {
-                        this.setTaskStep(4);
-                        const msg = data.message || (data.failCount > 0 ? `同步完成: ${data.successCount}成功，${data.failCount}失败/跳过` : '✅ 全部文件同步完成！');
-                        const meta = `共处理 ${data.total || 0} 个文件`;
-                        this.updateProgress(100, msg, meta);
-                        setTimeout(() => this.showProgress(false), 3500);
-                        this.loadSyncLogs();
-                    } else if (data.status === 'error') {
-                        this.updateProgress(0, `❌ 同步失败: ${data.message || '未知错误'}`, '');
-                        setTimeout(() => this.showProgress(false), 6000);
-                    }
-                } else if (data.type === 'restore') {
-                    this.showProgress(true, '从云端恢复数据中', '正在拉取云端快照并还原本地');
-                    if (data.status === 'start') {
-                        this.setTaskStep(1);
-                        this.updateProgress(5, data.message || '正在检索云端数据列表...', '');
-                    } else if (data.status === 'downloading') {
-                        this.setTaskStep(3);
-                        this.updateProgress(35, data.message || '正在从云端下载备份包...', '');
-                    } else if (data.status === 'extracting') {
-                        this.setTaskStep(2);
-                        this.updateProgress(75, data.message || '正在解压并恢复数据文件...', '');
-                    } else if (data.status === 'processing') {
-                        this.setTaskStep(3);
-                        const percent = data.total > 0 ? Math.min(95, Math.round((data.current / data.total) * 100)) : 50;
-                        this.updateProgress(percent, `正在还原: ${data.file || ''}`, `进度: ${data.current}/${data.total}`);
-                    } else if (data.status === 'finish') {
-                        this.setTaskStep(4);
-                        this.updateProgress(100, '✅ 数据恢复完成！', '页面即将刷新生效');
-                        setTimeout(() => this.showProgress(false), 3500);
-                        this.loadSyncLogs();
-                    } else if (data.status === 'error') {
-                        this.updateProgress(0, `❌ 恢复失败: ${data.message || '未知错误'}`, '');
-                        setTimeout(() => this.showProgress(false), 6000);
-                    }
-                }
-            } catch (e) {
-                console.error('SSE Parse Error:', e);
-            }
-        };
-
-        this.sseSource.onerror = (err) => {
-            // 连接失败不报错，静默重试
-        };
-    }
 
     appendLiveSyncLog(log) {
         const container = document.getElementById('sync-logs-content');
@@ -3953,34 +3575,7 @@ class App {
         }
     }
 
-    async loadSyncLogs() {
-        try {
-            const data = await this.request('/api/webdav/logs');
-            const container = document.getElementById('sync-logs-content');
-            if (!container) return;
 
-            if (!data.logs || data.logs.length === 0) {
-                container.innerHTML = '<p class="sync-empty-tip" style="color: var(--text-secondary); padding: 2.5rem; text-align: center;">暂无同步日志</p>';
-                return;
-            }
-
-            container.innerHTML = data.logs.map(log => `
-            <div class="sync-log-item">
-                <div class="log-info">
-                    <span class="log-type log-type-${log.type}">${this.getLogTypeText(log.type)}</span>
-                    <span class="log-file">${this.escapeHtml(log.file)}</span>
-                    ${log.message ? `<div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">${this.escapeHtml(log.message)}</div>` : ''}
-                </div>
-                <div style="display: flex; align-items: center; gap: 1rem;">
-                    <span class="log-status log-status-${log.status}">${log.status === 'success' ? '成功' : '失败'}</span>
-                    <span class="log-time">${this.formatTime(log.timestamp)}</span>
-                </div>
-            </div>
-        `).join('');
-        } catch (err) {
-            console.error('Failed to load sync logs:', err);
-        }
-    }
 
     getLogTypeText(type) {
         const types = {
@@ -4192,38 +3787,7 @@ class App {
 
     // ========== 初始化事件绑定 ==========
 
-    bindWebDAVEvents() {
-        document.getElementById('test-webdav-btn')?.addEventListener('click', () => this.testWebDAV());
-        document.getElementById('backup-webdav-btn')?.addEventListener('click', () => this.backupToWebDAV());
-        document.getElementById('restore-webdav-btn')?.addEventListener('click', () => this.restoreFromWebDAV());
-        document.getElementById('sync-files-btn')?.addEventListener('click', () => this.syncFilesToWebDAV());
-        document.getElementById('refresh-sync-logs-btn')?.addEventListener('click', () => this.loadSyncLogs());
-        document.getElementById('test-proxy-btn')?.addEventListener('click', () => this.testProxy());
-        // 细分代理：各分类地址旁的「测试」按钮，测的是该分类自己的地址
-        document.querySelectorAll('.test-proxy-btn-cat')?.forEach(btn => {
-            btn.addEventListener('click', () => {
-                const target = btn.getAttribute('data-target');
-                const input = document.querySelector(`input[name="${target}"]`);
-                this.testProxy(input ? input.value : '');
-            });
-        });
-        // 代理地址框按需显示
-        const cfgForm = document.getElementById('config-form');
-        cfgForm?.elements['proxy.all.enabled']?.addEventListener('change', () => this.updateProxyFieldsVisibility());
-        ['music', 'customSource', 'app'].forEach(cat => {
-            cfgForm?.elements[`proxy.${cat}.mode`]?.addEventListener('change', () => this.updateProxyFieldsVisibility());
-        });
 
-        // [新增] 本地备份/还原事件绑定
-        document.getElementById('backup-local-btn')?.addEventListener('click', () => this.downloadLocalBackup());
-        document.getElementById('restore-local-btn')?.addEventListener('click', () => document.getElementById('local-backup-input').click());
-        document.getElementById('local-backup-input')?.addEventListener('change', (e) => this.handleLocalRestore(e));
-
-        // [新增] 进度卡片主动关闭/隐藏按钮
-        document.getElementById('btn-close-progress')?.addEventListener('click', () => this.showProgress(false));
-
-        this.initSSE();
-    }
 
     bindFileManagerEvents() {
         document.getElementById('new-file-btn')?.addEventListener('click', () => this.createNewFile());
@@ -4653,8 +4217,7 @@ class App {
         loadingOverlay.style.background = 'rgba(0,0,0,0.8)';
         loadingOverlay.innerHTML = `
             <div class="login-box glass" style="padding: 3rem;">
-                <div class="status-dot" style="margin: 0 auto 1.5rem; width: 12px; height: 12px;"></div>
-                <h2>正在还原数据...</h2>
+                ${window.LoadingState.render('正在还原数据…')}
                 <p style="color: var(--text-secondary); margin-top: 1rem;">正在解压并恢复文件，请勿关闭或刷新页面。</p>
             </div>
         `;
@@ -4730,55 +4293,13 @@ class App {
         }
     }
 
-    checkWebDAVConfig(isConfigured) {
-        const cloudGroup = document.getElementById('webdav-cloud-group');
-        const guideCard = document.getElementById('webdav-config-guide');
-        const statusSection = document.getElementById('webdav-status-section');
-        const logsSection = document.getElementById('webdav-logs-section');
 
-        if (isConfigured) {
-            cloudGroup?.classList.remove('hidden');
-            guideCard?.classList.add('hidden');
-            statusSection?.classList.remove('hidden');
-            logsSection?.classList.remove('hidden');
-        } else {
-            cloudGroup?.classList.add('hidden');
-            guideCard?.classList.remove('hidden');
-            statusSection?.classList.add('hidden');
-            logsSection?.classList.add('hidden');
-        }
-    }
 
-    jumpToWebDAVConfig() {
-        this.switchView('config').then(() => {
-            setTimeout(() => {
-                this.systemConfiguration.select('WebDAV 同步配置');
-                const target = document.getElementById('config-card-webdav');
-                if (target) {
-                    target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    target.style.outline = '2px solid var(--accent-primary)';
-                    target.style.outlineOffset = '4px';
-                    setTimeout(() => {
-                        target.style.outline = 'none';
-                    }, 2000);
-                }
-            }, 300);
-        });
-    }
 
-    openWebdavUsageModal() {
-        const modal = document.getElementById('webdav-usage-modal');
-        if (modal) {
-            modal.classList.remove('hidden');
-        }
-    }
 
-    closeWebdavUsageModal() {
-        const modal = document.getElementById('webdav-usage-modal');
-        if (modal) {
-            modal.classList.add('hidden');
-        }
-    }
+
+
+
 }
 
 // 监听点击外部关闭下拉菜单

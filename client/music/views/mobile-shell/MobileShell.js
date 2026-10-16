@@ -3,6 +3,13 @@
     const mobile = window.matchMedia('(max-width: 767px)');
     const placements = [];
     let mounted = false;
+    let syncFrame = null;
+    const observations = [];
+    const observe = (callback, target, options) => {
+        if (!target) return;
+        const observer = new MutationObserver(callback); observations.push({ observer, target, options });
+        if (mobile.matches) observer.observe(target, options);
+    };
     let active = 'mobile-library';
     const byId = id => document.getElementById(id);
     const navButton = (target, icon, label) => `<button type="button" data-mobile-tab="${target}" onclick="MobileShell.open('${target}')" aria-label="${label}"><i class="${icon}" aria-hidden="true"></i><span>${label}</span></button>`;
@@ -40,6 +47,7 @@
             SETTINGS_NAVIGATION.forEach(group => {
                 const card = document.createElement('div'); card.className = 'mobile-card';
                 group.items.forEach(item => {
+                    if (item.id === 'admin') return;
                     const button = document.createElement('button'); button.type = 'button'; button.className = 'mobile-menu-row';
                     button.innerHTML = `<i class="fas ${item.icon}" aria-hidden="true"></i><span>${item.label}</span><i class="fas fa-chevron-right" aria-hidden="true"></i>`;
                     button.addEventListener('click', () => settings(item.id)); card.append(button);
@@ -51,18 +59,15 @@
         pages.querySelectorAll('i').forEach(icon => icon.setAttribute('aria-hidden', 'true'));
         const audio = byId('audio-player');
         audio?.addEventListener('play', syncPlayer); audio?.addEventListener('pause', syncPlayer);
-        new MutationObserver(syncPlayer).observe(byId('player-cover'), { attributes: true, attributeFilter: ['src'] });
-        new MutationObserver(syncProfile).observe(byId('header-account-trigger'), { childList: true, subtree: true });
+        observe(syncPlayer, byId('player-cover'), { attributes: true, attributeFilter: ['src'] });
+        observe(syncProfile, byId('header-account-trigger'), { childList: true, subtree: true });
         syncProfile(); syncPlayer();
-        let syncPending = false;
         const scheduleSync = () => {
-            if (syncPending) return;
-            syncPending = true;
-            requestAnimationFrame(() => { syncPending = false; sync(); });
+            if (syncFrame !== null || document.hidden || !mobile.matches) return;
+            syncFrame = requestAnimationFrame(() => { syncFrame = null; sync(); });
         };
-        const viewObserver = new MutationObserver(scheduleSync);
-        host.querySelectorAll('[id^="view-"]').forEach(view => viewObserver.observe(view, { attributes: true, attributeFilter: ['class'] }));
-        new MutationObserver(scheduleSync).observe(byId('settings-section-title'), { childList: true });
+        host.querySelectorAll('[id^="view-"]').forEach(view => observe(scheduleSync, view, { attributes: true, attributeFilter: ['class'] }));
+        observe(scheduleSync, byId('settings-section-title'), { childList: true });
     }
 
     /** 窄屏使用同一份歌单树，宽屏还原侧栏位置；保留节点上的事件与排序实例。 */
@@ -80,6 +85,15 @@
             placements.forEach(({ li, marker }) => marker.after(li));
             byId('mobile-pages').querySelectorAll('[id^="view-"]').forEach(n => n.classList.add('hidden'));
             if (!document.querySelector('.music-shell [id^="view-"]:not(.hidden)')) window.switchTab('localmusic');
+        }
+        for (const { observer, target, options } of observations) { observer.disconnect(); if (mobile.matches) observer.observe(target, options); }
+        if (!mobile.matches && syncFrame !== null) { cancelAnimationFrame(syncFrame); syncFrame = null; }
+        // 移动同一份目录节点时同步排序权限，旋转或切回桌面无需刷新。作者：jingyh
+        if (typeof Sortable !== 'undefined') {
+            ['my-lists-container', 'playlist-lists-container'].forEach(id => {
+                const container = byId(id);
+                if (container) Sortable.get(container)?.option('disabled', mobile.matches);
+            });
         }
     }
 
@@ -137,7 +151,15 @@
         if (cover?.src && byId('mobile-nav-cover').src !== cover.src) byId('mobile-nav-cover').src = cover.src;
         byId('mobile-bottom-nav').classList.toggle('is-playing', !byId('audio-player').paused);
     }
-    window.MobileShell = { open, settings, back, sync, resize };
+    function destroy() {
+        for (const { observer } of observations) observer.disconnect(); observations.length = 0;
+        if (syncFrame !== null) cancelAnimationFrame(syncFrame); syncFrame = null;
+        mobile.removeEventListener('change', resize);
+        const audio = byId('audio-player'); audio?.removeEventListener('play', syncPlayer); audio?.removeEventListener('pause', syncPlayer);
+    }
+    window.MobileShell = { open, settings, back, sync, resize, destroy };
     mobile.addEventListener('change', resize);
-    document.addEventListener('DOMContentLoaded', () => { resize(); });
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', resize, { once: true }); else resize();
+    window.addEventListener('pagehide', event => { if (syncFrame !== null) cancelAnimationFrame(syncFrame); syncFrame = null; if (!event.persisted) destroy(); });
+    document.addEventListener('visibilitychange', () => { if (!document.hidden && mobile.matches) sync(); });
 })();

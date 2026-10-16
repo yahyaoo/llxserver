@@ -1,5 +1,6 @@
 import type { RequestContext } from '../../common/http/RequestContext'
 import type { PlaylistServiceRuntime } from './PlaylistService'
+import { songIdentity } from './library/SongIdentity'
 
 /** 同账号喜欢操作串行提交，避免快速连点或并发请求丢失更新。 @author jingyh */
 const pending = new WeakMap<object, Promise<unknown>>()
@@ -32,15 +33,23 @@ export async function handleFavorites(context: RequestContext, runtime: Playlist
       respond(200, { success: true, items: (await manager.getListData()).loveList }); return
     }
     const input = JSON.parse(await runtime.readBody(req))
-    if (!input || typeof input.loved !== 'boolean' || !input.song || typeof input.song.id !== 'string' || !input.song.id.trim() || typeof input.song.name !== 'string') {
+    const validSong = (song: any) => song && typeof song.id === 'string' && song.id.trim() && typeof song.name === 'string'
+    const validChange = (change: any) => change && typeof change.loved === 'boolean' && validSong(change.song)
+    const changes = Array.isArray(input?.changes) ? input.changes : [input]
+    if (!input || changes.length > 10000 || !changes.every(validChange)) {
       respond(400, { success: false, error: '需要合法歌曲和喜欢状态' }); return
     }
     const work = (pending.get(manager) || Promise.resolve()).catch(() => {}).then(async () => {
-      if (input.loved) {
-        const location = input.location === 'top' || input.location === 'bottom' ? input.location : runtime.getUserConfig(username!)['list.addMusicLocationType']
-        await manager.listDataManage.listMusicAdd('love', [input.song], location)
-      } else await manager.listDataManage.listMusicRemove('love', [input.song.id])
-      await manager.createSnapshot()
+      // 批量请求逐项复用原增删规则，只写实际变化，保留其他设备的喜欢。 @author jingyh
+      let changed = false
+      for (const change of changes) {
+        const existing = (await manager.getListData()).loveList.filter(song => songIdentity().key(song) === songIdentity().key(change.song))
+        if (change.loved) {
+          const location = change.location === 'top' || change.location === 'bottom' ? change.location : runtime.getUserConfig(username!)['list.addMusicLocationType']
+          if (!existing.length) { await manager.listDataManage.listMusicAdd('love', [change.song], location); changed = true }
+        } else if (existing.length) { await manager.listDataManage.listMusicRemove('love', existing.map(song => song.id)); changed = true }
+      }
+      if (changed) await manager.createSnapshot()
       return (await manager.getListData()).loveList
     })
     pending.set(manager, work)

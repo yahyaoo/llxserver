@@ -6,6 +6,65 @@ const path = require('node:path');
 const vm = require('node:vm');
 const read = file => fs.readFileSync(path.join(__dirname, '..', file), 'utf8').replace(/\r\n/g, '\n');
 
+test('播放队列在抽屉外点击时关闭，内部点击和开关按钮不误关', () => {
+    const source = read('client/music/app.js');
+    const close = source.match(/function closeQueueDrawer\(\) \{[\s\S]*?\n\}/);
+    const outside = source.match(/function closeQueueDrawerOnOutsidePointerDown\(event\) \{[\s\S]*?\n\}/);
+    assert.ok(close && outside, '播放队列应有复用的关闭入口和外部点击处理');
+    assert.match(source, /document\.addEventListener\('pointerdown', closeQueueDrawerOnOutsidePointerDown\)/);
+    let opened = true, settingsClosed = 0;
+    const drawer = { classList: { contains: name => name === 'translate-x-full' && !opened, add: () => { opened = false; } },
+        contains: target => target === 'inside' };
+    const context = vm.createContext({ document: { getElementById: () => drawer },
+        window: { playbackExperience: { closeQueueSettings() { settingsClosed++; } } } });
+    vm.runInContext(close[0] + '\n' + outside[0], context);
+    context.closeQueueDrawerOnOutsidePointerDown({ target: { closest: () => null } });
+    assert.equal(opened, false); assert.equal(settingsClosed, 1);
+    opened = true;
+    context.closeQueueDrawerOnOutsidePointerDown({ target: 'inside' });
+    assert.equal(opened, true);
+    context.closeQueueDrawerOnOutsidePointerDown({ target: { closest: () => ({}) } });
+    assert.equal(opened, true);
+});
+
+test('播放队列歌曲行不提供音质与文件按钮', () => {
+    const source = read('client/music/app.js');
+    const start = source.indexOf('async function renderQueue()');
+    const end = source.indexOf('\nfunction playSongFromQueue', start);
+    const renderQueue = source.slice(start, end);
+    assert.ok(start >= 0, '播放队列渲染函数应存在');
+    assert.doesNotMatch(renderQueue, /SongFiles\?\.open|title="音质与文件"/);
+});
+
+test('播放器从本地定位信息重建认证地址，恢复播放无需先请求在线音源', async () => {
+    const source = read('client/music/app.js'), start = source.indexOf('    if ((song.isLocal', source.indexOf('async function fetchSongUrl('));
+    const block = source.slice(start, source.indexOf('\n    const shouldBypassServerCache', start));
+    const context = vm.createContext({ song: { isLocal: true, url: '/api/music/custom/file?token=expired', name: '本地歌曲' }, quality: 'flac', isRetry: false,
+        window: { MusicExperience: { playable: song => ({ ...song, url: '/api/music/custom/file?token=current' }) } }, console: { log() {} }, applyAutoProxy: async url => url });
+    const result = await vm.runInContext('(async function(){' + block + '})()', context);
+    assert.equal(result.url, '/api/music/custom/file?token=current');
+});
+
+test('等待元数据期间清除恢复信息或切换歌曲，不再异常或跳到旧进度', () => {
+    const source = read('client/music/app.js');
+    const start = source.indexOf('        if (noPlay) {', source.indexOf('playbackTracker.prepare(playbackSong'));
+    const block = source.slice(start, source.indexOf('\n        try {', start));
+    const prepare = () => {
+        let metadata;
+        const audio = { currentTime: 0, addEventListener(name, callback) { metadata = callback; } };
+        const context = vm.createContext({ window: { _resumeInfo: { time: 15 } }, audio, noPlay: true,
+            currentLoadingRequestId: 1, thisRequestId: 1, setPlayerStatus() {}, updatePlayButton() {} });
+        vm.runInContext('(function(){' + block + '})()', context);
+        return { context, audio, fire: () => metadata() };
+    };
+    const normal = prepare(); normal.fire(); assert.equal(normal.audio.currentTime, 15);
+    assert.equal(normal.context.window._resumeInfo, undefined);
+    const cleared = prepare(); delete cleared.context.window._resumeInfo;
+    assert.doesNotThrow(cleared.fire); assert.equal(cleared.audio.currentTime, 0);
+    const switched = prepare(); switched.context.currentLoadingRequestId = 2;
+    switched.fire(); assert.equal(switched.audio.currentTime, 0);
+});
+
 /** 可控时钟和最小 DOM，执行真实组件而不连接播放器与网络。 */
 function fixture() {
     let now = 0, next = 0, reduced = false;
@@ -143,7 +202,7 @@ test('主播放器等待长淡出时连续切歌，只允许最新请求暂停�
 test('自然播放提前按配置淡出，短曲只用后半段，拖回前面恢复用户音量', () => {
     const f = fixture(), app = read('client/music/app.js'), fades = [];
     const start = app.indexOf('    // 按配置提前淡出；短音频');
-    const end = app.indexOf("    document.getElementById('time-current')", start);
+    const end = app.indexOf('    refreshPlayerProgress();', start);
     Object.assign(f.context, { settings: { enableCrossfade: true }, audio: { paused: false, volume: 0.2 },
         currentVolume: 0.8, getCrossfadeDuration: () => 5000, fadeVolume: (...values) => fades.push(values),
     });

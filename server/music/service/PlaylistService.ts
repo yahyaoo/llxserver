@@ -1,7 +1,81 @@
 import type { RequestContext, ServerRuntime } from '../../common/http/RequestContext'
+import { getLibraryItems } from './download/ServerDownloadService'
 import { validatePlaylistCover } from './playlist/cover'
+import { aggregateLibrary } from './library/LibraryAggregationService'
+import { pageItems, pageEtag, parsePageQuery, type PageQuery } from './library/PagedListService'
+import crypto from 'node:crypto'
 /** 用户歌单、历史快照、缓存列表和平台歌单查询所需的应用依赖契约。 @author yahyaoo */
 export type PlaylistServiceRuntime = Pick<ServerRuntime, 'verifyUserAuth' | 'getUserSpace' | 'getUserDirname' | 'path' | 'storageFs' | 'readBody' | 'getUserConfig' | 'startupLog' | 'fileCache' | 'customMusicManager' | 'musicSdk' | 'normalizeSongInfo'>
+
+const sendPage = (context: RequestContext, scope: string, source: string, query: PageQuery, result: any) => {
+  const etag = pageEtag(scope, source, query, result)
+  if (context.req.headers['if-none-match'] === etag) { context.res.writeHead(304, { ETag: etag, 'Cache-Control': 'private, no-cache' }); context.res.end(); return }
+  context.res.writeHead(200, { ETag: etag, 'Content-Type': 'application/json', 'Cache-Control': 'private, no-cache' })
+  context.res.end(JSON.stringify(result))
+}
+
+const pageQuery = (urlObj: URL, sorts: string[], sort: string, order: 'asc' | 'desc' = 'desc') => parsePageQuery(urlObj, { sorts, sort, order })
+const listVersion = (items: any[]) => crypto.createHash('sha1').update(items.map(item => `${item.id || item.filename || ''}:${item.mtime || item.time || ''}:${item.updatedAt || ''}`).join('|')).digest('hex').slice(0, 16)
+
+/** 分页读取缓存库，旧 cache/list 接口保持不变。 */
+export async function getMusicCachePage(context: RequestContext, runtime: PlaylistServiceRuntime) {
+  const { urlObj, req, res } = context
+  const target = urlObj.searchParams.get('user') || (req.headers['x-user-name'] as string) || runtime.verifyUserAuth(req) || ''
+  const auth = req.headers['x-frontend-auth']; const isAdmin = !!auth && auth === global.lx.config['frontend.password']
+  const isPublic = !target || target === 'default' || target === '_open'
+  let username = target
+  if (isPublic) {
+    const verified = runtime.verifyUserAuth(req)
+    if (!global.lx.config['user.enablePublicNonAdminLocalMusic'] && !isAdmin && !verified) { res.writeHead(403); res.end(JSON.stringify({ success: false, message: '您没有权限查看此目录，请联系管理员设置' })); return }
+    username = '_open'
+  } else { username = runtime.verifyUserAuth(req) || ''; if (!username) { res.writeHead(401); res.end(JSON.stringify({ success: false, message: 'Unauthorized' })); return } }
+  try {
+    const query = pageQuery(urlObj, ['name', 'singer', 'album', 'time'], 'time')
+    const [cached, custom] = await Promise.all([runtime.fileCache.getCacheList(username), username === '_open' ? Promise.resolve([]) : (typeof runtime.customMusicManager.getCustomRawItems === 'function' ? Promise.resolve(runtime.customMusicManager.getCustomRawItems(username)) : runtime.customMusicManager.getCustomMusicList(username))])
+    const mappedCustom = username === '_open' ? custom : custom.map((item: any) => typeof runtime.customMusicManager.mapCustomMusicItem === 'function' ? runtime.customMusicManager.mapCustomMusicItem(item) : item)
+    const list = aggregateLibrary(username, [...cached, ...mappedCustom, ...getLibraryItems(username)])
+    const result = pageItems(list, query, { version: listVersion(list), scope: username + ':cache', text: item => `${(item as any).name || ''} ${(item as any).singer || ''} ${(item as any).albumName || (item as any).album || ''}`, sort: { name: item => (item as any).name || '', singer: item => (item as any).singer || '', album: item => (item as any).albumName || (item as any).album || '', time: item => Number((item as any).mtime || (item as any).time || 0) } })
+    sendPage(context, username || '_open', 'cache', query, { ...result, scan: runtime.customMusicManager.getScanStatus(username) })
+  } catch (error: any) { res.writeHead(error.statusCode || 500); res.end(JSON.stringify({ success: false, message: error.message })) }
+}
+
+/** 分页读取自定义目录，单条结构与旧 custom/list 兼容。 */
+export async function getMusicCustomPage(context: RequestContext, runtime: PlaylistServiceRuntime) {
+  const { req, res, urlObj } = context; const username = runtime.verifyUserAuth(req)
+  if (!username) { res.writeHead(401); res.end(JSON.stringify({ success: false, message: 'Unauthorized' })); return }
+  try {
+    const query = pageQuery(urlObj, ['name', 'singer', 'album', 'mtime', 'interval'], 'mtime')
+    if (typeof runtime.customMusicManager.getCustomMusicPage === 'function') {
+      const result = runtime.customMusicManager.getCustomMusicPage(username, query, urlObj.searchParams.get('directoryId') || undefined)
+      sendPage(context, username, 'custom', query, result)
+      return
+    }
+    const list = await runtime.customMusicManager.getCustomMusicList(username)
+    const directoryId = urlObj.searchParams.get('directoryId'); const selected = directoryId ? list.filter((item: any) => item.directoryId === directoryId) : list
+    const result = pageItems(selected, query, { text: item => `${(item as any).name || ''} ${(item as any).singer || ''} ${(item as any).album || ''}`, sort: { name: item => (item as any).name || '', singer: item => (item as any).singer || '', album: item => (item as any).album || '', mtime: item => Number((item as any).mtime || 0), interval: item => Number((item as any).interval || 0) } })
+    sendPage(context, username, 'custom', query, { ...result, scan: runtime.customMusicManager.getScanStatus(username) })
+  } catch (error: any) { res.writeHead(error.statusCode || 500); res.end(JSON.stringify({ success: false, message: error.message })) }
+}
+
+/** 返回歌单元信息，不读取歌曲到响应。 */
+export async function getUserListMeta(context: RequestContext, runtime: PlaylistServiceRuntime) {
+  const username = runtime.verifyUserAuth(context.req); if (!username) { context.res.writeHead(401); context.res.end(JSON.stringify({ success: false, message: 'Unauthorized' })); return }
+  const data: any = await runtime.getUserSpace(username).listManage.getListData(); const lists = [{ id: 'default', name: '默认列表', list: data.defaultList }, { id: 'love', name: '我喜欢', list: data.loveList }, ...(data.userList || [])]
+  const meta = lists.map((list: any) => ({ id: list.id, name: list.name, count: Array.isArray(list.list) ? list.list.length : 0, updatedAt: list.updatedAt || 0, cover: list.cover || list.list?.slice(0, 20).find((song: any) => song.img)?.img }))
+  const version = `l-${cryptoHash(JSON.stringify(meta))}`
+  context.res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'private, no-cache' }); context.res.end(JSON.stringify({ version, lists: meta }))
+}
+
+/** 分页读取一个歌单的只读歌曲视图。 */
+export async function getUserListSongs(context: RequestContext, runtime: PlaylistServiceRuntime) {
+  const username = runtime.verifyUserAuth(context.req); if (!username) { context.res.writeHead(401); context.res.end(JSON.stringify({ success: false, message: 'Unauthorized' })); return }
+  const id = context.urlObj.searchParams.get('id'); if (!id) { context.res.writeHead(400); context.res.end(JSON.stringify({ success: false, message: '缺少歌单 id' })); return }
+  const data: any = await runtime.getUserSpace(username).listManage.getListData(); const list = id === 'default' ? data.defaultList : id === 'love' ? data.loveList : data.userList?.find((item: any) => item.id === id)?.list
+  if (!list) { context.res.writeHead(404); context.res.end(JSON.stringify({ success: false, message: '歌单不存在' })); return }
+  try { const query = pageQuery(context.urlObj, ['name', 'singer', 'album'], 'name', 'asc'); const result = pageItems(list, query, { text: song => `${(song as any).name || ''} ${(song as any).singer || ''} ${(song as any).albumName || ''}`, sort: { name: song => (song as any).name || '', singer: song => (song as any).singer || '', album: song => (song as any).albumName || '' } }); sendPage(context, username, `list:${id}`, query, result) } catch (error: any) { context.res.writeHead(error.statusCode || 500); context.res.end(JSON.stringify({ success: false, message: error.message })) }
+}
+
+const cryptoHash = (value: string) => require('node:crypto').createHash('sha1').update(value).digest('hex').slice(0, 16)
 /** 用户歌单、历史快照、缓存列表和平台歌单查询服务。 @author yahyaoo */
 
 /**
@@ -726,7 +800,7 @@ export async function getMusicCacheList(context: RequestContext, runtime: Playli
   const { verifyUserAuth, fileCache } = runtime
 
         const targetUserParam = urlObj.searchParams.get('user')
-        const reqUsername = targetUserParam || (req.headers['x-user-name'] as string) || ''
+        const reqUsername = targetUserParam || (req.headers['x-user-name'] as string) || verifyUserAuth(req) || ''
         const auth = req.headers['x-frontend-auth']
         const isAdmin = !!(auth && auth === global.lx.config['frontend.password'])
         const isPublic = !reqUsername || reqUsername === 'default' || reqUsername === '_open' || targetUserParam === '_open'
@@ -756,12 +830,13 @@ export async function getMusicCacheList(context: RequestContext, runtime: Playli
           }
           username = verified
         }
-        void fileCache.getCacheList(username).then(list => {
+        void Promise.all([fileCache.getCacheList(username), username === '_open' ? Promise.resolve([]) : runtime.customMusicManager.getCustomMusicList(username)]).then(([cached, custom]) => {
+          const list = aggregateLibrary(username, [...cached, ...custom, ...getLibraryItems(username)])
           res.writeHead(200, {
             'Content-Type': 'application/json',
             'Cache-Control': 'no-cache, no-store, must-revalidate',
           })
-          res.end(JSON.stringify({ success: true, data: list }))
+          res.end(JSON.stringify({ success: true, data: list, scan: runtime.customMusicManager.getScanStatus(username) }))
         }).catch(err => {
           res.writeHead(500)
           res.end(err.message)

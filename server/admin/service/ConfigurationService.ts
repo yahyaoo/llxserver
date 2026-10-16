@@ -4,7 +4,7 @@ import { SystemConfigurationImportService } from './configuration/SystemConfigur
 import { repositories } from '../../application/persistence/storage'
 import type { RequestContext, ServerRuntime } from '../../common/http/RequestContext'
 /** 系统配置、旧配置导入、本地配置备份与代理连接测试所需的应用依赖契约。 @author yahyaoo */
-export type ConfigurationServiceRuntime = Pick<ServerRuntime, 'serverDownloads' | 'appUpdates' | 'path' | 'readBody' | 'validateCustomDirectoryUpdates' | 'storageFs' | 'saveUsers' | 'getSyncDownloadData' | 'migrateSyncStorage' | 'updateAllUserSnapshotDirs' | 'reloadServerData' | 'needle' | 'databaseLocation'>
+export type ConfigurationServiceRuntime = Pick<ServerRuntime, 'serverDownloads' | 'appUpdates' | 'path' | 'readBody' | 'validateCustomDirectoryUpdates' | 'storageFs' | 'saveUsers' | 'getSyncDownloadData' | 'migrateSyncStorage' | 'updateAllUserSnapshotDirs' | 'reloadServerData' | 'needle' | 'databaseLocation'> & Partial<Pick<ServerRuntime, 'refreshLibraryBackground'>>
 /** 系统配置、旧配置导入、本地配置备份与代理连接测试服务。 @author yahyaoo */
 
 /**
@@ -27,7 +27,7 @@ export async function handleConfig(context: RequestContext, runtime: Configurati
 
         if (req.method === 'GET') {
           const config = {
-            ...Object.fromEntries(Object.entries(global.lx.config).filter(([key]) => key !== "users" && key !== "update.token")),
+            ...Object.fromEntries(Object.entries(global.lx.config).filter(([key]) => !key.startsWith('webdav.') && key !== "users" && key !== "update.token")),
             ...runtime.databaseLocation.paths(),
             additionalFields: additionalConfigurationFields,
             serverName: global.lx.config.serverName,
@@ -57,16 +57,6 @@ export async function handleConfig(context: RequestContext, runtime: Configurati
             'frontend.password': global.lx.config['frontend.password'],
             'player.enableAuth': global.lx.config['player.enableAuth'] || false,
             'player.password': global.lx.config['player.password'] || '',
-            'webdav.enable': global.lx.config['webdav.enable'] ?? false,
-            'webdav.url': global.lx.config['webdav.url'] || '',
-            'webdav.username': global.lx.config['webdav.username'] || '',
-            'webdav.password': global.lx.config['webdav.password'] || '',
-            'webdav.syncPath': global.lx.config['webdav.syncPath'] || '/lx-sync',
-            'webdav.backupPath': global.lx.config['webdav.backupPath'] || '/lx-sync-backups',
-            'sync.interval': global.lx.config['sync.interval'] || 60,
-            'sync.backupInterval': global.lx.config['sync.backupInterval'] || 24,
-            'webdav.excludeCache': global.lx.config['webdav.excludeCache'] ?? false,
-            'webdav.excludeMusic': global.lx.config['webdav.excludeMusic'] ?? false,
             'proxy.all.enabled': global.lx.config['proxy.all.enabled'] || false,
             'proxy.all.address': global.lx.config['proxy.all.address'] || '',
             // 三类细分代理：enabled 为 undefined 表示「沿用上面的统一开关」
@@ -126,12 +116,12 @@ export async function handleConfig(context: RequestContext, runtime: Configurati
         }
 
         if (req.method === 'POST') {
-          void readBody(req).then(body => {
+          void readBody(req).then(async body => {
             try {
               const previousConfig = { ...global.lx.config }
               const newConfig = JSON.parse(body)
               const additional = validateAdditionalConfiguration(newConfig)
-              const customDirectoryUpdates = validateCustomDirectoryUpdates(newConfig['user.customMusicDirectories'])
+              const customDirectoryUpdates = await validateCustomDirectoryUpdates(newConfig['user.customMusicDirectories'])
               const nameTemplate = newConfig['download.nameTemplate'] === undefined ? undefined : serverDownloads.validateNameTemplate(newConfig['download.nameTemplate'])
               const updateServer = newConfig['update.server'] === undefined ? undefined : appUpdates.validateUpdateServer(newConfig['update.server'])
               if (newConfig['update.enabled'] !== undefined && typeof newConfig['update.enabled'] !== 'boolean') throw new Error('检查更新开关格式错误')
@@ -197,18 +187,6 @@ export async function handleConfig(context: RequestContext, runtime: Configurati
               // Web播放器配置
               if (newConfig['player.enableAuth'] !== undefined) global.lx.config['player.enableAuth'] = newConfig['player.enableAuth']
               if (newConfig['player.password'] !== undefined) global.lx.config['player.password'] = newConfig['player.password']
-
-              // WebDAV 配置
-              if (newConfig['webdav.enable'] !== undefined) global.lx.config['webdav.enable'] = newConfig['webdav.enable']
-              if (newConfig['webdav.url'] !== undefined) global.lx.config['webdav.url'] = newConfig['webdav.url']
-              if (newConfig['webdav.username'] !== undefined) global.lx.config['webdav.username'] = newConfig['webdav.username']
-              if (newConfig['webdav.password'] !== undefined) global.lx.config['webdav.password'] = newConfig['webdav.password']
-              if (newConfig['webdav.syncPath'] !== undefined) global.lx.config['webdav.syncPath'] = newConfig['webdav.syncPath']
-              if (newConfig['webdav.backupPath'] !== undefined) global.lx.config['webdav.backupPath'] = newConfig['webdav.backupPath']
-              if (newConfig['sync.interval'] !== undefined) global.lx.config['sync.interval'] = parseInt(newConfig['sync.interval'])
-              if (newConfig['sync.backupInterval'] !== undefined) global.lx.config['sync.backupInterval'] = parseInt(newConfig['sync.backupInterval']) || 24
-              if (newConfig['webdav.excludeCache'] !== undefined) global.lx.config['webdav.excludeCache'] = !!newConfig['webdav.excludeCache']
-              if (newConfig['webdav.excludeMusic'] !== undefined) global.lx.config['webdav.excludeMusic'] = !!newConfig['webdav.excludeMusic']
               const validateAndCleanProxy = (addr: any) => {
                 if (!addr || typeof addr !== 'string') return ''
                 const trimmed = addr.trim()
@@ -376,30 +354,16 @@ export async function handleConfig(context: RequestContext, runtime: Configurati
                   const migrated = runtime.databaseLocation.move({ 'database.adminPath': newConfig['database.adminPath'], 'database.musicPath': newConfig['database.musicPath'] })
                   if (migrated.warning) warning += migrated.warning
                 } catch (error) {
-                  // 迁库失败前尚未更新 WebDAV 或用户目录，恢复当前配置对象以保留调用方引用。
+                  // 迁库失败前尚未更新用户目录，恢复当前配置对象以保留调用方引用。
                   Object.assign(global.lx.config, previousConfig)
                   for (const key of Object.keys(global.lx.config)) if (!(key in previousConfig)) delete (global.lx.config as any)[key]
                   throw error
                 }
               }
 
-              // 更新 WebDAVSync 配置
-              if (global.lx.webdavSync && (newConfig['webdav.enable'] !== undefined || newConfig['webdav.url'] || newConfig['webdav.username'] || newConfig['webdav.password'] || newConfig['webdav.syncPath'] || newConfig['webdav.backupPath'] || newConfig['sync.interval'] || newConfig['sync.backupInterval'] || newConfig['webdav.excludeCache'] !== undefined || newConfig['webdav.excludeMusic'] !== undefined)) {
-                global.lx.webdavSync.updateConfig({
-                  enable: global.lx.config['webdav.enable'],
-                  url: global.lx.config['webdav.url'],
-                  username: global.lx.config['webdav.username'],
-                  password: global.lx.config['webdav.password'],
-                  syncPath: global.lx.config['webdav.syncPath'],
-                  backupPath: global.lx.config['webdav.backupPath'],
-                  interval: global.lx.config['sync.interval'],
-                  backupInterval: global.lx.config['sync.backupInterval'],
-                  excludeCache: global.lx.config['webdav.excludeCache'],
-                  excludeMusic: global.lx.config['webdav.excludeMusic'],
-                })
-              }
-
               for (const update of customDirectoryUpdates) {
+                repositories().admin.saveMusicDirectories(update.user.name, update.directories)
+                ;(update.user as any).musicDirectoriesMigrated = true
                 update.user.customMusicDir = update.directory
                 update.user.enableCustomMusicDir = update.enabled
               }
@@ -413,15 +377,11 @@ export async function handleConfig(context: RequestContext, runtime: Configurati
                 } catch (error: any) { console.error('[用户目录] 保存后的目录迁移失败:', error.message) }
               }
               global.lx.saveConfig()
+              runtime.refreshLibraryBackground?.()
 
               // 动态热迁移所有活跃用户空间的快照目录
               if (newConfig['snapshot.backupPath'] !== undefined) {
                 updateAllUserSnapshotDirs(global.lx.config['snapshot.backupPath'])
-              }
-
-              // 触发一次 WebDAV 同步检查（如果已配置）
-              if (global.lx.webdavSync && global.lx.webdavSync.isConfigured()) {
-                void global.lx.webdavSync.syncChangedFiles()
               }
 
               res.writeHead(200)
@@ -699,6 +659,7 @@ export async function postConfigBackupsRestore(context: RequestContext, runtime:
             // 还原业务配置到管理库，禁止覆盖数据库引导文件。
             const imported = new SystemConfigurationImportService(repositories().admin).import(storageFs.readFileSync(filePath, 'utf8'), global.lx.config, global.lx.configPath)
             global.lx.config = imported.config
+            runtime.refreshLibraryBackground?.()
 
             // 执行服务器热重载数据
             await reloadServerData()
@@ -798,6 +759,7 @@ export async function postConfigurationImport(context: RequestContext, runtime: 
     const previousPassword = global.lx.config['frontend.password']
     const imported = new SystemConfigurationImportService(repositories().admin).import(body.content, global.lx.config, global.lx.configPath)
     global.lx.config = imported.config
+    runtime.refreshLibraryBackground?.()
     await runtime.reloadServerData()
     runtime.updateAllUserSnapshotDirs(global.lx.config['snapshot.backupPath'])
     res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ ...imported.result, authenticationChanged: previousPassword !== imported.config['frontend.password'] }))

@@ -1,5 +1,6 @@
 /** 账号会话存储及访问检查，禁止使用保存的密码自动登录。 */
 (() => {
+    const nativeFetch = window.fetch.bind(window);
     const keys = ['lx_user_token', 'lx_user_expires_at', 'lx_remember_me'];
     const getToken = () => sessionStorage.getItem('lx_user_token') || localStorage.getItem('lx_user_token');
     const clear = () => {
@@ -29,7 +30,7 @@
     };
     const verify = async () => {
         const token = getToken();
-        const response = await fetch('/api/user/auth/verify', { headers: token ? { 'x-user-token': token } : {}, cache: 'no-store' });
+        const response = await nativeFetch('/api/user/auth/verify', { headers: token ? { 'x-user-token': token } : {}, cache: 'no-store' });
         const data = await response.json();
         if (!response.ok || !data.valid) return null;
         if (data.token) save(data);
@@ -39,15 +40,25 @@
     window.AccountSession = { getToken, save, clear, verify, loginUrl, redirect };
     if (document.documentElement.dataset.accountPage === 'login') return;
     document.documentElement.style.visibility = 'hidden';
-    window.accountReady = verify().then(data => {
+    window.accountReady = verify().then(async data => {
         if (!data) { redirect(); return null; }
         localStorage.setItem('lx_sync_user', data.username);
+        const cached = await window.ClientData.load();
+        // 登录页已准备快照；直达主界面的有效会话在显示界面前完成一次预加载。
+        if (!Object.keys(cached).length || sessionStorage.getItem('lx_client_bootstrap_ready') !== data.username) await window.ClientData.bootstrap();
+        sessionStorage.removeItem('lx_client_bootstrap_ready');
         document.documentElement.style.visibility = '';
+        window.ClientTransport.start();
         return data;
     }).catch(() => { redirect(); return null; });
-    window.addEventListener('pageshow', event => { if (event.persisted) verify().then(data => { if (!data) redirect(); }).catch(redirect); });
-    const originalFetch = window.fetch.bind(window);
+    window.addEventListener('pageshow', event => { if (event.persisted) window.ClientTransport.start(); });
+    const originalFetch = nativeFetch;
     window.fetch = async (input, options) => {
+        const address = new URL(typeof input === 'string' ? input : input.url, location.origin);
+        const method = options?.method || input?.method || 'GET';
+        if (method === 'GET' && address.pathname === '/api/user/auth/verify' && address.origin === location.origin) return new Response(JSON.stringify(await window.accountReady), { headers: { 'Content-Type': 'application/json' } });
+        // 缓存接口名单只覆盖账号和本地资料读取；在线搜索、媒体和显式业务操作沿用原接口。
+        if (method === 'GET' && address.origin === location.origin && window.ClientData.isCached(address.pathname)) return window.ClientData.request(address.href, options);
         const response = await originalFetch(input, options);
         const url = typeof input === 'string' ? input : input.url;
         if (response.status === 401 && /\/api\/(music|user)\//.test(url) && !url.includes('/auth/verify') && !url.endsWith('/login')) redirect();

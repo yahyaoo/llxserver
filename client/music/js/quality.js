@@ -85,6 +85,7 @@ function getSelectableQualities(songInfo) {
 function getBestQuality(songInfo, userPreference = '320k') {
     if (!songInfo) return '128k';
 
+    if (songInfo.isLocal && songInfo.quality && songInfo.quality !== 'custom') return songInfo.quality;
     const availableQualities = getAvailableQualities(songInfo);
     if (availableQualities.length === 0) {
         console.warn('[Quality] 歌曲无音质信息，使用默认 128k');

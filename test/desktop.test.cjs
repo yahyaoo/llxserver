@@ -39,6 +39,38 @@ test('桌面交付目录保留主页与仓库元数据，单架构构建只传�
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
 
+/** 验证桌面服务端过滤界面后保留真实共享脚本，不访问下载服务。 @author jingyh */
+test('桌面服务端后端目录保留歌曲标识脚本，排除界面资源', async () => {
+  // 按目标平台准备运行时名称，同时验证 Unix 权限分支，避免只在 Windows 通过。作者：jingyh
+  for (const platform of ['win32', 'linux', 'darwin']) {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'llx-desktop-shared-'));
+    const source = path.join(root, 'output/llxserver-server');
+    const runtime = path.join(root, 'runtime', platform === 'win32' ? 'node.exe' : 'node');
+    try {
+      for (const relative of ['deploy/desktop', 'output/llxserver-server/client/music/js', 'runtime']) fs.mkdirSync(path.join(root, relative), { recursive: true });
+      fs.writeFileSync(path.join(source, 'config.js'), 'module.exports={}');
+      fs.copyFileSync(path.join(__dirname, '../client/music/js/song_identity.js'), path.join(source, 'client/music/js/song_identity.js'));
+      fs.writeFileSync(path.join(source, 'client/index.html'), '界面资源不应进入后端');
+      fs.writeFileSync(path.join(root, 'deploy/desktop/backend.cjs'), 'backend');
+      fs.writeFileSync(runtime, 'runtime'); fs.writeFileSync(path.join(root, 'runtime/LICENSE'), 'license');
+      const sandbox = { module: { exports: {} }, __dirname: path.join(root, 'deploy/scripts'), process: { ...process, platform, env: { ...process.env, npm_execpath: 'npm-cli.js' } }, console, require: name => {
+        if (name === 'node:child_process') return { execFileSync: () => {} };
+        if (name === './package.cjs') return { packageApplication: async mode => assert.equal(mode, 'server') };
+        if (name === './node-runtime.cjs') return { version: '22.22.3', prepareNodeRuntime: async () => runtime };
+        if (name === path.join(root, 'package.json')) return { version: '2.1.5', license: 'Apache-2.0' };
+        if (name === path.join(root, 'node_modules/electron/package.json')) return { version: '43.7.5' };
+        return require(name);
+      } };
+      vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../deploy/scripts/desktop.cjs'), 'utf8'), sandbox);
+      await sandbox.module.exports.buildDesktop('server', ['--x64']);
+      const backend = path.join(root, `output/desktop-server-${platform}-x64/backend`);
+      assert.equal(fs.existsSync(path.join(backend, 'client/index.html')), false);
+      const identity = require(path.join(backend, 'client/music/js/song_identity.js'));
+      assert.equal(identity.aggregate([{ source: 'kw', id: 'desktop-song' }, { source: 'kw', id: 'desktop-song' }]).length, 1);
+    } finally { fs.rmSync(root, { recursive: true, force: true }); }
+  }
+});
+
 /**
  * 执行桌面入口并记录窗口、托盘和网关调用，不触碰真实桌面或用户配置。
  * @param {string} role server 或 client。

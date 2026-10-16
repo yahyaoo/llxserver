@@ -1,14 +1,19 @@
+import { ClientChannel, cacheVersions } from './ClientChannel'
+import { getMusicDirectories, validateDirectories, checkDirectory } from '../library/MusicDirectoryService'
 import { ApiTokenStore } from '../auth/ApiTokenStore'
 import { handleAccount } from '../../music/service/AccountService'
 import { UserSessionStore, USER_SESSION_COOKIE, ADMIN_SESSION_COOKIE, ADMIN_USERNAME } from '../auth/UserSessionStore'
 import { proxyRemoteRequest } from '../auth/RemoteSessionGateway'
 import { clientFileExists, clientMetadata, externalClient } from './ClientAssets'
+import { deliverStatic } from './StaticDelivery'
 import { DatabaseLocationService } from '../persistence/DatabaseLocationService'
 import { reloadActiveUserSpaces } from '../../user'
 import type { UserToken } from '../../common/model/dto/UserTokenDto'
 import { GlobalConfigurationService } from '../../admin/service/GlobalConfigurationService'
 import defaultConfig from '../../defaultConfig'
 import { BrowserStorageService } from '../../music/service/configuration/BrowserStorageService'
+import { handleLibraryAdmin, startLibraryBackground, stopLibraryBackground, refreshLibraryBackground } from '../../music/service/library/LibraryBackgroundService'
+import { installLibraryReadGuard } from '../../music/service/library/LibraryFileGuard'
 import { BrowserStorageRepository } from '../../music/repository/BrowserStorageRepository'
 /** 服务装配与 HTTP 路由：初始化依赖、同步 WebSocket、播放器鉴权和媒体响应。 @author yahyaoo */
 import * as adminOperationsController from '../../admin/controller/OperationsController'
@@ -28,6 +33,7 @@ import * as musicLibraryController from '../../music/controller/LibraryControlle
 import * as musicDownloadController from '../../music/controller/DownloadController'
 import * as musicSettingsController from '../../music/controller/SettingsController'
 import { handleExperience } from '../../music/controller/ExperienceController'
+import { startNotificationPersistence } from '../../music/service/NotificationService'
 import * as musicDiscoveryController from '../../music/controller/DiscoveryController'
 import * as adminSourceController from '../../admin/controller/SourceController'
 import * as adminConfigurationController from '../../admin/controller/ConfigurationController'
@@ -65,6 +71,8 @@ import * as fileCache from '../../music/service/cache/FileCacheService'
 import * as customMusicManager from '../../music/service/library/CustomMusicService'
 import * as serverDownloadQueue from '../../music/service/download/ServerDownloadQueueService'
 import * as serverDownloads from '../../music/service/download/ServerDownloadService'
+import { startMaintenance } from '../../music/service/library/MusicMaintenanceService'
+import { getMusicTasks } from '../../music/service/library/MusicTaskService'
 import * as appUpdates from '../../integrations/update/UpdateGateway'
 import * as remasterQueue from '../../music/service/download/RemasterQueueService'
 import * as scheduler from '../../music/service/task/SchedulerService'
@@ -577,6 +585,7 @@ const saveUsers = () => {
       'list.addMusicLocationType': u['list.addMusicLocationType'],
       enableCustomMusicDir: u.enableCustomMusicDir,
       customMusicDir: u.customMusicDir,
+      musicDirectoriesMigrated: (u as any).musicDirectoriesMigrated,
       allowOperateCustomMusicDir: u.allowOperateCustomMusicDir,
       allowWriteCustomMusicDir: u.allowWriteCustomMusicDir,
       enableAutoDownload: u.enableAutoDownload,
@@ -592,23 +601,22 @@ const saveUsers = () => {
 }
 
 /** 统一保存目录前完成全部校验，仅允许修改现有用户的目录字段。 @author yahyaoo */
-const validateCustomDirectoryUpdates = (value: unknown) => {
+const validateCustomDirectoryUpdates = async (value: unknown) => {
   if (value === undefined) return []
   if (!Array.isArray(value) || value.length > global.lx.config.users.length) throw new Error('用户歌曲目录配置格式错误')
   const names = new Set<string>()
-  return value.map(entry => {
-    if (!entry || typeof entry.name !== 'string' || typeof entry.customMusicDir !== 'string' || typeof entry.enableCustomMusicDir !== 'boolean' || names.has(entry.name)) throw new Error('用户歌曲目录配置格式错误')
+  const result = []
+  for (const entry of value) {
+    if (!entry || typeof entry.name !== 'string' || typeof entry.enableCustomMusicDir !== 'boolean' || names.has(entry.name)) throw new Error('用户歌曲目录配置格式错误')
     const user = global.lx.config.users.find(user => user.name === entry.name)
     if (!user) throw new Error('目录所属用户不存在')
     names.add(entry.name)
-    const directory = entry.customMusicDir.trim()
-    if (entry.enableCustomMusicDir && !directory) throw new Error(`用户 ${entry.name} 启用歌曲目录时必须填写绝对路径`)
-    if (directory) {
-      if (!path.isAbsolute(directory) || /[<>"|?*\x00-\x1f]/.test(directory)) throw new Error(`用户 ${entry.name} 的歌曲目录必须是有效绝对路径`)
-      try { storageFs.mkdirSync(directory, { recursive: true }); storageFs.accessSync(directory, storageFs.constants.R_OK) } catch { throw new Error(`用户 ${entry.name} 的歌曲目录无法访问，请检查路径与应用目录权限`) }
-    }
-    return { user, directory, enabled: entry.enableCustomMusicDir, oldDirectory: user.customMusicDir || '', oldEnabled: !!user.enableCustomMusicDir }
-  })
+    const values = entry.directories ?? (entry.customMusicDir?.trim() ? [{ path: entry.customMusicDir, scanMinutes: 30 }] : [])
+    const directories = await validateDirectories(entry.name, values)
+    if (entry.enableCustomMusicDir && !directories.length) throw new Error('启用歌曲目录时必须填写目录')
+    result.push({ user, directories, directory: directories[0]?.path || '', enabled: entry.enableCustomMusicDir, oldDirectory: user.customMusicDir || '', oldEnabled: !!user.enableCustomMusicDir })
+  }
+  return result
 }
 
 /** [新增] 服务器内部热重载数据 */
@@ -628,18 +636,6 @@ const reloadServerData = async () => {
         }
       }
 
-      // 如果有 WebDAV 同步实例，手动同步其配置
-      if (global.lx.webdavSync) {
-        global.lx.webdavSync.updateConfig({
-          url: global.lx.config['webdav.url'],
-          username: global.lx.config['webdav.username'],
-          password: global.lx.config['webdav.password'],
-          syncPath: global.lx.config['webdav.syncPath'],
-          backupPath: global.lx.config['webdav.backupPath'],
-          interval: global.lx.config['sync.interval'],
-          backupInterval: global.lx.config['sync.backupInterval'],
-        })
-      }
       startupLog.info(`Config re-loaded and merged from ${configPath}.`)
     } catch (err: any) {
       startupLog.error('Failed to reload config file:', err.message)
@@ -680,6 +676,7 @@ const reloadServerData = async () => {
   }
 
   await reloadActiveUserSpaces()
+  refreshLibraryBackground()
 
   return true
 }
@@ -984,49 +981,7 @@ const serveStatic = (req: IncomingMessage, res: http.ServerResponse, filePath: s
     return
   }
 
-  try {
-    const stats = storageFs.statSync(filePath)
-    const mtime = stats.mtime.getTime()
-    const etag = `W/"${stats.size}-${mtime}"`
-    const lastModified = stats.mtime.toUTCString()
-
-    // Check Cache Validity (Conditional Requests)
-    if (req.headers['if-none-match'] === etag || req.headers['if-modified-since'] === lastModified) {
-      res.writeHead(304)
-      res.end()
-      return
-    }
-
-    storageFs.readFile(filePath, (err, content) => {
-      if (err) {
-        if (err.code === 'ENOENT') {
-          res.writeHead(404)
-          res.end('Not Found')
-        } else {
-          res.writeHead(500)
-          res.end('Server Error')
-        }
-      } else {
-        res.writeHead(200, {
-          'Content-Type': contentType,
-          'ETag': etag,
-          'Last-Modified': lastModified,
-          'Cache-Control': 'no-cache, must-revalidate', // Force browser to revalidate every time
-          'Pragma': 'no-cache',
-          'Expires': '0',
-        })
-        res.end(content, 'utf-8')
-      }
-    })
-  } catch (err: any) {
-    if (err.code === 'ENOENT') {
-      res.writeHead(404)
-      res.end('Not Found')
-    } else {
-      res.writeHead(500)
-      res.end('Server Error')
-    }
-  }
+  void deliverStatic(req, res, filePath, contentType)
 }
 
 /** 应用能力装配，状态通过 getter 保留热更新，避免两个域直接依赖。 @author yahyaoo */
@@ -1089,6 +1044,7 @@ export function createServerRuntime() {
     get playerSessions() { return playerSessions },
     get readBody() { return readBody },
     get reloadServerData() { return reloadServerData },
+    get refreshLibraryBackground() { return refreshLibraryBackground },
     get remasterQueue() { return remasterQueue },
     get removeUpdatedListId() { return removeUpdatedListId },
     get renameUserSpace() { return renameUserSpace },
@@ -1118,7 +1074,7 @@ export function createServerRuntime() {
 
 const handleStartServer = async (port = 9527, ip = '0.0.0.0') => await new Promise((resolve, reject) => {
   const serverRuntime = createServerRuntime()
-  const httpServer = http.createServer(async (req, res) => {
+  const requestHandler = async (req: http.IncomingMessage, res: http.ServerResponse): Promise<void> => {
     // CORS 跨域处理
     res.setHeader('Access-Control-Allow-Origin', '*')
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS')
@@ -1132,10 +1088,16 @@ const handleStartServer = async (port = 9527, ip = '0.0.0.0') => await new Promi
     }
 
     const ip = getIP(req)
-    accessLog.info(`${req.method} ${req.url} from ${ip}`)
+    if (!(req as any).clientDispatch) accessLog.info(`${req.method} ${req.url} from ${ip}`)
     // console.log(req.url)
     const urlObj = new URL(req.url ?? '', `http://${req.headers.host}`)
     const pathname = urlObj.pathname
+    if (!(req as any).clientDispatch && req.method !== 'GET') res.once('finish', () => {
+      if (res.statusCode >= 300) return
+      const scoped = /^\/api\/(user\/|music\/(storage|cache|library|custom)\/)/.test(pathname)
+      const owner = scoped ? (req.headers['x-user-name'] === '_open' || urlObj.searchParams.get('user') === '_open' ? '_open' : verifyUserAuth(req) || undefined) : undefined
+      clientChannel.notify(pathname, owner)
+    })
 
     // 远程账号通过当前入口访问远端接口，Cookie 与管理员凭据不转发。
     // 已有播放器音频链接携带会话令牌，沿用其访问方式。
@@ -1167,6 +1129,19 @@ const handleStartServer = async (port = 9527, ip = '0.0.0.0') => await new Promi
     if (accountApi && !authEntry && !verifyUserAuth(req) && !adminAuthenticated) {
       res.writeHead(401, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' })
       res.end(JSON.stringify({ success: false, message: '请登录后访问系统' }))
+      return
+    }
+
+    if (await handleLibraryAdmin(req, res, urlObj)) return
+
+    if (pathname === '/api/user/client-bootstrap' && req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' })
+      const entries = await clientChannel.snapshot(req)
+      res.end(JSON.stringify({ entries, versions: cacheVersions(entries) })); return
+    }
+    if (pathname === '/api/user/client-sync' && req.method === 'POST') {
+      try { const result = await clientChannel.report(req, JSON.parse(await readBody(req))); res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(result)) }
+      catch (error: any) { res.writeHead(400); res.end(JSON.stringify({ message: error.message })) }
       return
     }
 
@@ -1407,12 +1382,12 @@ const handleStartServer = async (port = 9527, ip = '0.0.0.0') => await new Promi
         await songFileStatus({ req, res, pathname, urlObj, ip }, serverRuntime, songFileStatusService)
         return
       }
-      if (pathname === '/api/music/storage/list') {
+      if (pathname === '/api/music/storage/list' || pathname === '/api/music/storage/playback' || pathname === '/api/music/storage/queue') {
         await browserList(req, res, {
           verifyUser: verifyUserAuth,
           userDirectory: username => path.join(global.lx.userPath, getUserDirname(username)),
           service: new BrowserStorageService(new BrowserStorageRepository(repositories().music)),
-        })
+        }, pathname.endsWith('/playback') ? 'playback' : pathname.endsWith('/queue') ? 'queue' : 'list')
         return
       }
       if (pathname === '/api/music/playlists/import' && req.method === 'POST') {
@@ -1547,6 +1522,14 @@ enabled?: boolean } = {}
 
       // [新增] Get User List (User Auth)
       // [新增] Get User List (User Auth)
+      if (pathname === '/api/user/list/meta' && req.method === 'GET') {
+        await musicPlaylistController.getUserListMeta({ req, res, pathname, urlObj, ip }, serverRuntime)
+        return
+      }
+      if (pathname === '/api/user/list/songs' && req.method === 'GET') {
+        await musicPlaylistController.getUserListSongs({ req, res, pathname, urlObj, ip }, serverRuntime)
+        return
+      }
       if (pathname === '/api/user/list' && req.method === 'GET') {
         await musicPlaylistController.getUserList({ req, res, pathname, urlObj, ip }, serverRuntime)
         return
@@ -1674,7 +1657,7 @@ enabled?: boolean } = {}
       // ─────────────────────────────────────────────────────────────────────
 
 
-      if (['/api/user/appearance', '/api/user/appearance/background', '/api/user/recent', '/api/music/library/search', '/api/music/library/avatar', '/api/music/artwork'].includes(pathname)) {
+      if (['/api/user/appearance', '/api/user/appearance/background', '/api/user/notifications', '/api/user/notifications/read', '/api/user/recent', '/api/user/roaming/weights', '/api/music/library/search', '/api/music/library/avatar', '/api/music/artwork'].includes(pathname)) {
         await handleExperience({ req, res, pathname, urlObj, ip }, serverRuntime)
         return
       }
@@ -1911,6 +1894,42 @@ enabled?: boolean } = {}
       }
 
       // 7. Get Detailed Cache List
+      if (pathname === '/api/music/directories/check' && req.method === 'POST') {
+        if (req.headers['x-frontend-auth'] !== global.lx.config['frontend.password']) { res.writeHead(401); res.end('Unauthorized'); return }
+        try { const body = JSON.parse(await readBody(req)); const directory = await checkDirectory(body.path); res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ success: true, path: directory, message: '目录读写检测通过' })) }
+        catch (error: any) { res.writeHead(422, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ success: false, message: error.message })) }
+        return
+      }
+      if (pathname === '/api/music/server-download/remove' && req.method === 'POST') {
+        const username = verifyUserAuth(req)
+        if (!username) { res.writeHead(401); res.end('Unauthorized'); return }
+        try { const body = JSON.parse(await readBody(req)); if (!Array.isArray(body.ids) || body.ids.some((id: any) => typeof id !== 'string')) throw new Error('文件标识格式错误'); const deletedCount = serverDownloads.removeLibraryItems(body.ids, username); res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ success: true, deletedCount })) }
+        catch (error: any) { res.writeHead(400, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ success: false, message: error.message })) }
+        return
+      }
+      if (pathname === '/api/music/maintenance' && (req.method === 'GET' || req.method === 'POST')) {
+        const publicRequest = req.headers['x-user-name'] === '_open' || !verifyUserAuth(req) && adminAuthenticated
+        const username = publicRequest ? adminAuthenticated ? '_open' : null : verifyUserAuth(req)
+        const send = (code: number, value: unknown) => { res.writeHead(code, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(value)) }
+        if (!username) { send(401, { success: false, message: '请登录后维护歌曲' }); return }
+        try {
+          if (req.method === 'GET') send(200, { success: true, tasks: getMusicTasks(username) })
+          else send(202, { success: true, task: await startMaintenance(username, JSON.parse(await readBody(req)), publicRequest && adminAuthenticated) })
+        } catch (error: any) { send(error.statusCode || 400, { success: false, message: error.message }) }
+        return
+      }
+      if (pathname === '/api/music/library/scan' && (req.method === 'GET' || req.method === 'POST')) {
+        const username = req.headers['x-user-name'] === '_open' ? adminAuthenticated ? '_open' : null : verifyUserAuth(req) || (adminAuthenticated ? '_open' : null)
+        if (!username) { res.writeHead(401); res.end('Unauthorized'); return }
+        const mode = urlObj.searchParams.get('mode') || 'full'
+        if (req.method === 'POST' && !['quick', 'full'].includes(mode)) { res.writeHead(400); res.end('Invalid scan mode'); return }
+        const scan = req.method === 'POST' ? customMusicManager.ensureMusicScan(username, true, mode as 'quick' | 'full') : customMusicManager.getScanStatus(username)
+        res.writeHead(req.method === 'POST' ? 202 : 200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify({ success: true, scan })); return
+      }
+      if (pathname === '/api/music/cache/page' && req.method === 'GET') {
+        await musicPlaylistController.getMusicCachePage({ req, res, pathname, urlObj, ip }, serverRuntime)
+        return
+      }
       if (pathname === '/api/music/cache/list' && req.method === 'GET') {
         await musicPlaylistController.getMusicCacheList({ req, res, pathname, urlObj, ip }, serverRuntime)
         return
@@ -1930,6 +1949,10 @@ enabled?: boolean } = {}
 
       // ===== [新增] Custom Music APIs (独立于 cache/music) =====
       // A. 获取自定义目录歌曲列表
+      if (pathname === '/api/music/custom/page' && req.method === 'GET') {
+        await musicPlaylistController.getMusicCustomPage({ req, res, pathname, urlObj, ip }, serverRuntime)
+        return
+      }
       if (pathname === '/api/music/custom/list' && req.method === 'GET') {
         await musicPlaylistController.getMusicCustomList({ req, res, pathname, urlObj, ip }, serverRuntime)
         return
@@ -1990,7 +2013,6 @@ enabled?: boolean } = {}
         return
       }
 
-      // [New] WebDAV/Base Location switch
       if (pathname === '/api/music/cache/switch-base' && req.method === 'POST') {
         await musicDownloadController.postMusicCacheSwitchBase({ req, res, pathname, urlObj, ip }, serverRuntime)
         return
@@ -2143,6 +2165,20 @@ enabled?: boolean } = {}
 
       // [新增] 音乐 URL API
       if (pathname === '/api/music/url' && req.method === 'POST') {
+        const reqId = req.headers['x-req-id'] as string
+        const device = req.headers['x-browser-device'] as string
+        const owner = verifyUserAuth(req)
+        if (owner && device && /^[\w-]{1,128}$/.test(reqId || '')) {
+          // 复用原解析进度出口，原控制器的音源选择和重试规则保持不变。
+          const relay = { write(chunk: string) {
+            for (const line of String(chunk).split('\n')) if (line.startsWith('data:')) {
+              try { clientChannel.publish(owner, 'resolve-progress', { reqId, attempt: JSON.parse(line.slice(5)) }, device) } catch {}
+            }
+            return true
+          } } as unknown as http.ServerResponse
+          musicProgressClients.set(reqId, relay)
+          res.once('finish', () => { if (musicProgressClients.get(reqId) === relay) musicProgressClients.delete(reqId) })
+        }
         await musicDiscoveryController.postMusicUrl({ req, res, pathname, urlObj, ip }, serverRuntime)
         return
       }
@@ -2351,57 +2387,12 @@ enabled?: boolean } = {}
         return
       }
 
-      // WebDAV Test Connection API
-      if (pathname === '/api/webdav/test' && req.method === 'POST') {
-        await adminBackupController.postWebdavTest({ req, res, pathname, urlObj, ip }, serverRuntime)
-        return
-      }
 
-      // WebDAV Sync File API
-      if (pathname === '/api/webdav/sync-file' && req.method === 'POST') {
-        await adminBackupController.postWebdavSyncFile({ req, res, pathname, urlObj, ip }, serverRuntime)
-        return
-      }
 
-      // WebDAV Backup API
-      if (pathname === '/api/webdav/backup' && req.method === 'POST') {
-        await adminBackupController.postWebdavBackup({ req, res, pathname, urlObj, ip }, serverRuntime)
-        return
-      }
-      // WebDAV Sync All Files API
-      if (pathname === '/api/webdav/sync' && req.method === 'POST') {
-        await adminBackupController.postWebdavSync({ req, res, pathname, urlObj, ip }, serverRuntime)
-        return
-      }
 
-      // WebDAV Backups List API
-      if (pathname === '/api/webdav/backups' && req.method === 'GET') {
-        await adminBackupController.getWebdavBackups({ req, res, pathname, urlObj, ip }, serverRuntime)
-        return
-      }
 
-      // WebDAV Delete Backup API
-      if (pathname === '/api/webdav/backup' && req.method === 'DELETE') {
-        await adminBackupController.deleteWebdavBackup({ req, res, pathname, urlObj, ip }, serverRuntime)
-        return
-      }
 
-      // WebDAV Restore API
-      if (pathname === '/api/webdav/restore' && req.method === 'POST') {
-        await adminBackupController.postWebdavRestore({ req, res, pathname, urlObj, ip }, serverRuntime)
-        return
-      }
 
-      // WebDAV Logs API
-      if (pathname === '/api/webdav/logs' && req.method === 'GET') {
-        await adminBackupController.getWebdavLogs({ req, res, pathname, urlObj, ip }, serverRuntime)
-        return
-      }
-      // WebDAV Progress SSE API
-      if (pathname === '/api/webdav/progress' && req.method === 'GET') {
-        await adminBackupController.getWebdavProgress({ req, res, pathname, urlObj, ip }, serverRuntime)
-        return
-      }
       // [新增] 本地备份下载 API
       if (pathname === '/api/backup/download' && req.method === 'GET') {
         await adminBackupController.getBackupDownload({ req, res, pathname, urlObj, ip }, serverRuntime)
@@ -2540,52 +2531,19 @@ enabled?: boolean } = {}
     if (!code) return
     res.writeHead(code)
     res.end(msg)
-  })
+  }
+  const httpServer = http.createServer(requestHandler)
+  const clientChannel = new ClientChannel(requestHandler, verifyUserAuth, req => userSessions.get((req.headers['x-user-token'] as string) || parseCookies(req.headers.cookie)[USER_SESSION_COOKIE]), username => path.join(global.lx.userPath, getUserDirname(username)))
+  httpServer.on('close', () => clientChannel.close())
+  httpServer.on('close', startNotificationPersistence())
+  installLibraryReadGuard(httpServer)
+  httpServer.on('close', () => { void stopLibraryBackground().catch(error => console.error('[音乐库] 停止失败', error)) })
 
   wss = new WebSocketServer({
     noServer: true,
     perMessageDeflate: false,
   }) as unknown as LX.SocketServer
 
-  // WebDAV Sync Progress & Log Broadcast
-  if (global.lx.webdavSync) {
-    // 移除旧的监听器以防重复添加
-    global.lx.webdavSync.removeAllListeners('progress')
-    global.lx.webdavSync.removeAllListeners('log')
-
-    global.lx.webdavSync.on('progress', (data: any) => {
-      // Broadcast to WebSocket clients
-      if (wss) {
-        const msg = JSON.stringify({ type: 'webdav_progress', data })
-        for (const client of wss.clients) {
-          if (client.readyState === WebSocket.OPEN) {
-            client.send(msg)
-          }
-        }
-      }
-      // Broadcast to SSE clients
-      const sseMsg = `data: ${JSON.stringify(data)}\n\n`
-      for (const client of sseClients) {
-        client.write(sseMsg)
-      }
-    })
-
-    global.lx.webdavSync.on('log', (log: any) => {
-      const data = { type: 'sync_log', log }
-      if (wss) {
-        const msg = JSON.stringify({ type: 'webdav_log', data })
-        for (const client of wss.clients) {
-          if (client.readyState === WebSocket.OPEN) {
-            client.send(msg)
-          }
-        }
-      }
-      const sseMsg = `data: ${JSON.stringify(data)}\n\n`
-      for (const client of sseClients) {
-        client.write(sseMsg)
-      }
-    })
-  }
 
   wss.on('connection', function (socket: any, request) {
     socket.isReady = false
@@ -2706,6 +2664,12 @@ enabled?: boolean } = {}
 
   httpServer.on('upgrade', function upgrade(request, socket, head) {
     socket.addListener('error', onSocketError)
+    if (new URL(request.url || '/', 'http://localhost').pathname === '/api/music/client-channel') {
+      const origin = request.headers.origin
+      try { if (origin && new URL(origin).host !== request.headers.host) { socket.destroy(); return } }
+      catch { socket.destroy(); return }
+      clientChannel.sockets.handleUpgrade(request, socket, head, ws => clientChannel.connect(ws, request)); return
+    }
 
     // 调用全局定义的 authConnection (在文件顶部约113行已经定义过)
     authConnection(request, (err, success) => {
@@ -2876,10 +2840,10 @@ const startSubsonicStandaloneServer = () => {
  * 初始化公共账号默认数据、音乐 SDK、音源、缓存与下载解析器，再启动监听和任务调度。
  * @param port HTTP 监听端口。
  * @param ip 服务绑定地址。
- * @author jingyh
+ * @author yahyaoo
  */
 export const startServer = async (port: number, ip: string) => {
-  // 监听前持久化公共账号默认文档；数据库故障时不启动未初始化的服务。 @author jingyh
+  // 监听前持久化公共账号默认文档；数据库故障时不启动未初始化的服务。 @author yahyaoo
   const openUserSpace = getUserSpace('_open')
   await openUserSpace.listManage.listDataManage.initPromise
   // Initialize file cache settings from global config
@@ -3019,6 +2983,7 @@ export const startServer = async (port: number, ip: string) => {
     // console.log('sync server started')
     status.status = true
     status.message = ''
+    startLibraryBackground()
     scheduler.startScheduler()
     status.address = ip == '0.0.0.0' ? getAddress() : [ip]
 

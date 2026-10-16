@@ -1,6 +1,6 @@
 /** 账号资料与修改密码界面，设置页和弹窗共用认证请求。 @author jingyh @date 2026-10-11 */
 (() => {
-    let avatarUrl;
+    let avatarUrl, currentProfile;
     const renderAvatar = (container, url) => {
         if (!container) return;
         container.replaceChildren();
@@ -16,6 +16,7 @@
         return result;
     };
     const update = async profile => {
+        currentProfile = profile;
         document.getElementById('account-username').value = profile.username;
         document.getElementById('account-nickname').value = profile.nickname || profile.username;
         window.accountProfileNickname = profile.nickname || profile.username;
@@ -30,7 +31,11 @@
         renderAvatar(document.querySelector('#header-account-trigger .header-avatar'), avatarUrl);
     };
     window.loadAccountProfile = async () => {
-        try { await update(await request('/api/user/account')); }
+        try {
+            const profile = await request('/api/user/account');
+            const pending = await window.ClientSync?.read('account-profile');
+            await update({ ...profile, ...pending });
+        }
         catch (error) { document.getElementById('account-profile-status').textContent = error.message; }
     };
     window.openAccountSettings = async password => {
@@ -68,10 +73,22 @@
     window.closeAccountPasswordDialog = () => passwordDialog?.close();
     window.saveAccountProfile = async event => {
         event.preventDefault(); const button = event.submitter; if (button) button.disabled = true;
+        if (window.ClientSync && currentProfile) {
+            const nickname = document.getElementById('account-nickname').value.trim();
+            if (nickname.length > 40) { document.getElementById('account-profile-status').textContent = '用户名最多 40 字'; if (button) button.disabled = false; return; }
+            window.ClientSync.seed('account-profile', { nickname: currentProfile.nickname });
+            await window.ClientSync.update('account-profile', { nickname });
+            await update({ ...currentProfile, nickname });
+            document.getElementById('account-profile-status').textContent = '用户名已保存'; if (button) button.disabled = false; return;
+        }
         try { await update(await request('/api/user/account', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nickname: document.getElementById('account-nickname').value }) })); document.getElementById('account-profile-status').textContent = '用户名已保存'; }
         catch (error) { document.getElementById('account-profile-status').textContent = error.message; }
         finally { if (button) button.disabled = false; }
     };
+    window.ClientSync?.register('account-profile', async (snapshot, context) => {
+        const response = await fetch('/api/user/account', { method: 'PUT', headers: context.headers, body: JSON.stringify(snapshot) });
+        if (!response.ok) throw new Error('账号资料保存失败');
+    });
     window.uploadAccountAvatar = async input => {
         const file = input.files[0]; if (!file) return;
         try { if (file.size > 2 * 1024 * 1024) throw new Error('头像不能超过 2 MB'); const cropped = await window.AvatarCropper.edit(file); if (!cropped) return; await update(await request('/api/user/account/avatar', { method: 'POST', body: cropped })); document.getElementById('account-profile-status').textContent = '头像已更新'; }
@@ -84,7 +101,7 @@
         const password = document.getElementById(prefix + '-new-password').value;
         if (password !== document.getElementById(prefix + '-confirm-password').value) { status.textContent = '两次输入的新密码不一致'; return; }
         const button = event.submitter; if (button) button.disabled = true;
-        try { await request('/api/user/account/password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ currentPassword: document.getElementById(prefix + '-current-password').value, newPassword: password }) }); document.getElementById(prefix + '-password-form').reset(); status.textContent = '密码已修改，请重新登录'; await handleSyncLogout(true); }
+        try { await window.prepareClientLogout?.(); await request('/api/user/account/password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ currentPassword: document.getElementById(prefix + '-current-password').value, newPassword: password }) }); document.getElementById(prefix + '-password-form').reset(); status.textContent = '密码已修改，请重新登录'; await handleSyncLogout(true, true); }
         catch (error) { status.textContent = error.message; }
         finally { if (button) button.disabled = false; }
     };

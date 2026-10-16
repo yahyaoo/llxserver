@@ -1,0 +1,68 @@
+/* 统一加载动画，使用主题文字色保证黑白及自定义主题可读。 @author jingyh @date 2026-10-12 */
+.lx-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    width: 100%;
+    padding: 32px 20px;
+    color: var(--text-main, var(--text-primary, #334155));
+    text-align: center;
+    grid-column: 1 / -1;
+}
+.lx-loading--page { flex: 1; min-height: clamp(220px, 45dvh, 420px); }
+.lx-loading--section { min-height: 180px; }
+.lx-loading-art { position: relative; display: grid; place-items: center; width: 72px; height: 72px; flex-shrink: 0; }
+.lx-loading-art::before {
+    content: ''; position: absolute; inset: 0; border-radius: 50%;
+    border: 2px solid color-mix(in srgb, currentColor 12%, transparent);
+    border-top-color: currentColor; border-right-color: color-mix(in srgb, currentColor 45%, transparent);
+    animation: lx-loading-orbit 1.6s linear infinite;
+}
+.lx-loading-bars { display: flex; align-items: center; justify-content: center; gap: 4px; height: 32px; }
+.lx-loading-bars > span { width: 4px; height: 24px; border-radius: 4px; background: currentColor; transform: scaleY(.3); animation: lx-loading-wave 1s ease-in-out infinite; }
+.lx-loading-bars > span:nth-child(2) { animation-delay: -.8s; }
+.lx-loading-bars > span:nth-child(3) { animation-delay: -.6s; }
+.lx-loading-bars > span:nth-child(4) { animation-delay: -.4s; }
+.lx-loading-bars > span:nth-child(5) { animation-delay: -.2s; }
+.lx-loading-label { max-width: 100%; font-size: 13px; line-height: 1.7; font-weight: 500; overflow-wrap: anywhere; }
+.lx-loading--inline { display: inline-flex; flex-direction: row; gap: 8px; width: auto; min-height: 0; padding: 0; text-align: inherit; vertical-align: middle; color: inherit; }
+.lx-loading.lx-loading--inline .lx-loading-art { width: 18px; height: 18px; }
+.lx-loading--inline .lx-loading-bars { height: 10px; gap: 1px; }
+.lx-loading--inline .lx-loading-bars > span { width: 1.5px; height: 8px; }
+.lx-loading--inline .lx-loading-art::before { border-width: 1px; }
+.lx-loading--inline .lx-loading-label { font-size: inherit; font-weight: inherit; }
+/* 列表本身仍由业务渲染；只有加载占位存在时，让其占满剩余空间。 */
+:where(#search-results, #songlist-container, #lm-list-container, #sl-detail-list, #lb-songs-list, #artist-detail-content, #user-playlist-container):has(> .lx-loading--page) { display: flex; flex-direction: column; justify-content: center; }
+.recent-view:not(.hidden):has(#recent-list > .lx-loading--page) { display: flex; flex-direction: column; }
+#recent-list:has(> .lx-loading--page) { flex: 1; display: flex; min-height: 0; }
+/* 旧按钮/徽标中的加载图标也统一为细线旋转，保留按钮自己的前景色。 */
+:is(.fa-spinner, .fa-circle-notch).fa-spin { display: inline-block; width: 1em; height: 1em; box-sizing: border-box; border: 2px solid color-mix(in srgb, currentColor 22%, transparent); border-top-color: currentColor; border-radius: 50%; color: inherit !important; animation: lx-loading-orbit .85s linear infinite; vertical-align: -.12em; }
+:is(.fa-spinner, .fa-circle-notch).fa-spin::before { content: none; }
+@keyframes lx-loading-orbit { to { transform: rotate(360deg); } }
+@keyframes lx-loading-wave { 0%, 100% { transform: scaleY(.3); } 50% { transform: scaleY(1); } }
+@media (max-width: 700px) { .lx-loading--page { min-height: clamp(180px, 36dvh, 340px); } .lx-loading-art { width: 60px; height: 60px; } }
+@media (prefers-reduced-motion: reduce) { .lx-loading-art::before, .lx-loading-bars > span, :is(.fa-spinner, .fa-circle-notch).fa-spin { animation: none; } .lx-loading-bars > span { transform: scaleY(.65); } }
+
+/* 加载失败沿用主题色，以安静的提示和重试入口替代原始异常文本。 */
+.lx-load-error { box-sizing: border-box; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; width: 100%; min-height: 180px; padding: 32px 20px; text-align: center; color: var(--text-main, var(--text-primary, #334155)); grid-column: 1 / -1; }
+.lx-load-error--page { flex: 1; min-height: clamp(240px, 45dvh, 420px); }
+.lx-load-error-icon { position: relative; display: grid; place-items: center; width: 72px; height: 72px; margin-bottom: 6px; border-radius: 24px; background: color-mix(in srgb, currentColor 6%, transparent); }
+.lx-load-error-icon .fa-cloud { font-size: 30px; opacity: .4; }
+.lx-load-error-icon .fa-exclamation { position: absolute; right: 16px; bottom: 14px; font-size: 17px; }
+.lx-load-error-title { max-width: 100%; font-size: 17px; font-weight: 600; line-height: 1.5; overflow-wrap: anywhere; }
+.lx-load-error-description { max-width: 320px; color: var(--text-muted, var(--text-secondary, #64748b)); font-size: 13px; line-height: 1.8; overflow-wrap: anywhere; }
+.lx-load-error-retry { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 38px; margin-top: 6px; padding: 8px 18px; border: 1px solid color-mix(in srgb, currentColor 18%, transparent); border-radius: 999px; background: color-mix(in srgb, currentColor 5%, transparent); color: inherit; font-size: 13px; font-weight: 500; cursor: pointer; transition: background .15s ease; }
+.lx-load-error-retry:hover { background: color-mix(in srgb, currentColor 10%, transparent); }
+.lx-load-error-retry:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
+.lx-load-error-retry:disabled { opacity: .5; cursor: wait; }
+.lx-load-error--inline { min-height: 0; padding: 18px 12px; gap: 8px; }
+.lx-load-error--inline .lx-load-error-icon { width: 44px; height: 44px; border-radius: 14px; }
+.lx-load-error--inline .fa-cloud { font-size: 20px; }
+.lx-load-error--inline .fa-exclamation { right: 8px; bottom: 7px; font-size: 12px; }
+.lx-load-error--inline .lx-load-error-title { font-size: 13px; }
+:where(#search-results, #lm-list-container, #lb-songs-list):has(> .lx-load-error--page) { display: flex; flex-direction: column; justify-content: center; }
+.recent-view:not(.hidden):has(#recent-list > .lx-load-error--page) { display: flex; flex-direction: column; }
+#recent-list:has(> .lx-load-error--page) { flex: 1; display: flex; min-height: 0; border: 0; }
+@media (max-width: 700px) { .lx-load-error--page { min-height: clamp(200px, 36dvh, 340px); } }
