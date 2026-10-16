@@ -2518,6 +2518,7 @@ function getQualityTags(item) {
 window.getQualityTags = getQualityTags;
 
 function getSourceTag(source) {
+    source = String(source || 'local').trim().toLowerCase();
     const colors = {
         kw: 't-badge-yellow border-yellow-200 dark:border-yellow-500/30',
         kg: 't-badge-blue border-blue-200 dark:border-blue-500/30',
@@ -14582,7 +14583,7 @@ function cleanSongData(song) {
     if (song.url) cleanSong.url = song.url;
     if (song.folder) cleanSong.folder = song.folder;
     if (song.filename) cleanSong.filename = song.filename;
-    for (const key of ['_localFilename', '_localUsername', '_localFolder', '_isCustomDir', 'customFilename', 'isCustomFile', 'serverDownloadId', 'directoryId', 'quality', 'types', 'bitDepth', 'sampleRate', 'bitrate', 'hasCover', 'coverType']) {
+    for (const key of ['_localFilename', '_localUsername', '_localFolder', '_isCustomDir', 'customFilename', 'isCustomFile', 'isCustomDir', 'serverDownloadId', 'directoryId', 'location', 'mtime', 'coverVersion', 'quality', 'types', 'bitDepth', 'sampleRate', 'bitrate', 'hasCover', 'coverType']) {
         if (song[key] !== undefined) cleanSong[key] = song[key];
     }
 

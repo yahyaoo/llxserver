@@ -7,6 +7,13 @@ const window = {}
 vm.runInNewContext(read('js/song_metadata.js'), { window })
 const metadata = window.SongMetadata
 
+test('来源标签兼容大小写与空格，本地来源始终显示中文', () => {
+  const app = read('app.js'), context = {}
+  vm.runInNewContext(app.slice(app.indexOf('function getSourceTag('), app.indexOf('window.getSourceTag = getSourceTag;')), context)
+  for (const source of ['custom', 'CUSTOM', ' Custom ', 'local', 'LOCAL']) assert.ok(context.getSourceTag(source).includes('>本地</span>'))
+  assert.doesNotThrow(() => context.getSourceTag(null))
+})
+
 test('文件大小与位深、采样率同组显示，兼容字节与平台大小字符串', () => {
   assert.deepEqual(Array.from(metadata.values({ size: 26.3 * 1024 * 1024, bitDepth: 24, sampleRate: 96000, bitrate: 320 })), ['26.3 MB', '24bit', '96kHz', '320kbps'])
   assert.deepEqual(Array.from(metadata.values({ meta: { size: '26.3M', bitDepth: 16, sampleRate: 44100 } })), ['26.3 MB', '16bit', '44.1kHz'])
@@ -28,6 +35,11 @@ test('归一化和本地收藏保留实际文件参数', () => {
   vm.runInNewContext(app.slice(app.indexOf('function cleanSongData(song)'), app.indexOf('// Modified handler for Grid Buttons')), context)
   const song = context.cleanSongData({ id: 'wy_1', songmid: '1', source: 'wy', name: '测试', size: 4096, bitDepth: 24, sampleRate: 192000 })
   assert.deepEqual(Array.from(metadata.values(song)), ['4 KB', '24bit', '192kHz'])
+  const local = context.cleanSongData({ id: 'custom_one', source: 'custom', filename: '@dir/a.flac', folder: 'custom', isCustomDir: true, location: 'root', coverVersion: 'v2', mtime: 123 })
+  assert.equal(local.isCustomDir, true)
+  assert.equal(local.location, 'root')
+  assert.equal(local.coverVersion, 'v2')
+  assert.equal(local.mtime, 123)
 })
 
 test('加入歌单只列普通歌单，喜爱页隐藏搜索，所有歌曲行操作列没有播放键', () => {

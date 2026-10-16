@@ -23,7 +23,7 @@
         const song = info(item), name = filename(song);
         if (song.serverDownloadId) return JSON.stringify(['download', text(song.serverDownloadId)]);
         if (!name) return null;
-        return JSON.stringify(['file', text(song._localUsername || song.username), text(song.folder || song._localFolder || (song.isCustomDir || song._isCustomDir ? 'custom' : 'music')), text(song.location), name]);
+        return JSON.stringify(['file', text(song._localUsername || song.username), text(song.folder || song._localFolder || (song.isCustomDir || song._isCustomDir || song.isCustomFile || song.customFilename ? 'custom' : 'music')), text(song.location), name]);
     }
     const priorities = { '128k': 1, '192k': 2, '320k': 3, flac: 5, wav: 5, ape: 5, flac24bit: 6, hires: 7, atmos: 8, atmos_plus: 9, master: 10 };
     function rank(item) {

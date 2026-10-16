@@ -3,6 +3,12 @@ const {test}=require('node:test'),assert=require('node:assert/strict');
 const identity=require('../client/music/js/song_identity.js');
 const fs=require('node:fs'),vm=require('node:vm');
 const song=(extra={})=>({id:'wy_123',songmid:'123',source:'wy',name:'歌曲',singer:'歌手',filename:'歌曲.flac',folder:'cache',quality:'flac',...extra});
+test('旧歌单自定义文件与当前目录索引使用同一个文件身份',()=>{
+ const legacy={source:'custom',id:'custom_one',customFilename:'@dir/歌曲.mp3',isCustomFile:true};
+ const indexed={...legacy,customFilename:undefined,isCustomFile:undefined,filename:legacy.customFilename,folder:'custom'};
+ assert.equal(identity.fileKey(legacy),identity.fileKey(indexed));
+ assert.equal(identity.fileKey({...legacy,folder:'cache'}),identity.fileKey({...indexed,folder:'cache'}));
+});
 test('同曲聚合全部位置和音质，默认最高音质；相同音质下载优先',()=>{
  const cache=song({bitDepth:24,quality:'flac24bit'}),download=song({folder:'download',serverDownloadId:'download1',quality:'flac'});
  const groups=identity.aggregate([download,cache,{...cache}]);assert.equal(groups.length,1);assert.equal(groups[0].folder,'cache');assert.equal(groups[0].files.length,2);

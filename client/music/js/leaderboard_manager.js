@@ -267,6 +267,7 @@ window.LeaderboardManager = (function () {
             `;
         }).join('');
 
+        if (window.LibraryArtwork) container.querySelectorAll('.song-cover img').forEach((image, index) => window.LibraryArtwork.bind(image, pageList[index].item));
         window.SongFileStatus?.update(container, pageList.map(obj => obj.item));
 
         if (typeof window.lazyLoadImages === 'function') window.lazyLoadImages();

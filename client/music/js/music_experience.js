@@ -29,8 +29,8 @@
         if (!filename && !song.serverDownloadId) return song;
         const username = accountName();
         const token = window.getUserAuthHeaders()['x-user-token'];
-        const folder = song.folder || song._localFolder || 'music';
-        const custom = song.isCustomDir || song._isCustomDir || song.isCustomFile || folder === 'custom';
+        const folder = song.folder || song._localFolder || (song.isCustomDir || song._isCustomDir || song.isCustomFile || song.customFilename ? 'custom' : 'music');
+        const custom = folder === 'custom';
         const params = new URLSearchParams({ folder });
         if (song.location) params.set('location', song.location);
         if (token) params.set('token', token);
@@ -66,12 +66,12 @@
         const fields = value => {
             for (const url of [value.meta?.picUrl, value.img, value.pic, value.picUrl, value.picture, value.meta?.img, value.meta?.pic, value.meta?.albumPic, value.meta?.cover, value.album?.picUrl, value.album?.img, value.album?.pic, value.album?.cover, value.al?.picUrl, value.al?.img, value.otherSource?.meta?.picUrl]) add(url);
         };
-        const filename = song.filename || song._localFilename;
+        const filename = song.filename || song._localFilename || song.customFilename;
         if (filename && !(song.hasCover === false && song.coverType === 'none') && song.folder !== 'download') {
-            const folder = song.folder || song._localFolder || 'music';
-            const params = new URLSearchParams({ filename, user: accountName(), folder, v: String(song.mtime || '') });
+            const folder = song.folder || song._localFolder || (song.isCustomDir || song._isCustomDir || song.isCustomFile || song.customFilename ? 'custom' : 'music');
+            const params = new URLSearchParams({ filename, user: accountName(), folder, v: String(song.coverVersion || song.mtime || '') });
             if (song.location) params.set('location', song.location);
-            add(`/api/music/${song.isCustomDir || song._isCustomDir || folder === 'custom' ? 'custom' : 'cache'}/cover?${params}`);
+            add(`/api/music/${folder === 'custom' ? 'custom' : 'cache'}/cover?${params}`);
         }
         fields(song);
         // 旧历史丢失封面时按平台和歌曲标识补齐；不读取页面 DOM，也不跨账号取数据。
@@ -85,12 +85,13 @@
         }
         const remote = candidates.filter(url => /^https?:\/\//.test(url));
         // 即使旧记录丢失图片字段，也按歌曲标识读取已落盘的封面。
-        if (song.source && !['custom','local'].includes(song.source) && song.id != null) {
+        if (song.source && song.id != null) {
             const params = new URLSearchParams({ source: song.source, id: String(song.id), user: accountName() });
             for (const url of remote.slice(0, 8)) params.append('url', url);
             const auth = window.getUserAuthHeaders?.() || {};
             if (auth['x-user-token']) params.set('token', auth['x-user-token']);
-            candidates.splice(filename ? 1 : 0, 0, '/api/music/artwork?' + params);
+            const local = candidates.filter(url => !/^https?:\/\//i.test(url));
+            candidates.splice(0, candidates.length, ...local, '/api/music/artwork?' + params);
         }
         return candidates;
     };
@@ -98,7 +99,9 @@
     /** 保存和下载元数据优先保留音源地址；运行时认证参数不进入歌单或任务文档。 */
     const coverReference = item => {
         const candidates = coverCandidates(item);
-        const value = candidates.find(url => /^https?:\/\//.test(url)) || candidates[0];
+        const cached = candidates.find(url => url.startsWith('/api/music/artwork?'));
+        const remote = cached && new URL(cached, location.origin).searchParams.get('url');
+        const value = remote || candidates.find(url => /^https?:\/\//.test(url)) || candidates[0];
         if (!value) return null;
         if (!value.startsWith('/api/music/')) return value;
         const url = new URL(value, location.origin);

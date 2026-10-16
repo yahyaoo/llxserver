@@ -618,7 +618,7 @@ window.SongListManager = (function () {
                     <!-- Title & Info -->
                     <div class="col-span-7 sm:col-span-5 md:col-span-4 lg:col-span-5 flex items-center gap-3 min-w-0 pr-2">
                         <div class="w-8 h-8 flex-shrink-0 rounded-lg overflow-hidden shadow-sm border t-border-main">
-                            <img src="${window.getImgUrl ? window.getImgUrl(song) : (song.img || song.albumImg || '/music/assets/logo.svg')}"
+                            <img data-src="${window.getImgUrl ? window.getImgUrl(song) : (song.img || song.albumImg || '/music/assets/logo.svg')}" src="/music/assets/logo.svg"
                                  class="w-full h-full object-cover dynamic-logo"
                                  onerror="this.src='/music/assets/logo.svg'">
                         </div>
@@ -639,6 +639,7 @@ window.SongListManager = (function () {
                     <div class="col-span-4 sm:col-span-1 md:col-span-2 lg:col-span-3"></div>
                 </div>
                 `;
+                window.LibraryArtwork?.bind(template.content.querySelector('img'), song);
                 fragment.appendChild(template.content); return;
             }
 
@@ -719,7 +720,9 @@ window.SongListManager = (function () {
                     </button>
                 </div>
             </div>
-        `; fragment.appendChild(template.content);
+        `;
+        window.LibraryArtwork?.bind(template.content.querySelector('img'), song);
+        fragment.appendChild(template.content);
         }, batch => {
             Array.from(listContainer.children).slice(-batch.length).forEach(row => window.lazyLoadImages?.(row));
         });
